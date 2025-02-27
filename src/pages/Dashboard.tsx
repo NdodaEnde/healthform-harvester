@@ -71,8 +71,33 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [documents, setDocuments] = useState(mockDocuments);
   
-  const filteredDocuments = mockDocuments.filter(doc => {
+  // Store processed document data in sessionStorage to access in DocumentViewer
+  const saveDocumentData = (data: any) => {
+    if (data) {
+      sessionStorage.setItem(`document-${data.id}`, JSON.stringify(data));
+    }
+  };
+  
+  const handleUploadComplete = (data?: any) => {
+    setIsUploadDialogOpen(false);
+    
+    if (data) {
+      // Add the new document to the list
+      const newDocuments = [data, ...documents];
+      setDocuments(newDocuments);
+      
+      // Save the document data for retrieval in DocumentViewer
+      saveDocumentData(data);
+      
+      toast.success("Document uploaded and processed", {
+        description: "You can now view the extracted data"
+      });
+    }
+  };
+  
+  const filteredDocuments = documents.filter(doc => {
     if (selectedTab !== "all" && doc.status !== selectedTab) {
       return false;
     }
@@ -81,8 +106,8 @@ const Dashboard = () => {
       return (
         doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.patientId.toLowerCase().includes(searchQuery.toLowerCase())
+        (doc.patientName && doc.patientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (doc.patientId && doc.patientId.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
     
@@ -94,8 +119,13 @@ const Dashboard = () => {
   };
 
   const handleDeleteDocument = (docId: string) => {
+    const updatedDocuments = documents.filter(doc => doc.id !== docId);
+    setDocuments(updatedDocuments);
+    
+    // Remove from sessionStorage
+    sessionStorage.removeItem(`document-${docId}`);
+    
     toast.success("Document deleted successfully");
-    // In a real application, you would delete the document from your database/storage
   };
 
   return (
@@ -155,10 +185,7 @@ const Dashboard = () => {
                 <DialogHeader>
                   <DialogTitle>Upload Document</DialogTitle>
                 </DialogHeader>
-                <DocumentUploader onUploadComplete={() => {
-                  setIsUploadDialogOpen(false);
-                  toast.success("Document uploaded and processing started");
-                }} />
+                <DocumentUploader onUploadComplete={handleUploadComplete} />
               </DialogContent>
             </Dialog>
           </div>
@@ -223,7 +250,7 @@ const Dashboard = () => {
                                   <FileText className="h-5 w-5 text-muted-foreground" />
                                   <div>
                                     <CardTitle className="text-lg">{doc.name}</CardTitle>
-                                    <CardDescription>{doc.patientName} | {doc.patientId}</CardDescription>
+                                    <CardDescription>{doc.patientName || "Unknown"} | {doc.patientId || "No ID"}</CardDescription>
                                   </div>
                                 </div>
                                 <Badge variant={

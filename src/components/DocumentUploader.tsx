@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
 type DocumentUploaderProps = {
-  onUploadComplete: () => void;
+  onUploadComplete: (data?: any) => void;
 };
 
 const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
@@ -81,32 +81,28 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     setIsUploading(true);
     setUploadProgress(0);
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
+    // Create a simulated progress indicator
+    const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
-        const newProgress = prev + 10;
-        if (newProgress >= 100) {
-          clearInterval(interval);
-          
-          // Simulate processing time after upload completes
-          setTimeout(() => {
-            setIsUploading(false);
-            onUploadComplete();
-          }, 500);
-          
-          return 100;
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90; // Hold at 90% until API response
         }
-        return newProgress;
+        return prev + 5;
       });
     }, 300);
 
-    // In a real application, you would upload the file to your server here using the API
-    // Example code using fetch:
-    /*
-    const formData = new FormData();
-    formData.append(file.type.includes('pdf') ? 'pdf' : 'image', file);
-    
+    // Using the actual API
     try {
+      const formData = new FormData();
+      
+      // Append the file with the correct key based on type
+      if (file.type.includes('pdf')) {
+        formData.append('pdf', file);
+      } else {
+        formData.append('image', file);
+      }
+      
       const response = await fetch('https://api.va.landing.ai/v1/tools/agentic-document-analysis', {
         method: 'POST',
         body: formData,
@@ -115,23 +111,55 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         },
       });
       
+      setUploadProgress(95);
+      
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log(data);
+      console.log("API Response:", data);
       
-      onUploadComplete();
+      // Process the data to match our expected format
+      // We would need to transform the API response to match our expected structure
+      const processedData = {
+        id: `doc-${Date.now()}`,
+        name: file.name,
+        type: documentType === "medical-questionnaire" 
+          ? "Medical Examination Questionnaire" 
+          : "Certificate of Fitness",
+        uploadedAt: new Date().toISOString(),
+        status: "processed",
+        patientName: "Extracted from document", // Would be extracted from the API response
+        patientId: "Extracted from document", // Would be extracted from the API response
+        imageUrl: URL.createObjectURL(file), // Create a local URL for the file
+        extractedData: data, // Store the raw API response for now
+        jsonData: JSON.stringify(data, null, 2) // Formatted JSON string
+      };
+      
+      setUploadProgress(100);
+      
+      // Delay completion to show 100% progress
+      setTimeout(() => {
+        setIsUploading(false);
+        onUploadComplete(processedData);
+        
+        toast.success("Document processed successfully", {
+          description: "Your document has been processed using AI extraction."
+        });
+      }, 500);
+      
     } catch (error) {
       console.error('Error uploading file:', error);
+      
       toast.error('Upload failed', {
         description: 'There was an error processing your document. Please try again.'
       });
-    } finally {
+      
       setIsUploading(false);
+      clearInterval(progressInterval);
+      setUploadProgress(0);
     }
-    */
   };
 
   const removeFile = () => {
@@ -195,7 +223,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                     Drag and drop your file here, or click to browse
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your document will be securely processed
+                    Your document will be securely processed with AI extraction
                   </p>
                 </div>
                 <Button 
@@ -230,7 +258,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                       <div>
                         <p className="font-medium text-sm">{file.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {uploadProgress === 100 ? "Processing document..." : "Uploading..."}
+                          {uploadProgress >= 95 ? "Processing document with AI..." : "Uploading to API..."}
                         </p>
                       </div>
                     </div>
@@ -290,12 +318,12 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           {isUploading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {uploadProgress === 100 ? "Processing..." : "Uploading..."}
+              {uploadProgress >= 95 ? "Processing..." : "Uploading..."}
             </>
           ) : (
             <>
               <FileCheck className="h-4 w-4 mr-2" />
-              Process File
+              Process with AI
             </>
           )}
         </Button>
