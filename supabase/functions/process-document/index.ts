@@ -162,7 +162,7 @@ async function processDocumentWithLandingAI(file: File, documentType: string, do
     }
     
     // Update the document record with the extracted data
-    const { error: updateError } = await supabase
+    const { data: updateData, error: updateError } = await supabase
       .from('documents')
       .update({
         extracted_data: {
@@ -172,7 +172,8 @@ async function processDocumentWithLandingAI(file: File, documentType: string, do
         status: 'processed',
         processed_at: new Date().toISOString()
       })
-      .eq('id', documentId);
+      .eq('id', documentId)
+      .select();
     
     if (updateError) {
       console.error('Failed to update document with extracted data:', updateError);
@@ -180,18 +181,43 @@ async function processDocumentWithLandingAI(file: File, documentType: string, do
     }
     
     console.log(`Document processing completed for document ID: ${documentId}`);
+    console.log('Updated document record:', updateData);
+    
+    // Verify the document was updated
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single();
+      
+    if (verifyError) {
+      console.error('Error verifying document update:', verifyError);
+    } else {
+      console.log(`Verified document status is now: ${verifyData.status}`);
+    }
     
   } catch (error) {
     console.error('Document processing error:', error);
     
     // Update document status to failed with error message
-    await supabase
-      .from('documents')
-      .update({
-        status: 'failed',
-        processing_error: error.message
-      })
-      .eq('id', documentId);
+    try {
+      const { data, error: updateError } = await supabase
+        .from('documents')
+        .update({
+          status: 'failed',
+          processing_error: error.message
+        })
+        .eq('id', documentId)
+        .select();
+        
+      if (updateError) {
+        console.error('Error updating document status to failed:', updateError);
+      } else {
+        console.log('Updated document status to failed:', data);
+      }
+    } catch (updateError) {
+      console.error('Error updating document status after processing failure:', updateError);
+    }
   }
 }
 

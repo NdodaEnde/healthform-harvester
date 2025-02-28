@@ -22,6 +22,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<number | null>(null);
   const statusPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingAttemptsRef = useRef<number>(0);
 
   // Effect to check document processing status
   useEffect(() => {
@@ -30,12 +31,30 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     const checkStatus = async () => {
       try {
         console.log(`Checking status for document ID: ${processingDocumentId}`);
-        // Use maybeSingle instead of single to handle the case where no rows are returned
+        
+        // Log what tables exist in the database for debugging
+        if (pollingAttemptsRef.current === 0) {
+          console.log("First polling attempt - checking table structure");
+          const { data: tableData, error: tableError } = await supabase
+            .from('documents')
+            .select('*')
+            .limit(1);
+          
+          if (tableError) {
+            console.error('Error checking documents table:', tableError);
+          } else {
+            console.log('Documents table exists with sample data:', tableData);
+          }
+        }
+
+        // Use the from method to query the documents table
         const { data, error } = await supabase
           .from('documents')
           .select('*')
           .eq('id', processingDocumentId)
           .maybeSingle();
+        
+        pollingAttemptsRef.current++;
 
         if (error) {
           console.error('Error checking document status:', error);
@@ -45,10 +64,25 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         // If no data found, the document might not exist yet or was deleted
         if (!data) {
           console.log('Document not found, it might still be processing');
+          // After 10 attempts (30 seconds), try to get more information
+          if (pollingAttemptsRef.current > 10) {
+            console.log("Multiple polling attempts failed, checking for any documents in the table");
+            const { data: allDocs, error: allDocsError } = await supabase
+              .from('documents')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(5);
+            
+            if (allDocsError) {
+              console.error('Error fetching recent documents:', allDocsError);
+            } else {
+              console.log('Most recent documents in database:', allDocs);
+            }
+          }
           return;
         }
 
-        console.log(`Document status: ${data.status}`);
+        console.log(`Document found with status: ${data.status}`, data);
 
         if (data.status === 'processed') {
           // Document processing completed successfully
@@ -142,12 +176,17 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
   // Helper function to get file URL from Supabase storage
   const getFileUrl = async (filePath: string) => {
-    const { data } = await supabase
-      .storage
-      .from('medical-documents')
-      .createSignedUrl(filePath, 3600); // 1 hour expiry
-      
-    return data?.signedUrl || null;
+    try {
+      const { data } = await supabase
+        .storage
+        .from('medical-documents')
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
+        
+      return data?.signedUrl || null;
+    } catch (error) {
+      console.error('Error getting signed URL:', error);
+      return null;
+    }
   };
 
   // Helper functions to extract patient info from extracted data
@@ -242,6 +281,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
     setIsUploading(true);
     setUploadProgress(0);
+    pollingAttemptsRef.current = 0;
 
     // Create a simulated progress indicator
     const progressInterval = setInterval(() => {
@@ -265,6 +305,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
       
       // Call the edge function
+      console.log('Calling process-document edge function with form data', {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        documentType
+      });
+      
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/process-document`,
         {
@@ -276,7 +323,10 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         }
       );
       
+      // Handle non-200 responses
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Edge function error (${response.status}):`, errorText);
         throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
       }
       
