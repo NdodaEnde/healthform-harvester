@@ -21,6 +21,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const [processingDocumentId, setProcessingDocumentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<number | null>(null);
+  const statusPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Effect to check document processing status
   useEffect(() => {
@@ -28,6 +29,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
     const checkStatus = async () => {
       try {
+        console.log(`Checking status for document ID: ${processingDocumentId}`);
         // Use maybeSingle instead of single to handle the case where no rows are returned
         const { data, error } = await supabase
           .from('documents')
@@ -46,9 +48,16 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           return;
         }
 
+        console.log(`Document status: ${data.status}`);
+
         if (data.status === 'processed') {
           // Document processing completed successfully
           clearInterval(progressIntervalRef.current!);
+          if (statusPollingRef.current) {
+            clearInterval(statusPollingRef.current);
+            statusPollingRef.current = null;
+          }
+          
           setUploadProgress(100);
           
           // Prepare document data for the parent component
@@ -81,6 +90,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         } else if (data.status === 'failed') {
           // Document processing failed
           clearInterval(progressIntervalRef.current!);
+          if (statusPollingRef.current) {
+            clearInterval(statusPollingRef.current);
+            statusPollingRef.current = null;
+          }
+          
           setIsUploading(false);
           setProcessingDocumentId(null);
           
@@ -108,13 +122,20 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       }
     };
 
-    // Check status every 2 seconds
-    const interval = setInterval(checkStatus, 2000);
-    progressIntervalRef.current = interval as unknown as number;
+    // Initial check
+    checkStatus();
+
+    // Set up polling every 3 seconds
+    const interval = setInterval(checkStatus, 3000);
+    statusPollingRef.current = interval;
 
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
+      }
+      if (statusPollingRef.current) {
+        clearInterval(statusPollingRef.current);
+        statusPollingRef.current = null;
       }
     };
   }, [processingDocumentId, documentType]);
@@ -268,11 +289,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       // Clear the progress interval from earlier
       clearInterval(progressInterval);
       
-      // Add a timeout to stop checking for status after 30 seconds
+      // Add a timeout to stop checking for status after 60 seconds
       setTimeout(() => {
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-          progressIntervalRef.current = null;
+        if (statusPollingRef.current) {
+          clearInterval(statusPollingRef.current);
+          statusPollingRef.current = null;
           
           // If we're still in uploading state, something went wrong
           if (isUploading) {
@@ -286,7 +307,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             });
           }
         }
-      }, 30000); // 30 seconds timeout
+      }, 60000); // 60 seconds timeout
       
       // Set progress to indicate processing stage
       setUploadProgress(95);

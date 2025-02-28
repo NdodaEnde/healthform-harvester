@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -16,62 +16,15 @@ import { toast } from "sonner";
 import DocumentUploader from "@/components/DocumentUploader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-
-// Mock documents data
-const mockDocuments = [
-  { 
-    id: "doc-1", 
-    name: "Medical Exam - John Doe.pdf", 
-    type: "Medical Examination Questionnaire", 
-    uploadedAt: "2023-05-15T10:30:00", 
-    status: "processed",
-    patientName: "John Doe",
-    patientId: "P10045",
-  },
-  { 
-    id: "doc-2", 
-    name: "Certificate - Sarah Smith.pdf", 
-    type: "Certificate of Fitness", 
-    uploadedAt: "2023-05-14T14:45:00", 
-    status: "processed",
-    patientName: "Sarah Smith",
-    patientId: "P10046",
-  },
-  { 
-    id: "doc-3", 
-    name: "Medical Exam - Robert Johnson.pdf", 
-    type: "Medical Examination Questionnaire", 
-    uploadedAt: "2023-05-12T09:15:00", 
-    status: "processing",
-    patientName: "Robert Johnson",
-    patientId: "P10047",
-  },
-  { 
-    id: "doc-4", 
-    name: "Certificate - Emily Brown.pdf", 
-    type: "Certificate of Fitness", 
-    uploadedAt: "2023-05-10T16:20:00", 
-    status: "processed",
-    patientName: "Emily Brown",
-    patientId: "P10048",
-  },
-  { 
-    id: "doc-5", 
-    name: "Medical Exam - Michael Wilson.pdf", 
-    type: "Medical Examination Questionnaire", 
-    uploadedAt: "2023-05-08T11:10:00", 
-    status: "failed",
-    patientName: "Michael Wilson",
-    patientId: "P10049",
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [documents, setDocuments] = useState(mockDocuments);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Store processed document data in sessionStorage to access in DocumentViewer
   const saveDocumentData = (data: any) => {
@@ -79,6 +32,69 @@ const Dashboard = () => {
       sessionStorage.setItem(`document-${data.id}`, JSON.stringify(data));
     }
   };
+  
+  const fetchDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching documents:', error);
+        return;
+      }
+      
+      if (data) {
+        // Format documents to match the UI expectations
+        const formattedDocuments = data.map(doc => ({
+          id: doc.id,
+          name: doc.file_name,
+          type: doc.document_type === 'medical-questionnaire' 
+            ? 'Medical Examination Questionnaire' 
+            : 'Certificate of Fitness',
+          uploadedAt: doc.created_at,
+          status: doc.status,
+          patientName: extractPatientName(doc.extracted_data),
+          patientId: extractPatientId(doc.extracted_data),
+        }));
+        
+        setDocuments(formattedDocuments);
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Helper functions to extract patient info from extracted data
+  const extractPatientName = (extractedData: any) => {
+    if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
+      return "Unknown";
+    }
+    return extractedData.structured_data.patient.name || "Unknown";
+  };
+  
+  const extractPatientId = (extractedData: any) => {
+    if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
+      return "No ID";
+    }
+    return extractedData.structured_data.patient.employee_id || 
+           extractedData.structured_data.patient.id || 
+           "No ID";
+  };
+  
+  useEffect(() => {
+    fetchDocuments();
+    
+    // Set up polling to refresh documents every 5 seconds
+    const interval = setInterval(() => {
+      fetchDocuments();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const handleUploadComplete = (data?: any) => {
     setIsUploadDialogOpen(false);
@@ -95,6 +111,9 @@ const Dashboard = () => {
         description: "You can now view the extracted data"
       });
     }
+    
+    // Refresh documents
+    fetchDocuments();
   };
   
   const filteredDocuments = documents.filter(doc => {
@@ -118,14 +137,32 @@ const Dashboard = () => {
     navigate(`/document/${docId}`);
   };
 
-  const handleDeleteDocument = (docId: string) => {
-    const updatedDocuments = documents.filter(doc => doc.id !== docId);
-    setDocuments(updatedDocuments);
-    
-    // Remove from sessionStorage
-    sessionStorage.removeItem(`document-${docId}`);
-    
-    toast.success("Document deleted successfully");
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      // Delete document from database
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', docId);
+      
+      if (error) {
+        console.error('Error deleting document:', error);
+        toast.error("Failed to delete document");
+        return;
+      }
+      
+      // Remove from state
+      const updatedDocuments = documents.filter(doc => doc.id !== docId);
+      setDocuments(updatedDocuments);
+      
+      // Remove from sessionStorage
+      sessionStorage.removeItem(`document-${docId}`);
+      
+      toast.success("Document deleted successfully");
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error("Failed to delete document");
+    }
   };
 
   return (
@@ -218,7 +255,14 @@ const Dashboard = () => {
               </div>
               
               <TabsContent value="all" className="mt-4">
-                {filteredDocuments.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="flex flex-col items-center">
+                      <div className="h-8 w-8 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-4"></div>
+                      <p className="text-muted-foreground">Loading documents...</p>
+                    </div>
+                  </div>
+                ) : filteredDocuments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <FileText className="h-12 w-12 text-muted-foreground mb-4" strokeWidth={1.5} />
                     <h3 className="text-xl font-medium mb-2">No documents found</h3>
@@ -284,6 +328,7 @@ const Dashboard = () => {
                                     variant="outline" 
                                     size="sm"
                                     onClick={() => {
+                                      navigator.clipboard.writeText(window.location.origin + `/document/${doc.id}`);
                                       toast.success("Document link copied to clipboard");
                                     }}
                                   >

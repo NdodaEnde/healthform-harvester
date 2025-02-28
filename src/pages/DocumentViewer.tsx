@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
-  EyeOff, FileText, AlertCircle, ClipboardCheck
+  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,8 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock document data as fallback if nothing in session storage
+// Mock document data as fallback if nothing in session storage or API fails
 const mockDocumentData = {
   id: "doc-1",
   name: "Medical Exam - John Doe.pdf",
@@ -151,29 +152,119 @@ const DocumentViewer = () => {
   const [showOriginal, setShowOriginal] = useState(true);
   const [document, setDocument] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  const fetchDocumentFromSupabase = async (documentId: string) => {
+    try {
+      // Fetch document from Supabase
+      const { data: documentData, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching document:', error);
+        return null;
+      }
+      
+      if (!documentData) {
+        return null;
+      }
+      
+      // Get file URL
+      const { data: urlData } = await supabase
+        .storage
+        .from('medical-documents')
+        .createSignedUrl(documentData.file_path, 3600); // 1 hour expiry
+      
+      // Format document for UI
+      return {
+        id: documentData.id,
+        name: documentData.file_name,
+        type: documentData.document_type === 'medical-questionnaire' 
+          ? 'Medical Examination Questionnaire' 
+          : 'Certificate of Fitness',
+        uploadedAt: documentData.created_at,
+        status: documentData.status,
+        patientName: extractPatientName(documentData.extracted_data),
+        patientId: extractPatientId(documentData.extracted_data),
+        imageUrl: urlData?.signedUrl || null,
+        extractedData: documentData.extracted_data,
+        jsonData: JSON.stringify(documentData.extracted_data, null, 2)
+      };
+    } catch (error) {
+      console.error('Error fetching document from Supabase:', error);
+      return null;
+    }
+  };
+
+  // Helper functions to extract patient info from extracted data
+  const extractPatientName = (extractedData: any) => {
+    if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
+      return "Unknown";
+    }
+    return extractedData.structured_data.patient.name || "Unknown";
+  };
+  
+  const extractPatientId = (extractedData: any) => {
+    if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
+      return "No ID";
+    }
+    return extractedData.structured_data.patient.employee_id || 
+           extractedData.structured_data.patient.id || 
+           "No ID";
+  };
 
   useEffect(() => {
-    // Try to get document data from sessionStorage first
-    setIsLoading(true);
-    const storedData = sessionStorage.getItem(`document-${id}`);
-    
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setDocument(parsedData);
+    const fetchData = async () => {
+      if (!id) {
         setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      
+      // Try to get document data from sessionStorage first
+      const storedData = sessionStorage.getItem(`document-${id}`);
+      
+      if (storedData) {
+        try {
+          const parsedData = JSON.parse(storedData);
+          setDocument(parsedData);
+          setImageUrl(parsedData.imageUrl);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          console.error("Error parsing stored document data:", error);
+          // Continue to try fetching from Supabase
+        }
+      }
+      
+      // Fetch from Supabase if not in sessionStorage
+      try {
+        const documentData = await fetchDocumentFromSupabase(id);
+        
+        if (documentData) {
+          setDocument(documentData);
+          setImageUrl(documentData.imageUrl);
+          
+          // Save to sessionStorage for future use
+          sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
+        } else {
+          // Fallback to mock data if API fails
+          console.log('Using mock data as fallback');
+          setDocument(mockDocumentData);
+        }
       } catch (error) {
-        console.error("Error parsing stored document data:", error);
+        console.error('Error fetching document:', error);
         setDocument(mockDocumentData);
+      } finally {
         setIsLoading(false);
       }
-    } else {
-      // Fallback to mock data if not found in sessionStorage
-      setTimeout(() => {
-        setDocument(mockDocumentData);
-        setIsLoading(false);
-      }, 1000);
-    }
+    };
+
+    fetchData();
   }, [id]);
 
   const renderExtractedData = () => {
@@ -244,6 +335,16 @@ const DocumentViewer = () => {
                   <h4 className="text-md font-medium mb-2">Structured Data</h4>
                   <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
                     {JSON.stringify(document.extractedData.structured_data, null, 2)}
+                  </pre>
+                </div>
+              )}
+              
+              {/* Show raw response if available */}
+              {document.extractedData.raw_response && (
+                <div className="border rounded-md p-4 mt-4">
+                  <h4 className="text-md font-medium mb-2">Raw API Response</h4>
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-96">
+                    {JSON.stringify(document.extractedData.raw_response, null, 2)}
                   </pre>
                 </div>
               )}
@@ -353,7 +454,7 @@ const DocumentViewer = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center">
-          <div className="h-8 w-8 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-4"></div>
+          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
           <p className="text-muted-foreground">Loading document data...</p>
         </div>
       </div>
@@ -416,7 +517,11 @@ const DocumentViewer = () => {
               variant="outline"
               size="sm"
               onClick={() => {
-                toast.success("Document printed successfully");
+                if (document.imageUrl) {
+                  window.open(document.imageUrl, '_blank');
+                } else {
+                  toast.error("Document preview not available");
+                }
               }}
             >
               <Printer className="h-4 w-4 mr-2" />
@@ -476,9 +581,9 @@ const DocumentViewer = () => {
               </div>
               <Card className="overflow-hidden h-[calc(100vh-220px)]">
                 <div className="relative w-full h-full">
-                  {document.imageUrl ? (
+                  {imageUrl ? (
                     <img 
-                      src={document.imageUrl} 
+                      src={imageUrl} 
                       alt="Document preview" 
                       className="w-full h-full object-contain"
                     />
@@ -500,9 +605,18 @@ const DocumentViewer = () => {
           >
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Extracted Data</h2>
-              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-200">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Processed
+              <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
+                {document.status === 'processed' ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Processed
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-3 w-3 mr-1 animate-pulse" />
+                    Processing
+                  </>
+                )}
               </Badge>
             </div>
             
