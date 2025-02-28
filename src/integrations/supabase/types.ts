@@ -71,6 +71,7 @@ export type Database = {
           file_path: string
           id: string
           mime_type: string
+          processed_at: string | null
           processing_error: string | null
           status: string
           updated_at: string
@@ -83,6 +84,7 @@ export type Database = {
           file_path: string
           id?: string
           mime_type: string
+          processed_at?: string | null
           processing_error?: string | null
           status?: string
           updated_at?: string
@@ -95,6 +97,7 @@ export type Database = {
           file_path?: string
           id?: string
           mime_type?: string
+          processed_at?: string | null
           processing_error?: string | null
           status?: string
           updated_at?: string
