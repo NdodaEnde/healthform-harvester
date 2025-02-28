@@ -206,9 +206,6 @@ async function processDocumentWithLandingAI(fileUrl: string, documentType: strin
 // Process medical questionnaire data from Landing AI response
 function processMedicalQuestionnaireData(apiResponse: any) {
   try {
-    // This is a placeholder implementation and should be replaced with actual
-    // parsing logic based on the structure of Landing AI API response
-    
     // Extract text blocks if available
     const textBlocks = apiResponse.predictions?.text_blocks || [];
     
@@ -216,7 +213,6 @@ function processMedicalQuestionnaireData(apiResponse: any) {
     const formFields = apiResponse.predictions?.form_fields || [];
     
     // Map recognized fields to structured data
-    // This mapping would be specific to the medical questionnaire format
     const patientName = findFieldValue(formFields, 'patient_name') || 'Unknown';
     const dateOfBirth = findFieldValue(formFields, 'date_of_birth') || '';
     const employeeId = findFieldValue(formFields, 'employee_id') || '';
@@ -266,9 +262,6 @@ function processMedicalQuestionnaireData(apiResponse: any) {
 // Process certificate of fitness data from Landing AI response
 function processCertificateOfFitnessData(apiResponse: any) {
   try {
-    // This is a placeholder implementation and should be replaced with actual
-    // parsing logic based on the structure of Landing AI API response
-    
     // Extract text blocks if available
     const textBlocks = apiResponse.predictions?.text_blocks || [];
     
