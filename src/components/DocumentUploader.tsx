@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
@@ -23,8 +22,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const progressIntervalRef = useRef<number | null>(null);
   const statusCheckIntervalRef = useRef<number | null>(null);
   const timeoutRef = useRef<number | null>(null);
+  const processingStartTimeRef = useRef<number | null>(null);
 
-  // Clean up intervals on unmount
   useEffect(() => {
     return () => {
       if (progressIntervalRef.current) {
@@ -39,17 +38,16 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     };
   }, []);
 
-  // Effect to check document processing status
   useEffect(() => {
     if (!processingDocumentId) return;
 
     console.log(`Starting status check interval for document ID: ${processingDocumentId}`);
+    processingStartTimeRef.current = Date.now();
     
     const checkStatus = async () => {
       try {
         console.log(`Checking status for document ID: ${processingDocumentId}`);
         
-        // Use maybeSingle instead of single to handle the case where no rows are returned
         const { data, error } = await supabase
           .from('documents')
           .select('*')
@@ -61,20 +59,42 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           return;
         }
 
-        // If no data found, the document might not exist yet or was deleted
         if (!data) {
           console.log('Document not found, it might still be processing');
+          
+          if (processingStartTimeRef.current && (Date.now() - processingStartTimeRef.current > 30000)) {
+            console.log('Document not found after 30 seconds, something might be wrong');
+            try {
+              const secondCheck = await supabase
+                .from('documents')
+                .select('*')
+                .eq('id', processingDocumentId)
+                .maybeSingle();
+                
+              if (!secondCheck.data) {
+                clearStatusCheckInterval();
+                setIsUploading(false);
+                setUploadProgress(0);
+                setProcessingDocumentId(null);
+                
+                toast.destructive({
+                  title: "Processing issue",
+                  description: "We couldn't find your document in the system. It may have failed during processing. Please try again."
+                });
+              }
+            } catch (err) {
+              console.error('Error in second document check:', err);
+            }
+          }
           return;
         }
 
         console.log(`Document status: ${data.status}`);
 
         if (data.status === 'processed') {
-          // Document processing completed successfully
           clearStatusCheckInterval();
           setUploadProgress(100);
           
-          // Prepare document data for the parent component
           const processedData = {
             id: data.id,
             name: data.file_name,
@@ -90,11 +110,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             jsonData: JSON.stringify(data.extracted_data, null, 2)
           };
           
-          // Delay completion to show 100% progress
           setTimeout(() => {
             setIsUploading(false);
             onUploadComplete(processedData);
             setProcessingDocumentId(null);
+            processingStartTimeRef.current = null;
             
             toast.default({
               title: "Document processed successfully",
@@ -102,36 +122,41 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             });
           }, 500);
         } else if (data.status === 'failed') {
-          // Document processing failed
           clearStatusCheckInterval();
           setIsUploading(false);
           setProcessingDocumentId(null);
+          processingStartTimeRef.current = null;
           
           toast.destructive({
             title: "Document processing failed",
             description: data.processing_error || 'There was an error processing your document. Please try again.'
           });
+        } else if (data.status === 'processing') {
+          const elapsedTime = processingStartTimeRef.current 
+            ? (Date.now() - processingStartTimeRef.current) / 1000 
+            : 0;
+            
+          if (elapsedTime > 5) {
+            const calculatedProgress = Math.min(90 + (elapsedTime / 60) * 5, 95);
+            setUploadProgress(calculatedProgress);
+          }
         }
-        // If still processing, continue checking
       } catch (error) {
         console.error('Error in status check:', error);
       }
     };
 
-    // Check status immediately
     checkStatus();
     
-    // And then every 2 seconds
     const interval = setInterval(checkStatus, 2000);
     statusCheckIntervalRef.current = interval as unknown as number;
 
-    // Set a timeout to stop checking after 180 seconds (3 minutes)
     const timeout = setTimeout(() => {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current);
         statusCheckIntervalRef.current = null;
+        processingStartTimeRef.current = null;
         
-        // If we're still in uploading state, something went wrong
         if (isUploading) {
           setIsUploading(false);
           setUploadProgress(0);
@@ -142,8 +167,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           });
         }
       }
-    }, 180000); // 3 minutes timeout
-    
+    }, 180000);
+
     timeoutRef.current = timeout as unknown as number;
 
     return () => {
@@ -152,6 +177,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      processingStartTimeRef.current = null;
     };
   }, [processingDocumentId, documentType]);
 
@@ -162,17 +188,15 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     }
   };
 
-  // Helper function to get file URL from Supabase storage
   const getFileUrl = async (filePath: string) => {
     const { data } = await supabase
       .storage
       .from('medical-documents')
-      .createSignedUrl(filePath, 3600); // 1 hour expiry
-      
+      .createSignedUrl(filePath, 3600);
+    
     return data?.signedUrl || null;
   };
 
-  // Helper functions to extract patient info from extracted data
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
     
@@ -199,7 +223,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     
-    // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(selectedFile.type)) {
       toast.destructive({
@@ -209,7 +232,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       return;
     }
     
-    // Check file size (max 50MB)
     if (selectedFile.size > 50 * 1024 * 1024) {
       toast.destructive({
         title: "File too large",
@@ -228,7 +250,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     const droppedFile = e.dataTransfer.files?.[0];
     if (!droppedFile) return;
     
-    // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(droppedFile.type)) {
       toast.destructive({
@@ -238,7 +259,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       return;
     }
     
-    // Check file size (max 50MB)
     if (droppedFile.size > 50 * 1024 * 1024) {
       toast.destructive({
         title: "File too large",
@@ -261,12 +281,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     setIsUploading(true);
     setUploadProgress(0);
 
-    // Create a simulated progress indicator
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
           clearInterval(progressInterval);
-          return 90; // Hold at 90% until API response
+          return 90;
         }
         return prev + 5;
       });
@@ -275,16 +294,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     progressIntervalRef.current = progressInterval as unknown as number;
 
     try {
-      // Create FormData for the edge function
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
       
-      // Use the constant values from the client.ts file
       const SUPABASE_URL = "https://wgkbsiczgyaqmgoyirjs.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
       
-      // Call the edge function
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/process-document`,
         {
@@ -305,19 +321,15 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       const data = await response.json();
       console.log("Edge Function Response:", data);
       
-      // Store document ID for status polling
       setProcessingDocumentId(data.documentId);
       
-      // Clear the progress interval from earlier
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
       
-      // Set progress to indicate processing stage
       setUploadProgress(95);
       
-      // Show toast for upload success
       toast.default({
         title: "Document uploaded",
         description: "Your document is now being processed with AI extraction."
