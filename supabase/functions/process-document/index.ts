@@ -89,7 +89,7 @@ serve(async (req) => {
     const documentId = documentData.id;
     
     // Start background task for document processing
-    const processingPromise = processDocumentWithLandingAI(fileUrlData.signedUrl, documentType, documentId, supabase);
+    const processingPromise = processDocumentWithLandingAI(fileUrlData.signedUrl, documentType, documentId, supabase, file.type);
     // @ts-ignore - Deno specific API
     EdgeRuntime.waitUntil(processingPromise);
 
@@ -113,44 +113,51 @@ serve(async (req) => {
 });
 
 // Process document with Landing AI API
-async function processDocumentWithLandingAI(fileUrl: string, documentType: string, documentId: string, supabase: any) {
+async function processDocumentWithLandingAI(fileUrl: string, documentType: string, documentId: string, supabase: any, mimeType: string) {
   try {
     console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
     
-    // Get API credentials from environment variables
-    const landingAiApiKey = Deno.env.get('LANDING_AI_API_KEY');
+    // Get API key - hard-coded temporarily based on provided key
+    const landingAiApiKey = Deno.env.get('LANDING_AI_API_KEY') || 'bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5';
     
     if (!landingAiApiKey) {
       throw new Error('Landing AI API key is not configured');
     }
     
-    // Configure endpoint based on document type
-    let endpointId = '';
-    if (documentType === 'medical-questionnaire') {
-      endpointId = Deno.env.get('LANDING_AI_QUESTIONNAIRE_ENDPOINT_ID') || '';
+    console.log(`Calling Landing AI API for document type: ${documentType}`);
+    
+    // New endpoint from the provided code
+    const apiUrl = 'https://api.va.landing.ai/v1/tools/agentic-document-analysis';
+    
+    // Download the file from Supabase
+    const { data: fileData, error: fileError } = await supabase
+      .storage
+      .from('medical-documents')
+      .download(fileUrl.split('medical-documents/')[1].split('?')[0]);
+
+    if (fileError) {
+      throw new Error(`Failed to download file: ${fileError.message}`);
+    }
+
+    // Create form data for API request
+    const apiFormData = new FormData();
+    
+    // Determine if we should use 'image' or 'pdf' based on file type
+    const isPdf = mimeType.includes('pdf');
+    if (isPdf) {
+      apiFormData.append('pdf', new Blob([fileData]), 'document.pdf');
     } else {
-      // Certificate of fitness
-      endpointId = Deno.env.get('LANDING_AI_CERTIFICATE_ENDPOINT_ID') || '';
+      apiFormData.append('image', new Blob([fileData]), 'document.png');
     }
     
-    if (!endpointId) {
-      throw new Error(`Landing AI endpoint ID not configured for document type: ${documentType}`);
-    }
-    
-    // Call Landing AI API
-    console.log(`Calling Landing AI API with endpoint: ${endpointId}`);
-    
-    const apiUrl = `https://api.landing.ai/v1/predict/${endpointId}`;
+    // Call Landing AI API with Basic Auth
+    console.log(`Making request to Landing AI API`);
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'apikey': landingAiApiKey
+        'Authorization': `Basic ${landingAiApiKey}`
       },
-      body: JSON.stringify({
-        image_url: fileUrl,
-        confidence_threshold: 0.5
-      })
+      body: apiFormData
     });
     
     if (!response.ok) {
@@ -206,44 +213,26 @@ async function processDocumentWithLandingAI(fileUrl: string, documentType: strin
 // Process medical questionnaire data from Landing AI response
 function processMedicalQuestionnaireData(apiResponse: any) {
   try {
-    // Extract text blocks if available
-    const textBlocks = apiResponse.predictions?.text_blocks || [];
+    // Extract fields from AI response
+    const extractedData = apiResponse.result || {};
     
-    // Extract form fields if available
-    const formFields = apiResponse.predictions?.form_fields || [];
-    
-    // Map recognized fields to structured data
-    const patientName = findFieldValue(formFields, 'patient_name') || 'Unknown';
-    const dateOfBirth = findFieldValue(formFields, 'date_of_birth') || '';
-    const employeeId = findFieldValue(formFields, 'employee_id') || '';
-    const gender = findFieldValue(formFields, 'gender') || '';
-    
-    // Extract medical conditions
-    const hasHypertension = checkForCondition(textBlocks, 'hypertension');
-    const hasDiabetes = checkForCondition(textBlocks, 'diabetes');
-    const hasHeartDisease = checkForCondition(textBlocks, 'heart disease');
-    const hasAllergies = checkForCondition(textBlocks, 'allerg');
-    
-    // Extract medications
-    const medications = extractMedications(textBlocks);
-    
-    // Build structured data object
+    // Build structured data object from API response
     return {
       patient: {
-        name: patientName,
-        date_of_birth: dateOfBirth,
-        employee_id: employeeId,
-        gender: gender
+        name: extractPath(extractedData, 'patient.name') || 'Unknown',
+        date_of_birth: extractPath(extractedData, 'patient.date_of_birth') || '',
+        employee_id: extractPath(extractedData, 'patient.id') || '',
+        gender: extractPath(extractedData, 'patient.gender') || ''
       },
       medical_history: {
-        has_hypertension: hasHypertension,
-        has_diabetes: hasDiabetes,
-        has_heart_disease: hasHeartDisease,
-        has_allergies: hasAllergies,
-        allergies: extractAllergies(textBlocks)
+        has_hypertension: checkCondition(extractedData, 'medical_history.conditions', 'hypertension'),
+        has_diabetes: checkCondition(extractedData, 'medical_history.conditions', 'diabetes'),
+        has_heart_disease: checkCondition(extractedData, 'medical_history.conditions', 'heart disease'),
+        has_allergies: extractPath(extractedData, 'medical_history.allergies')?.length > 0,
+        allergies: extractPath(extractedData, 'medical_history.allergies') || []
       },
-      current_medications: medications,
-      questionnaire_date: findFieldValue(formFields, 'exam_date') || new Date().toISOString().split('T')[0]
+      current_medications: extractPath(extractedData, 'medications') || [],
+      questionnaire_date: extractPath(extractedData, 'date') || new Date().toISOString().split('T')[0]
     };
   } catch (error) {
     console.error('Error processing medical questionnaire data:', error);
@@ -262,39 +251,23 @@ function processMedicalQuestionnaireData(apiResponse: any) {
 // Process certificate of fitness data from Landing AI response
 function processCertificateOfFitnessData(apiResponse: any) {
   try {
-    // Extract text blocks if available
-    const textBlocks = apiResponse.predictions?.text_blocks || [];
+    // Extract fields from AI response
+    const extractedData = apiResponse.result || {};
     
-    // Extract form fields if available
-    const formFields = apiResponse.predictions?.form_fields || [];
-    
-    // Map recognized fields to structured data
-    const patientName = findFieldValue(formFields, 'patient_name') || 'Unknown';
-    const dateOfBirth = findFieldValue(formFields, 'date_of_birth') || '';
-    const employeeId = findFieldValue(formFields, 'employee_id') || '';
-    const gender = findFieldValue(formFields, 'gender') || '';
-    
-    // Extract examination details
-    const examDate = findFieldValue(formFields, 'exam_date') || new Date().toISOString().split('T')[0];
-    const physician = findFieldValue(formFields, 'physician_name') || '';
-    const fitnessStatus = findFieldValue(formFields, 'fitness_status') || 'Unknown';
-    const restrictions = extractRestrictions(textBlocks);
-    const nextExamDate = findFieldValue(formFields, 'next_exam_date') || '';
-    
-    // Build structured data object
+    // Build structured data object from API response
     return {
       patient: {
-        name: patientName,
-        date_of_birth: dateOfBirth,
-        employee_id: employeeId,
-        gender: gender
+        name: extractPath(extractedData, 'patient.name') || 'Unknown',
+        date_of_birth: extractPath(extractedData, 'patient.date_of_birth') || '',
+        employee_id: extractPath(extractedData, 'patient.id') || '',
+        gender: extractPath(extractedData, 'patient.gender') || ''
       },
       examination: {
-        date: examDate,
-        physician: physician,
-        fitness_status: fitnessStatus,
-        restrictions: restrictions,
-        next_examination_date: nextExamDate
+        date: extractPath(extractedData, 'examination.date') || new Date().toISOString().split('T')[0],
+        physician: extractPath(extractedData, 'examination.physician') || '',
+        fitness_status: extractPath(extractedData, 'examination.fitness_status') || 'Unknown',
+        restrictions: extractPath(extractedData, 'examination.restrictions') || 'None',
+        next_examination_date: extractPath(extractedData, 'examination.next_date') || ''
       }
     };
   } catch (error) {
@@ -313,81 +286,29 @@ function processCertificateOfFitnessData(apiResponse: any) {
   }
 }
 
-// Helper function to find a field value in form fields array
-function findFieldValue(formFields: any[], fieldName: string): string {
-  const field = formFields.find(f => 
-    f.label?.toLowerCase().includes(fieldName.toLowerCase()) ||
-    f.key?.toLowerCase().includes(fieldName.toLowerCase())
+// Helper function to safely extract nested properties from an object
+function extractPath(obj: any, path: string): any {
+  if (!obj) return undefined;
+  
+  const parts = path.split('.');
+  let current = obj;
+  
+  for (const part of parts) {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+    current = current[part];
+  }
+  
+  return current;
+}
+
+// Helper function to check if a condition exists in an array of conditions
+function checkCondition(data: any, path: string, condition: string): boolean {
+  const conditions = extractPath(data, path);
+  if (!Array.isArray(conditions)) return false;
+  
+  return conditions.some((item: string) => 
+    typeof item === 'string' && item.toLowerCase().includes(condition.toLowerCase())
   );
-  return field?.value || '';
-}
-
-// Helper function to check for medical conditions in text blocks
-function checkForCondition(textBlocks: any[], conditionKeyword: string): boolean {
-  const conditionRegex = new RegExp(`\\b${conditionKeyword}\\b`, 'i');
-  const yesRegex = /\byes\b|\bpositive\b|\bconfirmed\b/i;
-  
-  for (const block of textBlocks) {
-    if (conditionRegex.test(block.text)) {
-      // If the condition is mentioned and there's a "yes" nearby
-      if (yesRegex.test(block.text)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-// Helper function to extract allergies from text blocks
-function extractAllergies(textBlocks: any[]): string[] {
-  const allergies: string[] = [];
-  const allergyRegex = /allerg(y|ies)\s+to:?\s+([^.;]+)/i;
-  
-  for (const block of textBlocks) {
-    const match = block.text.match(allergyRegex);
-    if (match && match[2]) {
-      // Split by commas and filter out empty strings
-      const allergyList = match[2].split(',')
-        .map(item => item.trim())
-        .filter(item => item.length > 0);
-        
-      allergies.push(...allergyList);
-    }
-  }
-  
-  return allergies.length > 0 ? allergies : ["None specified"];
-}
-
-// Helper function to extract medications from text blocks
-function extractMedications(textBlocks: any[]): string[] {
-  const medications: string[] = [];
-  const medRegex = /medication(s)?:?\s+([^.;]+)/i;
-  
-  for (const block of textBlocks) {
-    const match = block.text.match(medRegex);
-    if (match && match[2]) {
-      // Split by commas and filter out empty strings
-      const medList = match[2].split(',')
-        .map(item => item.trim())
-        .filter(item => item.length > 0);
-        
-      medications.push(...medList);
-    }
-  }
-  
-  return medications.length > 0 ? medications : [];
-}
-
-// Helper function to extract restrictions from text blocks
-function extractRestrictions(textBlocks: any[]): string {
-  const restrictionRegex = /restriction(s)?:?\s+([^.;]+)/i;
-  
-  for (const block of textBlocks) {
-    const match = block.text.match(restrictionRegex);
-    if (match && match[2]) {
-      return match[2].trim();
-    }
-  }
-  
-  return 'None';
 }
