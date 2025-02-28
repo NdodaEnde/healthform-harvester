@@ -1,5 +1,5 @@
 
 project_id = "wgkbsiczgyaqmgoyirjs"
-[[functions]]
-name = "process-document"
+
+[functions.process-document]
 verify_jwt = false
