@@ -161,39 +161,77 @@ async function processDocumentWithLandingAI(file: File, documentType: string, do
       structuredData = processCertificateOfFitnessData(result);
     }
     
-    // Update the document record with the extracted data
-    const { data: updateData, error: updateError } = await supabase
-      .from('documents')
-      .update({
-        extracted_data: {
-          structured_data: structuredData,
-          raw_response: result
-        },
-        status: 'processed',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', documentId)
-      .select();
+    // Try to update the document record multiple times if needed
+    let updateSuccess = false;
+    let attempts = 0;
     
-    if (updateError) {
-      console.error('Failed to update document with extracted data:', updateError);
-      throw updateError;
+    while (!updateSuccess && attempts < 3) {
+      attempts++;
+      
+      // Update the document record with the extracted data
+      const { data: updateData, error: updateError } = await supabase
+        .from('documents')
+        .update({
+          extracted_data: {
+            structured_data: structuredData,
+            raw_response: result
+          },
+          status: 'processed',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', documentId)
+        .select();
+      
+      if (updateError) {
+        console.error(`Failed to update document with extracted data (attempt ${attempts}):`, updateError);
+        if (attempts < 3) {
+          console.log(`Retrying document update in 1 second...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          throw updateError;
+        }
+      } else {
+        updateSuccess = true;
+        console.log(`Document processing completed for document ID: ${documentId}`);
+        console.log('Updated document record:', updateData);
+        
+        // Force another update to ensure the status is set to processed
+        await supabase
+          .from('documents')
+          .update({ status: 'processed' })
+          .eq('id', documentId);
+      }
     }
     
-    console.log(`Document processing completed for document ID: ${documentId}`);
-    console.log('Updated document record:', updateData);
-    
-    // Verify the document was updated
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .single();
+    // Additional verification step: explicitly verify the document is marked as processed
+    for (let i = 0; i < 3; i++) {
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+        
+      if (verifyError) {
+        console.error('Error verifying document update:', verifyError);
+      } else {
+        console.log(`Verified document status is now: ${verifyData.status}`);
+        
+        if (verifyData.status !== 'processed') {
+          console.log(`Document status is not 'processed', forcing update one more time...`);
+          await supabase
+            .from('documents')
+            .update({ 
+              status: 'processed',
+              processed_at: new Date().toISOString()
+            })
+            .eq('id', documentId);
+        } else {
+          break;
+        }
+      }
       
-    if (verifyError) {
-      console.error('Error verifying document update:', verifyError);
-    } else {
-      console.log(`Verified document status is now: ${verifyData.status}`);
+      // Wait before retrying verification
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
   } catch (error) {
