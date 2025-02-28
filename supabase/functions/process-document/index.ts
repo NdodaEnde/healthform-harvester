@@ -57,6 +57,7 @@ serve(async (req) => {
       .insert({
         file_name: fileName,
         file_path: filePath,
+        document_type: documentType,
         mime_type: file.type,
         status: 'processing'
       })
@@ -84,12 +85,14 @@ serve(async (req) => {
       );
     }
 
-    // 4. Call the LandingAI API for document extraction
-    // Use background task to avoid timing out the response
+    // 4. Simulate document processing
+    // In a real implementation, you would call an external API for document processing
+    // For now, we'll simulate it with a mock extracted data response
     const documentId = documentData.id;
     
-    // Start background task
-    const processingPromise = processDocumentWithAPI(file, documentId, supabase);
+    // Start background task for document processing
+    const processingPromise = simulateDocumentProcessing(file, documentType, documentId, supabase);
+    // @ts-ignore - Deno specific API
     EdgeRuntime.waitUntil(processingPromise);
 
     // 5. Return immediate success response with document ID
@@ -111,49 +114,76 @@ serve(async (req) => {
   }
 });
 
-// Background task to process document with the API
-async function processDocumentWithAPI(file: File, documentId: string, supabase: any) {
+// Simulate document processing with mock data
+async function simulateDocumentProcessing(file: File, documentType: string, documentId: string, supabase: any) {
   try {
-    console.log(`Starting document processing for document ID: ${documentId}`);
+    console.log(`Starting document processing simulation for document ID: ${documentId}`);
     
-    // Create a new FormData for the API request
-    const apiFormData = new FormData();
+    // Wait a few seconds to simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
-    // Append the file with the correct key based on type
-    if (file.type.includes('pdf')) {
-      apiFormData.append('pdf', file);
+    // Generate mock extracted data based on document type
+    let extractedData;
+    
+    if (documentType === 'medical-questionnaire') {
+      extractedData = {
+        structured_data: {
+          patient: {
+            name: "John Smith",
+            date_of_birth: "1982-05-15",
+            employee_id: "EMP123456",
+            gender: "Male"
+          },
+          medical_history: {
+            has_hypertension: true,
+            has_diabetes: false,
+            has_heart_disease: false,
+            has_allergies: true,
+            allergies: ["Penicillin", "Peanuts"]
+          },
+          current_medications: [
+            "Lisinopril 10mg daily",
+            "Cetirizine 10mg as needed"
+          ],
+          questionnaire_date: new Date().toISOString().split('T')[0]
+        },
+        raw_text: "Mock extraction of medical questionnaire content"
+      };
     } else {
-      apiFormData.append('image', file);
+      // Certificate of fitness
+      extractedData = {
+        structured_data: {
+          patient: {
+            name: "Jane Doe",
+            date_of_birth: "1990-08-22",
+            employee_id: "EMP789012",
+            gender: "Female"
+          },
+          examination: {
+            date: new Date().toISOString().split('T')[0],
+            physician: "Dr. Robert Williams",
+            fitness_status: "Fit for duty",
+            restrictions: "None",
+            next_examination_date: "2025-02-28"
+          }
+        },
+        raw_text: "Mock extraction of certificate of fitness content"
+      };
     }
-    
-    // Call the Landing AI API
-    const response = await fetch('https://api.va.landing.ai/v1/tools/agentic-document-analysis', {
-      method: 'POST',
-      body: apiFormData,
-      headers: {
-        'Authorization': 'Basic bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
-    
-    const extractedData = await response.json();
-    console.log(`Received API response for document ID: ${documentId}`);
     
     // Update the document record with the extracted data
     const { error: updateError } = await supabase
       .from('documents')
       .update({
         extracted_data: extractedData,
-        status: 'processed'
+        status: 'processed',
+        processed_at: new Date().toISOString()
       })
       .eq('id', documentId);
     
     if (updateError) {
       console.error('Failed to update document with extracted data:', updateError);
-      return;
+      throw updateError;
     }
     
     console.log(`Document processing completed for document ID: ${documentId}`);
