@@ -28,14 +28,21 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
     const checkStatus = async () => {
       try {
+        // Use maybeSingle instead of single to handle the case where no rows are returned
         const { data, error } = await supabase
           .from('documents')
           .select('*')
           .eq('id', processingDocumentId)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Error checking document status:', error);
+          return;
+        }
+
+        // If no data found, the document might not exist yet or was deleted
+        if (!data) {
+          console.log('Document not found, it might still be processing');
           return;
         }
 
@@ -248,6 +255,26 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       
       // Clear the progress interval from earlier
       clearInterval(progressInterval);
+      
+      // Add a timeout to stop checking for status after 30 seconds
+      setTimeout(() => {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+          
+          // If we're still in uploading state, something went wrong
+          if (isUploading) {
+            setIsUploading(false);
+            setUploadProgress(0);
+            
+            toast({
+              variant: "destructive",
+              title: "Processing timeout",
+              description: "Document processing took too long. The document might still be processing in the background."
+            });
+          }
+        }
+      }, 30000); // 30 seconds timeout
       
       // Set progress to indicate processing stage
       setUploadProgress(95);
