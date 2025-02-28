@@ -1,203 +1,202 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.23.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
   }
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file');
-    const documentType = formData.get('documentType');
-
-    if (!file) {
-      return new Response(
-        JSON.stringify({ error: 'No file uploaded' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+    // Check if it's a POST request
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
     }
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get the form data
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    const documentType = formData.get('documentType') as string || 'unknown';
+    
+    if (!file) {
+      return new Response(JSON.stringify({ error: 'No file uploaded' }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
 
-    // 1. Upload file to Supabase Storage
+    // Create a Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get file data
+    const fileBytes = await file.arrayBuffer();
+    const fileBuffer = new Uint8Array(fileBytes);
+    const fileType = file.type;
     const fileName = file.name;
-    const fileExt = fileName.split('.').pop();
-    const filePath = `documents/${crypto.randomUUID()}.${fileExt}`;
+    
+    // Upload file to storage
+    const storagePath = `uploads/${Date.now()}_${fileName}`;
     
     const { data: storageData, error: storageError } = await supabase
       .storage
       .from('medical-documents')
-      .upload(filePath, file, {
-        contentType: file.type,
+      .upload(storagePath, fileBuffer, {
+        contentType: fileType,
         upsert: false
       });
-
+      
     if (storageError) {
-      console.error('Storage error:', storageError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to upload file to storage', details: storageError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+      console.error('Storage upload error:', storageError);
+      return new Response(JSON.stringify({ error: 'Failed to upload file to storage' }), {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
     }
 
-    // 2. Create document record in the database
+    // Create document record in database
     const { data: documentData, error: documentError } = await supabase
       .from('documents')
       .insert({
         file_name: fileName,
-        file_path: filePath,
-        document_type: documentType,
-        mime_type: file.type,
-        status: 'processing'
+        file_path: storagePath,
+        mime_type: fileType,
+        status: 'processing',
+        document_type: documentType  // Use the document_type column
       })
       .select()
       .single();
-
+      
     if (documentError) {
       console.error('Document insert error:', documentError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create document record', details: documentError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+      return new Response(JSON.stringify({ error: 'Failed to create document record' }), {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
     }
 
-    // 3. Get file URL for API call
-    const { data: fileUrlData } = await supabase
-      .storage
-      .from('medical-documents')
-      .createSignedUrl(filePath, 60); // 60 seconds expiry
-
-    if (!fileUrlData?.signedUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to create signed URL for file' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-
-    // 4. Simulate document processing
-    // In a real implementation, you would call an external API for document processing
-    // For now, we'll simulate it with a mock extracted data response
+    // Start document processing in background (mock for now)
+    // In a real implementation, you'd call an AI service here
+    // This simulates an asynchronous process that will update the document status later
     const documentId = documentData.id;
     
-    // Start background task for document processing
-    const processingPromise = simulateDocumentProcessing(file, documentType, documentId, supabase);
-    // @ts-ignore - Deno specific API
-    EdgeRuntime.waitUntil(processingPromise);
+    // Simulate processing by updating the document after a delay
+    // In a real implementation, this would be handled by a background job or webhook
+    setTimeout(async () => {
+      try {
+        console.log(`Starting document processing simulation for document ID: ${documentId}`);
+        
+        // Simulate AI extraction results
+        const extractedData = {
+          structured_data: {
+            patient: {
+              name: "John Doe",
+              employee_id: "EMP123456",
+              date_of_birth: "1980-01-15",
+              gender: "Male"
+            },
+            examination: {
+              date: "2023-05-10",
+              doctor: "Dr. Sarah Johnson",
+              clinic: "HealthCare Medical Center",
+              findings: [
+                "Blood pressure: 120/80 mmHg",
+                "Heart rate: 72 bpm",
+                "Respiratory rate: 14/min",
+                "Temperature: 98.6°F (37°C)"
+              ]
+            },
+            medical_history: {
+              conditions: ["None reported"],
+              medications: ["None reported"],
+              allergies: ["None reported"]
+            },
+            conclusion: {
+              is_fit: true,
+              restrictions: ["None"],
+              follow_up: "Annual check-up recommended"
+            }
+          },
+          raw_text: "Medical Examination Form\nPatient: John Doe\nID: EMP123456\nDOB: 1980-01-15\nGender: Male\n\nExamination Date: 2023-05-10\nExaminer: Dr. Sarah Johnson\nClinic: HealthCare Medical Center\n\nVital Signs:\n- Blood pressure: 120/80 mmHg\n- Heart rate: 72 bpm\n- Respiratory rate: 14/min\n- Temperature: 98.6°F (37°C)\n\nMedical History:\n- No significant conditions reported\n- No current medications\n- No known allergies\n\nConclusion:\nThe patient is medically fit for the specified job role.\nNo restrictions applied.\nAnnual check-up recommended."
+        };
 
-    // 5. Return immediate success response with document ID
-    return new Response(
-      JSON.stringify({ 
-        message: 'Document upload started', 
-        documentId: documentId,
-        status: 'processing'
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-    
+        // Update document status to processed - REMOVED processed_at field
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({
+            status: 'processed',
+            extracted_data: extractedData
+          })
+          .eq('id', documentId);
+          
+        if (updateError) {
+          console.error('Failed to update document with extracted data:', updateError);
+          throw updateError;
+        }
+        
+        console.log(`Document processing completed for document ID: ${documentId}`);
+      } catch (error) {
+        console.error('Document processing error:', error);
+        
+        // Update document to failed status
+        await supabase
+          .from('documents')
+          .update({
+            status: 'failed',
+            processing_error: 'Internal processing error'
+          })
+          .eq('id', documentId);
+      }
+    }, 3000); // 3 second delay for testing
+
+    // Return success with the document ID for client-side polling
+    return new Response(JSON.stringify({
+      status: 'processing',
+      documentId: documentId,
+      message: 'Document uploaded and processing started'
+    }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return new Response(
-      JSON.stringify({ error: 'An unexpected error occurred', details: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    console.error('Global error:', error);
+    
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   }
 });
-
-// Simulate document processing with mock data
-async function simulateDocumentProcessing(file: File, documentType: string, documentId: string, supabase: any) {
-  try {
-    console.log(`Starting document processing simulation for document ID: ${documentId}`);
-    
-    // Wait a few seconds to simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    // Generate mock extracted data based on document type
-    let extractedData;
-    
-    if (documentType === 'medical-questionnaire') {
-      extractedData = {
-        structured_data: {
-          patient: {
-            name: "John Smith",
-            date_of_birth: "1982-05-15",
-            employee_id: "EMP123456",
-            gender: "Male"
-          },
-          medical_history: {
-            has_hypertension: true,
-            has_diabetes: false,
-            has_heart_disease: false,
-            has_allergies: true,
-            allergies: ["Penicillin", "Peanuts"]
-          },
-          current_medications: [
-            "Lisinopril 10mg daily",
-            "Cetirizine 10mg as needed"
-          ],
-          questionnaire_date: new Date().toISOString().split('T')[0]
-        },
-        raw_text: "Mock extraction of medical questionnaire content"
-      };
-    } else {
-      // Certificate of fitness
-      extractedData = {
-        structured_data: {
-          patient: {
-            name: "Jane Doe",
-            date_of_birth: "1990-08-22",
-            employee_id: "EMP789012",
-            gender: "Female"
-          },
-          examination: {
-            date: new Date().toISOString().split('T')[0],
-            physician: "Dr. Robert Williams",
-            fitness_status: "Fit for duty",
-            restrictions: "None",
-            next_examination_date: "2025-02-28"
-          }
-        },
-        raw_text: "Mock extraction of certificate of fitness content"
-      };
-    }
-    
-    // Update the document record with the extracted data
-    const { error: updateError } = await supabase
-      .from('documents')
-      .update({
-        extracted_data: extractedData,
-        status: 'processed',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', documentId);
-    
-    if (updateError) {
-      console.error('Failed to update document with extracted data:', updateError);
-      throw updateError;
-    }
-    
-    console.log(`Document processing completed for document ID: ${documentId}`);
-    
-  } catch (error) {
-    console.error('Document processing error:', error);
-    
-    // Update document status to failed
-    await supabase
-      .from('documents')
-      .update({
-        status: 'failed',
-        processing_error: error.message
-      })
-      .eq('id', documentId);
-  }
-}
