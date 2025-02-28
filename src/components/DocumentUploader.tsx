@@ -84,11 +84,23 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           setIsUploading(false);
           setProcessingDocumentId(null);
           
-          toast({
-            variant: "destructive",
-            title: "Document processing failed",
-            description: data.processing_error || 'There was an error processing your document. Please try again.'
-          });
+          // Check for specific error message about API key
+          const errorMessage = data.processing_error || 'There was an error processing your document.';
+          const isApiKeyError = errorMessage.includes('API key is not configured');
+          
+          if (isApiKeyError) {
+            toast({
+              variant: "destructive",
+              title: "API Configuration Required",
+              description: "The Landing AI API key is not configured. Please set up the API key in the Supabase secrets."
+            });
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Document processing failed",
+              description: errorMessage
+            });
+          }
         }
         // If still processing, continue checking
       } catch (error) {
