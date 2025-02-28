@@ -72,28 +72,15 @@ serve(async (req) => {
       );
     }
 
-    // 3. Get file URL for API call
-    const { data: fileUrlData } = await supabase
-      .storage
-      .from('medical-documents')
-      .createSignedUrl(filePath, 300); // 5 minutes expiry
-
-    if (!fileUrlData?.signedUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to create signed URL for file' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-
-    // 4. Start document processing in the background
+    // 3. Start document processing in the background
     const documentId = documentData.id;
     
     // Start background task for document processing
-    const processingPromise = processDocumentWithLandingAI(fileUrlData.signedUrl, documentType, documentId, supabase, file.type);
+    const processingPromise = processDocumentWithLandingAI(file, documentType, documentId, supabase);
     // @ts-ignore - Deno specific API
     EdgeRuntime.waitUntil(processingPromise);
 
-    // 5. Return immediate success response with document ID
+    // 4. Return immediate success response with document ID
     return new Response(
       JSON.stringify({ 
         message: 'Document upload started', 
@@ -113,11 +100,11 @@ serve(async (req) => {
 });
 
 // Process document with Landing AI API
-async function processDocumentWithLandingAI(fileUrl: string, documentType: string, documentId: string, supabase: any, mimeType: string) {
+async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
   try {
     console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
     
-    // Get API key - hard-coded temporarily based on provided key
+    // Get API key
     const landingAiApiKey = Deno.env.get('LANDING_AI_API_KEY') || 'bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5';
     
     if (!landingAiApiKey) {
@@ -126,32 +113,28 @@ async function processDocumentWithLandingAI(fileUrl: string, documentType: strin
     
     console.log(`Calling Landing AI API for document type: ${documentType}`);
     
-    // New endpoint from the provided code
+    // API endpoint
     const apiUrl = 'https://api.va.landing.ai/v1/tools/agentic-document-analysis';
     
-    // Download the file from Supabase
-    const { data: fileData, error: fileError } = await supabase
-      .storage
-      .from('medical-documents')
-      .download(fileUrl.split('medical-documents/')[1].split('?')[0]);
-
-    if (fileError) {
-      throw new Error(`Failed to download file: ${fileError.message}`);
-    }
-
     // Create form data for API request
     const apiFormData = new FormData();
     
     // Determine if we should use 'image' or 'pdf' based on file type
-    const isPdf = mimeType.includes('pdf');
+    const isPdf = file.type.includes('pdf');
+    
+    // Instead of downloading from storage, use the original file
     if (isPdf) {
-      apiFormData.append('pdf', new Blob([fileData]), 'document.pdf');
+      console.log('Adding PDF file to request');
+      apiFormData.append('pdf', file, file.name);
     } else {
-      apiFormData.append('image', new Blob([fileData]), 'document.png');
+      console.log('Adding image file to request');
+      apiFormData.append('image', file, file.name);
     }
     
     // Call Landing AI API with Basic Auth
-    console.log(`Making request to Landing AI API`);
+    console.log(`Making request to Landing AI API with ${isPdf ? 'PDF' : 'image'} file`);
+    console.log(`File name: ${file.name}, File type: ${file.type}, File size: ${file.size} bytes`);
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -162,11 +145,13 @@ async function processDocumentWithLandingAI(fileUrl: string, documentType: strin
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`API Error: Status ${response.status}, Body: ${errorText}`);
       throw new Error(`Landing AI API error (${response.status}): ${errorText}`);
     }
     
     const result = await response.json();
     console.log(`Landing AI API response received for document ID: ${documentId}`);
+    console.log(`Response: ${JSON.stringify(result)}`);
     
     // Process and structure the data based on document type
     let structuredData;
