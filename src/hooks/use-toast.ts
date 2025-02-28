@@ -99,25 +99,28 @@ export function useToast() {
   };
 }
 
-// Export a standalone toast function for use outside of components
-export const toast = {
-  // Main function to create toasts - make it callable directly
-  (props: ToastProps): string {
-    return addToast(props);
-  },
-  // Variants
-  default(props: Omit<ToastProps, "variant">) {
-    return addToast({ ...props, variant: "default" });
-  },
-  destructive(props: Omit<ToastProps, "variant">) {
-    return addToast({ ...props, variant: "destructive" });
-  },
-  // Base function
-  custom(props: ToastProps) {
-    return addToast(props);
-  },
-  // Dismiss function
-  dismiss(id: string) {
-    removeToast(id);
-  },
+// Define a toast function that can be called directly and also has methods
+type ToastFunction = {
+  (props: ToastProps): string;
+  default: (props: Omit<ToastProps, "variant">) => string;
+  destructive: (props: Omit<ToastProps, "variant">) => string;
+  custom: (props: ToastProps) => string;
+  dismiss: (id: string) => void;
 };
+
+// Create the toast function with its methods
+const toastFn = ((props: ToastProps) => addToast(props)) as ToastFunction;
+
+// Add methods to the toast function
+toastFn.default = (props: Omit<ToastProps, "variant">) => 
+  addToast({ ...props, variant: "default" });
+
+toastFn.destructive = (props: Omit<ToastProps, "variant">) => 
+  addToast({ ...props, variant: "destructive" });
+
+toastFn.custom = (props: ToastProps) => addToast(props);
+
+toastFn.dismiss = (id: string) => removeToast(id);
+
+// Export the toast function
+export const toast = toastFn;
