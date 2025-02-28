@@ -9,6 +9,10 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// LandingAI API configuration
+const LANDINGAI_API_URL = "https://api.va.landing.ai/v1/tools/agentic-document-analysis";
+const LANDINGAI_API_KEY = "bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5";
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -56,6 +60,21 @@ serve(async (req) => {
     const fileType = file.type;
     const fileName = file.name;
     
+    // Create a storage bucket if it doesn't exist yet
+    try {
+      const { data: bucketData, error: bucketError } = await supabase
+        .storage
+        .getBucket('medical-documents');
+      
+      if (bucketError && bucketError.message.includes('not found')) {
+        await supabase.storage.createBucket('medical-documents', {
+          public: false,
+        });
+      }
+    } catch (error) {
+      console.log('Bucket check error, proceeding anyway:', error);
+    }
+    
     // Upload file to storage
     const storagePath = `uploads/${Date.now()}_${fileName}`;
     
@@ -69,7 +88,7 @@ serve(async (req) => {
       
     if (storageError) {
       console.error('Storage upload error:', storageError);
-      return new Response(JSON.stringify({ error: 'Failed to upload file to storage' }), {
+      return new Response(JSON.stringify({ error: 'Failed to upload file to storage', details: storageError }), {
         status: 500,
         headers: {
           ...corsHeaders,
@@ -93,7 +112,7 @@ serve(async (req) => {
       
     if (documentError) {
       console.error('Document insert error:', documentError);
-      return new Response(JSON.stringify({ error: 'Failed to create document record' }), {
+      return new Response(JSON.stringify({ error: 'Failed to create document record', details: documentError }), {
         status: 500,
         headers: {
           ...corsHeaders,
@@ -102,21 +121,11 @@ serve(async (req) => {
       });
     }
 
-    // Get a URL for the uploaded file
-    const { data: fileUrl } = await supabase
-      .storage
-      .from('medical-documents')
-      .createSignedUrl(storagePath, 3600);
-      
-    if (!fileUrl?.signedUrl) {
-      throw new Error('Could not generate signed URL for file');
-    }
-
-    // Start document processing in background using OpenAI
+    // Start document processing in background
     const documentId = documentData.id;
     
     // Start processing in background
-    processDocumentWithAI(documentId, fileUrl.signedUrl, documentType, supabase);
+    processDocumentWithLandingAI(documentId, fileBuffer, fileType, documentType, supabase);
 
     // Return success with the document ID for client-side polling
     return new Response(JSON.stringify({
@@ -134,7 +143,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Global error:', error);
     
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: 'Internal server error', details: error.message }), {
       status: 500,
       headers: {
         ...corsHeaders,
@@ -144,91 +153,54 @@ serve(async (req) => {
   }
 });
 
-// Function to process document with AI in the background
-async function processDocumentWithAI(documentId: string, fileUrl: string, documentType: string, supabase: any) {
+// Function to process document with LandingAI in the background
+async function processDocumentWithLandingAI(
+  documentId: string, 
+  fileBuffer: Uint8Array, 
+  fileType: string, 
+  documentType: string, 
+  supabase: any
+) {
   try {
-    console.log(`Starting AI document processing for document ID: ${documentId}`);
+    console.log(`Starting LandingAI document processing for document ID: ${documentId}`);
+
+    // Prepare form data for the API request
+    const landingAIFormData = new FormData();
     
-    // Get OpenAI API key from environment variables
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY is not set in environment variables');
+    // Determine if it's a PDF or image
+    if (fileType === 'application/pdf') {
+      landingAIFormData.append('pdf', new Blob([fileBuffer]), 'document.pdf');
+    } else {
+      // For images (png, jpeg, etc.)
+      landingAIFormData.append('image', new Blob([fileBuffer]), 'document.png');
     }
 
-    // First, extract the text from the document using GPT-4 Vision
-    const extractionPrompt = getPromptForDocumentType(documentType);
-    
-    const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Send request to LandingAI API
+    const response = await fetch(LANDINGAI_API_URL, {
       method: 'POST',
+      body: landingAIFormData,
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an AI specialized in extracting structured information from medical documents. Extract all relevant information from the image.`
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: extractionPrompt },
-              { type: 'image_url', image_url: { url: fileUrl } }
-            ]
-          }
-        ],
-        max_tokens: 2000
-      })
+        'Authorization': `Basic ${LANDINGAI_API_KEY}`
+      }
     });
 
-    if (!visionResponse.ok) {
-      const errorData = await visionResponse.json();
-      console.error('OpenAI Vision API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+    if (!response.ok) {
+      let errorMessage = `API request failed with status ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = `API request failed: ${JSON.stringify(errorData)}`;
+      } catch (e) {
+        // If JSON parsing fails, use the default error message
+      }
+      throw new Error(errorMessage);
     }
 
-    const visionData = await visionResponse.json();
-    const extractedText = visionData.choices[0].message.content;
-
-    // Now, structure the extracted text into a structured JSON format
-    const structuringResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: getStructuringPromptForDocumentType(documentType)
-          },
-          {
-            role: 'user',
-            content: extractedText
-          }
-        ],
-        response_format: { type: "json_object" }
-      })
-    });
-
-    if (!structuringResponse.ok) {
-      const errorData = await structuringResponse.json();
-      console.error('OpenAI Structuring API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const structuredData = await structuringResponse.json();
-    const parsedStructuredData = JSON.parse(structuredData.choices[0].message.content);
-
-    // Combine both raw text and structured data
-    const extractedData = {
-      raw_text: extractedText,
-      structured_data: parsedStructuredData
-    };
+    // Parse response from LandingAI
+    const apiResult = await response.json();
+    console.log('LandingAI API response received');
+    
+    // Process and structure the data based on document type
+    const extractedData = processApiResult(apiResult, documentType);
 
     // Update document status to processed
     const { error: updateError } = await supabase
@@ -259,156 +231,407 @@ async function processDocumentWithAI(documentId: string, fileUrl: string, docume
   }
 }
 
-function getPromptForDocumentType(documentType: string): string {
-  if (documentType === 'medical-questionnaire') {
-    return `
-      This appears to be a Medical Examination Questionnaire. Please extract all information from it, including:
-      - Patient personal details (name, ID, date of birth, gender, etc.)
-      - Medical history information
-      - Current health status
-      - Examination results
-      - Vital signs
-      - Any diagnoses or recommendations
+// Process and structure the API result based on document type
+function processApiResult(apiResult: any, documentType: string): any {
+  // Store the complete API result as raw data
+  const rawData = apiResult;
+  
+  // Create a structured format based on document type
+  let structuredData: any = {};
+  
+  try {
+    // Extract common fields first
+    structuredData = {
+      patient: {
+        name: extractPatientName(apiResult),
+        id: extractPatientId(apiResult),
+        employee_id: extractEmployeeId(apiResult),
+        date_of_birth: extractDateOfBirth(apiResult),
+        gender: extractGender(apiResult)
+      }
+    };
+    
+    // Add document-type specific structured data
+    if (documentType === 'medical-questionnaire') {
+      structuredData = {
+        ...structuredData,
+        medical_history: extractMedicalHistory(apiResult),
+        vital_signs: extractVitalSigns(apiResult),
+        examination_results: extractExaminationResults(apiResult),
+        assessment: extractAssessment(apiResult),
+        examination_details: extractExaminationDetails(apiResult)
+      };
+    } else if (documentType === 'certificate-fitness') {
+      structuredData = {
+        ...structuredData,
+        certificate: extractCertificateDetails(apiResult),
+        examination_details: extractExaminationDetails(apiResult),
+        medical_professional: extractMedicalProfessional(apiResult),
+        job_details: extractJobDetails(apiResult)
+      };
+    }
+  } catch (error) {
+    console.error('Error structuring data:', error);
+    // If there's an error, add an error indication but still include the raw data
+    structuredData.error = "Error structuring data: " + error.message;
+  }
+  
+  // Return both the raw and structured data
+  return {
+    raw_data: rawData,
+    structured_data: structuredData
+  };
+}
+
+// Helper functions to extract specific information from the API result
+function extractPatientName(apiResult: any): string {
+  // Try to find patient name in various places in the data
+  try {
+    // Look for fields related to names
+    if (apiResult.extracted_data && apiResult.extracted_data.name) {
+      return apiResult.extracted_data.name;
+    }
+    
+    if (apiResult.patient && apiResult.patient.name) {
+      return apiResult.patient.name;
+    }
+    
+    if (apiResult.patient_name) {
+      return apiResult.patient_name;
+    }
+    
+    if (apiResult.subject && apiResult.subject.name) {
+      return apiResult.subject.name;
+    }
+    
+    // Check for first and last name fields and combine them
+    const firstName = apiResult.first_name || 
+      (apiResult.patient && apiResult.patient.first_name) || 
+      (apiResult.subject && apiResult.subject.first_name);
       
-      Capture as much detail as possible from the document.
-    `;
-  } else if (documentType === 'certificate-fitness') {
-    return `
-      This appears to be a Certificate of Fitness. Please extract all information from it, including:
-      - Patient's full name and ID
-      - Doctor's name and qualifications
-      - Date of examination
-      - Fitness decision (fit/unfit for duty)
-      - Any restrictions or recommendations
-      - Validity period of the certificate
-      - Medical facility information
+    const lastName = apiResult.last_name || 
+      (apiResult.patient && apiResult.patient.last_name) || 
+      (apiResult.subject && apiResult.subject.last_name);
       
-      Capture all fields and details present in the document.
-    `;
-  } else {
-    return `
-      Please analyze this medical document carefully and extract all information present, including:
-      - Any personal identification information
-      - Medical data and findings
-      - Dates and timestamps
-      - Professional assessments and recommendations
-      
-      Be thorough and capture all details from the document.
-    `;
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    }
+    
+    // Look through any fields that might contain "name"
+    for (const key in apiResult) {
+      if (key.toLowerCase().includes('name') && typeof apiResult[key] === 'string') {
+        return apiResult[key];
+      }
+    }
+    
+    return "Unknown";
+  } catch (e) {
+    console.error("Error extracting patient name:", e);
+    return "Unknown";
   }
 }
 
-function getStructuringPromptForDocumentType(documentType: string): string {
-  if (documentType === 'medical-questionnaire') {
-    return `
-      You are an AI specialized in structuring medical data. Take the extracted text from a Medical Examination Questionnaire and organize it into a structured JSON format.
-      
-      The JSON should have this structure:
-      {
-        "patient": {
-          "name": "",
-          "id": "",
-          "employee_id": "",
-          "date_of_birth": "",
-          "gender": "",
-          "contact_information": {
-            "phone": "",
-            "email": "",
-            "address": ""
-          }
-        },
-        "medical_history": {
-          "allergies": [],
-          "current_medications": [],
-          "chronic_conditions": [],
-          "previous_surgeries": [],
-          "family_history": {}
-        },
-        "vital_signs": {
-          "height": "",
-          "weight": "",
-          "bmi": "",
-          "blood_pressure": "",
-          "heart_rate": "",
-          "respiratory_rate": "",
-          "temperature": "",
-          "oxygen_saturation": ""
-        },
-        "examination_results": {
-          "vision": "",
-          "hearing": "",
-          "cardiovascular": "",
-          "respiratory": "",
-          "gastrointestinal": "",
-          "musculoskeletal": "",
-          "neurological": "",
-          "other_findings": []
-        },
-        "assessment": {
-          "diagnoses": [],
-          "recommendations": [],
-          "restrictions": [],
-          "fitness_conclusion": ""
-        },
-        "examination_details": {
-          "date": "",
-          "location": "",
-          "examiner": "",
-          "next_examination_due": ""
-        }
+function extractPatientId(apiResult: any): string {
+  try {
+    // Look for ID fields
+    if (apiResult.patient && apiResult.patient.id) {
+      return apiResult.patient.id;
+    }
+    
+    if (apiResult.patient_id) {
+      return apiResult.patient_id;
+    }
+    
+    if (apiResult.subject && apiResult.subject.id) {
+      return apiResult.subject.id;
+    }
+    
+    // Look for any ID-related fields
+    for (const key in apiResult) {
+      if ((key.toLowerCase().includes('id') && !key.toLowerCase().includes('employee')) && 
+          typeof apiResult[key] === 'string') {
+        return apiResult[key];
       }
-      
-      Fill in all fields based on available information. Use null for missing data. Include any additional information in appropriate fields or add new fields if necessary.
-    `;
-  } else if (documentType === 'certificate-fitness') {
-    return `
-      You are an AI specialized in structuring medical certification data. Take the extracted text from a Certificate of Fitness and organize it into a structured JSON format.
-      
-      The JSON should have this structure:
-      {
-        "patient": {
-          "name": "",
-          "id": "",
-          "employee_id": "",
-          "date_of_birth": "",
-          "gender": ""
-        },
-        "certificate": {
-          "issue_date": "",
-          "expiry_date": "",
-          "fitness_status": "",
-          "restrictions": [],
-          "recommendations": []
-        },
-        "examination_details": {
-          "date": "",
-          "location": "",
-          "facility_name": "",
-          "facility_address": ""
-        },
-        "medical_professional": {
-          "name": "",
-          "title": "",
-          "license_number": "",
-          "signature_present": false
-        },
-        "job_details": {
-          "position": "",
-          "department": "",
-          "company": "",
-          "job_requirements": []
-        }
-      }
-      
-      Fill in all fields based on available information. Use null for missing data. Include any additional information in appropriate fields or add new fields if necessary.
-    `;
-  } else {
-    return `
-      You are an AI specialized in structuring medical data. Take the extracted text from the medical document and organize it into a structured JSON format.
-      
-      Create an appropriate JSON structure based on the type of document and the information present. Include all relevant sections like patient information, medical findings, assessments, and recommendations.
-      
-      Be thorough and make sure all important information is included in your structured output.
-    `;
+    }
+    
+    return "No ID";
+  } catch (e) {
+    console.error("Error extracting patient ID:", e);
+    return "No ID";
   }
+}
+
+function extractEmployeeId(apiResult: any): string {
+  try {
+    if (apiResult.employee_id) {
+      return apiResult.employee_id;
+    }
+    
+    if (apiResult.patient && apiResult.patient.employee_id) {
+      return apiResult.patient.employee_id;
+    }
+    
+    for (const key in apiResult) {
+      if (key.toLowerCase().includes('employee') && key.toLowerCase().includes('id') && 
+          typeof apiResult[key] === 'string') {
+        return apiResult[key];
+      }
+    }
+    
+    return "";
+  } catch (e) {
+    console.error("Error extracting employee ID:", e);
+    return "";
+  }
+}
+
+function extractDateOfBirth(apiResult: any): string {
+  try {
+    if (apiResult.date_of_birth || apiResult.dob) {
+      return apiResult.date_of_birth || apiResult.dob;
+    }
+    
+    if (apiResult.patient) {
+      return apiResult.patient.date_of_birth || apiResult.patient.dob || "";
+    }
+    
+    if (apiResult.subject) {
+      return apiResult.subject.date_of_birth || apiResult.subject.dob || "";
+    }
+    
+    for (const key in apiResult) {
+      if ((key.toLowerCase().includes('birth') || key.toLowerCase() === 'dob') && 
+          typeof apiResult[key] === 'string') {
+        return apiResult[key];
+      }
+    }
+    
+    return "";
+  } catch (e) {
+    console.error("Error extracting date of birth:", e);
+    return "";
+  }
+}
+
+function extractGender(apiResult: any): string {
+  try {
+    if (apiResult.gender || apiResult.sex) {
+      return apiResult.gender || apiResult.sex;
+    }
+    
+    if (apiResult.patient) {
+      return apiResult.patient.gender || apiResult.patient.sex || "";
+    }
+    
+    if (apiResult.subject) {
+      return apiResult.subject.gender || apiResult.subject.sex || "";
+    }
+    
+    return "";
+  } catch (e) {
+    console.error("Error extracting gender:", e);
+    return "";
+  }
+}
+
+function extractMedicalHistory(apiResult: any): any {
+  try {
+    if (apiResult.medical_history) {
+      return apiResult.medical_history;
+    }
+    
+    // Attempt to construct medical history from various fields
+    return {
+      allergies: findInApiResult(apiResult, 'allergies', []),
+      current_medications: findInApiResult(apiResult, 'medications', []),
+      chronic_conditions: findInApiResult(apiResult, 'conditions', []),
+      previous_surgeries: findInApiResult(apiResult, 'surgeries', []),
+      family_history: findInApiResult(apiResult, 'family_history', {})
+    };
+  } catch (e) {
+    console.error("Error extracting medical history:", e);
+    return {};
+  }
+}
+
+function extractVitalSigns(apiResult: any): any {
+  try {
+    if (apiResult.vital_signs) {
+      return apiResult.vital_signs;
+    }
+    
+    // Attempt to gather vital signs from scattered fields
+    return {
+      height: findInApiResult(apiResult, 'height', ""),
+      weight: findInApiResult(apiResult, 'weight', ""),
+      bmi: findInApiResult(apiResult, 'bmi', ""),
+      blood_pressure: findInApiResult(apiResult, 'blood_pressure', ""),
+      heart_rate: findInApiResult(apiResult, 'heart_rate', ""),
+      respiratory_rate: findInApiResult(apiResult, 'respiratory_rate', ""),
+      temperature: findInApiResult(apiResult, 'temperature', ""),
+      oxygen_saturation: findInApiResult(apiResult, 'oxygen_saturation', "")
+    };
+  } catch (e) {
+    console.error("Error extracting vital signs:", e);
+    return {};
+  }
+}
+
+function extractExaminationResults(apiResult: any): any {
+  try {
+    if (apiResult.examination_results) {
+      return apiResult.examination_results;
+    }
+    
+    if (apiResult.results) {
+      return apiResult.results;
+    }
+    
+    // Gather examination results from potential fields
+    return {
+      vision: findInApiResult(apiResult, 'vision', ""),
+      hearing: findInApiResult(apiResult, 'hearing', ""),
+      cardiovascular: findInApiResult(apiResult, 'cardiovascular', ""),
+      respiratory: findInApiResult(apiResult, 'respiratory', ""),
+      gastrointestinal: findInApiResult(apiResult, 'gastrointestinal', ""),
+      musculoskeletal: findInApiResult(apiResult, 'musculoskeletal', ""),
+      neurological: findInApiResult(apiResult, 'neurological', ""),
+      other_findings: []
+    };
+  } catch (e) {
+    console.error("Error extracting examination results:", e);
+    return {};
+  }
+}
+
+function extractAssessment(apiResult: any): any {
+  try {
+    if (apiResult.assessment) {
+      return apiResult.assessment;
+    }
+    
+    return {
+      diagnoses: findInApiResult(apiResult, 'diagnoses', []),
+      recommendations: findInApiResult(apiResult, 'recommendations', []),
+      restrictions: findInApiResult(apiResult, 'restrictions', []),
+      fitness_conclusion: findInApiResult(apiResult, 'fitness_conclusion', "")
+    };
+  } catch (e) {
+    console.error("Error extracting assessment:", e);
+    return {};
+  }
+}
+
+function extractExaminationDetails(apiResult: any): any {
+  try {
+    if (apiResult.examination_details) {
+      return apiResult.examination_details;
+    }
+    
+    return {
+      date: findInApiResult(apiResult, 'examination_date', ""),
+      location: findInApiResult(apiResult, 'examination_location', ""),
+      examiner: findInApiResult(apiResult, 'examiner', ""),
+      facility_name: findInApiResult(apiResult, 'facility_name', ""),
+      facility_address: findInApiResult(apiResult, 'facility_address', ""),
+      next_examination_due: findInApiResult(apiResult, 'next_examination', "")
+    };
+  } catch (e) {
+    console.error("Error extracting examination details:", e);
+    return {};
+  }
+}
+
+function extractCertificateDetails(apiResult: any): any {
+  try {
+    if (apiResult.certificate) {
+      return apiResult.certificate;
+    }
+    
+    return {
+      issue_date: findInApiResult(apiResult, 'issue_date', ""),
+      expiry_date: findInApiResult(apiResult, 'expiry_date', ""),
+      fitness_status: findInApiResult(apiResult, 'fitness_status', ""),
+      restrictions: findInApiResult(apiResult, 'restrictions', []),
+      recommendations: findInApiResult(apiResult, 'recommendations', [])
+    };
+  } catch (e) {
+    console.error("Error extracting certificate details:", e);
+    return {};
+  }
+}
+
+function extractMedicalProfessional(apiResult: any): any {
+  try {
+    if (apiResult.medical_professional) {
+      return apiResult.medical_professional;
+    }
+    
+    if (apiResult.doctor) {
+      return apiResult.doctor;
+    }
+    
+    return {
+      name: findInApiResult(apiResult, 'doctor_name', ""),
+      title: findInApiResult(apiResult, 'doctor_title', ""),
+      license_number: findInApiResult(apiResult, 'license_number', ""),
+      signature_present: findInApiResult(apiResult, 'signature_present', false)
+    };
+  } catch (e) {
+    console.error("Error extracting medical professional info:", e);
+    return {};
+  }
+}
+
+function extractJobDetails(apiResult: any): any {
+  try {
+    if (apiResult.job_details) {
+      return apiResult.job_details;
+    }
+    
+    return {
+      position: findInApiResult(apiResult, 'position', ""),
+      department: findInApiResult(apiResult, 'department', ""),
+      company: findInApiResult(apiResult, 'company', ""),
+      job_requirements: findInApiResult(apiResult, 'job_requirements', [])
+    };
+  } catch (e) {
+    console.error("Error extracting job details:", e);
+    return {};
+  }
+}
+
+// Utility to find values in the API result, looking in various locations
+function findInApiResult(apiResult: any, key: string, defaultValue: any): any {
+  // Direct match
+  if (apiResult[key] !== undefined) {
+    return apiResult[key];
+  }
+  
+  // Look for any field containing the key name
+  for (const field in apiResult) {
+    if (field.toLowerCase().includes(key.toLowerCase()) && 
+        typeof apiResult[field] !== 'object') {
+      return apiResult[field];
+    }
+  }
+  
+  // Look in nested objects, but only one level deep
+  for (const field in apiResult) {
+    if (typeof apiResult[field] === 'object' && apiResult[field] !== null) {
+      if (apiResult[field][key] !== undefined) {
+        return apiResult[field][key];
+      }
+      
+      // Also check for partial key matches in nested objects
+      for (const nestedField in apiResult[field]) {
+        if (nestedField.toLowerCase().includes(key.toLowerCase()) && 
+            typeof apiResult[field][nestedField] !== 'object') {
+          return apiResult[field][nestedField];
+        }
+      }
+    }
+  }
+  
+  return defaultValue;
 }
