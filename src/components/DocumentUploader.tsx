@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type DocumentUploaderProps = {
   onUploadComplete: (data?: any) => void;
@@ -17,7 +18,117 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const [documentType, setDocumentType] = useState<string>("medical-questionnaire");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingDocumentId, setProcessingDocumentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressIntervalRef = useRef<number | null>(null);
+
+  // Effect to check document processing status
+  useEffect(() => {
+    if (!processingDocumentId) return;
+
+    const checkStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('id', processingDocumentId)
+          .single();
+
+        if (error) {
+          console.error('Error checking document status:', error);
+          return;
+        }
+
+        if (data.status === 'processed') {
+          // Document processing completed successfully
+          clearInterval(progressIntervalRef.current!);
+          setUploadProgress(100);
+          
+          // Prepare document data for the parent component
+          const processedData = {
+            id: data.id,
+            name: data.file_name,
+            type: documentType === "medical-questionnaire" 
+              ? "Medical Examination Questionnaire" 
+              : "Certificate of Fitness",
+            uploadedAt: data.created_at,
+            status: "processed",
+            patientName: extractPatientName(data.extracted_data),
+            patientId: extractPatientId(data.extracted_data),
+            imageUrl: await getFileUrl(data.file_path),
+            extractedData: data.extracted_data,
+            jsonData: JSON.stringify(data.extracted_data, null, 2)
+          };
+          
+          // Delay completion to show 100% progress
+          setTimeout(() => {
+            setIsUploading(false);
+            onUploadComplete(processedData);
+            setProcessingDocumentId(null);
+            
+            toast.success("Document processed successfully", {
+              description: "Your document has been processed using AI extraction."
+            });
+          }, 500);
+        } else if (data.status === 'failed') {
+          // Document processing failed
+          clearInterval(progressIntervalRef.current!);
+          setIsUploading(false);
+          setProcessingDocumentId(null);
+          
+          toast.error('Document processing failed', {
+            description: data.processing_error || 'There was an error processing your document. Please try again.'
+          });
+        }
+        // If still processing, continue checking
+      } catch (error) {
+        console.error('Error in status check:', error);
+      }
+    };
+
+    // Check status every 2 seconds
+    const interval = setInterval(checkStatus, 2000);
+    progressIntervalRef.current = interval as unknown as number;
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [processingDocumentId, documentType]);
+
+  // Helper function to get file URL from Supabase storage
+  const getFileUrl = async (filePath: string) => {
+    const { data } = await supabase
+      .storage
+      .from('medical-documents')
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
+      
+    return data?.signedUrl || null;
+  };
+
+  // Helper functions to extract patient info from extracted data
+  const extractPatientName = (extractedData: any) => {
+    if (!extractedData) return "Unknown";
+    
+    if (extractedData.structured_data && extractedData.structured_data.patient) {
+      return extractedData.structured_data.patient.name || "Unknown";
+    }
+    
+    return "Unknown";
+  };
+  
+  const extractPatientId = (extractedData: any) => {
+    if (!extractedData) return "No ID";
+    
+    if (extractedData.structured_data && extractedData.structured_data.patient) {
+      return extractedData.structured_data.patient.employee_id || 
+             extractedData.structured_data.patient.id || 
+             "No ID";
+    }
+    
+    return "No ID";
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -93,154 +204,49 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     }, 300);
 
     try {
-      // In a production environment, you would need to:
-      // 1. Create a backend proxy/serverless function to make the API call
-      // 2. Call your backend endpoint instead of directly calling the third-party API
-      
-      // For demonstration purposes, we'll proceed with direct call and fallback to mock
+      // Create FormData for the edge function
       const formData = new FormData();
+      formData.append('file', file);
+      formData.append('documentType', documentType);
       
-      // Append the file with the correct key based on type
-      if (file.type.includes('pdf')) {
-        formData.append('pdf', file);
-      } else {
-        formData.append('image', file);
-      }
-      
-      try {
-        const response = await fetch('https://api.va.landing.ai/v1/tools/agentic-document-analysis', {
+      // Call the edge function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
+        {
           method: 'POST',
           body: formData,
           headers: {
-            'Authorization': 'Basic bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5',
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          }
         }
-        
-        const data = await response.json();
-        console.log("API Response:", data);
-        
-        completionWithData(data);
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        console.log('Falling back to mock implementation due to CORS restrictions');
-        
-        // Since we can't make cross-origin requests directly from the browser,
-        // we'll simulate a successful API response with mock data
-        simulateMockApiResponse();
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      console.log("Edge Function Response:", data);
+      
+      // Store document ID for status polling
+      setProcessingDocumentId(data.documentId);
+      
+      // Clear the progress interval from earlier
+      clearInterval(progressInterval);
+      
+      // Set progress to indicate processing stage
+      setUploadProgress(95);
     } catch (error) {
-      console.error('Unexpected error:', error);
+      console.error('Error uploading file:', error);
+      
+      clearInterval(progressInterval);
+      setIsUploading(false);
+      setUploadProgress(0);
       
       toast.error('Upload failed', {
         description: 'There was an error processing your document. Please try again.'
       });
-      
-      setIsUploading(false);
-      clearInterval(progressInterval);
-      setUploadProgress(0);
     }
-  };
-
-  // Function to handle mock API response simulation
-  const simulateMockApiResponse = () => {
-    // Simulate processing time
-    setTimeout(() => {
-      setUploadProgress(95);
-      
-      // Mock API response data
-      const mockApiResponse = {
-        document_type: documentType === "medical-questionnaire" ? "Medical Examination Form" : "Certificate of Fitness",
-        confidence: 0.92,
-        text: "MEDICAL EXAMINATION QUESTIONNAIRE\n\nPatient Information:\nName: James Wilson\nDate of Birth: 05/12/1982\nEmployee ID: EMP-2023-456\n\nVital Signs:\nHeight: 178 cm\nWeight: 81 kg\nBlood Pressure: 124/78 mmHg\nPulse: 68 bpm\n\nMedical History:\nAllergies: None\nCurrent Medications: Atorvastatin 10mg daily\nPrevious Surgeries: None\n\nPhysical Examination:\nVision: 20/20 both eyes\nHearing: Normal range\nLung Function: FEV1: 3.9L (98% predicted)\n\nAssessment:\nPatient is in good health with controlled cholesterol.\nNo restrictions for occupational duties.\nFit for duty status: APPROVED\n\nRecommendations:\nFollow-up in 12 months\nMaintain current medication\nRegular exercise recommended",
-        structured_data: {
-          patient: {
-            name: "James Wilson",
-            date_of_birth: "05/12/1982",
-            employee_id: "EMP-2023-456"
-          },
-          vital_signs: {
-            height: "178 cm",
-            weight: "81 kg",
-            blood_pressure: "124/78 mmHg",
-            pulse: "68 bpm"
-          },
-          medical_history: {
-            allergies: "None",
-            current_medications: "Atorvastatin 10mg daily",
-            previous_surgeries: "None"
-          },
-          assessment: {
-            status: "APPROVED",
-            restrictions: "None",
-            recommendations: [
-              "Follow-up in 12 months",
-              "Maintain current medication",
-              "Regular exercise recommended"
-            ]
-          }
-        },
-        tables: [
-          {
-            title: "Physical Examination Results",
-            data: [
-              ["Test", "Result", "Reference Range"],
-              ["Vision", "20/20", "20/20 - 20/40"],
-              ["Hearing", "Normal range", "Normal"],
-              ["Lung Function (FEV1)", "3.9L (98% predicted)", ">80% predicted"]
-            ]
-          }
-        ]
-      };
-      
-      // Process the mock data
-      setTimeout(() => {
-        completionWithData(mockApiResponse);
-      }, 500);
-    }, 1500);
-  };
-
-  // Common function to handle completion with data
-  const completionWithData = (data: any) => {
-    setUploadProgress(100);
-    
-    // Extract patient name and ID from the data if available
-    let patientName = "Unknown";
-    let patientId = "No ID";
-    
-    if (data.structured_data && data.structured_data.patient) {
-      patientName = data.structured_data.patient.name || "Unknown";
-      patientId = data.structured_data.patient.employee_id || data.structured_data.patient.id || "No ID";
-    }
-    
-    // Process the data to match our expected format
-    const processedData = {
-      id: `doc-${Date.now()}`,
-      name: file?.name || "Document.pdf",
-      type: documentType === "medical-questionnaire" 
-        ? "Medical Examination Questionnaire" 
-        : "Certificate of Fitness",
-      uploadedAt: new Date().toISOString(),
-      status: "processed",
-      patientName: patientName,
-      patientId: patientId,
-      imageUrl: file ? URL.createObjectURL(file) : null,
-      extractedData: data,
-      jsonData: JSON.stringify(data, null, 2)
-    };
-    
-    // Delay completion to show 100% progress
-    setTimeout(() => {
-      setIsUploading(false);
-      onUploadComplete(processedData);
-      
-      toast.success("Document processed successfully", {
-        description: "Your document has been processed using AI extraction."
-      });
-    }, 500);
   };
 
   const removeFile = () => {
