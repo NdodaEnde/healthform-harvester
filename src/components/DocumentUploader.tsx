@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 type DocumentUploaderProps = {
@@ -66,7 +66,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             onUploadComplete(processedData);
             setProcessingDocumentId(null);
             
-            toast.success("Document processed successfully", {
+            toast({
+              title: "Document processed successfully",
               description: "Your document has been processed using AI extraction."
             });
           }, 500);
@@ -76,7 +77,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           setIsUploading(false);
           setProcessingDocumentId(null);
           
-          toast.error('Document processing failed', {
+          toast({
+            variant: "destructive",
+            title: "Document processing failed",
             description: data.processing_error || 'There was an error processing your document. Please try again.'
           });
         }
@@ -137,7 +140,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(selectedFile.type)) {
-      toast.error("Invalid file type", {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
         description: "Please upload a PDF, PNG, or JPEG file."
       });
       return;
@@ -145,7 +150,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     
     // Check file size (max 50MB)
     if (selectedFile.size > 50 * 1024 * 1024) {
-      toast.error("File too large", {
+      toast({
+        variant: "destructive",
+        title: "File too large",
         description: "Maximum file size is 50MB."
       });
       return;
@@ -164,7 +171,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(droppedFile.type)) {
-      toast.error("Invalid file type", {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
         description: "Please upload a PDF, PNG, or JPEG file."
       });
       return;
@@ -172,7 +181,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     
     // Check file size (max 50MB)
     if (droppedFile.size > 50 * 1024 * 1024) {
-      toast.error("File too large", {
+      toast({
+        variant: "destructive",
+        title: "File too large",
         description: "Maximum file size is 50MB."
       });
       return;
@@ -209,14 +220,22 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       formData.append('file', file);
       formData.append('documentType', documentType);
       
+      // Get the Supabase URL and key from the Supabase client
+      const supabaseUrl = supabase.supabaseUrl;
+      const supabaseKey = supabase.supabaseKey;
+      
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase configuration is missing');
+      }
+      
       // Call the edge function
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
+        `${supabaseUrl}/functions/v1/process-document`,
         {
           method: 'POST',
           body: formData,
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            'Authorization': `Bearer ${supabaseKey}`
           }
         }
       );
@@ -243,7 +262,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       setIsUploading(false);
       setUploadProgress(0);
       
-      toast.error('Upload failed', {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
         description: 'There was an error processing your document. Please try again.'
       });
     }
