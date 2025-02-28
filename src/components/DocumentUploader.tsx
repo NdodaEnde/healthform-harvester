@@ -96,7 +96,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             onUploadComplete(processedData);
             setProcessingDocumentId(null);
             
-            toast({
+            toast.default({
               title: "Document processed successfully",
               description: "Your document has been processed using AI extraction."
             });
@@ -107,8 +107,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           setIsUploading(false);
           setProcessingDocumentId(null);
           
-          toast({
-            variant: "destructive",
+          toast.destructive({
             title: "Document processing failed",
             description: data.processing_error || 'There was an error processing your document. Please try again.'
           });
@@ -137,8 +136,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           setIsUploading(false);
           setUploadProgress(0);
           
-          toast({
-            variant: "destructive",
+          toast.destructive({
             title: "Processing timeout",
             description: "Document processing took too long. The document might still be processing in the background."
           });
@@ -204,8 +202,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(selectedFile.type)) {
-      toast({
-        variant: "destructive",
+      toast.destructive({
         title: "Invalid file type",
         description: "Please upload a PDF, PNG, or JPEG file."
       });
@@ -214,8 +211,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     
     // Check file size (max 50MB)
     if (selectedFile.size > 50 * 1024 * 1024) {
-      toast({
-        variant: "destructive",
+      toast.destructive({
         title: "File too large",
         description: "Maximum file size is 50MB."
       });
@@ -235,8 +231,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(droppedFile.type)) {
-      toast({
-        variant: "destructive",
+      toast.destructive({
         title: "Invalid file type",
         description: "Please upload a PDF, PNG, or JPEG file."
       });
@@ -245,8 +240,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     
     // Check file size (max 50MB)
     if (droppedFile.size > 50 * 1024 * 1024) {
-      toast({
-        variant: "destructive",
+      toast.destructive({
         title: "File too large",
         description: "Maximum file size is 50MB."
       });
@@ -324,7 +318,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       setUploadProgress(95);
       
       // Show toast for upload success
-      toast({
+      toast.default({
         title: "Document uploaded",
         description: "Your document is now being processed with AI extraction."
       });
@@ -339,8 +333,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       setIsUploading(false);
       setUploadProgress(0);
       
-      toast({
-        variant: "destructive",
+      toast.destructive({
         title: "Upload failed",
         description: error instanceof Error ? error.message : 'There was an error processing your document. Please try again.'
       });

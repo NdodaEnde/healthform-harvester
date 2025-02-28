@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 
 export type ToastProps = {
-  id: string;
+  id?: string;
   title?: string;
   description?: string;
   action?: React.ReactNode;
@@ -18,6 +18,7 @@ const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 5000;
 
 type ToasterToast = ToastProps & {
+  id: string;
   dismiss: () => void;
 };
 
@@ -100,6 +101,10 @@ export function useToast() {
 
 // Export a standalone toast function for use outside of components
 export const toast = {
+  // Main function to create toasts - make it callable directly
+  (props: ToastProps): string {
+    return addToast(props);
+  },
   // Variants
   default(props: Omit<ToastProps, "variant">) {
     return addToast({ ...props, variant: "default" });
