@@ -220,22 +220,18 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       formData.append('file', file);
       formData.append('documentType', documentType);
       
-      // Get the Supabase URL and key from the Supabase client
-      const supabaseUrl = supabase.supabaseUrl;
-      const supabaseKey = supabase.supabaseKey;
-      
-      if (!supabaseUrl || !supabaseKey) {
-        throw new Error('Supabase configuration is missing');
-      }
+      // Use the constant values from the client.ts file
+      const SUPABASE_URL = "https://wgkbsiczgyaqmgoyirjs.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
       
       // Call the edge function
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/process-document`,
+        `${SUPABASE_URL}/functions/v1/process-document`,
         {
           method: 'POST',
           body: formData,
           headers: {
-            'Authorization': `Bearer ${supabaseKey}`
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
           }
         }
       );
