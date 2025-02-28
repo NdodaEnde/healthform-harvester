@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 type DocumentUploaderProps = {
@@ -21,13 +21,34 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const [processingDocumentId, setProcessingDocumentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<number | null>(null);
+  const statusCheckIntervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
+
+  // Clean up intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current);
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Effect to check document processing status
   useEffect(() => {
     if (!processingDocumentId) return;
 
+    console.log(`Starting status check interval for document ID: ${processingDocumentId}`);
+    
     const checkStatus = async () => {
       try {
+        console.log(`Checking status for document ID: ${processingDocumentId}`);
+        
         // Use maybeSingle instead of single to handle the case where no rows are returned
         const { data, error } = await supabase
           .from('documents')
@@ -46,9 +67,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           return;
         }
 
+        console.log(`Document status: ${data.status}`);
+
         if (data.status === 'processed') {
           // Document processing completed successfully
-          clearInterval(progressIntervalRef.current!);
+          clearStatusCheckInterval();
           setUploadProgress(100);
           
           // Prepare document data for the parent component
@@ -80,7 +103,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           }, 500);
         } else if (data.status === 'failed') {
           // Document processing failed
-          clearInterval(progressIntervalRef.current!);
+          clearStatusCheckInterval();
           setIsUploading(false);
           setProcessingDocumentId(null);
           
@@ -96,16 +119,50 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       }
     };
 
-    // Check status every 2 seconds
+    // Check status immediately
+    checkStatus();
+    
+    // And then every 2 seconds
     const interval = setInterval(checkStatus, 2000);
-    progressIntervalRef.current = interval as unknown as number;
+    statusCheckIntervalRef.current = interval as unknown as number;
+
+    // Set a timeout to stop checking after 180 seconds (3 minutes)
+    const timeout = setTimeout(() => {
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current);
+        statusCheckIntervalRef.current = null;
+        
+        // If we're still in uploading state, something went wrong
+        if (isUploading) {
+          setIsUploading(false);
+          setUploadProgress(0);
+          
+          toast({
+            variant: "destructive",
+            title: "Processing timeout",
+            description: "Document processing took too long. The document might still be processing in the background."
+          });
+        }
+      }
+    }, 180000); // 3 minutes timeout
+    
+    timeoutRef.current = timeout as unknown as number;
 
     return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
+      clearStatusCheckInterval();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
   }, [processingDocumentId, documentType]);
+
+  const clearStatusCheckInterval = () => {
+    if (statusCheckIntervalRef.current) {
+      clearInterval(statusCheckIntervalRef.current);
+      statusCheckIntervalRef.current = null;
+    }
+  };
 
   // Helper function to get file URL from Supabase storage
   const getFileUrl = async (filePath: string) => {
@@ -220,6 +277,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         return prev + 5;
       });
     }, 300);
+    
+    progressIntervalRef.current = progressInterval as unknown as number;
 
     try {
       // Create FormData for the edge function
@@ -244,7 +303,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       );
       
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
       
       const data = await response.json();
@@ -254,41 +315,34 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       setProcessingDocumentId(data.documentId);
       
       // Clear the progress interval from earlier
-      clearInterval(progressInterval);
-      
-      // Add a timeout to stop checking for status after 30 seconds
-      setTimeout(() => {
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-          progressIntervalRef.current = null;
-          
-          // If we're still in uploading state, something went wrong
-          if (isUploading) {
-            setIsUploading(false);
-            setUploadProgress(0);
-            
-            toast({
-              variant: "destructive",
-              title: "Processing timeout",
-              description: "Document processing took too long. The document might still be processing in the background."
-            });
-          }
-        }
-      }, 30000); // 30 seconds timeout
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       
       // Set progress to indicate processing stage
       setUploadProgress(95);
+      
+      // Show toast for upload success
+      toast({
+        title: "Document uploaded",
+        description: "Your document is now being processed with AI extraction."
+      });
     } catch (error) {
       console.error('Error uploading file:', error);
       
-      clearInterval(progressInterval);
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      
       setIsUploading(false);
       setUploadProgress(0);
       
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: 'There was an error processing your document. Please try again.'
+        description: error instanceof Error ? error.message : 'There was an error processing your document. Please try again.'
       });
     }
   };
