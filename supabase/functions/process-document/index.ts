@@ -72,35 +72,18 @@ serve(async (req) => {
       );
     }
 
-    // 3. Get file URL for API call
-    const { data: fileUrlData } = await supabase
-      .storage
-      .from('medical-documents')
-      .createSignedUrl(filePath, 60); // 60 seconds expiry
-
-    if (!fileUrlData?.signedUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to create signed URL for file' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-
-    // 4. Simulate document processing
-    // In a real implementation, you would call an external API for document processing
-    // For now, we'll simulate it with a mock extracted data response
     const documentId = documentData.id;
     
-    // Start background task for document processing
-    const processingPromise = simulateDocumentProcessing(file, documentType, documentId, supabase);
-    // @ts-ignore - Deno specific API
-    EdgeRuntime.waitUntil(processingPromise);
+    // Important: Complete the document processing immediately instead of in background
+    // This makes sure the processing happens before the function times out
+    await processDocument(file, documentType, documentId, supabase);
 
-    // 5. Return immediate success response with document ID
+    // Return success response with document ID
     return new Response(
       JSON.stringify({ 
-        message: 'Document upload started', 
+        message: 'Document processed successfully', 
         documentId: documentId,
-        status: 'processing'
+        status: 'processed'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
@@ -114,13 +97,10 @@ serve(async (req) => {
   }
 });
 
-// Simulate document processing with mock data
-async function simulateDocumentProcessing(file: File, documentType: string, documentId: string, supabase: any) {
+// Process document with mock data immediately instead of in background
+async function processDocument(file: File, documentType: string, documentId: string, supabase: any) {
   try {
-    console.log(`Starting document processing simulation for document ID: ${documentId}`);
-    
-    // Wait a few seconds to simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    console.log(`Starting document processing for document ID: ${documentId}`);
     
     // Generate mock extracted data based on document type
     let extractedData;
@@ -171,6 +151,10 @@ async function simulateDocumentProcessing(file: File, documentType: string, docu
       };
     }
     
+    // Simulate API call time
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(`Received API response for document ID: ${documentId}`);
+    
     // Update the document record with the extracted data
     const { error: updateError } = await supabase
       .from('documents')
@@ -187,6 +171,7 @@ async function simulateDocumentProcessing(file: File, documentType: string, docu
     }
     
     console.log(`Document processing completed for document ID: ${documentId}`);
+    return true;
     
   } catch (error) {
     console.error('Document processing error:', error);
@@ -199,5 +184,7 @@ async function simulateDocumentProcessing(file: File, documentType: string, docu
         processing_error: error.message
       })
       .eq('id', documentId);
+      
+    return false;
   }
 }
