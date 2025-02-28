@@ -17,14 +17,9 @@ port = 54324
 
 [auth]
 enabled = true
-port = 54325
 
 [storage]
 enabled = true
-port = 54326
 
-[[storage.buckets]]
-name = "medical-documents"
-public = false
-file_size_limit = "50MiB"
-allowed_mime_types = ["application/pdf", "image/png", "image/jpeg"]
+[storage.buckets]
+medical-documents = { public = false, file_size_limit = "50MiB", allowed_mime_types = ["application/pdf", "image/png", "image/jpeg"] }
