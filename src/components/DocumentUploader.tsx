@@ -19,9 +19,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingDocumentId, setProcessingDocumentId] = useState<string | null>(null);
+  const [processingStage, setProcessingStage] = useState<string>("uploading");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<number | null>(null);
   const statusCheckCountRef = useRef<number>(0); // Count number of status checks
+  
+  // Extended max checks (4 minutes = 240 seconds / 2 second interval = 120 checks)
+  const MAX_STATUS_CHECKS = 120;
 
   // Effect to check document processing status
   useEffect(() => {
@@ -31,6 +35,25 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       try {
         // Increment status check counter
         statusCheckCountRef.current += 1;
+        
+        // Update the progress based on the number of status checks
+        // For longer processing times, we want progress to move slower
+        if (uploadProgress < 95) {
+          // Still uploading
+          setProcessingStage("uploading");
+        } else if (statusCheckCountRef.current < MAX_STATUS_CHECKS / 4) {
+          // Initial processing stage
+          setProcessingStage("initializing");
+          setUploadProgress(Math.min(96, uploadProgress + 0.2));
+        } else if (statusCheckCountRef.current < MAX_STATUS_CHECKS / 2) {
+          // Document analysis stage
+          setProcessingStage("analyzing");
+          setUploadProgress(Math.min(97, uploadProgress + 0.1));
+        } else {
+          // Final processing stage
+          setProcessingStage("extracting");
+          setUploadProgress(Math.min(98, uploadProgress + 0.05));
+        }
         
         // Use maybeSingle to handle the case where no rows are returned
         const { data, error } = await supabase
@@ -42,8 +65,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         if (error) {
           console.error('Error checking document status:', error);
           
-          // After 15 failed attempts (30 seconds), stop checking
-          if (statusCheckCountRef.current > 15) {
+          // After max attempts, stop checking
+          if (statusCheckCountRef.current > MAX_STATUS_CHECKS) {
             handleProcessingTimeout();
           }
           return;
@@ -53,8 +76,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         if (!data) {
           console.log('Document not found, it might still be processing');
           
-          // After 15 failed attempts (30 seconds), stop checking
-          if (statusCheckCountRef.current > 15) {
+          // After max attempts, stop checking
+          if (statusCheckCountRef.current > MAX_STATUS_CHECKS) {
             handleProcessingTimeout();
           }
           return;
@@ -105,16 +128,16 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             title: "Document processing failed",
             description: data.processing_error || 'There was an error processing your document. Please try again.'
           });
-        } else if (statusCheckCountRef.current > 15) {
-          // If still processing after 30 seconds, time out
+        } else if (statusCheckCountRef.current > MAX_STATUS_CHECKS) {
+          // If still processing after max attempts, time out
           handleProcessingTimeout();
         }
         // If still processing, continue checking
       } catch (error) {
         console.error('Error in status check:', error);
         
-        // After 15 failed attempts (30 seconds), stop checking
-        if (statusCheckCountRef.current > 15) {
+        // After max attempts, stop checking
+        if (statusCheckCountRef.current > MAX_STATUS_CHECKS) {
           handleProcessingTimeout();
         }
       }
@@ -129,7 +152,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         clearInterval(progressIntervalRef.current);
       }
     };
-  }, [processingDocumentId, documentType]);
+  }, [processingDocumentId, documentType, uploadProgress]);
 
   // Helper function to handle processing timeout
   const handleProcessingTimeout = () => {
@@ -145,7 +168,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     toast({
       variant: "destructive",
       title: "Processing timeout",
-      description: "Document processing took too long. Please try again or check if the document was processed in the Documents list."
+      description: "Document processing took too long. The document might still be processing in the background. Please check the Documents list in a few minutes."
     });
   };
 
@@ -251,9 +274,10 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
     setIsUploading(true);
     setUploadProgress(0);
+    setProcessingStage("uploading");
     statusCheckCountRef.current = 0;
 
-    // Create a simulated progress indicator
+    // Create a simulated progress indicator for upload phase only
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
@@ -298,9 +322,16 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       
       // Set progress to indicate processing stage
       setUploadProgress(95);
+      setProcessingStage("initializing");
       
       // Clear the progress interval from earlier
       clearInterval(progressInterval);
+      
+      // Show info toast for long processing
+      toast({
+        title: "Document processing started",
+        description: "Document processing may take up to 4 minutes to complete. You can leave this page and check the Documents list later."
+      });
       
       // If the document is already processed, we can skip the polling
       if (data.status === 'processed') {
@@ -362,6 +393,22 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     setFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+  
+  // Get processing stage message
+  const getProcessingMessage = () => {
+    switch (processingStage) {
+      case "uploading":
+        return "Uploading document...";
+      case "initializing":
+        return "Initializing AI processing...";
+      case "analyzing":
+        return "Analyzing document structure...";
+      case "extracting":
+        return "Extracting document data with AI...";
+      default:
+        return "Processing document with AI...";
     }
   };
 
@@ -454,8 +501,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                       <div>
                         <p className="font-medium text-sm">{file.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {uploadProgress >= 95 ? "Processing document with AI..." : "Uploading..."}
+                          {getProcessingMessage()}
                         </p>
+                        {uploadProgress >= 95 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            This may take up to 4 minutes to complete
+                          </p>
+                        )}
                       </div>
                     </div>
                     <Button 
@@ -468,7 +520,14 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                       <span className="sr-only">Cancel</span>
                     </Button>
                   </div>
-                  <Progress value={uploadProgress} />
+                  <div className="space-y-1">
+                    <Progress value={uploadProgress} />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Uploading</span>
+                      <span>AI Processing</span>
+                      <span>Complete</span>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="flex justify-between items-center">
@@ -514,7 +573,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           {isUploading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {uploadProgress >= 95 ? "Processing..." : "Uploading..."}
+              {processingStage === "uploading" ? "Uploading..." : "Processing..."}
             </>
           ) : (
             <>
