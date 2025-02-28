@@ -1,10 +1,11 @@
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { 
   FileText, Upload, Search, Clock, CheckCircle2, 
-  X, ChevronLeft, FileCheck, Filter, Download, Copy
+  X, ChevronLeft, FileCheck, Filter, Download, Copy,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 import DocumentUploader from "@/components/DocumentUploader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 // Mock documents data
 const mockDocuments = [
@@ -72,6 +74,8 @@ const Dashboard = () => {
   const [selectedTab, setSelectedTab] = useState("all");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [documents, setDocuments] = useState(mockDocuments);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   
   // Store processed document data in sessionStorage to access in DocumentViewer
   const saveDocumentData = (data: any) => {
@@ -79,6 +83,113 @@ const Dashboard = () => {
       sessionStorage.setItem(`document-${data.id}`, JSON.stringify(data));
     }
   };
+  
+  // Function to fetch documents from Supabase
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // Try to fetch from Supabase first
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching documents:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        // Map Supabase data to our document format
+        const formattedDocs = data.map(doc => {
+          const docType = doc.document_type === 'medical-questionnaire' 
+            ? "Medical Examination Questionnaire" 
+            : doc.document_type === 'certificate-fitness'
+              ? "Certificate of Fitness"
+              : "Unknown Document Type";
+              
+          let patientName = "Unknown";
+          let patientId = "No ID";
+          
+          if (doc.extracted_data && doc.extracted_data.structured_data && doc.extracted_data.structured_data.patient) {
+            patientName = doc.extracted_data.structured_data.patient.name || "Unknown";
+            patientId = doc.extracted_data.structured_data.patient.employee_id || 
+                        doc.extracted_data.structured_data.patient.id || 
+                        "No ID";
+          }
+          
+          return {
+            id: doc.id,
+            name: doc.file_name,
+            type: docType,
+            uploadedAt: doc.created_at,
+            status: doc.status,
+            patientName,
+            patientId,
+          };
+        });
+        
+        setDocuments(formattedDocs);
+      } else {
+        // If no data from Supabase, use mock data
+        setDocuments(mockDocuments);
+      }
+    } catch (error) {
+      console.error('Error in fetchDocuments:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+  
+  // Initial fetch and set up auto-refresh
+  useEffect(() => {
+    fetchDocuments();
+    
+    // Check for any documents in processing state
+    const hasProcessingDocs = documents.some(doc => doc.status === 'processing');
+    
+    // Enable auto-refresh if there are processing documents
+    if (hasProcessingDocs) {
+      setAutoRefresh(true);
+    }
+    
+    // Cleanup function
+    return () => {
+      setAutoRefresh(false);
+    };
+  }, []);
+  
+  // Set up auto-refresh timer
+  useEffect(() => {
+    let interval: number | null = null;
+    
+    if (autoRefresh) {
+      interval = window.setInterval(() => {
+        fetchDocuments();
+        
+        // Check if we still have processing documents
+        const hasProcessingDocs = documents.some(doc => doc.status === 'processing');
+        if (!hasProcessingDocs) {
+          setAutoRefresh(false);
+        }
+      }, 15000); // Refresh every 15 seconds
+      
+      // Show toast notification for auto-refresh
+      toast.info(
+        "Auto-refresh enabled",
+        {
+          description: "Checking for document updates every 15 seconds"
+        }
+      );
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [autoRefresh, fetchDocuments, documents]);
   
   const handleUploadComplete = (data?: any) => {
     setIsUploadDialogOpen(false);
@@ -91,10 +202,21 @@ const Dashboard = () => {
       // Save the document data for retrieval in DocumentViewer
       saveDocumentData(data);
       
+      // Notify user
       toast.success("Document uploaded and processed", {
         description: "You can now view the extracted data"
       });
+      
+      // Enable auto-refresh to check for document updates
+      if (data.status === 'processing') {
+        setAutoRefresh(true);
+      }
     }
+  };
+  
+  const handleManualRefresh = () => {
+    fetchDocuments();
+    toast.info("Documents refreshed");
   };
   
   const filteredDocuments = documents.filter(doc => {
@@ -126,6 +248,10 @@ const Dashboard = () => {
     sessionStorage.removeItem(`document-${docId}`);
     
     toast.success("Document deleted successfully");
+  };
+  
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(prev => !prev);
   };
 
   return (
@@ -201,10 +327,30 @@ const Dashboard = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-                <span className="sr-only">Filter</span>
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  size="icon"
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="sr-only">Refresh</span>
+                </Button>
+                <Button 
+                  variant={autoRefresh ? "default" : "outline"}
+                  size="sm"
+                  onClick={toggleAutoRefresh}
+                  className="gap-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  {autoRefresh ? "Auto-refresh On" : "Auto-refresh Off"}
+                </Button>
+                <Button variant="outline" size="icon">
+                  <Filter className="h-4 w-4" />
+                  <span className="sr-only">Filter</span>
+                </Button>
+              </div>
             </div>
             
             <Tabs defaultValue="all" onValueChange={setSelectedTab}>
