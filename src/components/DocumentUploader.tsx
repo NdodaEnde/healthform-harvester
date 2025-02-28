@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
@@ -62,8 +63,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         if (!data) {
           console.log('Document not found, it might still be processing');
           
-          if (processingStartTimeRef.current && (Date.now() - processingStartTimeRef.current > 30000)) {
-            console.log('Document not found after 30 seconds, something might be wrong');
+          // Only show warning after 60 seconds instead of 30 seconds
+          if (processingStartTimeRef.current && (Date.now() - processingStartTimeRef.current > 60000)) {
+            console.log('Document not found after 60 seconds, checking again...');
             try {
               const secondCheck = await supabase
                 .from('documents')
@@ -72,14 +74,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                 .maybeSingle();
                 
               if (!secondCheck.data) {
-                clearStatusCheckInterval();
-                setIsUploading(false);
-                setUploadProgress(0);
-                setProcessingDocumentId(null);
-                
-                toast.destructive({
-                  title: "Processing issue",
-                  description: "We couldn't find your document in the system. It may have failed during processing. Please try again."
+                // We don't want to clear the status check yet; we'll let it continue
+                // but inform the user that it's taking longer than expected
+                toast.default({
+                  title: "Processing taking longer than expected",
+                  description: "The document is still being processed. This may take 3-4 minutes for larger files."
                 });
               }
             } catch (err) {
@@ -132,12 +131,15 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             description: data.processing_error || 'There was an error processing your document. Please try again.'
           });
         } else if (data.status === 'processing') {
+          // Slow down the progress increase to reflect the longer expected processing time
           const elapsedTime = processingStartTimeRef.current 
             ? (Date.now() - processingStartTimeRef.current) / 1000 
             : 0;
             
+          // More gradual progress increase over 4 minutes (240 seconds)
           if (elapsedTime > 5) {
-            const calculatedProgress = Math.min(90 + (elapsedTime / 60) * 5, 95);
+            // Cap at 95% but make progress slower
+            const calculatedProgress = Math.min(90 + (elapsedTime / 240) * 5, 95);
             setUploadProgress(calculatedProgress);
           }
         }
@@ -146,11 +148,14 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       }
     };
 
+    // Check status immediately
     checkStatus();
     
-    const interval = setInterval(checkStatus, 2000);
+    // Check every 3 seconds instead of 2
+    const interval = setInterval(checkStatus, 3000);
     statusCheckIntervalRef.current = interval as unknown as number;
 
+    // Set timeout to 5 minutes (300,000 ms) instead of 3 minutes
     const timeout = setTimeout(() => {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current);
@@ -163,12 +168,12 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           
           toast.destructive({
             title: "Processing timeout",
-            description: "Document processing took too long. The document might still be processing in the background."
+            description: "Document processing exceeded the maximum wait time of 5 minutes. Please try again with a smaller file or contact support."
           });
         }
       }
-    }, 180000);
-
+    }, 300000); // 5 minutes timeout
+    
     timeoutRef.current = timeout as unknown as number;
 
     return () => {
@@ -281,15 +286,16 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     setIsUploading(true);
     setUploadProgress(0);
 
+    // Slower progress increase to reflect longer processing time
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
           clearInterval(progressInterval);
           return 90;
         }
-        return prev + 5;
+        return prev + 3; // Slower increment
       });
-    }, 300);
+    }, 400); // Longer interval
     
     progressIntervalRef.current = progressInterval as unknown as number;
 
@@ -300,6 +306,12 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       
       const SUPABASE_URL = "https://wgkbsiczgyaqmgoyirjs.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
+      
+      // Show a toast before making the API call
+      toast.default({
+        title: "Uploading document",
+        description: "Your document is being uploaded. Processing may take 3-4 minutes for larger files."
+      });
       
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/process-document`,
@@ -332,7 +344,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       
       toast.default({
         title: "Document uploaded",
-        description: "Your document is now being processed with AI extraction."
+        description: "Your document is now being processed with AI extraction. This may take 3-4 minutes."
       });
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -413,7 +425,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                     Drag and drop your file here, or click to browse
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your document will be securely processed with AI extraction
+                    Your document will be securely processed with AI extraction (may take 3-4 minutes)
                   </p>
                 </div>
                 <Button 
@@ -448,7 +460,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
                       <div>
                         <p className="font-medium text-sm">{file.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {uploadProgress >= 95 ? "Processing document with AI..." : "Uploading..."}
+                          {uploadProgress >= 95 ? "Processing document with AI (3-4 mins)..." : "Uploading..."}
                         </p>
                       </div>
                     </div>
