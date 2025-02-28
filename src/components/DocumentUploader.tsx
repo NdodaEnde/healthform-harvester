@@ -20,8 +20,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingDocumentId, setProcessingDocumentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const progressIntervalRef = useRef<number | null>(null);
-  const statusPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statusPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingAttemptsRef = useRef<number>(0);
 
   // Effect to check document processing status
@@ -90,7 +90,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
         if (data.status === 'processed') {
           // Document processing completed successfully
-          clearInterval(progressIntervalRef.current!);
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+          }
+          
           if (statusPollingRef.current) {
             clearInterval(statusPollingRef.current);
             statusPollingRef.current = null;
@@ -126,7 +130,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           }, 500);
         } else if (data.status === 'failed') {
           // Document processing failed
-          clearInterval(progressIntervalRef.current!);
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+          }
+          
           if (statusPollingRef.current) {
             clearInterval(statusPollingRef.current);
             statusPollingRef.current = null;
@@ -165,6 +173,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
       if (statusPollingRef.current) {
         clearInterval(statusPollingRef.current);
@@ -278,7 +287,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
-          clearInterval(progressInterval);
+          if (progressInterval) {
+            clearInterval(progressInterval);
+          }
           return 90; // Hold at 90% until API response
         }
         return prev + 5;
@@ -330,7 +341,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       setProcessingDocumentId(data.documentId);
       
       // Add a timeout to stop checking for status after 60 seconds
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         if (statusPollingRef.current) {
           clearInterval(statusPollingRef.current);
           statusPollingRef.current = null;
@@ -352,7 +363,11 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     } catch (error) {
       console.error('Error uploading file:', error);
       
-      clearInterval(progressIntervalRef.current!);
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      
       setIsUploading(false);
       setUploadProgress(0);
       
