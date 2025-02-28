@@ -192,7 +192,7 @@ async function processDocumentWithLandingAI(fileUrl: string, documentType: strin
   } catch (error) {
     console.error('Document processing error:', error);
     
-    // Update document status to failed
+    // Update document status to failed with error message
     await supabase
       .from('documents')
       .update({
@@ -200,11 +200,6 @@ async function processDocumentWithLandingAI(fileUrl: string, documentType: strin
         processing_error: error.message
       })
       .eq('id', documentId);
-      
-    // For testing purposes, let's use simulation data if API connection fails
-    // This will be helpful during development until the API is fully configured
-    console.log('Falling back to simulation data for testing');
-    await simulateDocumentProcessing(documentType, documentId, supabase);
   }
 }
 
@@ -402,92 +397,4 @@ function extractRestrictions(textBlocks: any[]): string {
   }
   
   return 'None';
-}
-
-// Simulate document processing with mock data - used as a fallback
-async function simulateDocumentProcessing(documentType: string, documentId: string, supabase: any) {
-  try {
-    console.log(`Falling back to document processing simulation for document ID: ${documentId}`);
-    
-    // Wait a few seconds to simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    // Generate mock extracted data based on document type
-    let extractedData;
-    
-    if (documentType === 'medical-questionnaire') {
-      extractedData = {
-        structured_data: {
-          patient: {
-            name: "John Smith",
-            date_of_birth: "1982-05-15",
-            employee_id: "EMP123456",
-            gender: "Male"
-          },
-          medical_history: {
-            has_hypertension: true,
-            has_diabetes: false,
-            has_heart_disease: false,
-            has_allergies: true,
-            allergies: ["Penicillin", "Peanuts"]
-          },
-          current_medications: [
-            "Lisinopril 10mg daily",
-            "Cetirizine 10mg as needed"
-          ],
-          questionnaire_date: new Date().toISOString().split('T')[0]
-        },
-        raw_text: "Mock extraction of medical questionnaire content"
-      };
-    } else {
-      // Certificate of fitness
-      extractedData = {
-        structured_data: {
-          patient: {
-            name: "Jane Doe",
-            date_of_birth: "1990-08-22",
-            employee_id: "EMP789012",
-            gender: "Female"
-          },
-          examination: {
-            date: new Date().toISOString().split('T')[0],
-            physician: "Dr. Robert Williams",
-            fitness_status: "Fit for duty",
-            restrictions: "None",
-            next_examination_date: "2025-02-28"
-          }
-        },
-        raw_text: "Mock extraction of certificate of fitness content"
-      };
-    }
-    
-    // Update the document record with the extracted data
-    const { error: updateError } = await supabase
-      .from('documents')
-      .update({
-        extracted_data: extractedData,
-        status: 'processed',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', documentId);
-    
-    if (updateError) {
-      console.error('Failed to update document with extracted data:', updateError);
-      throw updateError;
-    }
-    
-    console.log(`Simulation completed for document ID: ${documentId}`);
-    
-  } catch (error) {
-    console.error('Document processing error:', error);
-    
-    // Update document status to failed
-    await supabase
-      .from('documents')
-      .update({
-        status: 'failed',
-        processing_error: error.message
-      })
-      .eq('id', documentId);
-  }
 }
