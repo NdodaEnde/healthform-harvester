@@ -84,6 +84,32 @@ const Dashboard = () => {
     }
   };
   
+  // Helper function to safely extract data from JSON
+  const safelyExtractPatientData = (extractedData: any) => {
+    // Check if extractedData exists and is an object
+    if (!extractedData || typeof extractedData !== 'object') {
+      return { name: "Unknown", id: "No ID" };
+    }
+
+    // Check if structured_data exists and is an object
+    const structuredData = extractedData.structured_data;
+    if (!structuredData || typeof structuredData !== 'object') {
+      return { name: "Unknown", id: "No ID" };
+    }
+
+    // Check if patient exists and is an object
+    const patient = structuredData.patient;
+    if (!patient || typeof patient !== 'object') {
+      return { name: "Unknown", id: "No ID" };
+    }
+
+    // Now safely extract the name and ID
+    const name = patient.name || "Unknown";
+    const id = patient.employee_id || patient.id || "No ID";
+
+    return { name, id };
+  };
+  
   // Function to fetch documents from Supabase
   const fetchDocuments = useCallback(async () => {
     try {
@@ -109,15 +135,8 @@ const Dashboard = () => {
               ? "Certificate of Fitness"
               : "Unknown Document Type";
               
-          let patientName = "Unknown";
-          let patientId = "No ID";
-          
-          if (doc.extracted_data && doc.extracted_data.structured_data && doc.extracted_data.structured_data.patient) {
-            patientName = doc.extracted_data.structured_data.patient.name || "Unknown";
-            patientId = doc.extracted_data.structured_data.patient.employee_id || 
-                        doc.extracted_data.structured_data.patient.id || 
-                        "No ID";
-          }
+          // Use helper function to safely extract patient data
+          const patientData = safelyExtractPatientData(doc.extracted_data);
           
           return {
             id: doc.id,
@@ -125,8 +144,8 @@ const Dashboard = () => {
             type: docType,
             uploadedAt: doc.created_at,
             status: doc.status,
-            patientName,
-            patientId,
+            patientName: patientData.name,
+            patientId: patientData.id,
           };
         });
         
