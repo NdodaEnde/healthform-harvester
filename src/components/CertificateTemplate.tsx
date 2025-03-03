@@ -9,6 +9,19 @@ type CertificateTemplateProps = {
 const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
+    
+  // Log the raw_response data structure to see what's inside
+  if (extractedData?.raw_response) {
+    console.log("Raw response structure:", Object.keys(extractedData.raw_response));
+    if (extractedData.raw_response.data) {
+      console.log("Raw response data structure:", Object.keys(extractedData.raw_response.data));
+    }
+  }
+    
+  // Log the structured_data data structure
+  if (extractedData?.structured_data) {
+    console.log("Structured data:", extractedData.structured_data);
+  }
   }, [extractedData]);
 
   // Helper to check if a value is checked/selected
@@ -41,6 +54,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     if (!markdown) return {};
     
     console.log("Extracting data from markdown");
+    console.log("Markdown content sample:", markdown.substring(0, 200) + "...");
     
     const extracted: any = {
       patient: {},
@@ -356,11 +370,24 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   if (extractedData?.structured_data) {
     console.log("Using existing structured_data");
     structuredData = extractedData.structured_data;
+    
+    // Check if structured_data looks empty or incomplete
+    const hasPatientData = !!(structuredData.patient?.name || structuredData.patient?.id_number);
+    if (!hasPatientData) {
+      console.log("structured_data appears incomplete, will try alternative extraction");
+    } else {
+      console.log("structured_data has patient data, using it directly");
+    }
   } else if (extractedData?.extracted_data?.structured_data) {
     console.log("Using structured_data from extracted_data");
     structuredData = extractedData.extracted_data.structured_data;
   } else {
-    // If no structured data, try to extract from markdown
+    console.log("No structured_data found, attempting markdown extraction");
+  }
+  
+  // If structured data doesn't have patient info or is empty, try extracting from markdown
+  const hasPatientData = !!(structuredData.patient?.name || structuredData.patient?.id_number);
+  if (!hasPatientData || Object.keys(structuredData).length === 0) {
     const markdown = getMarkdown(extractedData);
     console.log("Markdown content found:", markdown ? "Yes" : "No");
     if (markdown) {
@@ -371,6 +398,24 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       if (extractedData?.event_message && typeof extractedData.event_message === 'string') {
         console.log("Attempting to extract directly from event_message");
         structuredData = extractDataFromMarkdown(extractedData.event_message);
+      } else if (extractedData?.raw_response?.data?.chunks) {
+        // Try to extract from chunks
+        console.log("Trying to extract from chunks array");
+        const chunks = extractedData.raw_response.data.chunks;
+        let combinedText = '';
+        
+        if (Array.isArray(chunks)) {
+          chunks.forEach(chunk => {
+            if (chunk.text) {
+              combinedText += chunk.text + '\n\n';
+            }
+          });
+          
+          if (combinedText) {
+            console.log("Extracted text from chunks");
+            structuredData = extractDataFromMarkdown(combinedText);
+          }
+        }
       } else {
         console.log("No markdown found, using extractedData as is");
         structuredData = extractedData || {};
