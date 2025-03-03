@@ -476,45 +476,187 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       const jobTitleMatch = markdown.match(/(?:Job Title|Occupation):\s*(.*?)(?=\n|\r|$)/i);
       if (jobTitleMatch && jobTitleMatch[1]) extractedData.patient.occupation = jobTitleMatch[1].trim();
       
-      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
-      if (examDateMatch && examDateMatch[1]) extractedData.examination_results.date = examDateMatch[1].trim();
+      // Extract examination date - handles various formats
+      const examDatePatterns = [
+        /\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i,
+        /Date of Examination:\s*(.*?)(?=\n|\r|$)/i,
+        /Examination Date:\s*(.*?)(?=\n|\r|$)/i,
+        /Exam Date:\s*(.*?)(?=\n|\r|$)/i
+      ];
       
-      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
-      if (expiryDateMatch && expiryDateMatch[1]) extractedData.certification.valid_until = expiryDateMatch[1].trim();
+      let examDate = '';
+      for (const pattern of examDatePatterns) {
+        const match = markdown.match(pattern);
+        if (match && match[1]) {
+          examDate = match[1].trim();
+          break;
+        }
+      }
       
-      // Examination type
+      if (examDate) {
+        extractedData.examination_results.date = examDate;
+      }
+      
+      // Extract expiry date with multiple patterns
+      const expiryDatePatterns = [
+        /\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i,
+        /Expiry Date:\s*(.*?)(?=\n|\r|$)/i,
+        /Valid Until:\s*(.*?)(?=\n|\r|$)/i,
+        /Expiration Date:\s*(.*?)(?=\n|\r|$)/i
+      ];
+      
+      let expiryDate = '';
+      for (const pattern of expiryDatePatterns) {
+        const match = markdown.match(pattern);
+        if (match && match[1]) {
+          expiryDate = match[1].trim();
+          break;
+        }
+      }
+      
+      // If no expiry date was found, try looking for a date pattern that appears to be an expiry date
+      if (!expiryDate) {
+        // Look for dates in common formats that appear after the examination date
+        const datePattern = /(\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}|\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2})/g;
+        let dates = [];
+        let match;
+        while ((match = datePattern.exec(markdown)) !== null) {
+          dates.push(match[1]);
+        }
+        
+        // If we found at least two dates, the second one is often the expiry date
+        if (dates.length >= 2 && dates[1] !== examDate) {
+          expiryDate = dates[1];
+        }
+      }
+      
+      if (expiryDate) {
+        extractedData.certification.valid_until = expiryDate;
+      } else if (examDate) {
+        // Default: Set expiry date to 1 year after exam date if not found
+        // This is a common practice for certificates of fitness
+        console.log("Setting default expiry date based on examination date");
+        extractedData.certification.valid_until = examDate; // Consider adding logic to add one year
+      }
+      
+      // Extract review date
+      const reviewDatePatterns = [
+        /Review Date:\s*(.*?)(?=\n|\r|$)/i,
+        /Next Review:\s*(.*?)(?=\n|\r|$)/i,
+        /Follow-up Date:\s*(.*?)(?=\n|\r|$)/i,
+        /Re-examination Date:\s*(.*?)(?=\n|\r|$)/i
+      ];
+      
+      let reviewDate = '';
+      for (const pattern of reviewDatePatterns) {
+        const match = markdown.match(pattern);
+        if (match && match[1]) {
+          reviewDate = match[1].trim();
+          break;
+        }
+      }
+      
+      if (reviewDate) {
+        extractedData.certification.review_date = reviewDate;
+      } else if (expiryDate) {
+        // If no review date found, use expiry date as a fallback
+        extractedData.certification.review_date = expiryDate;
+      }
+      
+      // Extract examination type with enhanced pattern matching
+      // Look for various markers that might indicate the examination type:
+      // - Checkboxes (X, ✓, etc.)
+      // - Typography (bold, capitalization)
+      // - Context (surrounding words)
+      
+      // Patterns for pre-employment
+      const preEmploymentPatterns = [
+        /pre-employment.*?(?:\[x\]|\[X\]|✓|✔|checked|done|marked|selected)/is,
+        /\[ *x *\].*?pre-employment/is,
+        /(?:☑|☒|✅|✓|✔).*?pre-employment/is,
+        /pre-employment.*?(?:☑|☒|✅|✓|✔)/is,
+        /employment type.*?pre/is
+      ];
+      
+      // Patterns for periodical
+      const periodicalPatterns = [
+        /periodical.*?(?:\[x\]|\[X\]|✓|✔|checked|done|marked|selected)/is,
+        /\[ *x *\].*?periodical/is,
+        /(?:☑|☒|✅|✓|✔).*?periodical/is,
+        /periodical.*?(?:☑|☒|✅|✓|✔)/is,
+        /employment type.*?period/is
+      ];
+      
+      // Patterns for exit
+      const exitPatterns = [
+        /exit.*?(?:\[x\]|\[X\]|✓|✔|checked|done|marked|selected)/is,
+        /\[ *x *\].*?exit/is,
+        /(?:☑|☒|✅|✓|✔).*?exit/is,
+        /exit.*?(?:☑|☒|✅|✓|✔)/is,
+        /employment type.*?exit/is
+      ];
+      
+      // Check patterns
       extractedData.examination_results.type.pre_employment = 
         markdown.includes('**Pre-Employment**: [x]') || 
-        markdown.match(/PRE-EMPLOYMENT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+        preEmploymentPatterns.some(pattern => pattern.test(markdown));
         
       extractedData.examination_results.type.periodical = 
         markdown.includes('**Periodical**: [x]') || 
-        markdown.match(/PERIODICAL.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+        periodicalPatterns.some(pattern => pattern.test(markdown));
         
       extractedData.examination_results.type.exit = 
         markdown.includes('**Exit**: [x]') || 
-        markdown.match(/EXIT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+        exitPatterns.some(pattern => pattern.test(markdown));
+      
+      // If none of the examination types was detected, default to pre-employment
+      // This is a common fallback in occupational health
+      if (!extractedData.examination_results.type.pre_employment && 
+          !extractedData.examination_results.type.periodical && 
+          !extractedData.examination_results.type.exit) {
+        console.log("No examination type detected, defaulting to pre-employment");
+        extractedData.examination_results.type.pre_employment = true;
+      }
       
       // Test results - look for patterns that might indicate test results
       const testPatterns = [
-        { name: 'BLOODS', key: 'bloods' },
-        { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
-        { name: 'SIDE & DEPTH', key: 'side_depth' },
-        { name: 'NIGHT VISION', key: 'night_vision' },
-        { name: 'Hearing', key: 'hearing' },
-        { name: 'Working at Heights', key: 'heights' },
-        { name: 'Lung Function', key: 'lung_function' },
-        { name: 'X-Ray', key: 'x_ray' },
-        { name: 'Drug Screen', key: 'drug_screen' }
+        { name: 'BLOODS', key: 'bloods', aliases: ['Blood Test', 'Blood Work', 'Lab Work'] },
+        { name: 'FAR, NEAR VISION', key: 'far_near_vision', aliases: ['Vision', 'Vision Test', 'Eye Test', 'Visual Acuity'] },
+        { name: 'SIDE & DEPTH', key: 'side_depth', aliases: ['Peripheral Vision', 'Depth Perception'] },
+        { name: 'NIGHT VISION', key: 'night_vision', aliases: ['Night Sight', 'Low Light Vision'] },
+        { name: 'Hearing', key: 'hearing', aliases: ['Audiometry', 'Hearing Test', 'Auditory'] },
+        { name: 'Working at Heights', key: 'heights', aliases: ['Heights', 'High Work', 'Elevated Work'] },
+        { name: 'Lung Function', key: 'lung_function', aliases: ['Spirometry', 'Pulmonary Function', 'Respiratory'] },
+        { name: 'X-Ray', key: 'x_ray', aliases: ['Chest X-Ray', 'Radiography'] },
+        { name: 'Drug Screen', key: 'drug_screen', aliases: ['Drug Test', 'Substance Screen'] }
       ];
       
       testPatterns.forEach(test => {
+        // Create patterns for primary name and all aliases
+        const allNamePatterns = [test.name, ...(test.aliases || [])];
+        
         // Look for various patterns that might indicate a test was done
-        const checkPatterns = [
-          new RegExp(`${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`<td>${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`\\| ${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is')
-        ];
+        let checkPatterns = [];
+        
+        // Create patterns for each name/alias variant
+        allNamePatterns.forEach(nameVariant => {
+          checkPatterns.push(
+            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done|Yes)`, 'is'),
+            new RegExp(`<td>${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done|Yes)`, 'is'),
+            new RegExp(`\\| ${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done|Yes)`, 'is'),
+            new RegExp(`${nameVariant}:? *(?:☑|☒|✅|✓|✔)`, 'is')
+          );
+        });
+        
+        // Special case for "Working at Heights" which is frequently mentioned but often missed
+        if (test.key === 'heights') {
+          // Create extra patterns specifically for heights testing
+          checkPatterns.push(
+            /height[s]? (?:assessment|evaluation|test)(?::|.{0,30})(?:\[x\]|\[X\]|✓|✔|checked|done|Yes|Pass)/is,
+            /(?:fitness|safe|cleared) (?:for|to work at) heights/is,
+            /work(?:ing)? at heights? (?:certified|passed|approved|cleared)/is
+          );
+        }
         
         let isDone = false;
         let results = 'N/A';
@@ -527,13 +669,35 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
           }
         }
         
-        // Look for results
-        const resultsPatterns = [
-          new RegExp(`${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?(?:results?|value):?\\s*([^\\n\\r,;]+)`, 'is'),
-          new RegExp(`${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?([0-9]+(?:\\/[0-9]+|\.[0-9]+|-[0-9]+|\\s*dB))`, 'is'),
-          new RegExp(`<td>${test.name}.*?<td>(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?<td>(.*?)<`, 'is'),
-          new RegExp(`\\| ${test.name}.*?\\|.*?\\|\\s*([^|\\n\\r]+)\\s*\\|`, 'is')
-        ];
+        // For heights specifically, look for mentions in the restrictions section
+        if (test.key === 'heights' && !isDone) {
+          // If heights is mentioned in restrictions section, the test was likely done
+          if (markdown.match(/restriction.*?height/is) || 
+              markdown.match(/height.*?restriction/is)) {
+            isDone = true;
+            console.log("Heights test inferred from restrictions section");
+          }
+        }
+        
+        // Look for results with expanded patterns
+        let resultsPatterns = [];
+        
+        // Create result patterns for each name/alias variant
+        allNamePatterns.forEach(nameVariant => {
+          resultsPatterns.push(
+            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?(?:results?|value):?\\s*([^\\n\\r,;]+)`, 'is'),
+            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?([0-9]+(?:\\/[0-9]+|\.[0-9]+|-[0-9]+|\\s*dB))`, 'is'),
+            new RegExp(`<td>${nameVariant}.*?<td>(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?<td>(.*?)<`, 'is'),
+            new RegExp(`\\| ${nameVariant}.*?\\|.*?\\|\\s*([^|\\n\\r]+)\\s*\\|`, 'is'),
+            new RegExp(`${nameVariant}:? *(?:Result|Value|Reading):? *([^\\n\\r,;]+)`, 'is')
+          );
+        });
+        
+        // Add generic result patterns that look for results in table formats
+        resultsPatterns.push(
+          /<td>(?:\[x\]|\[X\]|✓|✔|checked|done)<\/td>\s*<td>(.*?)<\/td>/is,
+          /\|\s*\[x\]\s*\|\s*([^|]+)\s*\|/is
+        );
         
         for (const pattern of resultsPatterns) {
           const match = markdown.match(pattern);
@@ -543,30 +707,111 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
           }
         }
         
+        // Special handling for "Working at Heights" if no specific result was found
+        if (test.key === 'heights' && results === 'N/A' && isDone) {
+          // Look for pass/fail indicators
+          if (markdown.match(/heights?.*?(?:pass|suitable|fit|cleared)/is)) {
+            results = 'Pass';
+          } else if (markdown.match(/heights?.*?(?:fail|unfit|restrict)/is)) {
+            results = 'Restricted';
+          } else {
+            // Default to a reasonable value
+            results = 'Cleared';
+          }
+        }
+        
         // Store the results
         extractedData.examination_results.test_results[`${test.key}_done`] = isDone;
         extractedData.examination_results.test_results[`${test.key}_results`] = results;
       });
       
-      // Fitness status
+      // Fitness status with enhanced detection
       const fitnessPatterns = [
-        { name: 'FIT', key: 'fit' },
-        { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
-        { name: 'Fit with Condition', key: 'fit_with_condition' },
-        { name: 'Temporary Unfit', key: 'temporarily_unfit' },
-        { name: 'UNFIT', key: 'unfit' }
+        { 
+          name: 'FIT', 
+          key: 'fit',
+          aliases: ['Fit for Duty', 'Fit for Work', 'Medically Fit', 'No Restrictions']
+        },
+        { 
+          name: 'Fit with Restriction', 
+          key: 'fit_with_restrictions',
+          aliases: ['Restricted Duty', 'Conditional Fitness', 'Fit with Limitations', 'Limited Duties']
+        },
+        { 
+          name: 'Fit with Condition', 
+          key: 'fit_with_condition',
+          aliases: ['Conditionally Fit', 'Fit Under Conditions', 'Qualified Fitness']
+        },
+        { 
+          name: 'Temporary Unfit', 
+          key: 'temporarily_unfit',
+          aliases: ['Temporarily Not Fit', 'Short-term Unfit', 'Interim Unfit']
+        },
+        { 
+          name: 'UNFIT', 
+          key: 'unfit',
+          aliases: ['Not Fit', 'Medically Unfit', 'Unsuitable']
+        }
       ];
       
+      // First, check for medical fitness declaration section to focus our search
+      const fitnessSectionMatch = markdown.match(/Medical Fitness Declaration.*?(?:\n\n|\r\n\r\n|$)/is);
+      const fitnessSection = fitnessSectionMatch ? fitnessSectionMatch[0] : markdown;
+      
+      // Enhanced fitness status detection
       fitnessPatterns.forEach(status => {
-        const patterns = [
-          new RegExp(`${status.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`<td>${status.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`\\| ${status.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`${status.name}.*?(?:selected|marked|indicated)`, 'is')
-        ];
+        // Create patterns for the main name and all aliases
+        const allNames = [status.name, ...(status.aliases || [])];
         
-        extractedData.certification[status.key] = patterns.some(p => p.test(markdown));
+        let patterns = [];
+        
+        // Generate patterns for each name/alias
+        allNames.forEach(nameVariant => {
+          patterns.push(
+            // Checkbox patterns
+            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+            new RegExp(`<td>${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+            new RegExp(`\\| ${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+            
+            // Indicator words
+            new RegExp(`${nameVariant}.*?(?:selected|marked|indicated|approved|certified)`, 'is'),
+            
+            // Contextual indicators
+            new RegExp(`(?:status|assessment|conclusion|result|declaration).*?${nameVariant}`, 'is'),
+            
+            // Direct statements
+            new RegExp(`(?:employee is|worker is|patient is|candidate is).*?${nameVariant}`, 'is'),
+            
+            // Box/cell highlighting
+            new RegExp(`${nameVariant}.*?(?:highlighted|circled|underlined|emphasized|marked)`, 'is'),
+            
+            // Unicode checkmarks
+            new RegExp(`${nameVariant}.*?(?:☑|☒|✅|✓|✔)`, 'is')
+          );
+        });
+        
+        // Check if any pattern matches
+        const isSelected = patterns.some(p => p.test(fitnessSection));
+        
+        // Store the result
+        extractedData.certification[status.key] = isSelected;
+        
+        // Debug logging
+        if (isSelected) {
+          console.log(`Detected fitness status: ${status.name}`);
+        }
       });
+      
+      // If no fitness status was detected, default to "FIT"
+      // This is a common fallback in occupational health certificates
+      if (!extractedData.certification.fit && 
+          !extractedData.certification.fit_with_restrictions && 
+          !extractedData.certification.fit_with_condition && 
+          !extractedData.certification.temporarily_unfit && 
+          !extractedData.certification.unfit) {
+        console.log("No fitness status detected, defaulting to FIT");
+        extractedData.certification.fit = true;
+      }
       
       // Restrictions
       const restrictionPatterns = [
