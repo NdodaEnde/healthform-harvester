@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -17,6 +17,7 @@ import DocumentUploader from "@/components/DocumentUploader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress"; 
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ const Dashboard = () => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [documents, setDocuments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   
   // Store processed document data in sessionStorage to access in DocumentViewer
   const saveDocumentData = (data: any) => {
@@ -33,8 +35,10 @@ const Dashboard = () => {
     }
   };
   
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
+      setLoadingError(null);
+      
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -42,6 +46,7 @@ const Dashboard = () => {
       
       if (error) {
         console.error('Error fetching documents:', error);
+        setLoadingError(`Failed to load documents: ${error.message}`);
         return;
       }
       
@@ -62,11 +67,13 @@ const Dashboard = () => {
         setDocuments(formattedDocuments);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       console.error('Error fetching documents:', error);
+      setLoadingError(`Failed to load documents: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
   
   // Helper functions to extract patient info from extracted data
   const extractPatientName = (extractedData: any) => {
@@ -94,7 +101,7 @@ const Dashboard = () => {
     }, 5000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchDocuments]);
   
   const handleUploadComplete = (data?: any) => {
     setIsUploadDialogOpen(false);
@@ -163,6 +170,11 @@ const Dashboard = () => {
       console.error('Error deleting document:', error);
       toast.error("Failed to delete document");
     }
+  };
+
+  const handleRetryFetch = () => {
+    setIsLoading(true);
+    fetchDocuments();
   };
 
   return (
@@ -261,6 +273,15 @@ const Dashboard = () => {
                       <div className="h-8 w-8 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-4"></div>
                       <p className="text-muted-foreground">Loading documents...</p>
                     </div>
+                  </div>
+                ) : loadingError ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <X className="h-12 w-12 text-destructive mb-4" strokeWidth={1.5} />
+                    <h3 className="text-xl font-medium mb-2">Error loading documents</h3>
+                    <p className="text-muted-foreground mb-4 max-w-md">{loadingError}</p>
+                    <Button onClick={handleRetryFetch}>
+                      Try Again
+                    </Button>
                   </div>
                 ) : filteredDocuments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
