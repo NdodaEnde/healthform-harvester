@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -264,6 +263,69 @@ const DocumentViewer = () => {
     return "No ID";
   };
 
+  const processCertificateData = (rawData: any) => {
+    console.log("Processing certificate data:", rawData);
+    
+    if (!rawData) return rawData;
+    
+    if (rawData.raw_response && rawData.raw_response.data && rawData.raw_response.data.markdown) {
+      console.log("Raw response with markdown already exists");
+      return rawData;
+    }
+    
+    if (typeof rawData === 'string') {
+      try {
+        const parsed = JSON.parse(rawData);
+        if (parsed.data && parsed.data.markdown) {
+          return {
+            raw_response: parsed
+          };
+        }
+      } catch (e) {
+        console.error("Error parsing certificate data string:", e);
+      }
+    }
+    
+    if (rawData.data && rawData.data.markdown) {
+      console.log("Wrapping API response in raw_response structure");
+      return {
+        raw_response: rawData
+      };
+    }
+    
+    if (rawData.markdown) {
+      console.log("Found markdown field directly in data");
+      return {
+        raw_response: {
+          data: {
+            markdown: rawData.markdown
+          }
+        }
+      };
+    }
+    
+    if (rawData.event_message && typeof rawData.event_message === 'string') {
+      try {
+        if (rawData.event_message.includes('"markdown":"')) {
+          console.log("Extracting markdown from event_message");
+          const messageObj = JSON.parse(rawData.event_message.substring(
+            rawData.event_message.indexOf('{"data"')
+          ));
+          
+          if (messageObj.data && messageObj.data.markdown) {
+            return {
+              raw_response: messageObj
+            };
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing event_message:", e);
+      }
+    }
+    
+    return rawData;
+  };
+
   const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
       const { data: documentData, error } = await supabase
@@ -293,23 +355,8 @@ const DocumentViewer = () => {
       let patientId = extractPatientId(extractedData);
       
       if (documentData.document_type === 'certificate-of-fitness') {
-        if (
-          typeof extractedData === 'object' && 
-          extractedData !== null && 
-          !Array.isArray(extractedData) && 
-          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
-          extractedData.raw_response
-        ) {
-          extractedData = {
-            ...extractedData,
-            structured_data: {
-              patient: {
-                name: patientName,
-                id_number: patientId
-              }
-            }
-          };
-        }
+        console.log("Processing certificate of fitness data");
+        extractedData = processCertificateData(extractedData);
       }
       
       console.log('Processed extracted data:', extractedData);
@@ -466,10 +513,29 @@ const DocumentViewer = () => {
     const extractedData = document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
-      console.log("Passing to CertificateTemplate:", extractedData);
+      let processedData = extractedData;
+      
+      if (extractedData.event_message && !extractedData.raw_response) {
+        try {
+          console.log("Attempting to process event_message data");
+          const eventMessageMatch = extractedData.event_message.match(/Response: (.*)/);
+          if (eventMessageMatch && eventMessageMatch[1]) {
+            const responseObj = JSON.parse(eventMessageMatch[1]);
+            if (responseObj.data && responseObj.data.markdown) {
+              processedData = {
+                raw_response: responseObj
+              };
+            }
+          }
+        } catch (e) {
+          console.error("Error processing event_message:", e);
+        }
+      }
+      
+      console.log("Passing to CertificateTemplate:", processedData);
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
+          <CertificateTemplate extractedData={processedData} />
         </div>
       );
     }
