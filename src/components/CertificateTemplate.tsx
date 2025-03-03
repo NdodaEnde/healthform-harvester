@@ -53,37 +53,39 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       restrictions: {}
     };
     
-    // Patient data
-    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+    // Patient data - more robust pattern matching
+    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (nameMatch && nameMatch[1]) extracted.patient.name = nameMatch[1].trim();
     
-    const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/);
+    const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (idMatch && idMatch[1]) extracted.patient.id_number = idMatch[1].trim();
     
-    const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/);
+    const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (companyMatch && companyMatch[1]) extracted.patient.company = companyMatch[1].trim();
     
-    const jobTitleMatch = markdown.match(/Job Title:\s*(.*?)(?=\n|\r|$|<)/i);
+    const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
     
-    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/);
+    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
     
-    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/);
+    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
     
-    // Examination type
-    if (markdown.includes('[x]') && markdown.match(/PRE-EMPLOYMENT.*?\[x\]/s)) {
-      extracted.examination_results.type.pre_employment = true;
-    }
-    if (markdown.includes('[x]') && markdown.match(/PERIODICAL.*?\[x\]/s)) {
-      extracted.examination_results.type.periodical = true;
-    }
-    if (markdown.includes('[x]') && markdown.match(/EXIT.*?\[x\]/s)) {
-      extracted.examination_results.type.exit = true;
-    }
+    // Examination type - look for [x] markers in different formats
+    extracted.examination_results.type.pre_employment = 
+      markdown.includes('**Pre-Employment**: [x]') || 
+      markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
+      
+    extracted.examination_results.type.periodical = 
+      markdown.includes('**Periodical**: [x]') || 
+      markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
+      
+    extracted.examination_results.type.exit = 
+      markdown.includes('**Exit**: [x]') || 
+      markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
     
-    // Medical tests
+    // Medical tests - check multiple formats
     const testsMap = [
       { name: 'BLOODS', key: 'bloods' },
       { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
@@ -97,19 +99,39 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     ];
     
     testsMap.forEach(test => {
-      const testRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 's');
-      const match = markdown.match(testRegex);
+      // Check table format with pipe separators
+      const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
+      const tableMatch = markdown.match(tableRegex);
       
-      if (match) {
-        const isDone = match[1] === 'x';
-        const results = match[2] ? match[2].trim() : '';
-        
+      // Check list format
+      const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
+      const listMatch = markdown.match(listRegex);
+      
+      // Check HTML table format
+      const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
+      const htmlTableMatch = markdown.match(htmlTableRegex);
+      
+      let isDone = false;
+      let results = '';
+      
+      if (tableMatch) {
+        isDone = tableMatch[1].trim() === 'x';
+        results = tableMatch[2] ? tableMatch[2].trim() : '';
+      } else if (listMatch) {
+        isDone = listMatch[1].trim() === 'x';
+        results = listMatch[2] ? listMatch[2].trim() : '';
+      } else if (htmlTableMatch) {
+        isDone = htmlTableMatch[1].trim() === 'x';
+        results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
+      }
+      
+      if (isDone || results) {
         extracted.examination_results.test_results[`${test.key}_done`] = isDone;
         extracted.examination_results.test_results[`${test.key}_results`] = results;
       }
     });
     
-    // Fitness status
+    // Fitness status - check various formats
     const fitnessOptions = [
       { name: 'FIT', key: 'fit' },
       { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
@@ -119,47 +141,89 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     ];
     
     fitnessOptions.forEach(option => {
-      const regex = new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 's');
-      const match = markdown.match(regex);
+      // Check multiple formats
+      const patterns = [
+        new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'),
+        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'),
+        new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
+      ];
       
-      if (match) {
-        extracted.certification[option.key] = match[0].includes('[x]');
+      // Check all patterns
+      let isSelected = false;
+      for (const pattern of patterns) {
+        const match = markdown.match(pattern);
+        if (match && match[0].includes('[x]')) {
+          isSelected = true;
+          break;
+        }
       }
+      
+      extracted.certification[option.key] = isSelected;
     });
     
-    // Restrictions
+    // Restrictions - check both table and list formats
     const restrictions = [
-      'Heights', 'Dust Exposure', 'Motorized Equipment', 'Wear Hearing Protection',
-      'Confined Spaces', 'Chemical Exposure', 'Wear Spectacles', 'Remain on Treatment for Chronic Conditions'
+      { name: 'Heights', key: 'heights' },
+      { name: 'Dust Exposure', key: 'dust_exposure' },
+      { name: 'Motorized Equipment', key: 'motorized_equipment' },
+      { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
+      { name: 'Confined Spaces', key: 'confined_spaces' },
+      { name: 'Chemical Exposure', key: 'chemical_exposure' },
+      { name: 'Wear Spectacles', key: 'wear_spectacles' },
+      { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
     ];
     
     restrictions.forEach(restriction => {
-      const key = restriction.toLowerCase().replace(/\s+/g, '_');
-      const isRestricted = markdown.includes(`**${restriction}**`) && 
-                           markdown.includes(`**${restriction}**: Indicates a restriction`);
+      // Check multiple formats
+      const patterns = [
+        new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
+        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'),
+        new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
+      ];
       
-      extracted.restrictions[key] = isRestricted;
+      // Check all patterns
+      let isSelected = false;
+      for (const pattern of patterns) {
+        const match = markdown.match(pattern);
+        if (match && match[0].includes('[x]')) {
+          isSelected = true;
+          break;
+        }
+      }
+      
+      extracted.restrictions[restriction.key] = isSelected;
     });
     
     // Follow-up actions and comments
-    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/);
+    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
     if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
     
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/);
+    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
     if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
     
-    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$)/s);
-    if (commentsMatch && commentsMatch[1]) extracted.certification.comments = commentsMatch[1].trim();
+    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
+    if (commentsMatch && commentsMatch[1]) {
+      let comments = commentsMatch[1].trim();
+      // If it's just "N/A" or empty after HTML tags are removed
+      if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || 
+          comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
+        extracted.certification.comments = "N/A";
+      } else {
+        extracted.certification.comments = comments;
+      }
+    }
     
     console.log("Extracted data from markdown:", extracted);
     return extracted;
   };
   
-  // Get markdown from extractedData
+  // Enhanced function to extract markdown from the Landing AI response
   const getMarkdown = (data: any): string | null => {
     if (!data) return null;
     
-    // Check nested paths for markdown content
+    console.log("Attempting to extract markdown from data structure");
+    
+    // First, try direct known paths
     const possiblePaths = [
       'raw_response.data.markdown',
       'extracted_data.raw_response.data.markdown',
@@ -175,24 +239,45 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       }
     }
     
-    // If no direct path works, try to find any property that might contain markdown
-    if (typeof data === 'object' && data !== null) {
-      for (const key in data) {
-        if (typeof data[key] === 'object' && data[key] !== null) {
-          // Check if this object has a raw_response or markdown property
-          if (data[key].raw_response?.data?.markdown) {
-            console.log(`Found markdown in nested object: ${key}.raw_response.data.markdown`);
-            return data[key].raw_response.data.markdown;
-          }
-          if (data[key].markdown) {
-            console.log(`Found markdown in nested object: ${key}.markdown`);
-            return data[key].markdown;
-          }
+    // Deep search for any property containing markdown content
+    const searchForMarkdown = (obj: any, path = ''): string | null => {
+      if (!obj || typeof obj !== 'object') return null;
+      
+      if (obj.markdown && typeof obj.markdown === 'string') {
+        console.log(`Found markdown at deep path: ${path}.markdown`);
+        return obj.markdown;
+      }
+      
+      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
+        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
+        return obj.raw_response.data.markdown;
+      }
+      
+      if (obj.data && obj.data.markdown) {
+        console.log(`Found markdown at deep path: ${path}.data.markdown`);
+        return obj.data.markdown;
+      }
+      
+      for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+          const result = searchForMarkdown(obj[key], `${path}.${key}`);
+          if (result) return result;
         }
       }
+      
+      return null;
+    };
+    
+    const deepMarkdown = searchForMarkdown(data);
+    if (deepMarkdown) return deepMarkdown;
+    
+    // Try to find structured_data.raw_content
+    if (data.structured_data && data.structured_data.raw_content) {
+      console.log("Found structured_data.raw_content, using as markdown");
+      return data.structured_data.raw_content;
     }
     
-    console.log("Could not find markdown in data");
+    console.log("Could not find markdown in provided data");
     return null;
   };
   

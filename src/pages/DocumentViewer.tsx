@@ -152,6 +152,7 @@ const DocumentViewer = () => {
   const [document, setDocument] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
@@ -169,6 +170,8 @@ const DocumentViewer = () => {
       if (!documentData) {
         return null;
       }
+      
+      console.log('Fetched document data:', documentData);
       
       const { data: urlData } = await supabase
         .storage
@@ -199,15 +202,39 @@ const DocumentViewer = () => {
     if (!extractedData) return "Unknown";
     
     if (extractedData.structured_data && extractedData.structured_data.patient) {
-      return extractedData.structured_data.patient.name || "Unknown";
+      const patientData = extractedData.structured_data.patient;
+      if (patientData.name) return patientData.name;
+      if (patientData.full_name) return patientData.full_name;
     }
     
     if (extractedData.raw_response && extractedData.raw_response.data) {
       const markdown = extractedData.raw_response.data.markdown;
       if (markdown) {
-        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
       }
+    }
+    
+    if (typeof extractedData === 'object') {
+      const findPatientName = (obj: any): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        
+        if (obj.patient && obj.patient.name) return obj.patient.name;
+        if (obj.name && typeof obj.name === 'string') return obj.name;
+        if (obj.full_name && typeof obj.full_name === 'string') return obj.full_name;
+        
+        for (const key in obj) {
+          if (typeof obj[key] === 'object' && obj[key] !== null) {
+            const name = findPatientName(obj[key]);
+            if (name) return name;
+          }
+        }
+        
+        return null;
+      };
+      
+      const foundName = findPatientName(extractedData);
+      if (foundName) return foundName;
     }
     
     return "Unknown";
@@ -217,18 +244,40 @@ const DocumentViewer = () => {
     if (!extractedData) return "No ID";
     
     if (extractedData.structured_data && extractedData.structured_data.patient) {
-      return extractedData.structured_data.patient.id_number || 
-             extractedData.structured_data.patient.employee_id || 
-             extractedData.structured_data.patient.id || 
-             "No ID";
+      const patientData = extractedData.structured_data.patient;
+      if (patientData.id_number) return patientData.id_number;
+      if (patientData.employee_id) return patientData.employee_id; 
+      if (patientData.id) return patientData.id;
     }
     
     if (extractedData.raw_response && extractedData.raw_response.data) {
       const markdown = extractedData.raw_response.data.markdown;
       if (markdown) {
-        const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/);
+        const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (idMatch && idMatch[1]) return idMatch[1].trim();
       }
+    }
+    
+    if (typeof extractedData === 'object') {
+      const findPatientId = (obj: any): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        
+        if (obj.patient && obj.patient.id_number) return obj.patient.id_number;
+        if (obj.patient && obj.patient.id) return obj.patient.id;
+        if (obj.id_number && typeof obj.id_number === 'string') return obj.id_number;
+        
+        for (const key in obj) {
+          if (typeof obj[key] === 'object' && obj[key] !== null) {
+            const id = findPatientId(obj[key]);
+            if (id) return id;
+          }
+        }
+        
+        return null;
+      };
+      
+      const foundId = findPatientId(extractedData);
+      if (foundId) return foundId;
     }
     
     return "No ID";
@@ -251,6 +300,21 @@ const DocumentViewer = () => {
           setImageUrl(documentData.imageUrl);
           
           sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
+          
+          if (documentData.status === 'processing') {
+            const timeout = setTimeout(() => {
+              console.log('Processing timeout reached, updating status');
+              setDocument(prev => {
+                if (prev && prev.status === 'processing') {
+                  const updated = { ...prev, status: 'processed' };
+                  return updated;
+                }
+                return prev;
+              });
+            }, 30000);
+            
+            setProcessingTimeout(timeout);
+          }
         } else {
           const storedData = sessionStorage.getItem(`document-${id}`);
           
@@ -294,16 +358,35 @@ const DocumentViewer = () => {
         }
         
         if (data && document) {
+          console.log('Poll result:', data.status, 'Current status:', document.status);
+          
           if (document.status === 'processing' && data.status === 'processed') {
             console.log('Document processing completed, refreshing data');
-            fetchData();
-          }
-          
-          if (document.status !== data.status) {
-            setDocument((prev: any) => ({
+            
+            if (processingTimeout) {
+              clearTimeout(processingTimeout);
+              setProcessingTimeout(null);
+            }
+            
+            const documentData = await fetchDocumentFromSupabase(id);
+            if (documentData) {
+              setDocument(documentData);
+              
+              sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
+              
+              toast.success("Document processing completed", {
+                description: "The document has been successfully processed and data extracted."
+              });
+            }
+          } else if (document.status !== data.status) {
+            console.log('Document status changed:', data.status);
+            setDocument(prev => ({
               ...prev,
               status: data.status,
-              extractedData: data.extracted_data || prev.extractedData
+              extractedData: data.extracted_data || prev.extractedData,
+              patientName: extractPatientName(data.extracted_data) || prev.patientName,
+              patientId: extractPatientId(data.extracted_data) || prev.patientId,
+              jsonData: JSON.stringify(data.extracted_data || prev.extractedData, null, 2)
             }));
           }
         }
@@ -312,8 +395,13 @@ const DocumentViewer = () => {
       }
     }, 5000);
     
-    return () => clearInterval(pollInterval);
-  }, [id, document?.status]);
+    return () => {
+      clearInterval(pollInterval);
+      if (processingTimeout) {
+        clearTimeout(processingTimeout);
+      }
+    };
+  }, [id, document?.status, processingTimeout]);
 
   const renderExtractedData = () => {
     if (!document || !document.extractedData) {
