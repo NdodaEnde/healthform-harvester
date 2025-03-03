@@ -388,7 +388,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(data, 'examination_date')}</span>
+                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(extractedData, 'examination_date')}</span>
                   </div>
                 </div>
                 <div className="flex-1">
