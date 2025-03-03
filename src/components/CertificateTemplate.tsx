@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card } from "@/components/ui/card";
 
@@ -32,14 +31,226 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     return current !== undefined && current !== null ? current : defaultValue;
   };
   
+  // Extract data from both potential sources
+  // First, try to extract from the raw_response which contains markdown
+  const parseFromMarkdown = (data: any) => {
+    // Create a structured data object from the markdown information
+    if (!data || !data.raw_response || !data.raw_response.data) return null;
+    
+    const markdown = data.raw_response.data.markdown;
+    if (!markdown) return null;
+    
+    // Basic parsing to extract important fields
+    const structured: any = {
+      patient: {},
+      examination_results: { test_results: {} },
+      restrictions: {},
+      certification: {},
+    };
+    
+    // Extract patient information from the markdown
+    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*: (.*?)(?=\n|\r|$)/);
+    if (nameMatch && nameMatch[1]) structured.patient.name = nameMatch[1].trim();
+    
+    const idMatch = markdown.match(/\*\*ID NO\*\*: (.*?)(?=\n|\r|$)/);
+    if (idMatch && idMatch[1]) structured.patient.id_number = idMatch[1].trim();
+    
+    const companyMatch = markdown.match(/\*\*Company Name\*\*: (.*?)(?=\n|\r|$)/);
+    if (companyMatch && companyMatch[1]) structured.patient.company = companyMatch[1].trim();
+    
+    const jobTitleMatch = markdown.match(/## Job Title: (.*?)(?=\n|\r|$|<)/);
+    if (jobTitleMatch && jobTitleMatch[1]) structured.patient.occupation = jobTitleMatch[1].trim();
+    
+    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*: (.*?)(?=\n|\r|$)/);
+    if (examDateMatch && examDateMatch[1]) structured.examination_results.date = examDateMatch[1].trim();
+    
+    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*: (.*?)(?=\n|\r|$)/);
+    if (expiryDateMatch && expiryDateMatch[1]) structured.certification.valid_until = expiryDateMatch[1].trim();
+    
+    // Extract examination type
+    if (markdown.includes('[x]</td>') && markdown.includes('PRE-EMPLOYMENT')) {
+      structured.examination_results.type = { pre_employment: true };
+    } else if (markdown.includes('[x]</td>') && markdown.includes('PERIODICAL')) {
+      structured.examination_results.type = { periodical: true };
+    } else if (markdown.includes('[x]</td>') && markdown.includes('EXIT')) {
+      structured.examination_results.type = { exit: true };
+    }
+    
+    // Extract test results
+    if (markdown.includes('BLOODS') && markdown.includes('[x]')) {
+      structured.examination_results.test_results.bloods_done = true;
+      const bloodsResultsMatch = markdown.match(/BLOODS<\/td>\s*<td>\[x\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (bloodsResultsMatch && bloodsResultsMatch[1]) {
+        structured.examination_results.test_results.bloods_results = bloodsResultsMatch[1].trim();
+      }
+    }
+    
+    if (markdown.includes('FAR, NEAR VISION')) {
+      const visionDoneMatch = markdown.match(/FAR, NEAR VISION<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.vision_test = visionDoneMatch && visionDoneMatch[1] === 'x';
+      
+      const visionResultsMatch = markdown.match(/FAR, NEAR VISION<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (visionResultsMatch && visionResultsMatch[2]) {
+        structured.examination_results.test_results.vision_results = visionResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('SIDE & DEPTH')) {
+      const sideDepthDoneMatch = markdown.match(/SIDE & DEPTH<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.side_depth_test = sideDepthDoneMatch && sideDepthDoneMatch[1] === 'x';
+      
+      const sideDepthResultsMatch = markdown.match(/SIDE & DEPTH<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (sideDepthResultsMatch && sideDepthResultsMatch[2]) {
+        structured.examination_results.test_results.side_depth_results = sideDepthResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('NIGHT VISION')) {
+      const nightVisionDoneMatch = markdown.match(/NIGHT VISION<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.night_vision_test = nightVisionDoneMatch && nightVisionDoneMatch[1] === 'x';
+      
+      const nightVisionResultsMatch = markdown.match(/NIGHT VISION<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (nightVisionResultsMatch && nightVisionResultsMatch[2]) {
+        structured.examination_results.test_results.night_vision_results = nightVisionResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('Hearing')) {
+      const hearingDoneMatch = markdown.match(/Hearing<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.hearing_test = hearingDoneMatch && hearingDoneMatch[1] === 'x';
+      
+      const hearingResultsMatch = markdown.match(/Hearing<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (hearingResultsMatch && hearingResultsMatch[2]) {
+        structured.examination_results.test_results.hearing_test_results = hearingResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('Working at Heights')) {
+      const heightsDoneMatch = markdown.match(/Working at Heights<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.heights_test = heightsDoneMatch && heightsDoneMatch[1] === 'x';
+      
+      const heightsResultsMatch = markdown.match(/Working at Heights<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (heightsResultsMatch && heightsResultsMatch[2]) {
+        structured.examination_results.test_results.heights_results = heightsResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('Lung Function')) {
+      const lungDoneMatch = markdown.match(/Lung Function<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.lung_function_test = lungDoneMatch && lungDoneMatch[1] === 'x';
+      
+      const lungResultsMatch = markdown.match(/Lung Function<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (lungResultsMatch && lungResultsMatch[2]) {
+        structured.examination_results.test_results.lung_function_results = lungResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('X-Ray')) {
+      const xrayDoneMatch = markdown.match(/X-Ray<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.x_ray_test = xrayDoneMatch && xrayDoneMatch[1] === 'x';
+      
+      const xrayResultsMatch = markdown.match(/X-Ray<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (xrayResultsMatch && xrayResultsMatch[2]) {
+        structured.examination_results.test_results.x_ray_results = xrayResultsMatch[2].trim();
+      }
+    }
+    
+    if (markdown.includes('Drug Screen')) {
+      const drugDoneMatch = markdown.match(/Drug Screen<\/td>\s*<td>\[(x| )\]<\/td>/);
+      structured.examination_results.test_results.drug_screen_test = drugDoneMatch && drugDoneMatch[1] === 'x';
+      
+      const drugResultsMatch = markdown.match(/Drug Screen<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+      if (drugResultsMatch && drugResultsMatch[2]) {
+        structured.examination_results.test_results.drug_screen_results = drugResultsMatch[2].trim();
+      }
+    }
+    
+    // Extract restrictions
+    if (markdown.includes('**Heights**:')) structured.restrictions.heights = true;
+    if (markdown.includes('**Confined Spaces**:')) structured.restrictions.confined_spaces = true;
+    if (markdown.includes('**Dust Exposure**:')) structured.restrictions.dust_exposure = true;
+    if (markdown.includes('**Chemical Exposure**:')) structured.restrictions.chemical_exposure = true;
+    if (markdown.includes('**Motorized Equipment**:')) structured.restrictions.motorized_equipment = true;
+    if (markdown.includes('**Wear Spectacles**:')) structured.restrictions.wear_spectacles = true;
+    if (markdown.includes('**Wear Hearing Protection**:')) structured.restrictions.wear_hearing_protection = true;
+    if (markdown.includes('**Remain on Treatment for Chronic Conditions**:')) structured.restrictions.chronic_conditions = true;
+    
+    // Extract fitness declaration
+    if (markdown.includes('<th>FIT</th>') && markdown.match(/FIT<\/th>[\s\S]*?\[x\]/)) {
+      structured.certification.fit = true;
+    }
+    if (markdown.includes('<th>Fit with Restriction</th>') && markdown.match(/Fit with Restriction<\/th>[\s\S]*?\[x\]/)) {
+      structured.certification.fit_with_restrictions = true;
+    }
+    if (markdown.includes('<th>Fit with Condition</th>') && markdown.match(/Fit with Condition<\/th>[\s\S]*?\[x\]/)) {
+      structured.certification.fit_with_condition = true;
+    }
+    if (markdown.includes('<th>Temporary Unfit</th>') && markdown.match(/Temporary Unfit<\/th>[\s\S]*?\[x\]/)) {
+      structured.certification.temporarily_unfit = true;
+    }
+    if (markdown.includes('<th>UNFIT</th>') && markdown.match(/UNFIT<\/th>[\s\S]*?\[x\]/)) {
+      structured.certification.unfit = true;
+    }
+    
+    // Extract referred or follow up actions
+    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/);
+    if (followUpMatch && followUpMatch[1]) structured.certification.follow_up = followUpMatch[1].trim();
+    
+    // Extract review date
+    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/);
+    if (reviewDateMatch && reviewDateMatch[1]) structured.certification.review_date = reviewDateMatch[1].trim();
+    
+    // Extract comments
+    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$)/s);
+    if (commentsMatch && commentsMatch[1]) structured.certification.comments = commentsMatch[1].trim();
+    
+    return { structured_data: structured };
+  };
+  
+  // Try to get structured data from the extractedData
+  let data;
+  
+  // First check if we have structured_data directly
+  if (extractedData?.structured_data) {
+    console.log("Using existing structured_data");
+    data = extractedData;
+  } 
+  // Then check if we have it in the extractedData.extracted_data object
+  else if (extractedData?.extracted_data?.structured_data) {
+    console.log("Using structured_data from extracted_data");
+    data = extractedData.extracted_data;
+  }
+  // Then try to parse from raw_response
+  else if (extractedData?.extracted_data?.raw_response) {
+    console.log("Parsing from raw_response");
+    data = parseFromMarkdown(extractedData.extracted_data);
+  }
+  // Finally check if the extractedData itself is the raw_response
+  else if (extractedData?.raw_response) {
+    console.log("Parsing from direct raw_response");
+    data = parseFromMarkdown(extractedData);
+  }
+  // If nothing worked, use the extractedData as is
+  else {
+    console.log("Using default data handling");
+    data = { structured_data: {} };
+    
+    // Try to get the highest level object that might contain our data
+    if (typeof extractedData === 'object' && extractedData !== null) {
+      data.structured_data = extractedData;
+    }
+  }
+  
+  console.log("Final data structure used:", data);
+  
   // Extract data based on expected structure from API response
-  const data = extractedData?.structured_data || {};
+  const structured_data = data?.structured_data || {};
   
   // Get the main sections from the data
-  const patient = data.patient || {};
-  const examination = data.examination_results || data.medical_details || {};
-  const restrictions = data.restrictions || {};
-  const certification = data.certification || data.fitness_assessment || {};
+  const patient = structured_data.patient || {};
+  const examination = structured_data.examination_results || structured_data.medical_details || {};
+  const restrictions = structured_data.restrictions || {};
+  const certification = structured_data.certification || structured_data.fitness_assessment || {};
   const testResults = examination.test_results || examination.tests || {};
   
   // Fitness status
@@ -111,7 +322,21 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   };
   
   return (
+    
     <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
+      {/* Add console logging to help debugging */}
+      {console.log("Certificate Data:", {
+        patient,
+        examination,
+        restrictions,
+        certification,
+        testResults,
+        medicalTests,
+        restrictionsData,
+        fitnessStatus,
+        examinationType
+      })}
+      
       <div className="relative overflow-hidden">
         {/* Certificate watermark (faint background) */}
         <div 
@@ -396,116 +621,4 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                     </td>
                   </tr>
                   <tr>
-                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
-                      <div className="font-semibold">Confined Spaces</div>
-                      {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
-                    </td>
-                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
-                      <div className="font-semibold">Chemical Exposure</div>
-                      {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
-                    </td>
-                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
-                      <div className="font-semibold">Wear Spectacles</div>
-                      {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
-                    </td>
-                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
-                      <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
-                      {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          {/* Fitness Declaration */}
-          <div className="mb-4">
-            <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
-              Medical Fitness Declaration
-            </div>
-            
-            <div className="px-4">
-              <table className="w-full border border-gray-400 text-sm">
-                <thead>
-                  <tr>
-                    <th className={`border border-gray-400 py-2 px-3 text-center w-1/5 ${fitnessStatus.fit ? 'bg-green-200' : 'bg-green-100'}`}>
-                      FIT
-                    </th>
-                    <th className={`border border-gray-400 py-2 px-3 text-center w-1/5 ${fitnessStatus.fitWithRestriction ? 'bg-yellow-200' : 'bg-yellow-100'}`}>
-                      Fit with Restriction
-                    </th>
-                    <th className={`border border-gray-400 py-2 px-3 text-center w-1/5 ${fitnessStatus.fitWithCondition ? 'bg-yellow-200' : 'bg-yellow-100'}`}>
-                      Fit with Condition
-                    </th>
-                    <th className={`border border-gray-400 py-2 px-3 text-center w-1/5 ${fitnessStatus.temporarilyUnfit ? 'bg-orange-200' : 'bg-orange-100'}`}>
-                      Temporary Unfit
-                    </th>
-                    <th className={`border border-gray-400 py-2 px-3 text-center w-1/5 ${fitnessStatus.unfit ? 'bg-red-200' : 'bg-red-100'}`}>
-                      UNFIT
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="border border-gray-400 h-10 text-center">
-                      {fitnessStatus.fit ? '✓' : ''}
-                    </td>
-                    <td className="border border-gray-400 h-10 text-center">
-                      {fitnessStatus.fitWithRestriction ? '✓' : ''}
-                    </td>
-                    <td className="border border-gray-400 h-10 text-center">
-                      {fitnessStatus.fitWithCondition ? '✓' : ''}
-                    </td>
-                    <td className="border border-gray-400 h-10 text-center">
-                      {fitnessStatus.temporarilyUnfit ? '✓' : ''}
-                    </td>
-                    <td className="border border-gray-400 h-10 text-center">
-                      {fitnessStatus.unfit ? '✓' : ''}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          {/* Comments */}
-          <div className="px-4 mb-6">
-            <div className="flex items-center mb-1">
-              <span className="font-semibold mr-1">Comments:</span>
-            </div>
-            <div className="border-b border-gray-400 pb-1 min-h-[2.5rem]">
-              {getValue(certification, 'comments') || getValue(certification, 'notes') || getValue(certification, 'additional_comments')}
-            </div>
-            <div className="border-b border-gray-400 pb-1 min-h-[1.5rem]">&nbsp;</div>
-          </div>
-          
-          {/* Signature Section */}
-          <div className="px-4 mb-4">
-            <div className="text-center text-xs mt-6">
-              <p>Occupational Health Practitioner / Occupational Medical Practitioner</p>
-              <p>Dr MJ Mpishi / Practice No: 0404160</p>
-            </div>
-            
-            <div className="flex justify-between items-end mt-4">
-              <div className="w-48 border-t border-black text-center">
-                <div className="font-semibold">SIGNATURE</div>
-                <div className="text-xs">
-                  SANC No: 14262351, SASOHN Reg. Nr: 2136 / MBCHB DOH
-                  <br />
-                  Practice Number: 999 088 0000 8177 91
-                </div>
-              </div>
-              
-              <div className="w-48 text-center">
-                <div className="rounded-full border border-black w-24 h-24 mx-auto mb-2"></div>
-                <div className="font-semibold">STAMP</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-};
-
-export default CertificateTemplate;
+                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-
