@@ -163,6 +163,10 @@ const DocumentViewer = () => {
       return "Unknown";
     }
     
+    if (Array.isArray(extractedData)) {
+      return "Unknown";
+    }
+    
     if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
       const patientData = extractedData.structured_data.patient;
       if (patientData && typeof patientData === 'object') {
@@ -210,6 +214,10 @@ const DocumentViewer = () => {
     console.log("Extracting patient ID from:", extractedData);
     
     if (typeof extractedData !== 'object' || extractedData === null) {
+      return "No ID";
+    }
+    
+    if (Array.isArray(extractedData)) {
       return "No ID";
     }
     
@@ -287,6 +295,7 @@ const DocumentViewer = () => {
         if (
           typeof extractedData === 'object' && 
           extractedData !== null && 
+          !Array.isArray(extractedData) && 
           (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
           extractedData.raw_response
         ) {
@@ -464,7 +473,12 @@ const DocumentViewer = () => {
       );
     }
     
-    if (typeof extractedData === 'object' && extractedData !== null && extractedData.structured_data) {
+    if (
+      typeof extractedData === 'object' && 
+      extractedData !== null && 
+      !Array.isArray(extractedData) && 
+      extractedData.structured_data
+    ) {
       const structuredData = extractedData.structured_data;
       
       return (
@@ -588,8 +602,12 @@ const DocumentViewer = () => {
       );
     }
     
-    if (typeof extractedData === 'object' && extractedData !== null && 
-        (extractedData.documents || extractedData.text || extractedData.tables)) {
+    if (
+      typeof extractedData === 'object' && 
+      extractedData !== null && 
+      !Array.isArray(extractedData) && 
+      (extractedData.documents || extractedData.text || extractedData.tables)
+    ) {
       return (
         <div className="space-y-6">
           <div>
@@ -864,41 +882,3 @@ const DocumentViewer = () => {
                         <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
                           {document.jsonData}
                         </pre>
-                      </div>
-                    </ScrollArea>
-                  </TabsContent>
-                </CardContent>
-              </Tabs>
-            </Card>
-            
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => navigate("/dashboard")}
-              >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <Button
-                onClick={() => {
-                  toast("Certificate generated successfully", {
-                    description: "The certificate of fitness has been saved to your downloads folder",
-                    action: {
-                      label: "View",
-                      onClick: () => console.log("Viewing certificate")
-                    }
-                  });
-                }}
-              >
-                <ClipboardCheck className="h-4 w-4 mr-2" />
-                Generate Certificate
-              </Button>
-            </div>
-          </motion.div>
-        </motion.div>
-      </main>
-    </div>
-  );
-};
-
-export default DocumentViewer;
