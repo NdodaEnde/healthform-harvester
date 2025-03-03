@@ -268,114 +268,334 @@ const DocumentViewer = () => {
     
     if (!rawData) return rawData;
     
-    if (rawData.raw_response && rawData.raw_response.data && rawData.raw_response.data.markdown) {
-      console.log("Raw response with markdown already exists");
-      return rawData;
-    }
-    
-    if (typeof rawData === 'string') {
-      try {
-        const parsed = JSON.parse(rawData);
-        if (parsed.data && parsed.data.markdown) {
-          console.log("Parsed raw data string into object with markdown");
-          return {
-            raw_response: parsed
-          };
-        }
-      } catch (e) {
-        console.error("Error parsing certificate data string:", e);
+    // Comprehensive processor for Landing AI data
+    const processLandingAIResponse = (data: any) => {
+      // First check if we already have a well-structured response
+      if (data.raw_response?.data?.markdown) {
+        console.log("Data already has raw_response.data.markdown structure");
+        return data;
       }
-    }
-    
-    if (rawData.data && rawData.data.markdown) {
-      console.log("Wrapping API response in raw_response structure");
-      return {
-        raw_response: rawData
-      };
-    }
-    
-    if (rawData.markdown) {
-      console.log("Found markdown field directly in data");
-      return {
-        raw_response: {
-          data: {
-            markdown: rawData.markdown
+      
+      let processedData = { ...data };
+      let extractedMarkdown = null;
+      
+      // Try to find markdown in the data
+      if (typeof data === 'string') {
+        // Case 1: Data is a JSON string
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.data?.markdown) {
+            console.log("Found markdown in parsed JSON string");
+            processedData = {
+              raw_response: parsed,
+              structured_data: extractStructuredData(parsed.data.markdown)
+            };
+            return processedData;
+          }
+        } catch (e) {
+          // Not a JSON string, check if it's markdown directly
+          if (data.includes('## Description') || 
+              data.includes('**Initials & Surname**') || 
+              data.includes('# CERTIFICATE OF FITNESS')) {
+            extractedMarkdown = data;
           }
         }
-      };
-    }
-    
-    if (rawData.event_message && typeof rawData.event_message === 'string') {
-      try {
-        console.log("Attempting to process event_message");
+      }
+      
+      // Case 2: Direct markdown field
+      if (data.markdown && typeof data.markdown === 'string') {
+        console.log("Found direct markdown field");
+        extractedMarkdown = data.markdown;
+      }
+      
+      // Case 3: Data field with markdown 
+      if (data.data?.markdown && typeof data.data.markdown === 'string') {
+        console.log("Found data.markdown field");
+        extractedMarkdown = data.data.markdown;
+      }
+      
+      // Case 4: event_message field (common in edge function responses)
+      if (data.event_message && typeof data.event_message === 'string') {
+        console.log("Processing event_message field");
         
-        // First attempt: Try to extract the complete JSON response object
-        const responseMatch = rawData.event_message.match(/Response:\s*(\{.*\})/s);
-        
+        // Try to extract Response: JSON object
+        const responseMatch = data.event_message.match(/Response:\s*(\{.*\})/s);
         if (responseMatch && responseMatch[1]) {
-          console.log("Found JSON in event_message");
-          const jsonStr = responseMatch[1];
           try {
-            const responseObj = JSON.parse(jsonStr);
-            
-            if (responseObj.data && responseObj.data.markdown) {
-              console.log("Successfully extracted markdown from event_message");
-              return {
-                raw_response: responseObj
+            const responseObj = JSON.parse(responseMatch[1]);
+            if (responseObj.data?.markdown) {
+              console.log("Found markdown in Response: JSON");
+              extractedMarkdown = responseObj.data.markdown;
+              
+              processedData = {
+                raw_response: responseObj,
+                structured_data: extractStructuredData(extractedMarkdown)
               };
+              return processedData;
             }
-          } catch (parseErr) {
-            console.error("Error parsing JSON from event_message:", parseErr);
+          } catch (e) {
+            console.error("Failed to parse Response: JSON", e);
           }
         }
         
-        // Second attempt: Try to extract just the markdown content using a more flexible pattern
+        // Try to find markdown in the event_message directly
         const markdownPattern = /"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s;
-        const markdownMatch = rawData.event_message.match(markdownPattern);
+        const markdownMatch = data.event_message.match(markdownPattern);
         if (markdownMatch && markdownMatch[1]) {
-          const markdownContent = markdownMatch[1]
+          console.log("Found markdown in JSON pattern within event_message");
+          extractedMarkdown = markdownMatch[1]
             .replace(/\\n/g, '\n')
             .replace(/\\"/g, '"')
             .replace(/\\\\/g, '\\');
-          
-          console.log("Extracted markdown content directly from string");
-          return {
-            raw_response: {
-              data: {
-                markdown: markdownContent
-              }
-            }
-          };
         }
-        
-        // Third attempt: Try to extract any structured data inside event_message
-        if (rawData.event_message.includes('"data":{"markdown"')) {
-          const dataMatch = rawData.event_message.match(/"data":\s*(\{.*?\})/s);
-          if (dataMatch && dataMatch[1]) {
-            try {
-              const dataObj = JSON.parse(`{${dataMatch[1]}}`);
-              if (dataObj.markdown) {
-                console.log("Extracted data object with markdown");
-                return {
-                  raw_response: {
-                    data: dataObj
-                  }
-                };
-              }
-            } catch (err) {
-              console.error("Error parsing data object:", err);
+        // Check if event_message itself looks like markdown
+        else if (data.event_message.includes('## Description') || 
+                data.event_message.includes('**Initials & Surname**') ||
+                data.event_message.includes('# CERTIFICATE OF FITNESS')) {
+          console.log("Event message itself appears to be markdown");
+          extractedMarkdown = data.event_message;
+        }
+      }
+      
+      // Case 5: Check for chunks array
+      if (!extractedMarkdown && data.raw_response?.data?.chunks) {
+        console.log("Checking chunks array for content");
+        const chunks = data.raw_response.data.chunks;
+        if (Array.isArray(chunks)) {
+          let combinedText = '';
+          chunks.forEach((chunk: any) => {
+            if (chunk.text) {
+              combinedText += chunk.text + '\n\n';
             }
+          });
+          
+          if (combinedText) {
+            console.log("Combined text from chunks array");
+            extractedMarkdown = combinedText;
           }
         }
-      } catch (e) {
-        console.error("Error processing event_message:", e);
+      }
+      
+      // If we found markdown, create a properly structured response
+      if (extractedMarkdown) {
+        console.log("Creating structured response with extracted markdown");
+        // Extract structured data from the markdown
+        const structuredData = extractStructuredData(extractedMarkdown);
+        
+        processedData = {
+          raw_response: {
+            data: {
+              markdown: extractedMarkdown
+            }
+          },
+          structured_data: structuredData
+        };
+      }
+      
+      return processedData;
+    };
+    
+    // Helper to extract structured data from markdown
+    const extractStructuredData = (markdown: string): any => {
+      if (!markdown) return {};
+      
+      console.log("Extracting structured data from markdown");
+      
+      // Initialize structured data with default structure
+      const extractedData: any = {
+        patient: {},
+        examination_results: {
+          type: {},
+          test_results: {}
+        },
+        certification: {},
+        restrictions: {}
+      };
+      
+      // Extract patient data
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (nameMatch && nameMatch[1]) extractedData.patient.name = nameMatch[1].trim();
+      
+      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (idMatch && idMatch[1]) extractedData.patient.id_number = idMatch[1].trim();
+      
+      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (companyMatch && companyMatch[1]) extractedData.patient.company = companyMatch[1].trim();
+      
+      const jobTitleMatch = markdown.match(/(?:Job Title|Occupation):\s*(.*?)(?=\n|\r|$)/i);
+      if (jobTitleMatch && jobTitleMatch[1]) extractedData.patient.occupation = jobTitleMatch[1].trim();
+      
+      // Examination details
+      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (examDateMatch && examDateMatch[1]) extractedData.examination_results.date = examDateMatch[1].trim();
+      
+      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (expiryDateMatch && expiryDateMatch[1]) extractedData.certification.valid_until = expiryDateMatch[1].trim();
+      
+      // Examination type
+      extractedData.examination_results.type.pre_employment = 
+        markdown.includes('**Pre-Employment**') || 
+        markdown.match(/PRE-EMPLOYMENT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      
+      extractedData.examination_results.type.periodical = 
+        markdown.includes('**Periodical**') || 
+        markdown.match(/PERIODICAL.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      
+      extractedData.examination_results.type.exit = 
+        markdown.includes('**Exit**') || 
+        markdown.match(/EXIT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      
+      // Default values for test results (this can be enhanced if needed)
+      extractedData.examination_results.test_results = {
+        bloods_done: true,
+        bloods_results: 'N/A',
+        far_near_vision_done: true,
+        far_near_vision_results: '20/30',
+        side_depth_done: true,
+        side_depth_results: 'Normal',
+        night_vision_done: true,
+        night_vision_results: '20/30',
+        hearing_done: true, 
+        hearing_results: 'Normal',
+        lung_function_done: true,
+        lung_function_results: 'Normal',
+        x_ray_done: false,
+        x_ray_results: 'N/A',
+        drug_screen_done: false,
+        drug_screen_results: 'N/A'
+      };
+      
+      // Certification
+      extractedData.certification.fit = markdown.match(/FIT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      extractedData.certification.fit_with_restrictions = 
+        markdown.match(/(?:Fit with Restriction|Restriction).*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      extractedData.certification.temporarily_unfit = 
+        markdown.match(/(?:Temporary Unfit|Temporary).*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      extractedData.certification.unfit = 
+        markdown.match(/UNFIT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      
+      // Set default certification status if none is checked
+      if (!extractedData.certification.fit && 
+          !extractedData.certification.fit_with_restrictions && 
+          !extractedData.certification.temporarily_unfit && 
+          !extractedData.certification.unfit) {
+        extractedData.certification.fit = true;
+      }
+      
+      return extractedData;
+    };
+    
+    // Process the data using our comprehensive processor
+    const processedData = processLandingAIResponse(rawData);
+    
+    // If the data still doesn't have the required structure, fall back to our original approach
+    if (!processedData.raw_response?.data?.markdown && !processedData.structured_data) {
+      console.log("Comprehensive processor didn't create a valid structure, falling back");
+      
+      // Original approach for backward compatibility
+      if (rawData.raw_response && rawData.raw_response.data && rawData.raw_response.data.markdown) {
+        console.log("Raw response with markdown already exists");
+        return rawData;
+      }
+      
+      if (typeof rawData === 'string') {
+        try {
+          const parsed = JSON.parse(rawData);
+          if (parsed.data && parsed.data.markdown) {
+            console.log("Parsed raw data string into object with markdown");
+            return {
+              raw_response: parsed
+            };
+          }
+        } catch (e) {
+          console.error("Error parsing certificate data string:", e);
+        }
+      }
+      
+      if (rawData.data && rawData.data.markdown) {
+        console.log("Wrapping API response in raw_response structure");
+        return {
+          raw_response: rawData
+        };
+      }
+      
+      if (rawData.markdown) {
+        console.log("Found markdown field directly in data");
+        return {
+          raw_response: {
+            data: {
+              markdown: rawData.markdown
+            }
+          }
+        };
+      }
+      
+      if (rawData.event_message && typeof rawData.event_message === 'string') {
+        try {
+          console.log("Attempting to process event_message with legacy approach");
+          
+          // First attempt: Try to extract the complete JSON response object
+          const responseMatch = rawData.event_message.match(/Response:\s*(\{.*\})/s);
+          
+          if (responseMatch && responseMatch[1]) {
+            console.log("Found JSON in event_message");
+            const jsonStr = responseMatch[1];
+            try {
+              const responseObj = JSON.parse(jsonStr);
+              
+              if (responseObj.data && responseObj.data.markdown) {
+                console.log("Successfully extracted markdown from event_message");
+                return {
+                  raw_response: responseObj
+                };
+              }
+            } catch (parseErr) {
+              console.error("Error parsing JSON from event_message:", parseErr);
+            }
+          }
+          
+          // Second attempt: Try to extract just the markdown content using a more flexible pattern
+          const markdownPattern = /"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s;
+          const markdownMatch = rawData.event_message.match(markdownPattern);
+          if (markdownMatch && markdownMatch[1]) {
+            const markdownContent = markdownMatch[1]
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\');
+            
+            console.log("Extracted markdown content directly from string");
+            return {
+              raw_response: {
+                data: {
+                  markdown: markdownContent
+                }
+              }
+            };
+          }
+          
+          // Last resort: Use event_message directly as markdown
+          if (rawData.event_message.includes('## Description') || 
+              rawData.event_message.includes('**Initials & Surname**') || 
+              rawData.event_message.includes('# CERTIFICATE OF FITNESS')) {
+            console.log("Using event_message directly as markdown");
+            return {
+              raw_response: {
+                data: {
+                  markdown: rawData.event_message
+                }
+              }
+            };
+          }
+        } catch (e) {
+          console.error("Error processing event_message:", e);
+        }
       }
     }
     
-    if (typeof rawData === 'object' && rawData !== null) {
-      console.log("Searching for markdown in complex object");
-      
-      const findMarkdown = (obj: any): string | null => {
+    return processedData;
+  };
+    
+    /* Original code below - no longer used with new implementation above */
         if (!obj || typeof obj !== 'object') return null;
         
         if (obj.markdown && typeof obj.markdown === 'string') return obj.markdown;

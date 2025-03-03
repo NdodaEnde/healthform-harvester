@@ -25,11 +25,11 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   }, [extractedData]);
 
   // Helper to check if a value is checked/selected
-  const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
+  const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x', '✓', '✔', 'done', 'selected', 'true']) => {
     if (value === undefined || value === null) return false;
     
     const stringValue = String(value).toLowerCase().trim();
-    return trueValues.includes(stringValue);
+    return trueValues.includes(stringValue) || stringValue === 'on' || stringValue === 'true';
   };
   
   // Helper to get nested values safely
@@ -385,40 +385,317 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     console.log("No structured_data found, attempting markdown extraction");
   }
   
+  // Specialized function to extract data from Landing AI response
+  const extractLandingAIData = (data: any): any => {
+    console.log("Attempting to extract Landing AI data");
+    
+    if (!data) return null;
+    
+    // Initialize structured data
+    const extractedData: any = {
+      patient: {},
+      examination_results: {
+        type: {},
+        test_results: {}
+      },
+      certification: {},
+      restrictions: {}
+    };
+    
+    // Try to find markdown content
+    let markdown = null;
+    
+    // First check for raw_response.data.markdown
+    if (data.raw_response?.data?.markdown) {
+      console.log("Found markdown in raw_response.data.markdown");
+      markdown = data.raw_response.data.markdown;
+    }
+    // Check for event_message containing Response: JSON structure
+    else if (data.event_message && typeof data.event_message === 'string') {
+      console.log("Checking event_message for markdown");
+      
+      // Try to find a JSON Response object
+      const responseMatch = data.event_message.match(/Response:\s*(\{.*\})/s);
+      if (responseMatch && responseMatch[1]) {
+        try {
+          const responseObj = JSON.parse(responseMatch[1]);
+          if (responseObj.data?.markdown) {
+            console.log("Found markdown in parsed Response: JSON");
+            markdown = responseObj.data.markdown;
+          }
+        } catch (e) {
+          console.error("Failed to parse Response JSON:", e);
+        }
+      }
+      
+      // Try direct markdown pattern
+      if (!markdown) {
+        const markdownMatch = data.event_message.match(/"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s);
+        if (markdownMatch && markdownMatch[1]) {
+          markdown = markdownMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+          console.log("Extracted markdown from event_message JSON pattern");
+        } else if (data.event_message.includes('## Description') || 
+                 data.event_message.includes('**Initials & Surname**') ||
+                 data.event_message.includes('# CERTIFICATE OF FITNESS')) {
+          console.log("Using event_message directly as markdown");
+          markdown = data.event_message;
+        }
+      }
+    }
+    // Check chunks array
+    else if (data.raw_response?.data?.chunks && Array.isArray(data.raw_response.data.chunks)) {
+      console.log("Extracting from chunks array");
+      let combinedText = '';
+      data.raw_response.data.chunks.forEach((chunk: any) => {
+        if (chunk.text) {
+          combinedText += chunk.text + '\n\n';
+        }
+      });
+      if (combinedText) {
+        markdown = combinedText;
+      }
+    }
+    
+    // Process markdown if found
+    if (markdown) {
+      console.log("Processing markdown content");
+      
+      // Patient data
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (nameMatch && nameMatch[1]) extractedData.patient.name = nameMatch[1].trim();
+      
+      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (idMatch && idMatch[1]) extractedData.patient.id_number = idMatch[1].trim();
+      
+      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (companyMatch && companyMatch[1]) extractedData.patient.company = companyMatch[1].trim();
+      
+      const jobTitleMatch = markdown.match(/(?:Job Title|Occupation):\s*(.*?)(?=\n|\r|$)/i);
+      if (jobTitleMatch && jobTitleMatch[1]) extractedData.patient.occupation = jobTitleMatch[1].trim();
+      
+      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (examDateMatch && examDateMatch[1]) extractedData.examination_results.date = examDateMatch[1].trim();
+      
+      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      if (expiryDateMatch && expiryDateMatch[1]) extractedData.certification.valid_until = expiryDateMatch[1].trim();
+      
+      // Examination type
+      extractedData.examination_results.type.pre_employment = 
+        markdown.includes('**Pre-Employment**: [x]') || 
+        markdown.match(/PRE-EMPLOYMENT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+        
+      extractedData.examination_results.type.periodical = 
+        markdown.includes('**Periodical**: [x]') || 
+        markdown.match(/PERIODICAL.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+        
+      extractedData.examination_results.type.exit = 
+        markdown.includes('**Exit**: [x]') || 
+        markdown.match(/EXIT.*?(?:\[x\]|\[X\]|✓|checked|done)/is) !== null;
+      
+      // Test results - look for patterns that might indicate test results
+      const testPatterns = [
+        { name: 'BLOODS', key: 'bloods' },
+        { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
+        { name: 'SIDE & DEPTH', key: 'side_depth' },
+        { name: 'NIGHT VISION', key: 'night_vision' },
+        { name: 'Hearing', key: 'hearing' },
+        { name: 'Working at Heights', key: 'heights' },
+        { name: 'Lung Function', key: 'lung_function' },
+        { name: 'X-Ray', key: 'x_ray' },
+        { name: 'Drug Screen', key: 'drug_screen' }
+      ];
+      
+      testPatterns.forEach(test => {
+        // Look for various patterns that might indicate a test was done
+        const checkPatterns = [
+          new RegExp(`${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`<td>${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`\\| ${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is')
+        ];
+        
+        let isDone = false;
+        let results = 'N/A';
+        
+        // Check if test was done
+        for (const pattern of checkPatterns) {
+          if (pattern.test(markdown)) {
+            isDone = true;
+            break;
+          }
+        }
+        
+        // Look for results
+        const resultsPatterns = [
+          new RegExp(`${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?(?:results?|value):?\\s*([^\\n\\r,;]+)`, 'is'),
+          new RegExp(`${test.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?([0-9]+(?:\\/[0-9]+|\.[0-9]+|-[0-9]+|\\s*dB))`, 'is'),
+          new RegExp(`<td>${test.name}.*?<td>(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?<td>(.*?)<`, 'is'),
+          new RegExp(`\\| ${test.name}.*?\\|.*?\\|\\s*([^|\\n\\r]+)\\s*\\|`, 'is')
+        ];
+        
+        for (const pattern of resultsPatterns) {
+          const match = markdown.match(pattern);
+          if (match && match[1]) {
+            results = match[1].trim();
+            break;
+          }
+        }
+        
+        // Store the results
+        extractedData.examination_results.test_results[`${test.key}_done`] = isDone;
+        extractedData.examination_results.test_results[`${test.key}_results`] = results;
+      });
+      
+      // Fitness status
+      const fitnessPatterns = [
+        { name: 'FIT', key: 'fit' },
+        { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
+        { name: 'Fit with Condition', key: 'fit_with_condition' },
+        { name: 'Temporary Unfit', key: 'temporarily_unfit' },
+        { name: 'UNFIT', key: 'unfit' }
+      ];
+      
+      fitnessPatterns.forEach(status => {
+        const patterns = [
+          new RegExp(`${status.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`<td>${status.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`\\| ${status.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`${status.name}.*?(?:selected|marked|indicated)`, 'is')
+        ];
+        
+        extractedData.certification[status.key] = patterns.some(p => p.test(markdown));
+      });
+      
+      // Restrictions
+      const restrictionPatterns = [
+        { name: 'Heights', key: 'heights' },
+        { name: 'Dust Exposure', key: 'dust_exposure' },
+        { name: 'Motorized Equipment', key: 'motorized_equipment' },
+        { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
+        { name: 'Confined Spaces', key: 'confined_spaces' },
+        { name: 'Chemical Exposure', key: 'chemical_exposure' },
+        { name: 'Wear Spectacles', key: 'wear_spectacles' },
+        { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
+      ];
+      
+      restrictionPatterns.forEach(restriction => {
+        const patterns = [
+          new RegExp(`${restriction.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`<td>${restriction.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`\\| ${restriction.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+          new RegExp(`${restriction.name}.*?(?:required|indicated|necessary)`, 'is')
+        ];
+        
+        extractedData.restrictions[restriction.key] = patterns.some(p => p.test(markdown));
+      });
+      
+      // Follow-up and review date
+      const followUpMatch = markdown.match(/(?:Referred|follow up actions|followup):\s*(.*?)(?=\n\n|\r\n\r\n|$|<)/i);
+      if (followUpMatch && followUpMatch[1]) extractedData.certification.follow_up = followUpMatch[1].trim();
+      
+      const reviewDateMatch = markdown.match(/Review Date:\s*(.*?)(?=\n|\r|$|<)/i);
+      if (reviewDateMatch && reviewDateMatch[1]) extractedData.certification.review_date = reviewDateMatch[1].trim();
+    }
+    
+    // If we have structured_data, enhance with any data from that
+    if (data.structured_data) {
+      console.log("Merging with structured_data");
+      
+      // Patient data
+      if (data.structured_data.patient) {
+        if (data.structured_data.patient.name && !extractedData.patient.name)
+          extractedData.patient.name = data.structured_data.patient.name;
+        
+        if (data.structured_data.patient.id_number && !extractedData.patient.id_number)
+          extractedData.patient.id_number = data.structured_data.patient.id_number;
+        
+        if (data.structured_data.patient.company && !extractedData.patient.company)
+          extractedData.patient.company = data.structured_data.patient.company;
+        
+        if (data.structured_data.patient.occupation && !extractedData.patient.occupation)
+          extractedData.patient.occupation = data.structured_data.patient.occupation;
+      }
+      
+      // Examination data
+      if (data.structured_data.examination_results || data.structured_data.examination) {
+        const examinationData = data.structured_data.examination_results || data.structured_data.examination;
+        
+        if (examinationData.date && !extractedData.examination_results.date)
+          extractedData.examination_results.date = examinationData.date;
+        
+        // Copy over any test results
+        if (examinationData.test_results) {
+          Object.keys(examinationData.test_results).forEach(key => {
+            if (!extractedData.examination_results.test_results[key])
+              extractedData.examination_results.test_results[key] = examinationData.test_results[key];
+          });
+        }
+      }
+      
+      // Certification data
+      if (data.structured_data.certification) {
+        Object.keys(data.structured_data.certification).forEach(key => {
+          if (extractedData.certification[key] === undefined)
+            extractedData.certification[key] = data.structured_data.certification[key];
+        });
+      }
+      
+      // Restrictions data
+      if (data.structured_data.restrictions) {
+        Object.keys(data.structured_data.restrictions).forEach(key => {
+          if (extractedData.restrictions[key] === undefined)
+            extractedData.restrictions[key] = data.structured_data.restrictions[key];
+        });
+      }
+    }
+    
+    return extractedData;
+  };
+
   // If structured data doesn't have patient info or is empty, try extracting from markdown
   const hasPatientData = !!(structuredData.patient?.name || structuredData.patient?.id_number);
   if (!hasPatientData || Object.keys(structuredData).length === 0) {
-    const markdown = getMarkdown(extractedData);
-    console.log("Markdown content found:", markdown ? "Yes" : "No");
-    if (markdown) {
-      console.log("Extracting from markdown content");
-      structuredData = extractDataFromMarkdown(markdown);
+    // First try the specialized Landing AI extractor
+    const landingAIData = extractLandingAIData(extractedData);
+    if (landingAIData && (landingAIData.patient.name || landingAIData.patient.id_number)) {
+      console.log("Successfully extracted data with Landing AI extractor");
+      structuredData = landingAIData;
     } else {
-      // Try direct access to event_message as a last resort
-      if (extractedData?.event_message && typeof extractedData.event_message === 'string') {
-        console.log("Attempting to extract directly from event_message");
-        structuredData = extractDataFromMarkdown(extractedData.event_message);
-      } else if (extractedData?.raw_response?.data?.chunks) {
-        // Try to extract from chunks
-        console.log("Trying to extract from chunks array");
-        const chunks = extractedData.raw_response.data.chunks;
-        let combinedText = '';
-        
-        if (Array.isArray(chunks)) {
-          chunks.forEach(chunk => {
-            if (chunk.text) {
-              combinedText += chunk.text + '\n\n';
-            }
-          });
-          
-          if (combinedText) {
-            console.log("Extracted text from chunks");
-            structuredData = extractDataFromMarkdown(combinedText);
-          }
-        }
+      // Fall back to the original extraction methods
+      const markdown = getMarkdown(extractedData);
+      console.log("Markdown content found:", markdown ? "Yes" : "No");
+      if (markdown) {
+        console.log("Extracting from markdown content");
+        structuredData = extractDataFromMarkdown(markdown);
       } else {
-        console.log("No markdown found, using extractedData as is");
-        structuredData = extractedData || {};
+        // Try direct access to event_message as a last resort
+        if (extractedData?.event_message && typeof extractedData.event_message === 'string') {
+          console.log("Attempting to extract directly from event_message");
+          structuredData = extractDataFromMarkdown(extractedData.event_message);
+        } else if (extractedData?.raw_response?.data?.chunks) {
+          // Try to extract from chunks
+          console.log("Trying to extract from chunks array");
+          const chunks = extractedData.raw_response.data.chunks;
+          let combinedText = '';
+          
+          if (Array.isArray(chunks)) {
+            chunks.forEach(chunk => {
+              if (chunk.text) {
+                combinedText += chunk.text + '\n\n';
+              }
+            });
+            
+            if (combinedText) {
+              console.log("Extracted text from chunks");
+              structuredData = extractDataFromMarkdown(combinedText);
+            }
+          }
+        } else {
+          console.log("No markdown found, using extractedData as is");
+          structuredData = extractedData || {};
+        }
       }
     }
   }
