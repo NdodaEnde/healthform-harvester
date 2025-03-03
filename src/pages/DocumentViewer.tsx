@@ -268,7 +268,11 @@ const DocumentViewer = () => {
     const extractedData = document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
-      return <CertificateTemplate extractedData={extractedData} />;
+      return (
+        <div className="certificate-container pb-6">
+          <CertificateTemplate extractedData={extractedData} />
+        </div>
+      );
     }
     
     if (extractedData.structured_data) {
@@ -647,14 +651,12 @@ const DocumentViewer = () => {
                   </TabsList>
                 </CardHeader>
                 
-                <CardContent className="pt-4 h-[calc(100vh-270px)]">
-                  <TabsContent value="structured" className="m-0">
-                    <ScrollArea className="h-full pr-4">
-                      {renderExtractedData()}
-                    </ScrollArea>
+                <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
+                  <TabsContent value="structured" className="m-0 h-full">
+                    {renderExtractedData()}
                   </TabsContent>
                   
-                  <TabsContent value="json" className="m-0">
+                  <TabsContent value="json" className="m-0 h-full">
                     <ScrollArea className="h-full">
                       <div className="relative">
                         <Button 

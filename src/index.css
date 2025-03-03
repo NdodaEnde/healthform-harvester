@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -88,6 +87,7 @@
 @layer base {
   * {
     @apply border-border;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground;
@@ -125,6 +125,13 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/50;
+}
+
+/* Making sure the certificate is scrollable */
+.certificate-container {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+  padding-right: 16px; /* Add padding for scrollbar */
 }
 
 /* Adding smooth page transitions */
