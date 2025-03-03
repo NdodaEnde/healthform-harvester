@@ -277,6 +277,7 @@ const DocumentViewer = () => {
       try {
         const parsed = JSON.parse(rawData);
         if (parsed.data && parsed.data.markdown) {
+          console.log("Parsed raw data string into object with markdown");
           return {
             raw_response: parsed
           };
@@ -306,23 +307,111 @@ const DocumentViewer = () => {
     
     if (rawData.event_message && typeof rawData.event_message === 'string') {
       try {
-        if (rawData.event_message.includes('"markdown":"')) {
-          console.log("Extracting markdown from event_message");
-          const messageObj = JSON.parse(rawData.event_message.substring(
-            rawData.event_message.indexOf('{"data"')
-          ));
-          
-          if (messageObj.data && messageObj.data.markdown) {
-            return {
-              raw_response: messageObj
-            };
+        console.log("Attempting to process event_message");
+        
+        const responseMatch = rawData.event_message.match(/Response:\s*(\{.*\})/s);
+        
+        if (responseMatch && responseMatch[1]) {
+          console.log("Found JSON in event_message");
+          const jsonStr = responseMatch[1];
+          try {
+            const responseObj = JSON.parse(jsonStr);
+            
+            if (responseObj.data && responseObj.data.markdown) {
+              console.log("Successfully extracted markdown from event_message");
+              return {
+                raw_response: responseObj
+              };
+            }
+          } catch (parseErr) {
+            console.error("Error parsing JSON from event_message:", parseErr);
+            
+            const markdownMatch = rawData.event_message.match(/"markdown":"(.*?)(?:","chunks|"})/s);
+            if (markdownMatch && markdownMatch[1]) {
+              const markdownContent = markdownMatch[1]
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\');
+              
+              console.log("Extracted markdown content directly from string");
+              return {
+                raw_response: {
+                  data: {
+                    markdown: markdownContent
+                  }
+                }
+              };
+            }
           }
         }
       } catch (e) {
-        console.error("Error parsing event_message:", e);
+        console.error("Error processing event_message:", e);
       }
     }
     
+    if (typeof rawData === 'object' && rawData !== null) {
+      console.log("Searching for markdown in complex object");
+      
+      const findMarkdown = (obj: any): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        
+        if (obj.markdown && typeof obj.markdown === 'string') return obj.markdown;
+        if (obj.data && obj.data.markdown && typeof obj.data.markdown === 'string') return obj.data.markdown;
+        
+        for (const key in obj) {
+          if (typeof obj[key] === 'object' && obj[key] !== null) {
+            const markdown = findMarkdown(obj[key]);
+            if (markdown) return markdown;
+          } else if (typeof obj[key] === 'string' && obj[key].includes('"markdown":"')) {
+            try {
+              const markdownMatch = obj[key].match(/"markdown":"(.*?)(?:","chunks|"})/s);
+              if (markdownMatch && markdownMatch[1]) {
+                return markdownMatch[1]
+                  .replace(/\\n/g, '\n')
+                  .replace(/\\"/g, '"')
+                  .replace(/\\\\/g, '\\');
+              }
+            } catch (e) {
+              console.error("Error extracting markdown from string field:", e);
+            }
+          }
+        }
+        
+        return null;
+      };
+      
+      const markdown = findMarkdown(rawData);
+      if (markdown) {
+        console.log("Found markdown in deep object search");
+        return {
+          raw_response: {
+            data: {
+              markdown: markdown
+            }
+          }
+        };
+      }
+    }
+    
+    if (rawData.event_message && typeof rawData.event_message === 'string') {
+      console.log("Attempting last resort extraction from event_message");
+      
+      const sections = rawData.event_message.split('\n\n');
+      for (const section of sections) {
+        if (section.includes('##') || section.includes('**')) {
+          console.log("Found markdown-like content in event_message section");
+          return {
+            raw_response: {
+              data: {
+                markdown: section
+              }
+            }
+          };
+        }
+      }
+    }
+    
+    console.log("Could not process certificate data into expected format");
     return rawData;
   };
 
@@ -517,14 +606,44 @@ const DocumentViewer = () => {
       
       if (extractedData.event_message && !extractedData.raw_response) {
         try {
-          console.log("Attempting to process event_message data");
-          const eventMessageMatch = extractedData.event_message.match(/Response: (.*)/);
+          console.log("Attempting to process event_message data in renderExtractedData");
+          
+          const eventMessageMatch = extractedData.event_message.match(/Response:\s*(\{.*\})/s);
           if (eventMessageMatch && eventMessageMatch[1]) {
-            const responseObj = JSON.parse(eventMessageMatch[1]);
-            if (responseObj.data && responseObj.data.markdown) {
-              processedData = {
-                raw_response: responseObj
-              };
+            try {
+              const responseObj = JSON.parse(eventMessageMatch[1]);
+              if (responseObj.data && responseObj.data.markdown) {
+                console.log("Successfully extracted Response JSON object");
+                processedData = {
+                  raw_response: responseObj
+                };
+              }
+            } catch (e) {
+              console.error("Error parsing Response JSON:", e);
+            }
+          }
+          
+          if (!processedData.raw_response && extractedData.event_message.includes('"markdown":"')) {
+            try {
+              console.log("Trying direct markdown extraction");
+              const markdownMatch = extractedData.event_message.match(/"markdown":"(.*?)(?:","chunks|"})/s);
+              if (markdownMatch && markdownMatch[1]) {
+                const markdownContent = markdownMatch[1]
+                  .replace(/\\n/g, '\n')
+                  .replace(/\\"/g, '"')
+                  .replace(/\\\\/g, '\\');
+                
+                processedData = {
+                  raw_response: {
+                    data: {
+                      markdown: markdownContent
+                    }
+                  }
+                };
+                console.log("Direct markdown extraction successful");
+              }
+            } catch (e) {
+              console.error("Error in direct markdown extraction:", e);
             }
           }
         } catch (e) {
@@ -532,7 +651,7 @@ const DocumentViewer = () => {
         }
       }
       
-      console.log("Passing to CertificateTemplate:", processedData);
+      console.log("Final data being passed to CertificateTemplate:", processedData);
       return (
         <div className="certificate-container pb-6">
           <CertificateTemplate extractedData={processedData} />
