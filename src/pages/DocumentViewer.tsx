@@ -309,6 +309,7 @@ const DocumentViewer = () => {
       try {
         console.log("Attempting to process event_message");
         
+        // First attempt: Try to extract the complete JSON response object
         const responseMatch = rawData.event_message.match(/Response:\s*(\{.*\})/s);
         
         if (responseMatch && responseMatch[1]) {
@@ -325,22 +326,44 @@ const DocumentViewer = () => {
             }
           } catch (parseErr) {
             console.error("Error parsing JSON from event_message:", parseErr);
-            
-            const markdownMatch = rawData.event_message.match(/"markdown":"(.*?)(?:","chunks|"})/s);
-            if (markdownMatch && markdownMatch[1]) {
-              const markdownContent = markdownMatch[1]
-                .replace(/\\n/g, '\n')
-                .replace(/\\"/g, '"')
-                .replace(/\\\\/g, '\\');
-              
-              console.log("Extracted markdown content directly from string");
-              return {
-                raw_response: {
-                  data: {
-                    markdown: markdownContent
+          }
+        }
+        
+        // Second attempt: Try to extract just the markdown content using a more flexible pattern
+        const markdownPattern = /"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s;
+        const markdownMatch = rawData.event_message.match(markdownPattern);
+        if (markdownMatch && markdownMatch[1]) {
+          const markdownContent = markdownMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+          
+          console.log("Extracted markdown content directly from string");
+          return {
+            raw_response: {
+              data: {
+                markdown: markdownContent
+              }
+            }
+          };
+        }
+        
+        // Third attempt: Try to extract any structured data inside event_message
+        if (rawData.event_message.includes('"data":{"markdown"')) {
+          const dataMatch = rawData.event_message.match(/"data":\s*(\{.*?\})/s);
+          if (dataMatch && dataMatch[1]) {
+            try {
+              const dataObj = JSON.parse(`{${dataMatch[1]}}`);
+              if (dataObj.markdown) {
+                console.log("Extracted data object with markdown");
+                return {
+                  raw_response: {
+                    data: dataObj
                   }
-                }
-              };
+                };
+              }
+            } catch (err) {
+              console.error("Error parsing data object:", err);
             }
           }
         }
@@ -608,6 +631,7 @@ const DocumentViewer = () => {
         try {
           console.log("Attempting to process event_message data in renderExtractedData");
           
+          // First attempt: Try to extract the complete JSON response object
           const eventMessageMatch = extractedData.event_message.match(/Response:\s*(\{.*\})/s);
           if (eventMessageMatch && eventMessageMatch[1]) {
             try {
@@ -623,10 +647,12 @@ const DocumentViewer = () => {
             }
           }
           
+          // If still no raw_response, try direct markdown extraction with more flexible pattern
           if (!processedData.raw_response && extractedData.event_message.includes('"markdown":"')) {
             try {
               console.log("Trying direct markdown extraction");
-              const markdownMatch = extractedData.event_message.match(/"markdown":"(.*?)(?:","chunks|"})/s);
+              const markdownPattern = /"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s;
+              const markdownMatch = extractedData.event_message.match(markdownPattern);
               if (markdownMatch && markdownMatch[1]) {
                 const markdownContent = markdownMatch[1]
                   .replace(/\\n/g, '\n')
@@ -645,6 +671,18 @@ const DocumentViewer = () => {
             } catch (e) {
               console.error("Error in direct markdown extraction:", e);
             }
+          }
+          
+          // Last resort: Just pass the event_message as full markdown content
+          if (!processedData.raw_response) {
+            processedData = {
+              raw_response: {
+                data: {
+                  markdown: extractedData.event_message
+                }
+              }
+            };
+            console.log("Using event_message directly as markdown");
           }
         } catch (e) {
           console.error("Error processing event_message:", e);

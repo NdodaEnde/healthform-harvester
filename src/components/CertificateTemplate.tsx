@@ -220,7 +220,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   const getMarkdown = (data: any): string | null => {
     if (!data) return null;
     
-    console.log("Attempting to extract markdown from data structure");
+    console.log("Attempting to extract markdown from data structure:", data);
     
     // First, try direct known paths
     const possiblePaths = [
@@ -235,6 +235,51 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       if (value && typeof value === 'string') {
         console.log(`Found markdown at path: ${path}`);
         return value;
+      }
+    }
+    
+    // Check if data is a string that contains markdown-like content
+    if (typeof data === 'string') {
+      if (data.includes('## Description') || data.includes('**') || data.includes('# CERTIFICATE OF FITNESS')) {
+        console.log("Data is a string that appears to contain markdown");
+        return data;
+      }
+      
+      // Try to extract markdown from a JSON string
+      if (data.includes('"markdown":"')) {
+        try {
+          const markdownMatch = data.match(/"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s);
+          if (markdownMatch && markdownMatch[1]) {
+            const markdownContent = markdownMatch[1]
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\');
+            console.log("Extracted markdown from JSON string");
+            return markdownContent;
+          }
+        } catch (e) {
+          console.error("Error extracting markdown from string:", e);
+        }
+      }
+      
+      // Try to extract from Response: format
+      if (data.includes('Response:')) {
+        try {
+          const responseMatch = data.match(/Response:\s*(\{.*\})/s);
+          if (responseMatch && responseMatch[1]) {
+            try {
+              const responseObj = JSON.parse(responseMatch[1]);
+              if (responseObj.data && responseObj.data.markdown) {
+                console.log("Extracted markdown from Response: format");
+                return responseObj.data.markdown;
+              }
+            } catch (e) {
+              console.error("Error parsing Response JSON:", e);
+            }
+          }
+        } catch (e) {
+          console.error("Error extracting from Response format:", e);
+        }
       }
     }
     
@@ -261,6 +306,24 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
         if (typeof obj[key] === 'object' && obj[key] !== null) {
           const result = searchForMarkdown(obj[key], `${path}.${key}`);
           if (result) return result;
+        } else if (typeof obj[key] === 'string') {
+          // Check if any string property contains markdown-like content
+          const str = obj[key];
+          if (str.includes('"markdown":"')) {
+            try {
+              const markdownMatch = str.match(/"markdown":"((\\"|[^"])*?)(?:","chunks|"})/s);
+              if (markdownMatch && markdownMatch[1]) {
+                const markdownContent = markdownMatch[1]
+                  .replace(/\\n/g, '\n')
+                  .replace(/\\"/g, '"')
+                  .replace(/\\\\/g, '\\');
+                console.log(`Found markdown in string property at ${path}.${key}`);
+                return markdownContent;
+              }
+            } catch (e) {
+              // Continue searching
+            }
+          }
         }
       }
       
@@ -274,6 +337,12 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     if (data.structured_data && data.structured_data.raw_content) {
       console.log("Found structured_data.raw_content, using as markdown");
       return data.structured_data.raw_content;
+    }
+    
+    // Last attempt: check if event_message contains markdown
+    if (data.event_message && typeof data.event_message === 'string') {
+      console.log("Checking event_message for markdown content");
+      return getMarkdown(data.event_message); // Recursive call with event_message
     }
     
     console.log("Could not find markdown in provided data");
@@ -293,14 +362,23 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   } else {
     // If no structured data, try to extract from markdown
     const markdown = getMarkdown(extractedData);
+    console.log("Markdown content found:", markdown ? "Yes" : "No");
     if (markdown) {
       console.log("Extracting from markdown content");
       structuredData = extractDataFromMarkdown(markdown);
     } else {
-      console.log("No markdown found, using extractedData as is");
-      structuredData = extractedData || {};
+      // Try direct access to event_message as a last resort
+      if (extractedData?.event_message && typeof extractedData.event_message === 'string') {
+        console.log("Attempting to extract directly from event_message");
+        structuredData = extractDataFromMarkdown(extractedData.event_message);
+      } else {
+        console.log("No markdown found, using extractedData as is");
+        structuredData = extractedData || {};
+      }
     }
   }
+  
+  console.log("Final structured data:", structuredData);
   
   // Get the main sections from the data
   const patient = structuredData.patient || {};
