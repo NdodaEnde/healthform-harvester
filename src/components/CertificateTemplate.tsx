@@ -672,4 +672,113 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                         <div className="font-semibold">Motorized Equipment</div>
                         {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Hearing Protection</div>
+                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Confined Spaces</div>
+                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Chemical Exposure</div>
+                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Spectacles</div>
+                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
+                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Fitness Status */}
+            <div className="mb-6">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                Medical Fitness Declaration
+              </div>
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400">
+                  <tbody>
+                    <tr>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                        <div className="font-semibold text-sm">FIT</div>
+                        {fitnessStatus.fit && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold text-sm">Fit with Restriction</div>
+                        {fitnessStatus.fitWithRestriction && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold text-sm">Fit with Condition</div>
+                        {fitnessStatus.fitWithCondition && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        <div className="font-semibold text-sm">Temporary Unfit</div>
+                        {fitnessStatus.temporarilyUnfit && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        <div className="font-semibold text-sm">UNFIT</div>
+                        {fitnessStatus.unfit && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Comments */}
+            <div className="px-4 mb-6">
+              <div className="flex flex-col">
+                <div className="font-semibold text-sm mb-1">Comments:</div>
+                <div className="border border-gray-400 p-2 min-h-24 text-sm">
+                  {getValue(certification, 'comments') || 'N/A'}
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer with signature */}
+            <div className="px-4 flex justify-between items-end mb-4">
+              <div className="w-56">
+                <div className="border-b border-gray-400 h-14 flex items-end justify-center pb-1">
+                  <img 
+                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgODAiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0yMCA0MGMwIDAgMjAtMzAgNjAgMCBjIDMwIDI1IDQwLTEwIDYwIDUgYyAyMCAxNyA0MCA1IDYwLTEwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==" 
+                    alt="Signature" 
+                    className="h-12 opacity-70"
+                  />
+                </div>
+                <div className="text-center text-sm font-semibold mt-1">
+                  Medical Practitioner
+                </div>
+              </div>
+              
+              <div className="w-56">
+                <div className="border-b border-gray-400 h-14"></div>
+                <div className="text-center text-sm font-semibold mt-1">
+                  Employee Signature
+                </div>
+              </div>
+            </div>
+            
+            {/* Disclaimer */}
+            <div className="bg-gray-100 p-3 text-xs text-center">
+              <p>This certificate is valid for the duration specified above from the date of medical examination, 
+                unless there is a change in the employees' medical condition or the nature of their work.</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
