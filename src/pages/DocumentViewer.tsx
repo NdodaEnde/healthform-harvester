@@ -196,19 +196,42 @@ const DocumentViewer = () => {
   };
 
   const extractPatientName = (extractedData: any) => {
-    if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
-      return "Unknown";
+    if (!extractedData) return "Unknown";
+    
+    if (extractedData.structured_data && extractedData.structured_data.patient) {
+      return extractedData.structured_data.patient.name || "Unknown";
     }
-    return extractedData.structured_data.patient.name || "Unknown";
+    
+    if (extractedData.raw_response && extractedData.raw_response.data) {
+      const markdown = extractedData.raw_response.data.markdown;
+      if (markdown) {
+        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+        if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
+      }
+    }
+    
+    return "Unknown";
   };
   
   const extractPatientId = (extractedData: any) => {
-    if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
-      return "No ID";
+    if (!extractedData) return "No ID";
+    
+    if (extractedData.structured_data && extractedData.structured_data.patient) {
+      return extractedData.structured_data.patient.id_number || 
+             extractedData.structured_data.patient.employee_id || 
+             extractedData.structured_data.patient.id || 
+             "No ID";
     }
-    return extractedData.structured_data.patient.employee_id || 
-           extractedData.structured_data.patient.id || 
-           "No ID";
+    
+    if (extractedData.raw_response && extractedData.raw_response.data) {
+      const markdown = extractedData.raw_response.data.markdown;
+      if (markdown) {
+        const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/);
+        if (idMatch && idMatch[1]) return idMatch[1].trim();
+      }
+    }
+    
+    return "No ID";
   };
 
   useEffect(() => {
@@ -254,7 +277,43 @@ const DocumentViewer = () => {
     };
 
     fetchData();
-  }, [id]);
+    
+    const pollInterval = setInterval(async () => {
+      if (!id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('status, extracted_data')
+          .eq('id', id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error polling document status:', error);
+          return;
+        }
+        
+        if (data && document) {
+          if (document.status === 'processing' && data.status === 'processed') {
+            console.log('Document processing completed, refreshing data');
+            fetchData();
+          }
+          
+          if (document.status !== data.status) {
+            setDocument((prev: any) => ({
+              ...prev,
+              status: data.status,
+              extractedData: data.extracted_data || prev.extractedData
+            }));
+          }
+        }
+      } catch (e) {
+        console.error('Error in polling interval:', e);
+      }
+    }, 5000);
+    
+    return () => clearInterval(pollInterval);
+  }, [id, document?.status]);
 
   const renderExtractedData = () => {
     if (!document || !document.extractedData) {
@@ -268,6 +327,7 @@ const DocumentViewer = () => {
     const extractedData = document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
+      console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
           <CertificateTemplate extractedData={extractedData} />

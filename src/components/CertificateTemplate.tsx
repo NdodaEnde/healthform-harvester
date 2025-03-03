@@ -32,208 +32,227 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     return current !== undefined && current !== null ? current : defaultValue;
   };
   
-  // Extract data from both potential sources
-  // First, try to extract from the raw_response which contains markdown
+  // Parse data from markdown in raw_response
   const parseFromMarkdown = (data: any) => {
-    // Create a structured data object from the markdown information
-    if (!data || !data.raw_response || !data.raw_response.data) return null;
-    
-    const markdown = data.raw_response.data.markdown;
-    if (!markdown) return null;
-    
-    // Basic parsing to extract important fields
-    const structured: any = {
-      patient: {},
-      examination_results: { test_results: {} },
-      restrictions: {},
-      certification: {},
-    };
-    
-    // Extract patient information from the markdown
-    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*: (.*?)(?=\n|\r|$)/);
-    if (nameMatch && nameMatch[1]) structured.patient.name = nameMatch[1].trim();
-    
-    const idMatch = markdown.match(/\*\*ID NO\*\*: (.*?)(?=\n|\r|$)/);
-    if (idMatch && idMatch[1]) structured.patient.id_number = idMatch[1].trim();
-    
-    const companyMatch = markdown.match(/\*\*Company Name\*\*: (.*?)(?=\n|\r|$)/);
-    if (companyMatch && companyMatch[1]) structured.patient.company = companyMatch[1].trim();
-    
-    const jobTitleMatch = markdown.match(/## Job Title: (.*?)(?=\n|\r|$|<)/);
-    if (jobTitleMatch && jobTitleMatch[1]) structured.patient.occupation = jobTitleMatch[1].trim();
-    
-    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*: (.*?)(?=\n|\r|$)/);
-    if (examDateMatch && examDateMatch[1]) structured.examination_results.date = examDateMatch[1].trim();
-    
-    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*: (.*?)(?=\n|\r|$)/);
-    if (expiryDateMatch && expiryDateMatch[1]) structured.certification.valid_until = expiryDateMatch[1].trim();
-    
-    // Extract examination type
-    if (markdown.includes('[x]</td>') && markdown.includes('PRE-EMPLOYMENT')) {
-      structured.examination_results.type = { pre_employment: true };
-    } else if (markdown.includes('[x]</td>') && markdown.includes('PERIODICAL')) {
-      structured.examination_results.type = { periodical: true };
-    } else if (markdown.includes('[x]</td>') && markdown.includes('EXIT')) {
-      structured.examination_results.type = { exit: true };
-    }
-    
-    // Extract test results
-    if (markdown.includes('BLOODS') && markdown.includes('[x]')) {
-      structured.examination_results.test_results.bloods_done = true;
-      const bloodsResultsMatch = markdown.match(/BLOODS<\/td>\s*<td>\[x\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (bloodsResultsMatch && bloodsResultsMatch[1]) {
-        structured.examination_results.test_results.bloods_results = bloodsResultsMatch[1].trim();
-      }
-    }
-    
-    if (markdown.includes('FAR, NEAR VISION')) {
-      const visionDoneMatch = markdown.match(/FAR, NEAR VISION<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.vision_test = visionDoneMatch && visionDoneMatch[1] === 'x';
+    try {
+      // Create a structured data object from the markdown information
+      if (!data || !data.raw_response || !data.raw_response.data) return null;
       
-      const visionResultsMatch = markdown.match(/FAR, NEAR VISION<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (visionResultsMatch && visionResultsMatch[2]) {
-        structured.examination_results.test_results.vision_results = visionResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('SIDE & DEPTH')) {
-      const sideDepthDoneMatch = markdown.match(/SIDE & DEPTH<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.side_depth_test = sideDepthDoneMatch && sideDepthDoneMatch[1] === 'x';
+      const markdown = data.raw_response.data.markdown;
+      if (!markdown) return null;
       
-      const sideDepthResultsMatch = markdown.match(/SIDE & DEPTH<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (sideDepthResultsMatch && sideDepthResultsMatch[2]) {
-        structured.examination_results.test_results.side_depth_results = sideDepthResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('NIGHT VISION')) {
-      const nightVisionDoneMatch = markdown.match(/NIGHT VISION<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.night_vision_test = nightVisionDoneMatch && nightVisionDoneMatch[1] === 'x';
+      console.log("Parsing from markdown:", markdown.substring(0, 200) + "...");
       
-      const nightVisionResultsMatch = markdown.match(/NIGHT VISION<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (nightVisionResultsMatch && nightVisionResultsMatch[2]) {
-        structured.examination_results.test_results.night_vision_results = nightVisionResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('Hearing')) {
-      const hearingDoneMatch = markdown.match(/Hearing<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.hearing_test = hearingDoneMatch && hearingDoneMatch[1] === 'x';
+      // Basic parsing to extract important fields
+      const structured: any = {
+        patient: {},
+        examination_results: { 
+          test_results: {},
+          type: {}
+        },
+        restrictions: {},
+        certification: {},
+      };
       
-      const hearingResultsMatch = markdown.match(/Hearing<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (hearingResultsMatch && hearingResultsMatch[2]) {
-        structured.examination_results.test_results.hearing_test_results = hearingResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('Working at Heights')) {
-      const heightsDoneMatch = markdown.match(/Working at Heights<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.heights_test = heightsDoneMatch && heightsDoneMatch[1] === 'x';
+      // Extract patient information
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (nameMatch && nameMatch[1]) structured.patient.name = nameMatch[1].trim();
       
-      const heightsResultsMatch = markdown.match(/Working at Heights<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (heightsResultsMatch && heightsResultsMatch[2]) {
-        structured.examination_results.test_results.heights_results = heightsResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('Lung Function')) {
-      const lungDoneMatch = markdown.match(/Lung Function<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.lung_function_test = lungDoneMatch && lungDoneMatch[1] === 'x';
+      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (idMatch && idMatch[1]) structured.patient.id_number = idMatch[1].trim();
       
-      const lungResultsMatch = markdown.match(/Lung Function<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (lungResultsMatch && lungResultsMatch[2]) {
-        structured.examination_results.test_results.lung_function_results = lungResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('X-Ray')) {
-      const xrayDoneMatch = markdown.match(/X-Ray<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.x_ray_test = xrayDoneMatch && xrayDoneMatch[1] === 'x';
+      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (companyMatch && companyMatch[1]) structured.patient.company = companyMatch[1].trim();
       
-      const xrayResultsMatch = markdown.match(/X-Ray<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (xrayResultsMatch && xrayResultsMatch[2]) {
-        structured.examination_results.test_results.x_ray_results = xrayResultsMatch[2].trim();
-      }
-    }
-    
-    if (markdown.includes('Drug Screen')) {
-      const drugDoneMatch = markdown.match(/Drug Screen<\/td>\s*<td>\[(x| )\]<\/td>/);
-      structured.examination_results.test_results.drug_screen_test = drugDoneMatch && drugDoneMatch[1] === 'x';
+      const jobTitleMatch = markdown.match(/Job Title:\s*(.*?)(?=\n|\r|$|<)/i);
+      if (jobTitleMatch && jobTitleMatch[1]) structured.patient.occupation = jobTitleMatch[1].trim();
       
-      const drugResultsMatch = markdown.match(/Drug Screen<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
-      if (drugResultsMatch && drugResultsMatch[2]) {
-        structured.examination_results.test_results.drug_screen_results = drugResultsMatch[2].trim();
+      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (examDateMatch && examDateMatch[1]) structured.examination_results.date = examDateMatch[1].trim();
+      
+      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (expiryDateMatch && expiryDateMatch[1]) structured.certification.valid_until = expiryDateMatch[1].trim();
+      
+      // Extract examination type
+      if (markdown.includes('[x]') && markdown.includes('PRE-EMPLOYMENT')) {
+        structured.examination_results.type.pre_employment = true;
+      } else if (markdown.includes('[x]') && markdown.includes('PERIODICAL')) {
+        structured.examination_results.type.periodical = true;
+      } else if (markdown.includes('[x]') && markdown.includes('EXIT')) {
+        structured.examination_results.type.exit = true;
       }
+      
+      // Extract test results
+      if (markdown.includes('BLOODS') && markdown.match(/BLOODS<\/td>\s*<td>\[x\]<\/td>/)) {
+        structured.examination_results.test_results.bloods_done = true;
+        const bloodsResultsMatch = markdown.match(/BLOODS<\/td>\s*<td>\[x\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (bloodsResultsMatch && bloodsResultsMatch[1]) {
+          structured.examination_results.test_results.bloods_results = bloodsResultsMatch[1].trim();
+        }
+      }
+      
+      if (markdown.includes('FAR, NEAR VISION')) {
+        const visionDoneMatch = markdown.match(/FAR, NEAR VISION<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.vision_test = visionDoneMatch && visionDoneMatch[1] === 'x';
+        
+        const visionResultsMatch = markdown.match(/FAR, NEAR VISION<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (visionResultsMatch && visionResultsMatch[2]) {
+          structured.examination_results.test_results.vision_results = visionResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('SIDE & DEPTH')) {
+        const sideDepthDoneMatch = markdown.match(/SIDE & DEPTH<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.side_depth_test = sideDepthDoneMatch && sideDepthDoneMatch[1] === 'x';
+        
+        const sideDepthResultsMatch = markdown.match(/SIDE & DEPTH<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (sideDepthResultsMatch && sideDepthResultsMatch[2]) {
+          structured.examination_results.test_results.side_depth_results = sideDepthResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('NIGHT VISION')) {
+        const nightVisionDoneMatch = markdown.match(/NIGHT VISION<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.night_vision_test = nightVisionDoneMatch && nightVisionDoneMatch[1] === 'x';
+        
+        const nightVisionResultsMatch = markdown.match(/NIGHT VISION<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (nightVisionResultsMatch && nightVisionResultsMatch[2]) {
+          structured.examination_results.test_results.night_vision_results = nightVisionResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('Hearing')) {
+        const hearingDoneMatch = markdown.match(/Hearing<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.hearing_test = hearingDoneMatch && hearingDoneMatch[1] === 'x';
+        
+        const hearingResultsMatch = markdown.match(/Hearing<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (hearingResultsMatch && hearingResultsMatch[2]) {
+          structured.examination_results.test_results.hearing_test_results = hearingResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('Working at Heights')) {
+        const heightsDoneMatch = markdown.match(/Working at Heights<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.heights_test = heightsDoneMatch && heightsDoneMatch[1] === 'x';
+        
+        const heightsResultsMatch = markdown.match(/Working at Heights<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (heightsResultsMatch && heightsResultsMatch[2]) {
+          structured.examination_results.test_results.heights_results = heightsResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('Lung Function')) {
+        const lungDoneMatch = markdown.match(/Lung Function<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.lung_function_test = lungDoneMatch && lungDoneMatch[1] === 'x';
+        
+        const lungResultsMatch = markdown.match(/Lung Function<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (lungResultsMatch && lungResultsMatch[2]) {
+          structured.examination_results.test_results.lung_function_results = lungResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('X-Ray')) {
+        const xrayDoneMatch = markdown.match(/X-Ray<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.x_ray_test = xrayDoneMatch && xrayDoneMatch[1] === 'x';
+        
+        const xrayResultsMatch = markdown.match(/X-Ray<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (xrayResultsMatch && xrayResultsMatch[2]) {
+          structured.examination_results.test_results.x_ray_results = xrayResultsMatch[2].trim();
+        }
+      }
+      
+      if (markdown.includes('Drug Screen')) {
+        const drugDoneMatch = markdown.match(/Drug Screen<\/td>\s*<td>\[(x| )\]<\/td>/);
+        structured.examination_results.test_results.drug_screen_test = drugDoneMatch && drugDoneMatch[1] === 'x';
+        
+        const drugResultsMatch = markdown.match(/Drug Screen<\/td>\s*<td>\[(x| )\]<\/td>\s*<td>(.*?)<\/td>/);
+        if (drugResultsMatch && drugResultsMatch[2]) {
+          structured.examination_results.test_results.drug_screen_results = drugResultsMatch[2].trim();
+        }
+      }
+      
+      // Extract fitness declaration
+      if (markdown.includes('<th>FIT</th>') && markdown.match(/FIT<\/th>[\s\S]*?\[x\]/)) {
+        structured.certification.fit = true;
+      }
+      if (markdown.includes('<th>Fit with Restriction</th>') && markdown.match(/Fit with Restriction<\/th>[\s\S]*?\[x\]/)) {
+        structured.certification.fit_with_restrictions = true;
+      }
+      if (markdown.includes('<th>Fit with Condition</th>') && markdown.match(/Fit with Condition<\/th>[\s\S]*?\[x\]/)) {
+        structured.certification.fit_with_condition = true;
+      }
+      if (markdown.includes('<th>Temporary Unfit</th>') && markdown.match(/Temporary Unfit<\/th>[\s\S]*?\[x\]/)) {
+        structured.certification.temporarily_unfit = true;
+      }
+      if (markdown.includes('<th>UNFIT</th>') && markdown.match(/UNFIT<\/th>[\s\S]*?\[x\]/)) {
+        structured.certification.unfit = true;
+      }
+      
+      // Extract referred or follow up actions
+      const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/);
+      if (followUpMatch && followUpMatch[1]) structured.certification.follow_up = followUpMatch[1].trim();
+      
+      // Extract review date
+      const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/);
+      if (reviewDateMatch && reviewDateMatch[1]) structured.certification.review_date = reviewDateMatch[1].trim();
+      
+      // Extract comments
+      const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$)/s);
+      if (commentsMatch && commentsMatch[1]) structured.certification.comments = commentsMatch[1].trim();
+      
+      console.log("Parsed structured data:", structured);
+      
+      return { structured_data: structured };
+    } catch (error) {
+      console.error("Error parsing markdown:", error);
+      return null;
     }
-    
-    // Extract restrictions
-    if (markdown.includes('**Heights**:')) structured.restrictions.heights = true;
-    if (markdown.includes('**Confined Spaces**:')) structured.restrictions.confined_spaces = true;
-    if (markdown.includes('**Dust Exposure**:')) structured.restrictions.dust_exposure = true;
-    if (markdown.includes('**Chemical Exposure**:')) structured.restrictions.chemical_exposure = true;
-    if (markdown.includes('**Motorized Equipment**:')) structured.restrictions.motorized_equipment = true;
-    if (markdown.includes('**Wear Spectacles**:')) structured.restrictions.wear_spectacles = true;
-    if (markdown.includes('**Wear Hearing Protection**:')) structured.restrictions.wear_hearing_protection = true;
-    if (markdown.includes('**Remain on Treatment for Chronic Conditions**:')) structured.restrictions.chronic_conditions = true;
-    
-    // Extract fitness declaration
-    if (markdown.includes('<th>FIT</th>') && markdown.match(/FIT<\/th>[\s\S]*?\[x\]/)) {
-      structured.certification.fit = true;
-    }
-    if (markdown.includes('<th>Fit with Restriction</th>') && markdown.match(/Fit with Restriction<\/th>[\s\S]*?\[x\]/)) {
-      structured.certification.fit_with_restrictions = true;
-    }
-    if (markdown.includes('<th>Fit with Condition</th>') && markdown.match(/Fit with Condition<\/th>[\s\S]*?\[x\]/)) {
-      structured.certification.fit_with_condition = true;
-    }
-    if (markdown.includes('<th>Temporary Unfit</th>') && markdown.match(/Temporary Unfit<\/th>[\s\S]*?\[x\]/)) {
-      structured.certification.temporarily_unfit = true;
-    }
-    if (markdown.includes('<th>UNFIT</th>') && markdown.match(/UNFIT<\/th>[\s\S]*?\[x\]/)) {
-      structured.certification.unfit = true;
-    }
-    
-    // Extract referred or follow up actions
-    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/);
-    if (followUpMatch && followUpMatch[1]) structured.certification.follow_up = followUpMatch[1].trim();
-    
-    // Extract review date
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/);
-    if (reviewDateMatch && reviewDateMatch[1]) structured.certification.review_date = reviewDateMatch[1].trim();
-    
-    // Extract comments
-    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$)/s);
-    if (commentsMatch && commentsMatch[1]) structured.certification.comments = commentsMatch[1].trim();
-    
-    return { structured_data: structured };
   };
   
   // Try to get structured data from the extractedData
   let data;
+  console.log("Initial extractedData:", extractedData);
   
   // First check if we have structured_data directly
   if (extractedData?.structured_data) {
     console.log("Using existing structured_data");
     data = extractedData;
   } 
-  // Then check if we have it in the extractedData.extracted_data object
+  // Then check if we have extracted_data with structured_data
   else if (extractedData?.extracted_data?.structured_data) {
     console.log("Using structured_data from extracted_data");
     data = extractedData.extracted_data;
   }
-  // Then try to parse from raw_response
+  // Then check if we have raw_response in extracted_data
   else if (extractedData?.extracted_data?.raw_response) {
-    console.log("Parsing from raw_response");
+    console.log("Parsing from raw_response in extracted_data");
     data = parseFromMarkdown(extractedData.extracted_data);
   }
-  // Finally check if the extractedData itself is the raw_response
+  // Then check if the extractedData itself contains raw_response
   else if (extractedData?.raw_response) {
     console.log("Parsing from direct raw_response");
     data = parseFromMarkdown(extractedData);
   }
-  // If nothing worked, use the extractedData as is
-  else {
-    console.log("Using default data handling");
+  // If nothing worked, try to parse markdown from any available data
+  else if (typeof extractedData === 'object' && extractedData !== null) {
+    console.log("Trying to parse from any available data");
+    for (const key in extractedData) {
+      if (typeof extractedData[key] === 'object' && extractedData[key] !== null) {
+        if (extractedData[key].raw_response || extractedData[key].markdown) {
+          console.log("Found potential data source in key:", key);
+          const parsed = parseFromMarkdown(extractedData[key]);
+          if (parsed) {
+            data = parsed;
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  // If we still don't have structured data, use the extractedData as is
+  if (!data || !data.structured_data) {
+    console.log("Using default data handling, no structured data found");
     data = { structured_data: {} };
     
     // Try to get the highest level object that might contain our data
@@ -322,21 +341,18 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
   };
   
+  // For debugging - log the patient data to console
+  console.log("Patient data:", {
+    name: getValue(patient, 'name'),
+    id: getValue(patient, 'id_number'),
+    company: getValue(patient, 'company'),
+    occupation: getValue(patient, 'occupation'),
+    examDate: getValue(examination, 'date'),
+    expiryDate: getValue(certification, 'valid_until')
+  });
+  
   return (
     <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
-      {/* Add console logging to help debugging */}
-      {console.log("Certificate Data:", {
-        patient,
-        examination,
-        restrictions,
-        certification,
-        testResults,
-        medicalTests,
-        restrictionsData,
-        fitnessStatus,
-        examinationType
-      })}
-      
       <div className="relative overflow-hidden">
         {/* Certificate watermark (faint background) */}
         <div 
