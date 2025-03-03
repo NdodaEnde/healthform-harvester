@@ -159,13 +159,19 @@ const DocumentViewer = () => {
     
     console.log("Extracting patient name from:", extractedData);
     
-    if (extractedData.structured_data && extractedData.structured_data.patient) {
-      const patientData = extractedData.structured_data.patient;
-      if (patientData.name) return patientData.name;
-      if (patientData.full_name) return patientData.full_name;
+    if (typeof extractedData !== 'object' || extractedData === null) {
+      return "Unknown";
     }
     
-    if (extractedData.raw_response && extractedData.raw_response.data) {
+    if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
+      const patientData = extractedData.structured_data.patient;
+      if (patientData && typeof patientData === 'object') {
+        if (patientData.name) return patientData.name;
+        if (patientData.full_name) return patientData.full_name;
+      }
+    }
+    
+    if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
       const markdown = extractedData.raw_response.data.markdown;
       if (markdown) {
         const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
@@ -203,14 +209,20 @@ const DocumentViewer = () => {
     
     console.log("Extracting patient ID from:", extractedData);
     
-    if (extractedData.structured_data && extractedData.structured_data.patient) {
-      const patientData = extractedData.structured_data.patient;
-      if (patientData.id_number) return patientData.id_number;
-      if (patientData.employee_id) return patientData.employee_id; 
-      if (patientData.id) return patientData.id;
+    if (typeof extractedData !== 'object' || extractedData === null) {
+      return "No ID";
     }
     
-    if (extractedData.raw_response && extractedData.raw_response.data) {
+    if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
+      const patientData = extractedData.structured_data.patient;
+      if (patientData && typeof patientData === 'object') {
+        if (patientData.id_number) return patientData.id_number;
+        if (patientData.employee_id) return patientData.employee_id; 
+        if (patientData.id) return patientData.id;
+      }
+    }
+    
+    if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
       const markdown = extractedData.raw_response.data.markdown;
       if (markdown) {
         const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
@@ -272,7 +284,12 @@ const DocumentViewer = () => {
       let patientId = extractPatientId(extractedData);
       
       if (documentData.document_type === 'certificate-of-fitness') {
-        if (!extractedData.structured_data && extractedData.raw_response) {
+        if (
+          typeof extractedData === 'object' && 
+          extractedData !== null && 
+          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
+          extractedData.raw_response
+        ) {
           extractedData = {
             ...extractedData,
             structured_data: {
@@ -447,7 +464,7 @@ const DocumentViewer = () => {
       );
     }
     
-    if (extractedData.structured_data) {
+    if (typeof extractedData === 'object' && extractedData !== null && extractedData.structured_data) {
       const structuredData = extractedData.structured_data;
       
       return (
@@ -571,7 +588,8 @@ const DocumentViewer = () => {
       );
     }
     
-    if (extractedData.documents || extractedData.text || extractedData.tables) {
+    if (typeof extractedData === 'object' && extractedData !== null && 
+        (extractedData.documents || extractedData.text || extractedData.tables)) {
       return (
         <div className="space-y-6">
           <div>
