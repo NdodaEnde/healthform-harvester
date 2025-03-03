@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
@@ -25,7 +24,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const pollingAttemptsRef = useRef<number>(0);
   const maxPollingAttempts = 20; // About 60 seconds with 3-second intervals
 
-  // Effect to check document processing status
   useEffect(() => {
     if (!processingDocumentId) return;
 
@@ -33,7 +31,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       try {
         console.log(`Checking status for document ID: ${processingDocumentId}`);
         
-        // Use the from method to query the documents table with cache control
         const { data, error } = await supabase
           .from('documents')
           .select('*')
@@ -41,19 +38,18 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           .maybeSingle();
         
         pollingAttemptsRef.current++;
+        console.log(`Polling attempt ${pollingAttemptsRef.current} of ${maxPollingAttempts}`);
 
         if (error) {
           console.error('Error checking document status:', error);
           return;
         }
 
-        // If no data found, the document might not exist yet or was deleted
         if (!data) {
           console.log('Document not found, it might still be processing');
           
-          // After many attempts, stop polling and show error
-          if (pollingAttemptsRef.current > maxPollingAttempts) {
-            console.log("Multiple polling attempts failed, stopping polling");
+          if (pollingAttemptsRef.current >= maxPollingAttempts) {
+            console.log("Maximum polling attempts reached, stopping polling");
             
             if (statusPollingRef.current) {
               clearInterval(statusPollingRef.current);
@@ -72,11 +68,9 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
 
         console.log(`Document found with status: ${data.status}`, data);
 
-        // If document is still processing after many attempts, try to verify it directly
-        if (data.status === 'processing' && pollingAttemptsRef.current > 15) {
+        if (data.status === 'processing' && pollingAttemptsRef.current > maxPollingAttempts / 2) {
           console.log('Document has been in processing state for a long time, checking directly');
           
-          // Make a direct database check with a fresh connection and no caching
           const freshCheck = await supabase
             .from('documents')
             .select('*')
@@ -85,14 +79,12 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             
           if (freshCheck.data && freshCheck.data.status === 'processed') {
             console.log('Found document is actually processed with fresh check!', freshCheck.data);
-            // Override the data with the fresh result
             data.status = 'processed';
             data.extracted_data = freshCheck.data.extracted_data;
           }
         }
 
         if (data.status === 'processed') {
-          // Document processing completed successfully
           if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
             progressIntervalRef.current = null;
@@ -105,7 +97,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           
           setUploadProgress(100);
           
-          // Prepare document data for the parent component
           const processedData = {
             id: data.id,
             name: data.file_name,
@@ -121,7 +112,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             jsonData: JSON.stringify(data.extracted_data, null, 2)
           };
           
-          // Delay completion to show 100% progress
           setTimeout(() => {
             setIsUploading(false);
             onUploadComplete(processedData);
@@ -132,7 +122,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             });
           }, 500);
         } else if (data.status === 'failed') {
-          // Document processing failed
           if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
             progressIntervalRef.current = null;
@@ -146,7 +135,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           setIsUploading(false);
           setProcessingDocumentId(null);
           
-          // Check for specific error message about API key
           const errorMessage = data.processing_error || 'There was an error processing your document.';
           const isApiKeyError = errorMessage.includes('API key is not configured');
           
@@ -159,13 +147,25 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
               description: errorMessage
             });
           }
+        } else if (data.status === 'processing' && pollingAttemptsRef.current >= maxPollingAttempts) {
+          console.log("Maximum polling attempts reached but document is still processing");
+          
+          if (statusPollingRef.current) {
+            clearInterval(statusPollingRef.current);
+            statusPollingRef.current = null;
+          }
+          
+          setIsUploading(false);
+          setProcessingDocumentId(null);
+          
+          toast("Document still processing", {
+            description: "The document is taking longer than expected to process. You can check the dashboard later for results.",
+          });
         }
-        // If still processing, continue checking
       } catch (error) {
         console.error('Error in status check:', error);
         
-        // After too many errors, stop polling
-        if (pollingAttemptsRef.current > maxPollingAttempts) {
+        if (pollingAttemptsRef.current >= maxPollingAttempts) {
           if (statusPollingRef.current) {
             clearInterval(statusPollingRef.current);
             statusPollingRef.current = null;
@@ -179,10 +179,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       }
     };
 
-    // Initial check
     checkStatus();
 
-    // Set up polling every 3 seconds
     const interval = setInterval(checkStatus, 3000);
     statusPollingRef.current = interval;
 
@@ -196,15 +194,14 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         statusPollingRef.current = null;
       }
     };
-  }, [processingDocumentId, documentType]);
+  }, [processingDocumentId, documentType, maxPollingAttempts]);
 
-  // Helper function to get file URL from Supabase storage
   const getFileUrl = async (filePath: string) => {
     try {
       const { data } = await supabase
         .storage
         .from('medical-documents')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
+        .createSignedUrl(filePath, 3600);
         
       return data?.signedUrl || null;
     } catch (error) {
@@ -213,7 +210,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     }
   };
 
-  // Helper functions to extract patient info from extracted data
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
     
@@ -240,7 +236,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     
-    // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(selectedFile.type)) {
       toast.error("Invalid file type", {
@@ -249,7 +244,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       return;
     }
     
-    // Check file size (max 50MB)
     if (selectedFile.size > 50 * 1024 * 1024) {
       toast.error("File too large", {
         description: "Maximum file size is 50MB."
@@ -267,7 +261,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     const droppedFile = e.dataTransfer.files?.[0];
     if (!droppedFile) return;
     
-    // Check if file is valid (PDF, PNG, or JPEG)
     const validTypes = ["application/pdf", "image/png", "image/jpeg"];
     if (!validTypes.includes(droppedFile.type)) {
       toast.error("Invalid file type", {
@@ -276,7 +269,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       return;
     }
     
-    // Check file size (max 50MB)
     if (droppedFile.size > 50 * 1024 * 1024) {
       toast.error("File too large", {
         description: "Maximum file size is 50MB."
@@ -299,14 +291,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     setUploadProgress(0);
     pollingAttemptsRef.current = 0;
 
-    // Create a simulated progress indicator
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
           if (progressInterval) {
             clearInterval(progressInterval);
           }
-          return 90; // Hold at 90% until API response
+          return 90;
         }
         return prev + 5;
       });
@@ -315,16 +306,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     progressIntervalRef.current = progressInterval;
 
     try {
-      // Create FormData for the edge function
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
       
-      // Use the constant values from the client.ts file
       const SUPABASE_URL = "https://wgkbsiczgyaqmgoyirjs.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
       
-      // Call the edge function
       console.log('Calling process-document edge function with form data', {
         fileName: file.name,
         fileType: file.type,
@@ -343,7 +331,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         }
       );
       
-      // Handle non-200 responses
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Edge function error (${response.status}):`, errorText);
@@ -353,16 +340,13 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       const data = await response.json();
       console.log("Edge Function Response:", data);
       
-      // Store document ID for status polling
       setProcessingDocumentId(data.documentId);
       
-      // Add a timeout to stop checking for status after 60 seconds
       const timeout = setTimeout(() => {
         if (statusPollingRef.current) {
           clearInterval(statusPollingRef.current);
           statusPollingRef.current = null;
           
-          // If we're still in uploading state, something went wrong
           if (isUploading) {
             setIsUploading(false);
             setUploadProgress(0);
@@ -372,9 +356,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
             });
           }
         }
-      }, 60000); // 60 seconds timeout
+      }, 60000);
       
-      // Set progress to indicate processing stage
       setUploadProgress(95);
     } catch (error) {
       console.error('Error uploading file:', error);

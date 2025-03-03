@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -14,8 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import CertificateTemplate from "@/components/CertificateTemplate";
 
-// Mock document data as fallback if nothing in session storage or API fails
 const mockDocumentData = {
   id: "doc-1",
   name: "Medical Exam - John Doe.pdf",
@@ -156,7 +155,6 @@ const DocumentViewer = () => {
 
   const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
-      // Fetch document from Supabase with no caching to get latest status
       const { data: documentData, error } = await supabase
         .from('documents')
         .select('*')
@@ -172,13 +170,11 @@ const DocumentViewer = () => {
         return null;
       }
       
-      // Get file URL
       const { data: urlData } = await supabase
         .storage
         .from('medical-documents')
-        .createSignedUrl(documentData.file_path, 3600); // 1 hour expiry
+        .createSignedUrl(documentData.file_path, 3600);
       
-      // Format document for UI
       return {
         id: documentData.id,
         name: documentData.file_name,
@@ -199,7 +195,6 @@ const DocumentViewer = () => {
     }
   };
 
-  // Helper functions to extract patient info from extracted data
   const extractPatientName = (extractedData: any) => {
     if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
       return "Unknown";
@@ -226,17 +221,14 @@ const DocumentViewer = () => {
       setIsLoading(true);
       
       try {
-        // Always fetch fresh data from Supabase to ensure we have the latest status
         const documentData = await fetchDocumentFromSupabase(id);
         
         if (documentData) {
           setDocument(documentData);
           setImageUrl(documentData.imageUrl);
           
-          // Save to sessionStorage for future use
           sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
         } else {
-          // Try to get document data from sessionStorage if Supabase fails
           const storedData = sessionStorage.getItem(`document-${id}`);
           
           if (storedData) {
@@ -249,7 +241,6 @@ const DocumentViewer = () => {
               setDocument(mockDocumentData);
             }
           } else {
-            // Fallback to mock data if API fails and nothing in sessionStorage
             console.log('Using mock data as fallback');
             setDocument(mockDocumentData);
           }
@@ -266,7 +257,6 @@ const DocumentViewer = () => {
   }, [id]);
 
   const renderExtractedData = () => {
-    // Handle no data case
     if (!document || !document.extractedData) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -275,22 +265,22 @@ const DocumentViewer = () => {
       );
     }
     
-    // Access the extraction data - check for both structured_data and raw formats
     const extractedData = document.extractedData;
     
-    // First, check if we have the structured_data object which is the preferred format
+    if (document.type === 'Certificate of Fitness') {
+      return <CertificateTemplate extractedData={extractedData} />;
+    }
+    
     if (extractedData.structured_data) {
       const structuredData = extractedData.structured_data;
       
       return (
         <div className="space-y-6">
-          {/* Patient Information Section */}
           {structuredData.patient && (
             <div>
               <h3 className="text-lg font-medium mb-3">Patient Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(structuredData.patient).map(([key, value]: [string, any]) => {
-                  // Skip complex nested objects
                   if (typeof value === 'object' && value !== null) return null;
                   return (
                     <div key={key} className="space-y-1">
@@ -307,19 +297,17 @@ const DocumentViewer = () => {
           
           <Separator />
           
-          {/* Medical Information Section */}
           {structuredData.medical_details && (
             <>
               <div>
                 <h3 className="text-lg font-medium mb-3">Medical Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(structuredData.medical_details).map(([key, value]: [string, any]) => {
-                    // Handle arrays and objects
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
                     } else if (typeof value === 'object' && value !== null) {
-                      return null; // Skip complex nested objects
+                      return null;
                     }
                     
                     return (
@@ -338,19 +326,17 @@ const DocumentViewer = () => {
             </>
           )}
           
-          {/* Examination Results Section */}
           {structuredData.examination_results && (
             <>
               <div>
                 <h3 className="text-lg font-medium mb-3">Examination Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(structuredData.examination_results).map(([key, value]: [string, any]) => {
-                    // Handle arrays and objects
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
                     } else if (typeof value === 'object' && value !== null) {
-                      return null; // Skip complex nested objects
+                      return null;
                     }
                     
                     return (
@@ -369,19 +355,17 @@ const DocumentViewer = () => {
             </>
           )}
           
-          {/* Certification Section */}
           {structuredData.certification && (
             <>
               <div>
                 <h3 className="text-lg font-medium mb-3">Certification</h3>
                 <div className="grid grid-cols-1 gap-4">
                   {Object.entries(structuredData.certification).map(([key, value]: [string, any]) => {
-                    // Handle arrays and objects
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
                     } else if (typeof value === 'object' && value !== null) {
-                      return null; // Skip complex nested objects
+                      return null;
                     }
                     
                     return (
@@ -398,7 +382,6 @@ const DocumentViewer = () => {
             </>
           )}
           
-          {/* If no structured sections were rendered, show a generic view */}
           {!structuredData.patient && !structuredData.medical_details && 
            !structuredData.examination_results && !structuredData.certification && (
             <div>
@@ -412,9 +395,6 @@ const DocumentViewer = () => {
       );
     }
     
-    // If we don't have structured_data, check for other formats
-    
-    // Check if data has API extraction format (documents, text, tables)
     if (extractedData.documents || extractedData.text || extractedData.tables) {
       return (
         <div className="space-y-6">
@@ -424,7 +404,6 @@ const DocumentViewer = () => {
               This displays the raw data extracted from your document using the Agentic Document Extraction API.
             </p>
             
-            {/* Show document segments if available */}
             {extractedData.documents && (
               <div className="space-y-4">
                 {extractedData.documents.map((doc: any, index: number) => (
@@ -438,7 +417,6 @@ const DocumentViewer = () => {
               </div>
             )}
             
-            {/* Show text extraction if available */}
             {extractedData.text && (
               <div className="border rounded-md p-4 mt-4">
                 <h4 className="text-md font-medium mb-2">Extracted Text</h4>
@@ -448,7 +426,6 @@ const DocumentViewer = () => {
               </div>
             )}
             
-            {/* Show tables if available */}
             {extractedData.tables && extractedData.tables.length > 0 && (
               <div className="space-y-4 mt-4">
                 <h4 className="text-md font-medium">Extracted Tables</h4>
@@ -477,7 +454,6 @@ const DocumentViewer = () => {
       );
     }
     
-    // Fallback - show a raw JSON view if no recognized format
     return (
       <div className="space-y-6">
         <div>
@@ -608,7 +584,6 @@ const DocumentViewer = () => {
           transition={{ duration: 0.5 }}
           className="grid grid-cols-1 lg:grid-cols-2 gap-8"
         >
-          {/* Original Document Panel */}
           {showOriginal && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -641,7 +616,6 @@ const DocumentViewer = () => {
             </motion.div>
           )}
           
-          {/* Extracted Data Panel */}
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
