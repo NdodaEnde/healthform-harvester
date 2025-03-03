@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Card } from "@/components/ui/card";
 
@@ -322,7 +323,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   };
   
   return (
-    
     <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
       {/* Add console logging to help debugging */}
       {console.log("Certificate Data:", {
@@ -621,4 +621,117 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                     </td>
                   </tr>
                   <tr>
-                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-
+                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                      <div className="font-semibold">Confined Spaces</div>
+                      {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                    </td>
+                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                      <div className="font-semibold">Chemical Exposure</div>
+                      {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                    </td>
+                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                      <div className="font-semibold">Wear Spectacles</div>
+                      {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                    </td>
+                    <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                      <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
+                      {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Fitness Status */}
+          <div className="mb-4">
+            <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+              Fitness Status
+            </div>
+            
+            <div className="px-4">
+              <table className="w-full border border-gray-400 text-sm">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-400 py-2 text-center w-1/5 bg-blue-50">FIT</th>
+                    <th className="border border-gray-400 py-2 text-center w-1/5 bg-blue-50">Fit with Restriction</th>
+                    <th className="border border-gray-400 py-2 text-center w-1/5 bg-blue-50">Fit with Condition</th>
+                    <th className="border border-gray-400 py-2 text-center w-1/5 bg-blue-50">Temporary Unfit</th>
+                    <th className="border border-gray-400 py-2 text-center w-1/5 bg-blue-50">UNFIT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-400 py-4 text-center font-bold">
+                      {fitnessStatus.fit ? '✓' : ''}
+                    </td>
+                    <td className="border border-gray-400 py-4 text-center font-bold">
+                      {fitnessStatus.fitWithRestriction ? '✓' : ''}
+                    </td>
+                    <td className="border border-gray-400 py-4 text-center font-bold">
+                      {fitnessStatus.fitWithCondition ? '✓' : ''}
+                    </td>
+                    <td className="border border-gray-400 py-4 text-center font-bold">
+                      {fitnessStatus.temporarilyUnfit ? '✓' : ''}
+                    </td>
+                    <td className="border border-gray-400 py-4 text-center font-bold">
+                      {fitnessStatus.unfit ? '✓' : ''}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Comments */}
+          <div className="mb-4 px-4">
+            <div className="font-semibold text-sm mb-1">Comments:</div>
+            <div className="border border-gray-400 p-2 min-h-[60px] text-sm">
+              {getValue(certification, 'comments') || ''}
+            </div>
+          </div>
+          
+          {/* Signatures */}
+          <div className="mb-4 px-4 pt-4">
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="text-center text-sm font-semibold">
+                    Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mpishi'}
+                  </p>
+                  <p className="text-center text-xs">
+                    Occupational Medical Practitioner
+                  </p>
+                  <p className="text-center text-xs">
+                    Practice No: {getValue(examination, 'practice_number') || '0404160'}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="text-center text-sm font-semibold">
+                    Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}
+                  </p>
+                  <p className="text-center text-xs">
+                    Occupational Health Practitioner
+                  </p>
+                  <p className="text-center text-xs">
+                    Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Footer */}
+          <div className="bg-gray-800 text-white text-center py-2 text-xs">
+            <p>Blue Collar Occupational Health Certificate of Fitness</p>
+            <p>This certificate is valid for the period indicated unless revoked earlier.</p>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+export default CertificateTemplate;
