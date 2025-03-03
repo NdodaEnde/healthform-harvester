@@ -154,52 +154,10 @@ const DocumentViewer = () => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const fetchDocumentFromSupabase = async (documentId: string) => {
-    try {
-      const { data: documentData, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching document:', error);
-        return null;
-      }
-      
-      if (!documentData) {
-        return null;
-      }
-      
-      console.log('Fetched document data:', documentData);
-      
-      const { data: urlData } = await supabase
-        .storage
-        .from('medical-documents')
-        .createSignedUrl(documentData.file_path, 3600);
-      
-      return {
-        id: documentData.id,
-        name: documentData.file_name,
-        type: documentData.document_type === 'medical-questionnaire' 
-          ? 'Medical Examination Questionnaire' 
-          : 'Certificate of Fitness',
-        uploadedAt: documentData.created_at,
-        status: documentData.status,
-        patientName: extractPatientName(documentData.extracted_data),
-        patientId: extractPatientId(documentData.extracted_data),
-        imageUrl: urlData?.signedUrl || null,
-        extractedData: documentData.extracted_data,
-        jsonData: JSON.stringify(documentData.extracted_data, null, 2)
-      };
-    } catch (error) {
-      console.error('Error fetching document from Supabase:', error);
-      return null;
-    }
-  };
-
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
+    
+    console.log("Extracting patient name from:", extractedData);
     
     if (extractedData.structured_data && extractedData.structured_data.patient) {
       const patientData = extractedData.structured_data.patient;
@@ -239,9 +197,11 @@ const DocumentViewer = () => {
     
     return "Unknown";
   };
-  
+
   const extractPatientId = (extractedData: any) => {
     if (!extractedData) return "No ID";
+    
+    console.log("Extracting patient ID from:", extractedData);
     
     if (extractedData.structured_data && extractedData.structured_data.patient) {
       const patientData = extractedData.structured_data.patient;
@@ -281,6 +241,70 @@ const DocumentViewer = () => {
     }
     
     return "No ID";
+  };
+
+  const fetchDocumentFromSupabase = async (documentId: string) => {
+    try {
+      const { data: documentData, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching document:', error);
+        return null;
+      }
+      
+      if (!documentData) {
+        return null;
+      }
+      
+      console.log('Fetched document data:', documentData);
+      
+      const { data: urlData } = await supabase
+        .storage
+        .from('medical-documents')
+        .createSignedUrl(documentData.file_path, 3600);
+      
+      let extractedData = documentData.extracted_data || {};
+      let patientName = extractPatientName(extractedData);
+      let patientId = extractPatientId(extractedData);
+      
+      if (documentData.document_type === 'certificate-of-fitness') {
+        if (!extractedData.structured_data && extractedData.raw_response) {
+          extractedData = {
+            ...extractedData,
+            structured_data: {
+              patient: {
+                name: patientName,
+                id_number: patientId
+              }
+            }
+          };
+        }
+      }
+      
+      console.log('Processed extracted data:', extractedData);
+      
+      return {
+        id: documentData.id,
+        name: documentData.file_name,
+        type: documentData.document_type === 'medical-questionnaire' 
+          ? 'Medical Examination Questionnaire' 
+          : 'Certificate of Fitness',
+        uploadedAt: documentData.created_at,
+        status: documentData.status,
+        patientName: patientName,
+        patientId: patientId,
+        imageUrl: urlData?.signedUrl || null,
+        extractedData: extractedData,
+        jsonData: JSON.stringify(extractedData, null, 2)
+      };
+    } catch (error) {
+      console.error('Error fetching document from Supabase:', error);
+      return null;
+    }
   };
 
   useEffect(() => {
