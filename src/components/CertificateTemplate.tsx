@@ -473,8 +473,131 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
       if (companyMatch && companyMatch[1]) extractedData.patient.company = companyMatch[1].trim();
       
-      const jobTitleMatch = markdown.match(/(?:Job Title|Occupation):\s*(.*?)(?=\n|\r|$)/i);
+      const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
       if (jobTitleMatch && jobTitleMatch[1]) extractedData.patient.occupation = jobTitleMatch[1].trim();
+      
+      console.log("Looking directly for fields in form-formatted responses");
+      
+      // Special handling for the form format displayed in the sample:
+      // It has very clear markdown formatting with ### sections and checkboxes
+      if (markdown.includes("### Examination Type") && 
+          markdown.includes("### Medical Examination Conducted") &&
+          markdown.includes("### Medical Fitness Declaration")) {
+        
+        console.log("Detected form-formatted markdown response - using direct extraction");
+        
+        // Examination Type
+        if (markdown.includes("**Pre-Employment**: [x]")) {
+          extractedData.examination_results.type.pre_employment = true;
+        }
+        if (markdown.includes("**Periodical**: [x]")) {
+          extractedData.examination_results.type.periodical = true;
+        }
+        if (markdown.includes("**Exit**: [x]")) {
+          extractedData.examination_results.type.exit = true;
+        }
+        
+        // Working at Heights (special case)
+        if (markdown.includes("Working at Heights    | [x]")) {
+          extractedData.examination_results.test_results.heights_done = true;
+          
+          // Look for results in the same table row
+          const heightsMatch = markdown.match(/Working at Heights.*?\[(x| )\].*?\|(.*?)\|/is);
+          if (heightsMatch && heightsMatch[2]) {
+            extractedData.examination_results.test_results.heights_results = heightsMatch[2].trim();
+          } else {
+            extractedData.examination_results.test_results.heights_results = "N/A";
+          }
+        }
+        
+        // Medical Fitness Declaration
+        if (markdown.includes("**FIT**: [x]")) {
+          extractedData.certification.fit = true;
+        }
+        if (markdown.includes("**Fit with Restriction**: [x]")) {
+          extractedData.certification.fit_with_restrictions = true;
+        }
+        if (markdown.includes("**Fit with Condition**: [x]")) {
+          extractedData.certification.fit_with_condition = true;
+        }
+        if (markdown.includes("**Temporary Unfit**: [x]")) {
+          extractedData.certification.temporarily_unfit = true;
+        }
+        if (markdown.includes("**UNFIT**: [x]")) {
+          extractedData.certification.unfit = true;
+        }
+        
+        // For table-format test results
+        // This is the format in the provided response
+        const testTablePattern = /\| ([\w\s,&]+?)\s*\| \[(x| )\]\s*\| ([\w\s\/\-]+?)\s*\|/g;
+        let testMatch;
+        const testResults = extractedData.examination_results.test_results;
+        
+        while ((testMatch = testTablePattern.exec(markdown)) !== null) {
+          const testName = testMatch[1].trim();
+          const isDone = testMatch[2].trim() === 'x';
+          const results = testMatch[3].trim();
+          
+          // Map test names to our standardized keys
+          if (testName.includes("BLOODS")) {
+            testResults.bloods_done = isDone;
+            testResults.bloods_results = results;
+          }
+          else if (testName.includes("FAR, NEAR VISION")) {
+            testResults.far_near_vision_done = isDone;
+            testResults.far_near_vision_results = results;
+          }
+          else if (testName.includes("SIDE & DEPTH")) {
+            testResults.side_depth_done = isDone;
+            testResults.side_depth_results = results;
+          }
+          else if (testName.includes("NIGHT VISION")) {
+            testResults.night_vision_done = isDone;
+            testResults.night_vision_results = results;
+          }
+          else if (testName.includes("Hearing")) {
+            testResults.hearing_done = isDone;
+            testResults.hearing_results = results;
+          }
+          else if (testName.includes("Working at Heights")) {
+            testResults.heights_done = isDone;
+            testResults.heights_results = results;
+          }
+          else if (testName.includes("Lung Function")) {
+            testResults.lung_function_done = isDone;
+            testResults.lung_function_results = results;
+          }
+          else if (testName.includes("X-Ray")) {
+            testResults.x_ray_done = isDone;
+            testResults.x_ray_results = results;
+          }
+          else if (testName.includes("Drug Screen")) {
+            testResults.drug_screen_done = isDone;
+            testResults.drug_screen_results = results;
+          }
+        }
+        
+        console.log("Extracted test results:", testResults);
+        
+        // Directly extract Restrictions mentioned in the Restrictions section
+        if (markdown.includes("### Restrictions")) {
+          const restrictionsMatch = markdown.match(/### Restrictions\s*([\s\S]*?)(?=\n\n|###)/);
+          if (restrictionsMatch && restrictionsMatch[1]) {
+            const restrictionsText = restrictionsMatch[1];
+            
+            extractedData.restrictions.heights = restrictionsText.includes("Heights");
+            extractedData.restrictions.dust_exposure = restrictionsText.includes("Dust Exposure");
+            extractedData.restrictions.motorized_equipment = restrictionsText.includes("Motorized Equipment");
+            extractedData.restrictions.wear_hearing_protection = restrictionsText.includes("Wear Hearing Protection");
+            extractedData.restrictions.confined_spaces = restrictionsText.includes("Confined Spaces");
+            extractedData.restrictions.chemical_exposure = restrictionsText.includes("Chemical Exposure");
+            extractedData.restrictions.wear_spectacles = restrictionsText.includes("Wear Spectacles");
+            extractedData.restrictions.remain_on_treatment_for_chronic_conditions = 
+              restrictionsText.includes("Remain on Treatment") || 
+              restrictionsText.includes("Chronic Conditions");
+          }
+        }
+      }
       
       // Extract examination date - handles various formats
       const examDatePatterns = [
