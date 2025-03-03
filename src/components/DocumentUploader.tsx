@@ -23,6 +23,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingAttemptsRef = useRef<number>(0);
+  const maxPollingAttempts = 20; // About 60 seconds with 3-second intervals
 
   // Effect to check document processing status
   useEffect(() => {
@@ -49,21 +50,23 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         // If no data found, the document might not exist yet or was deleted
         if (!data) {
           console.log('Document not found, it might still be processing');
-          // After 10 attempts (30 seconds), try to get more information
-          if (pollingAttemptsRef.current > 10) {
-            console.log("Multiple polling attempts failed, checking for any documents in the table");
-            const { data: allDocs, error: allDocsError } = await supabase
-              .from('documents')
-              .select('*')
-              .order('created_at', { ascending: false })
-              .limit(5);
+          
+          // After many attempts, stop polling and show error
+          if (pollingAttemptsRef.current > maxPollingAttempts) {
+            console.log("Multiple polling attempts failed, stopping polling");
             
-            if (allDocsError) {
-              console.error('Error fetching recent documents:', allDocsError);
-            } else {
-              console.log('Most recent documents in database:', allDocs);
+            if (statusPollingRef.current) {
+              clearInterval(statusPollingRef.current);
+              statusPollingRef.current = null;
             }
+            
+            setIsUploading(false);
+            toast.error("Document processing timeout", {
+              description: "Unable to verify document status. Please check the dashboard for updates."
+            });
+            return;
           }
+          
           return;
         }
 
@@ -73,7 +76,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         if (data.status === 'processing' && pollingAttemptsRef.current > 15) {
           console.log('Document has been in processing state for a long time, checking directly');
           
-          // Make a direct database check with a fresh connection
+          // Make a direct database check with a fresh connection and no caching
           const freshCheck = await supabase
             .from('documents')
             .select('*')
@@ -160,6 +163,19 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         // If still processing, continue checking
       } catch (error) {
         console.error('Error in status check:', error);
+        
+        // After too many errors, stop polling
+        if (pollingAttemptsRef.current > maxPollingAttempts) {
+          if (statusPollingRef.current) {
+            clearInterval(statusPollingRef.current);
+            statusPollingRef.current = null;
+          }
+          
+          setIsUploading(false);
+          toast.error("Error checking document status", {
+            description: "Please check the dashboard for document status."
+          });
+        }
       }
     };
 

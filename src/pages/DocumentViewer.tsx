@@ -156,12 +156,12 @@ const DocumentViewer = () => {
 
   const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
-      // Fetch document from Supabase
+      // Fetch document from Supabase with no caching to get latest status
       const { data: documentData, error } = await supabase
         .from('documents')
         .select('*')
         .eq('id', documentId)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching document:', error);
@@ -225,24 +225,8 @@ const DocumentViewer = () => {
 
       setIsLoading(true);
       
-      // Try to get document data from sessionStorage first
-      const storedData = sessionStorage.getItem(`document-${id}`);
-      
-      if (storedData) {
-        try {
-          const parsedData = JSON.parse(storedData);
-          setDocument(parsedData);
-          setImageUrl(parsedData.imageUrl);
-          setIsLoading(false);
-          return;
-        } catch (error) {
-          console.error("Error parsing stored document data:", error);
-          // Continue to try fetching from Supabase
-        }
-      }
-      
-      // Fetch from Supabase if not in sessionStorage
       try {
+        // Always fetch fresh data from Supabase to ensure we have the latest status
         const documentData = await fetchDocumentFromSupabase(id);
         
         if (documentData) {
@@ -252,9 +236,23 @@ const DocumentViewer = () => {
           // Save to sessionStorage for future use
           sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
         } else {
-          // Fallback to mock data if API fails
-          console.log('Using mock data as fallback');
-          setDocument(mockDocumentData);
+          // Try to get document data from sessionStorage if Supabase fails
+          const storedData = sessionStorage.getItem(`document-${id}`);
+          
+          if (storedData) {
+            try {
+              const parsedData = JSON.parse(storedData);
+              setDocument(parsedData);
+              setImageUrl(parsedData.imageUrl);
+            } catch (error) {
+              console.error("Error parsing stored document data:", error);
+              setDocument(mockDocumentData);
+            }
+          } else {
+            // Fallback to mock data if API fails and nothing in sessionStorage
+            console.log('Using mock data as fallback');
+            setDocument(mockDocumentData);
+          }
         }
       } catch (error) {
         console.error('Error fetching document:', error);
@@ -268,184 +266,230 @@ const DocumentViewer = () => {
   }, [id]);
 
   const renderExtractedData = () => {
-    // Handle actual API response data
-    if (document && document.extractedData) {
-      // If this is the raw API response, we'll render it differently
-      if (document.extractedData.documents || document.extractedData.text) {
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-3">Extracted API Data</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                This displays the raw data extracted from your document using the Agentic Document Extraction API.
-              </p>
-              
-              {/* Show document segments if available */}
-              {document.extractedData.documents && (
-                <div className="space-y-4">
-                  {document.extractedData.documents.map((doc: any, index: number) => (
-                    <div key={index} className="border rounded-md p-4">
-                      <h4 className="text-md font-medium mb-2">Document Segment {index + 1}</h4>
-                      <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                        {JSON.stringify(doc, null, 2)}
-                      </pre>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Show text extraction if available */}
-              {document.extractedData.text && (
-                <div className="border rounded-md p-4 mt-4">
-                  <h4 className="text-md font-medium mb-2">Extracted Text</h4>
-                  <div className="bg-muted p-3 rounded">
-                    <p className="whitespace-pre-wrap text-sm">{document.extractedData.text}</p>
-                  </div>
-                </div>
-              )}
-              
-              {/* Show tables if available */}
-              {document.extractedData.tables && document.extractedData.tables.length > 0 && (
-                <div className="space-y-4 mt-4">
-                  <h4 className="text-md font-medium">Extracted Tables</h4>
-                  {document.extractedData.tables.map((table: any, index: number) => (
-                    <div key={index} className="border rounded-md p-4 overflow-x-auto">
-                      <h5 className="text-sm font-medium mb-2">Table {index + 1}</h5>
-                      <table className="min-w-full divide-y divide-border">
-                        <tbody className="divide-y divide-border">
-                          {table.data.map((row: any, rowIndex: number) => (
-                            <tr key={rowIndex}>
-                              {row.map((cell: any, cellIndex: number) => (
-                                <td key={cellIndex} className="px-3 py-2 text-sm">
-                                  {cell}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Show structured data if available */}
-              {document.extractedData.structured_data && (
-                <div className="border rounded-md p-4 mt-4">
-                  <h4 className="text-md font-medium mb-2">Structured Data</h4>
-                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                    {JSON.stringify(document.extractedData.structured_data, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {/* Show raw response if available */}
-              {document.extractedData.raw_response && (
-                <div className="border rounded-md p-4 mt-4">
-                  <h4 className="text-md font-medium mb-2">Raw API Response</h4>
-                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-96">
-                    {JSON.stringify(document.extractedData.raw_response, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
+    // Handle no data case
+    if (!document || !document.extractedData) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available</p>
+        </div>
+      );
+    }
+    
+    // Access the extraction data - check for both structured_data and raw formats
+    const extractedData = document.extractedData;
+    
+    // First, check if we have the structured_data object which is the preferred format
+    if (extractedData.structured_data) {
+      const structuredData = extractedData.structured_data;
       
-      // Use the mock format for structured display if needed
       return (
         <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-3">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {document.extractedData.personal && Object.entries(document.extractedData.personal).map(([key, value]: [string, any]) => (
-                <div key={key} className="space-y-1">
-                  <p className="text-sm text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
-                  <p className="font-medium">{value}</p>
-                </div>
-              ))}
+          {/* Patient Information Section */}
+          {structuredData.patient && (
+            <div>
+              <h3 className="text-lg font-medium mb-3">Patient Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(structuredData.patient).map(([key, value]: [string, any]) => {
+                  // Skip complex nested objects
+                  if (typeof value === 'object' && value !== null) return null;
+                  return (
+                    <div key={key} className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                      </p>
+                      <p className="font-medium">{value !== null ? value.toString() : 'N/A'}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
           
-          {document.extractedData.medical && (
+          <Separator />
+          
+          {/* Medical Information Section */}
+          {structuredData.medical_details && (
             <>
-              <Separator />
-              
               <div>
-                <h3 className="text-lg font-medium mb-3">Medical History</h3>
+                <h3 className="text-lg font-medium mb-3">Medical Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(document.extractedData.medical).map(([key, value]: [string, any]) => (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
-                      <p className="font-medium">{value}</p>
-                    </div>
-                  ))}
+                  {Object.entries(structuredData.medical_details).map(([key, value]: [string, any]) => {
+                    // Handle arrays and objects
+                    let displayValue = value;
+                    if (Array.isArray(value)) {
+                      displayValue = value.join(', ');
+                    } else if (typeof value === 'object' && value !== null) {
+                      return null; // Skip complex nested objects
+                    }
+                    
+                    return (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+              
+              <Separator />
             </>
           )}
           
-          {document.extractedData.vitals && (
+          {/* Examination Results Section */}
+          {structuredData.examination_results && (
             <>
-              <Separator />
-              
-              <div>
-                <h3 className="text-lg font-medium mb-3">Vital Signs</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(document.extractedData.vitals).map(([key, value]: [string, any]) => (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
-                      <p className="font-medium">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-          
-          {document.extractedData.examResults && (
-            <>
-              <Separator />
-              
               <div>
                 <h3 className="text-lg font-medium mb-3">Examination Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(document.extractedData.examResults).map(([key, value]: [string, any]) => (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
-                      <p className="font-medium">{value}</p>
-                    </div>
-                  ))}
+                  {Object.entries(structuredData.examination_results).map(([key, value]: [string, any]) => {
+                    // Handle arrays and objects
+                    let displayValue = value;
+                    if (Array.isArray(value)) {
+                      displayValue = value.join(', ');
+                    } else if (typeof value === 'object' && value !== null) {
+                      return null; // Skip complex nested objects
+                    }
+                    
+                    return (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <Separator />
+            </>
+          )}
+          
+          {/* Certification Section */}
+          {structuredData.certification && (
+            <>
+              <div>
+                <h3 className="text-lg font-medium mb-3">Certification</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {Object.entries(structuredData.certification).map(([key, value]: [string, any]) => {
+                    // Handle arrays and objects
+                    let displayValue = value;
+                    if (Array.isArray(value)) {
+                      displayValue = value.join(', ');
+                    } else if (typeof value === 'object' && value !== null) {
+                      return null; // Skip complex nested objects
+                    }
+                    
+                    return (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </>
           )}
           
-          {document.extractedData.assessment && (
-            <>
-              <Separator />
-              
-              <div>
-                <h3 className="text-lg font-medium mb-3">Assessment</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {Object.entries(document.extractedData.assessment).map(([key, value]: [string, any]) => (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
-                      <p className="font-medium">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
+          {/* If no structured sections were rendered, show a generic view */}
+          {!structuredData.patient && !structuredData.medical_details && 
+           !structuredData.examination_results && !structuredData.certification && (
+            <div>
+              <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
+              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                {JSON.stringify(structuredData, null, 2)}
+              </pre>
+            </div>
           )}
         </div>
       );
     }
     
+    // If we don't have structured_data, check for other formats
+    
+    // Check if data has API extraction format (documents, text, tables)
+    if (extractedData.documents || extractedData.text || extractedData.tables) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-medium mb-3">Extracted API Data</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              This displays the raw data extracted from your document using the Agentic Document Extraction API.
+            </p>
+            
+            {/* Show document segments if available */}
+            {extractedData.documents && (
+              <div className="space-y-4">
+                {extractedData.documents.map((doc: any, index: number) => (
+                  <div key={index} className="border rounded-md p-4">
+                    <h4 className="text-md font-medium mb-2">Document Segment {index + 1}</h4>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                      {JSON.stringify(doc, null, 2)}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Show text extraction if available */}
+            {extractedData.text && (
+              <div className="border rounded-md p-4 mt-4">
+                <h4 className="text-md font-medium mb-2">Extracted Text</h4>
+                <div className="bg-muted p-3 rounded">
+                  <p className="whitespace-pre-wrap text-sm">{extractedData.text}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Show tables if available */}
+            {extractedData.tables && extractedData.tables.length > 0 && (
+              <div className="space-y-4 mt-4">
+                <h4 className="text-md font-medium">Extracted Tables</h4>
+                {extractedData.tables.map((table: any, index: number) => (
+                  <div key={index} className="border rounded-md p-4 overflow-x-auto">
+                    <h5 className="text-sm font-medium mb-2">Table {index + 1}</h5>
+                    <table className="min-w-full divide-y divide-border">
+                      <tbody className="divide-y divide-border">
+                        {table.data.map((row: any, rowIndex: number) => (
+                          <tr key={rowIndex}>
+                            {row.map((cell: any, cellIndex: number) => (
+                              <td key={cellIndex} className="px-3 py-2 text-sm">
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
+    // Fallback - show a raw JSON view if no recognized format
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No data available</p>
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            The data structure from this extraction doesn't match the expected format. 
+            Here's the raw data that was extracted:
+          </p>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+            {JSON.stringify(extractedData, null, 2)}
+          </pre>
+        </div>
       </div>
     );
   };
