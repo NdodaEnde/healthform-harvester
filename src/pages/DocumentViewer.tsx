@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -882,3 +883,41 @@ const DocumentViewer = () => {
                         <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
                           {document.jsonData}
                         </pre>
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
+            </Card>
+            
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => navigate("/dashboard")}
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <Button
+                onClick={() => {
+                  toast("Certificate generated successfully", {
+                    description: "The certificate of fitness has been saved to your downloads folder",
+                    action: {
+                      label: "View",
+                      onClick: () => console.log("Viewing certificate")
+                    }
+                  });
+                }}
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Generate Certificate
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </main>
+    </div>
+  );
+};
+
+export default DocumentViewer;
