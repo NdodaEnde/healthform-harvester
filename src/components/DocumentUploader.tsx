@@ -97,6 +97,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           
           setUploadProgress(100);
           
+          console.log("Processing document with raw data:", data.extracted_data);
+          
           const processedData = {
             id: data.id,
             name: data.file_name,
@@ -114,8 +116,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           
           setTimeout(() => {
             setIsUploading(false);
-            onUploadComplete(processedData);
             setProcessingDocumentId(null);
+            onUploadComplete(processedData);
             
             toast.success("Document processed successfully", {
               description: "Your document has been processed using AI extraction."
@@ -172,6 +174,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           }
           
           setIsUploading(false);
+          setProcessingDocumentId(null);
+          
           toast.error("Error checking document status", {
             description: "Please check the dashboard for document status."
           });
@@ -194,7 +198,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         statusPollingRef.current = null;
       }
     };
-  }, [processingDocumentId, documentType, maxPollingAttempts]);
+  }, [processingDocumentId, documentType, maxPollingAttempts, onUploadComplete]);
 
   const getFileUrl = async (filePath: string) => {
     try {
@@ -217,6 +221,17 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       return extractedData.structured_data.patient.name || "Unknown";
     }
     
+    if (extractedData.raw_response && extractedData.raw_response.data && 
+        extractedData.raw_response.data.markdown) {
+      
+      const markdown = extractedData.raw_response.data.markdown;
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+      
+      if (nameMatch && nameMatch[1]) {
+        return nameMatch[1].trim();
+      }
+    }
+    
     return "Unknown";
   };
   
@@ -225,8 +240,20 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     
     if (extractedData.structured_data && extractedData.structured_data.patient) {
       return extractedData.structured_data.patient.employee_id || 
+             extractedData.structured_data.patient.id_number || 
              extractedData.structured_data.patient.id || 
              "No ID";
+    }
+    
+    if (extractedData.raw_response && extractedData.raw_response.data && 
+        extractedData.raw_response.data.markdown) {
+      
+      const markdown = extractedData.raw_response.data.markdown;
+      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/);
+      
+      if (idMatch && idMatch[1]) {
+        return idMatch[1].trim();
+      }
     }
     
     return "No ID";
@@ -349,6 +376,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           
           if (isUploading) {
             setIsUploading(false);
+            setProcessingDocumentId(null);
             setUploadProgress(0);
             
             toast.error("Processing timeout", {
@@ -368,6 +396,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       }
       
       setIsUploading(false);
+      setProcessingDocumentId(null);
       setUploadProgress(0);
       
       toast.error("Upload failed", {
