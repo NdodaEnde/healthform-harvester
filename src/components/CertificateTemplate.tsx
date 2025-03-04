@@ -10,18 +10,18 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
     
-  // Log the raw_response data structure to see what's inside
-  if (extractedData?.raw_response) {
-    console.log("Raw response structure:", Object.keys(extractedData.raw_response));
-    if (extractedData.raw_response.data) {
-      console.log("Raw response data structure:", Object.keys(extractedData.raw_response.data));
+    // Log the raw_response data structure to see what's inside
+    if (extractedData?.raw_response) {
+      console.log("Raw response structure:", Object.keys(extractedData.raw_response));
+      if (extractedData.raw_response.data) {
+        console.log("Raw response data structure:", Object.keys(extractedData.raw_response.data));
+      }
     }
-  }
     
-  // Log the structured_data data structure
-  if (extractedData?.structured_data) {
-    console.log("Structured data:", extractedData.structured_data);
-  }
+    // Log the structured_data data structure
+    if (extractedData?.structured_data) {
+      console.log("Structured data:", extractedData.structured_data);
+    }
   }, [extractedData]);
 
   // Helper to check if a value is checked/selected
@@ -79,11 +79,59 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
     
-    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
+    const examDatePatterns = [
+      /\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i,
+      /Date of Examination:\s*(.*?)(?=\n|\r|$)/i,
+      /Examination Date:\s*(.*?)(?=\n|\r|$)/i,
+      /Exam Date:\s*(.*?)(?=\n|\r|$)/i
+    ];
     
-    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
+    let examDate = '';
+    for (const pattern of examDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1]) {
+        examDate = match[1].trim();
+        break;
+      }
+    }
+    
+    if (examDate) extracted.examination_results.date = examDate;
+    
+    const expiryDatePatterns = [
+      /\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i,
+      /Expiry Date:\s*(.*?)(?=\n|\r|$)/i,
+      /Valid Until:\s*(.*?)(?=\n|\r|$)/i,
+      /Expiration Date:\s*(.*?)(?=\n|\r|$)/i
+    ];
+    
+    let expiryDate = '';
+    for (const pattern of expiryDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1]) {
+        expiryDate = match[1].trim();
+        break;
+      }
+    }
+    
+    if (expiryDate) extracted.certification.valid_until = expiryDate;
+    
+    const reviewDatePatterns = [
+      /Review Date:\s*(.*?)(?=\n|\r|$)/i,
+      /Next Review:\s*(.*?)(?=\n|\r|$)/i,
+      /Follow-up Date:\s*(.*?)(?=\n|\r|$)/i,
+      /Re-examination Date:\s*(.*?)(?=\n|\r|$)/i
+    ];
+    
+    let reviewDate = '';
+    for (const pattern of reviewDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1]) {
+        reviewDate = match[1].trim();
+        break;
+      }
+    }
+    
+    if (reviewDate) extracted.certification.review_date = reviewDate;
     
     // Examination type - look for [x] markers in different formats
     extracted.examination_results.type.pre_employment = 
@@ -157,7 +205,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       // Check multiple formats
       const patterns = [
         new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'),
+        new RegExp(`<td>${option.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is'),
         new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
       ];
       
@@ -190,7 +238,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       // Check multiple formats
       const patterns = [
         new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'),
+        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is'),
         new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
       ];
       
@@ -208,10 +256,10 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     });
     
     // Follow-up actions and comments
-    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
+    const followUpMatch = markdown.match(/(?:Referred|follow up actions|followup):\s*(.*?)(?=\n|\r|$|<)/i);
     if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
     
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
+    const reviewDateMatch = markdown.match(/Review Date:\s*(.*?)(?=\n|\r|$)/i);
     if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
     
     const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
@@ -229,7 +277,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     console.log("Extracted data from markdown:", extracted);
     return extracted;
   };
-  
+
   // Enhanced function to extract markdown from the Landing AI response
   const getMarkdown = (data: any): string | null => {
     if (!data) return null;
@@ -362,7 +410,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     console.log("Could not find markdown in provided data");
     return null;
   };
-  
+
   // Get structured data from either direct input or extracted from markdown
   let structuredData: any = {};
   
@@ -616,9 +664,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
         }
       }
       
-      if (examDate) {
-        extractedData.examination_results.date = examDate;
-      }
+      if (examDate) extractedData.examination_results.date = examDate;
       
       // Extract expiry date with multiple patterns
       const expiryDatePatterns = [
@@ -764,88 +810,33 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
         // Create patterns for each name/alias variant
         allNamePatterns.forEach(nameVariant => {
           checkPatterns.push(
-            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done|Yes)`, 'is'),
-            new RegExp(`<td>${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done|Yes)`, 'is'),
-            new RegExp(`\\| ${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done|Yes)`, 'is'),
-            new RegExp(`${nameVariant}:? *(?:☑|☒|✅|✓|✔)`, 'is')
-          );
-        });
-        
-        // Special case for "Working at Heights" which is frequently mentioned but often missed
-        if (test.key === 'heights') {
-          // Create extra patterns specifically for heights testing
-          checkPatterns.push(
-            /height[s]? (?:assessment|evaluation|test)(?::|.{0,30})(?:\[x\]|\[X\]|✓|✔|checked|done|Yes|Pass)/is,
-            /(?:fitness|safe|cleared) (?:for|to work at) heights/is,
-            /work(?:ing)? at heights? (?:certified|passed|approved|cleared)/is
-          );
-        }
-        
-        let isDone = false;
-        let results = 'N/A';
-        
-        // Check if test was done
-        for (const pattern of checkPatterns) {
-          if (pattern.test(markdown)) {
-            isDone = true;
-            break;
-          }
-        }
-        
-        // For heights specifically, look for mentions in the restrictions section
-        if (test.key === 'heights' && !isDone) {
-          // If heights is mentioned in restrictions section, the test was likely done
-          if (markdown.match(/restriction.*?height/is) || 
-              markdown.match(/height.*?restriction/is)) {
-            isDone = true;
-            console.log("Heights test inferred from restrictions section");
-          }
-        }
-        
-        // Look for results with expanded patterns
-        let resultsPatterns = [];
-        
-        // Create result patterns for each name/alias variant
-        allNamePatterns.forEach(nameVariant => {
-          resultsPatterns.push(
-            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?(?:results?|value):?\\s*([^\\n\\r,;]+)`, 'is'),
-            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?([0-9]+(?:\\/[0-9]+|\.[0-9]+|-[0-9]+|\\s*dB))`, 'is'),
-            new RegExp(`<td>${nameVariant}.*?<td>(?:\\[x\\]|\\[X\\]|✓|✔|checked|done).*?<td>(.*?)<`, 'is'),
-            new RegExp(`\\| ${nameVariant}.*?\\|.*?\\|\\s*([^|\\n\\r]+)\\s*\\|`, 'is'),
-            new RegExp(`${nameVariant}:? *(?:Result|Value|Reading):? *([^\\n\\r,;]+)`, 'is')
-          );
-        });
-        
-        // Add generic result patterns that look for results in table formats
-        resultsPatterns.push(
-          /<td>(?:\[x\]|\[X\]|✓|✔|checked|done)<\/td>\s*<td>(.*?)<\/td>/is,
-          /\|\s*\[x\]\s*\|\s*([^|]+)\s*\|/is
+            // Checkbox patterns
+            new RegExp(`${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+            new RegExp(`<td>${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+            new RegExp(`\\| ${nameVariant}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
+            
+            // Indicator words
+            new RegExp(`${nameVariant}.*?(?:selected|marked|indicated|approved|certified)`, 'is'),
+            
+            // Contextual indicators
+            new RegExp(`(?:status|assessment|conclusion|result|declaration).*?${nameVariant}`, 'is'),
+            
+            // Direct statements
+            new RegExp(`(?:employee is|worker is|patient is|candidate is).*?${nameVariant}`, 'is'),
+            
+            // Box/cell highlighting
+            new RegExp(`${nameVariant}.*?(?:highlighted|circled|underlined|emphasized|marked)`, 'is'),
+            
+            // Unicode checkmarks
+            new RegExp(`${nameVariant}.*?(?:☑|☒|✅|✓|✔)`, 'is)
         );
+        });
         
-        for (const pattern of resultsPatterns) {
-          const match = markdown.match(pattern);
-          if (match && match[1]) {
-            results = match[1].trim();
-            break;
-          }
-        }
+        // Check if any pattern matches
+        const isSelected = patterns.some(p => p.test(markdown));
         
-        // Special handling for "Working at Heights" if no specific result was found
-        if (test.key === 'heights' && results === 'N/A' && isDone) {
-          // Look for pass/fail indicators
-          if (markdown.match(/heights?.*?(?:pass|suitable|fit|cleared)/is)) {
-            results = 'Pass';
-          } else if (markdown.match(/heights?.*?(?:fail|unfit|restrict)/is)) {
-            results = 'Restricted';
-          } else {
-            // Default to a reasonable value
-            results = 'Cleared';
-          }
-        }
-        
-        // Store the results
-        extractedData.examination_results.test_results[`${test.key}_done`] = isDone;
-        extractedData.examination_results.test_results[`${test.key}_results`] = results;
+        // Store the result
+        extractedData.examination_results.test_results[`${test.key}_done`] = isSelected;
       });
       
       // Fitness status with enhanced detection
@@ -888,7 +879,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
         
         let patterns = [];
         
-        // Generate patterns for each name/alias
+        // Generate patterns for each name/alias variant
         allNames.forEach(nameVariant => {
           patterns.push(
             // Checkbox patterns
@@ -909,8 +900,8 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             new RegExp(`${nameVariant}.*?(?:highlighted|circled|underlined|emphasized|marked)`, 'is'),
             
             // Unicode checkmarks
-            new RegExp(`${nameVariant}.*?(?:☑|☒|✅|✓|✔)`, 'is')
-          );
+            new RegExp(`${nameVariant}.*?(?:☑|☒|✅|✓|✔)`, 'is)
+        );
         });
         
         // Check if any pattern matches
@@ -949,21 +940,31 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       ];
       
       restrictionPatterns.forEach(restriction => {
+        // Check multiple formats
         const patterns = [
-          new RegExp(`${restriction.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`<td>${restriction.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`\\| ${restriction.name}.*?(?:\\[x\\]|\\[X\\]|✓|✔|checked|done)`, 'is'),
-          new RegExp(`${restriction.name}.*?(?:required|indicated|necessary)`, 'is')
+          new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
+          new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is'),
+          new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
         ];
         
-        extractedData.restrictions[restriction.key] = patterns.some(p => p.test(markdown));
+        // Check all patterns
+        let isSelected = false;
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match && match[0].includes('[x]')) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        extractedData.restrictions[restriction.key] = isSelected;
       });
       
       // Follow-up and review date
-      const followUpMatch = markdown.match(/(?:Referred|follow up actions|followup):\s*(.*?)(?=\n\n|\r\n\r\n|$|<)/i);
+      const followUpMatch = markdown.match(/(?:Referred|follow up actions|followup):\s*(.*?)(?=\n|\r|$|<)/i);
       if (followUpMatch && followUpMatch[1]) extractedData.certification.follow_up = followUpMatch[1].trim();
       
-      const reviewDateMatch = markdown.match(/Review Date:\s*(.*?)(?=\n|\r|$|<)/i);
+      const reviewDateMatch = markdown.match(/Review Date:\s*(.*?)(?=\n|\r|$)/i);
       if (reviewDateMatch && reviewDateMatch[1]) extractedData.certification.review_date = reviewDateMatch[1].trim();
     }
     
