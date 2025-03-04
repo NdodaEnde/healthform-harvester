@@ -685,7 +685,326 @@ const DocumentViewer = () => {
       }
     }
     
-    // Process the data using our comprehensive processor
+    // Process the data using our new approach - Parse and Map
+    function parseApiResponse(rawResponse: any) {
+      try {
+        if (!rawResponse || !rawResponse.event_message) {
+          console.error("Invalid or missing event_message in API response");
+          return null;
+        }
+        
+        // Extract the Response JSON from event_message
+        const responseMatch = rawResponse.event_message.match(/Response:\s*({.*})/s);
+        if (responseMatch && responseMatch[1]) {
+          return JSON.parse(responseMatch[1]);
+        }
+        
+        console.error("Could not find Response pattern in event_message");
+        return null;
+      } catch (e) {
+        console.error("Error parsing API response:", e);
+        return null;
+      }
+    }
+    
+    // Map API data to Certificate Template format
+    function mapToCertificateTemplate(apiResponse: any) {
+      try {
+        if (!apiResponse || !apiResponse.data || !apiResponse.data.markdown) {
+          console.error("API response missing required markdown data");
+          return null;
+        }
+        
+        const markdown = apiResponse.data.markdown;
+        console.log("Mapping markdown to certificate template format");
+        
+        // Initialize template data structure
+        const templateData = {
+          patient: {
+            name: "",
+            id_number: "",
+            company: "",
+            occupation: ""
+          },
+          examination_results: {
+            date: "",
+            type: {
+              pre_employment: false,
+              periodical: false,
+              exit: false
+            },
+            test_results: {
+              bloods_done: false,
+              bloods_results: "N/A",
+              far_near_vision_done: false,
+              far_near_vision_results: "N/A",
+              side_depth_done: false,
+              side_depth_results: "N/A",
+              night_vision_done: false,
+              night_vision_results: "N/A",
+              hearing_done: false,
+              hearing_results: "N/A",
+              heights_done: false,
+              heights_results: "N/A",
+              lung_function_done: false,
+              lung_function_results: "N/A",
+              x_ray_done: false,
+              x_ray_results: "N/A",
+              drug_screen_done: false,
+              drug_screen_results: "N/A"
+            }
+          },
+          certification: {
+            fit: false,
+            fit_with_restrictions: false,
+            fit_with_condition: false,
+            temporarily_unfit: false,
+            unfit: false,
+            valid_until: "",
+            review_date: "",
+            comments: ""
+          },
+          restrictions: {
+            heights: false,
+            dust_exposure: false,
+            motorized_equipment: false,
+            wear_hearing_protection: false,
+            confined_spaces: false,
+            chemical_exposure: false,
+            wear_spectacles: false,
+            remain_on_treatment_for_chronic_conditions: false
+          }
+        };
+        
+        // Extract patient information
+        const extractPatientInfo = () => {
+          // Name
+          const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (nameMatch && nameMatch[1]) templateData.patient.name = nameMatch[1].trim();
+          
+          // ID Number
+          const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (idMatch && idMatch[1]) templateData.patient.id_number = idMatch[1].trim();
+          
+          // Company
+          const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (companyMatch && companyMatch[1]) templateData.patient.company = companyMatch[1].trim();
+          
+          // Job Title
+          const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (jobTitleMatch && jobTitleMatch[1]) templateData.patient.occupation = jobTitleMatch[1].trim();
+        };
+        
+        // Extract examination details
+        const extractExamDetails = () => {
+          // Examination Date
+          const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (examDateMatch && examDateMatch[1]) templateData.examination_results.date = examDateMatch[1].trim();
+          
+          // Expiry Date
+          const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (expiryDateMatch && expiryDateMatch[1]) templateData.certification.valid_until = expiryDateMatch[1].trim();
+          
+          // Review Date
+          const reviewDateMatch = markdown.match(/\*\*Review Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
+          if (reviewDateMatch && reviewDateMatch[1] && reviewDateMatch[1].trim() !== "") {
+            templateData.certification.review_date = reviewDateMatch[1].trim();
+          } else if (templateData.certification.valid_until) {
+            // If no review date, use expiry date
+            templateData.certification.review_date = templateData.certification.valid_until;
+          }
+        };
+        
+        // Extract examination type (PRE-EMPLOYMENT, PERIODICAL, EXIT)
+        const extractExaminationType = () => {
+          // Check for exact pattern matches in the Examination Type section
+          templateData.examination_results.type.pre_employment = 
+            markdown.includes("**Pre-Employment**: [x]") || 
+            markdown.includes("Pre-Employment") && markdown.includes("[x]");
+            
+          templateData.examination_results.type.periodical = 
+            markdown.includes("**Periodical**: [x]") ||
+            markdown.includes("Periodical") && markdown.includes("[x]");
+            
+          templateData.examination_results.type.exit = 
+            markdown.includes("**Exit**: [x]") ||
+            markdown.includes("Exit") && markdown.includes("[x]");
+            
+          // Default to PRE-EMPLOYMENT if none selected
+          if (!templateData.examination_results.type.pre_employment && 
+              !templateData.examination_results.type.periodical && 
+              !templateData.examination_results.type.exit) {
+            templateData.examination_results.type.pre_employment = true;
+          }
+        };
+        
+        // Extract test results (focusing on Working at Heights)
+        const extractTestResults = () => {
+          // Process all tests using table format
+          const testsTable = [
+            { name: 'BLOODS', key: 'bloods' },
+            { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
+            { name: 'SIDE & DEPTH', key: 'side_depth' },
+            { name: 'NIGHT VISION', key: 'night_vision' },
+            { name: 'Hearing', key: 'hearing' },
+            { name: 'Working at Heights', key: 'heights' },
+            { name: 'Lung Function', key: 'lung_function' },
+            { name: 'X-Ray', key: 'x_ray' },
+            { name: 'Drug Screen', key: 'drug_screen' }
+          ];
+          
+          // Extract table rows
+          testsTable.forEach(test => {
+            // Match table row pattern with checkbox
+            const tableRowPattern = new RegExp(`\\|\\s*${test.name}\\s*\\|\\s*\\[([ xX])\\]\\s*\\|\\s*([^|]*?)\\s*\\|`, 'i');
+            const match = markdown.match(tableRowPattern);
+            
+            if (match) {
+              // Test is done if there's an 'x' or 'X' in the checkbox
+              const isDone = match[1].toLowerCase().trim() === 'x';
+              const results = match[2].trim();
+              
+              templateData.examination_results.test_results[`${test.key}_done`] = isDone;
+              templateData.examination_results.test_results[`${test.key}_results`] = results || 'N/A';
+            }
+          });
+          
+          // Special case for Working at Heights - ensure it's detected
+          if (markdown.includes("Working at Heights") && markdown.includes("[x]")) {
+            templateData.examination_results.test_results.heights_done = true;
+            
+            // If we didn't get results above, set a default
+            if (templateData.examination_results.test_results.heights_results === 'N/A') {
+              templateData.examination_results.test_results.heights_results = 'Pass';
+            }
+          }
+        };
+        
+        // Extract medical fitness declaration
+        const extractFitnessDeclaration = () => {
+          // Look for patterns in the Medical Fitness Declaration section
+          if (markdown.includes("### Medical Fitness Declaration")) {
+            const fitnessSection = markdown.match(/### Medical Fitness Declaration([\s\S]*?)(?=###|$)/i);
+            if (fitnessSection) {
+              const section = fitnessSection[1];
+              
+              templateData.certification.fit = 
+                section.includes("**FIT**: [x]") || 
+                section.includes("FIT") && section.includes("[x]");
+                
+              templateData.certification.fit_with_restrictions = 
+                section.includes("**Fit with Restriction**: [x]") ||
+                section.includes("Fit with Restriction") && section.includes("[x]");
+                
+              templateData.certification.fit_with_condition = 
+                section.includes("**Fit with Condition**: [x]") ||
+                section.includes("Fit with Condition") && section.includes("[x]");
+                
+              templateData.certification.temporarily_unfit = 
+                section.includes("**Temporary Unfit**: [x]") ||
+                section.includes("Temporary Unfit") && section.includes("[x]");
+                
+              templateData.certification.unfit = 
+                section.includes("**UNFIT**: [x]") ||
+                section.includes("UNFIT") && section.includes("[x]");
+            }
+          }
+          
+          // Default to FIT if none selected
+          if (!templateData.certification.fit && 
+              !templateData.certification.fit_with_restrictions && 
+              !templateData.certification.fit_with_condition &&
+              !templateData.certification.temporarily_unfit &&
+              !templateData.certification.unfit) {
+            templateData.certification.fit = true;
+          }
+        };
+        
+        // Extract restrictions
+        const extractRestrictions = () => {
+          if (markdown.includes("### Restrictions")) {
+            const restrictionsSection = markdown.match(/### Restrictions([\s\S]*?)(?=###|$)/i);
+            if (restrictionsSection) {
+              const section = restrictionsSection[1];
+              
+              templateData.restrictions.heights = section.includes("Heights");
+              templateData.restrictions.dust_exposure = section.includes("Dust Exposure");
+              templateData.restrictions.motorized_equipment = section.includes("Motorized Equipment");
+              templateData.restrictions.wear_hearing_protection = section.includes("Wear Hearing Protection");
+              templateData.restrictions.confined_spaces = section.includes("Confined Spaces");
+              templateData.restrictions.chemical_exposure = section.includes("Chemical Exposure");
+              templateData.restrictions.wear_spectacles = section.includes("Wear Spectacles");
+              templateData.restrictions.remain_on_treatment_for_chronic_conditions = 
+                section.includes("Remain on Treatment") || section.includes("Chronic Conditions");
+            }
+          }
+        };
+        
+        // Extract comments
+        const extractComments = () => {
+          if (markdown.includes("### Comments")) {
+            const commentsSection = markdown.match(/### Comments([\s\S]*?)(?=###|$)/i);
+            if (commentsSection) {
+              const comments = commentsSection[1].replace(/-/g, '').trim();
+              templateData.certification.comments = comments || 'N/A';
+            }
+          }
+        };
+        
+        // Execute all extraction functions
+        extractPatientInfo();
+        extractExamDetails();
+        extractExaminationType();
+        extractTestResults();
+        extractFitnessDeclaration();
+        extractRestrictions();
+        extractComments();
+        
+        // Log important fields for debugging
+        console.log("Final check of problematic fields:");
+        console.log("Expiry Date:", templateData.certification.valid_until);
+        console.log("Review Date:", templateData.certification.review_date);
+        console.log("PRE-EMPLOYMENT:", templateData.examination_results.type.pre_employment);
+        console.log("Working at Heights:", templateData.examination_results.test_results.heights_done);
+        console.log("Medical Fitness (FIT):", templateData.certification.fit);
+        
+        return templateData;
+      } catch (e) {
+        console.error("Error mapping to certificate template:", e);
+        return null;
+      }
+    }
+    
+    // Main processing function combining parse and map steps
+    if (rawData.event_message) {
+      console.log("Processing certificate data with parseApiResponse + mapToCertificateTemplate approach");
+      
+      // Step 1: Parse the API response
+      const parsedApiResponse = parseApiResponse(rawData);
+      if (!parsedApiResponse) {
+        console.error("Failed to parse API response");
+        return null;
+      }
+      
+      // Step 2: Map to the template structure
+      const templateData = mapToCertificateTemplate(parsedApiResponse);
+      if (!templateData) {
+        console.error("Failed to map data to template structure");
+        return null;
+      }
+      
+      // Return in the expected format
+      return {
+        structured_data: templateData,
+        raw_response: {
+          data: {
+            markdown: parsedApiResponse.data.markdown
+          }
+        }
+      };
+    }
+    
+    // If our new approach didn't work, try the previous ones
     const processedData = processLandingAIResponse(rawData);
     
     // If the data still doesn't have the required structure, fall back to our original approach
