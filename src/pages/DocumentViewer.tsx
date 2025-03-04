@@ -485,162 +485,203 @@ const DocumentViewer = () => {
       return extractedData;
     };
     
-    // Direct extraction from Landing AI event_message format
-    const extractCertificateDataFromMarkdown = (extractedData: any) => {
-      // Get the event_message string
-      const eventMessage = extractedData.event_message;
-      if (!eventMessage) return null;
+    // Cleaner two-step approach for processing Landing AI data
+    
+    // Step 1: Extract the markdown from the Landing AI API response
+    const extractMarkdownFromLandingAI = (extractedData: any) => {
+      if (!extractedData || !extractedData.event_message) {
+        console.error("Invalid input data");
+        return null;
+      }
       
-      console.log("Extracting certificate data directly from event_message");
+      console.log("Extracting markdown from Landing AI response");
       
-      // Extract the markdown from the Response JSON
-      const responseMatch = eventMessage.match(/Response:\s*({.*})/s);
-      if (!responseMatch || !responseMatch[1]) return null;
+      // Extract the Response JSON from event_message
+      const responseMatch = extractedData.event_message.match(/Response:\s*({.*})/s);
+      if (!responseMatch || !responseMatch[1]) {
+        console.error("Response pattern not found in event_message");
+        return null;
+      }
       
       try {
         // Parse the Response JSON
         const responseObj = JSON.parse(responseMatch[1]);
-        const markdown = responseObj.data.markdown;
         
-        console.log("Successfully extracted markdown from event_message");
-        
-        // Initialize our data structure
-        const data = {
-          patient: {},
-          examination_results: {
-            type: {},
-            test_results: {}
-          },
-          certification: {},
-          restrictions: {}
-        };
-        
-        // Extract patient information
-        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (nameMatch && nameMatch[1]) data.patient.name = nameMatch[1].trim();
-        
-        const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (idMatch && idMatch[1]) data.patient.id_number = idMatch[1].trim();
-        
-        const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (companyMatch && companyMatch[1]) data.patient.company = companyMatch[1].trim();
-        
-        const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (jobTitleMatch && jobTitleMatch[1]) data.patient.occupation = jobTitleMatch[1].trim();
-        
-        const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (examDateMatch && examDateMatch[1]) data.examination_results.date = examDateMatch[1].trim();
-        
-        const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (expiryDateMatch && expiryDateMatch[1]) data.certification.valid_until = expiryDateMatch[1].trim();
-        
-        // Helper function to check if a checkbox is marked
-        const isCheckboxMarked = (text: string, identifier: string) => {
-          // Check for various checkbox marker patterns
-          const patterns = [
-            `**${identifier}**: [x]`,
-            `**${identifier}**: [X]`,
-            `**${identifier}**: [✓]`,
-            `**${identifier}**: [✔]`,
-            `**${identifier}**: [v]`,
-            `**${identifier}**: [V]`,
-            `**${identifier}**: [check]`,
-            `**${identifier}**: [tick]`
-          ];
-          
-          return patterns.some(pattern => text.includes(pattern));
-        };
-        
-        // Extract examination type
-        data.examination_results.type.pre_employment = isCheckboxMarked(markdown, "Pre-Employment");
-        data.examination_results.type.periodical = isCheckboxMarked(markdown, "Periodical");
-        data.examination_results.type.exit = isCheckboxMarked(markdown, "Exit");
-        
-        // Extract medical tests
-        const testsMap = [
-          { name: 'BLOODS', key: 'bloods' },
-          { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
-          { name: 'SIDE & DEPTH', key: 'side_depth' },
-          { name: 'NIGHT VISION', key: 'night_vision' },
-          { name: 'Hearing', key: 'hearing' },
-          { name: 'Working at Heights', key: 'heights' },
-          { name: 'Lung Function', key: 'lung_function' },
-          { name: 'X-Ray', key: 'x_ray' },
-          { name: 'Drug Screen', key: 'drug_screen' }
-        ];
-        
-        testsMap.forEach(test => {
-          // Look for the pattern like "| BLOODS | [x] | N/A |"
-          // But with multiple possible checkbox markers
-          const pattern = new RegExp(`\\| ${test.name}\\s*\\| \\[([xX✓✔vVtT ])\\]\\s*\\| (.*?)\\|`, 's');
-          const match = markdown.match(pattern);
-          
-          if (match) {
-            // Check if the character indicates the checkbox is marked
-            const isDone = !!match[1].match(/[xX✓✔vVtT]/); // any of these chars indicates checked
-            data.examination_results.test_results[`${test.key}_done`] = isDone;
-            data.examination_results.test_results[`${test.key}_results`] = match[2].trim();
-          }
-        });
-        
-        // Extract medical fitness declaration
-        data.certification.fit = isCheckboxMarked(markdown, "FIT");
-        data.certification.fit_with_restrictions = isCheckboxMarked(markdown, "Fit with Restriction");
-        data.certification.fit_with_condition = isCheckboxMarked(markdown, "Fit with Condition");
-        data.certification.temporarily_unfit = isCheckboxMarked(markdown, "Temporary Unfit");
-        data.certification.unfit = isCheckboxMarked(markdown, "UNFIT");
-        
-        // Extract Review Date
-        const reviewDateMatch = markdown.match(/\*\*Review Date\*\*:\s*(.*?)(?=\n|\r|$)/);
-        if (reviewDateMatch && reviewDateMatch[1]) {
-          data.certification.review_date = reviewDateMatch[1].trim();
+        if (responseObj.data && responseObj.data.markdown) {
+          console.log("Successfully extracted markdown");
+          return responseObj.data.markdown;
+        } else {
+          console.error("Markdown not found in Response object");
+          return null;
         }
-        
-        // Extract restrictions
-        const restrictionsSection = markdown.match(/### Restrictions\s*([\s\S]*?)(?=\n\n|\n###|$)/);
-        if (restrictionsSection && restrictionsSection[1]) {
-          const restrictionsText = restrictionsSection[1];
-          data.restrictions.heights = restrictionsText.includes("Heights");
-          data.restrictions.dust_exposure = restrictionsText.includes("Dust Exposure");
-          data.restrictions.motorized_equipment = restrictionsText.includes("Motorized Equipment");
-          data.restrictions.wear_hearing_protection = restrictionsText.includes("Wear Hearing Protection");
-          data.restrictions.confined_spaces = restrictionsText.includes("Confined Spaces");
-          data.restrictions.chemical_exposure = restrictionsText.includes("Chemical Exposure");
-          data.restrictions.wear_spectacles = restrictionsText.includes("Wear Spectacles");
-          data.restrictions.remain_on_treatment_for_chronic_conditions = 
-            restrictionsText.includes("Remain on Treatment") || 
-            restrictionsText.includes("Chronic Conditions");
-        }
-        
-        // Extract comments
-        const commentsMatch = markdown.match(/### Comments\s*\n- (.*?)(?=\n\n|\n###|$)/);
-        if (commentsMatch && commentsMatch[1]) {
-          data.certification.comments = commentsMatch[1].trim();
-        }
-        
-        console.log("Extracted data:", data);
-        
-        // Return both the structured data and the raw markdown for reference
-        return {
-          structured_data: data,
-          raw_response: {
-            data: {
-              markdown: markdown
-            }
-          }
-        };
       } catch (e) {
-        console.error("Error extracting certificate data:", e);
+        console.error("Error parsing Response JSON:", e);
         return null;
       }
     };
     
-    // First try the direct extraction approach if we have event_message
+    // Step 2: Structure the markdown data for the certificate template
+    const structureMarkdownForCertificate = (markdown: string) => {
+      if (!markdown) {
+        console.error("No markdown to structure");
+        return null;
+      }
+      
+      console.log("Structuring markdown for certificate template");
+      
+      // Initialize our data structure
+      const data = {
+        patient: {},
+        examination_results: {
+          type: {},
+          test_results: {}
+        },
+        certification: {},
+        restrictions: {}
+      };
+      
+      // Extract patient information
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (nameMatch && nameMatch[1]) data.patient.name = nameMatch[1].trim();
+      
+      const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (idMatch && idMatch[1]) data.patient.id_number = idMatch[1].trim();
+      
+      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (companyMatch && companyMatch[1]) data.patient.company = companyMatch[1].trim();
+      
+      const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (jobTitleMatch && jobTitleMatch[1]) data.patient.occupation = jobTitleMatch[1].trim();
+      
+      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (examDateMatch && examDateMatch[1]) data.examination_results.date = examDateMatch[1].trim();
+      
+      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (expiryDateMatch && expiryDateMatch[1]) data.certification.valid_until = expiryDateMatch[1].trim();
+      
+      // Helper function to check if a checkbox is marked
+      const isCheckboxMarked = (text: string, identifier: string) => {
+        // Check for various checkbox marker patterns
+        const patterns = [
+          `**${identifier}**: [x]`,
+          `**${identifier}**: [X]`,
+          `**${identifier}**: [✓]`,
+          `**${identifier}**: [✔]`,
+          `**${identifier}**: [v]`,
+          `**${identifier}**: [V]`,
+          `**${identifier}**: [check]`,
+          `**${identifier}**: [tick]`
+        ];
+        
+        return patterns.some(pattern => text.includes(pattern));
+      };
+      
+      // Extract examination type
+      data.examination_results.type.pre_employment = isCheckboxMarked(markdown, "Pre-Employment");
+      data.examination_results.type.periodical = isCheckboxMarked(markdown, "Periodical");
+      data.examination_results.type.exit = isCheckboxMarked(markdown, "Exit");
+      
+      // Extract medical tests
+      const testsMap = [
+        { name: 'BLOODS', key: 'bloods' },
+        { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
+        { name: 'SIDE & DEPTH', key: 'side_depth' },
+        { name: 'NIGHT VISION', key: 'night_vision' },
+        { name: 'Hearing', key: 'hearing' },
+        { name: 'Working at Heights', key: 'heights' },
+        { name: 'Lung Function', key: 'lung_function' },
+        { name: 'X-Ray', key: 'x_ray' },
+        { name: 'Drug Screen', key: 'drug_screen' }
+      ];
+      
+      testsMap.forEach(test => {
+        // Look for the pattern like "| BLOODS | [x] | N/A |"
+        // With multiple possible checkbox markers
+        const pattern = new RegExp(`\\| ${test.name}\\s*\\| \\[([xX✓✔vVtT ])\\]\\s*\\| (.*?)\\|`, 's');
+        const match = markdown.match(pattern);
+        
+        if (match) {
+          // Check if the character indicates the checkbox is marked
+          const isDone = !!match[1].match(/[xX✓✔vVtT]/); // any of these chars indicates checked
+          data.examination_results.test_results[`${test.key}_done`] = isDone;
+          data.examination_results.test_results[`${test.key}_results`] = match[2].trim();
+        }
+      });
+      
+      // Extract medical fitness declaration
+      data.certification.fit = isCheckboxMarked(markdown, "FIT");
+      data.certification.fit_with_restrictions = isCheckboxMarked(markdown, "Fit with Restriction");
+      data.certification.fit_with_condition = isCheckboxMarked(markdown, "Fit with Condition");
+      data.certification.temporarily_unfit = isCheckboxMarked(markdown, "Temporary Unfit");
+      data.certification.unfit = isCheckboxMarked(markdown, "UNFIT");
+      
+      // Extract Review Date
+      const reviewDateMatch = markdown.match(/\*\*Review Date\*\*:\s*(.*?)(?=\n|\r|$)/);
+      if (reviewDateMatch && reviewDateMatch[1]) {
+        data.certification.review_date = reviewDateMatch[1].trim();
+      }
+      
+      // Extract restrictions
+      const restrictionsSection = markdown.match(/### Restrictions\s*([\s\S]*?)(?=\n\n|\n###|$)/);
+      if (restrictionsSection && restrictionsSection[1]) {
+        const restrictionsText = restrictionsSection[1];
+        data.restrictions.heights = restrictionsText.includes("Heights");
+        data.restrictions.dust_exposure = restrictionsText.includes("Dust Exposure");
+        data.restrictions.motorized_equipment = restrictionsText.includes("Motorized Equipment");
+        data.restrictions.wear_hearing_protection = restrictionsText.includes("Wear Hearing Protection");
+        data.restrictions.confined_spaces = restrictionsText.includes("Confined Spaces");
+        data.restrictions.chemical_exposure = restrictionsText.includes("Chemical Exposure");
+        data.restrictions.wear_spectacles = restrictionsText.includes("Wear Spectacles");
+        data.restrictions.remain_on_treatment_for_chronic_conditions = 
+          restrictionsText.includes("Remain on Treatment") || 
+          restrictionsText.includes("Chronic Conditions");
+      }
+      
+      // Extract comments
+      const commentsMatch = markdown.match(/### Comments\s*\n- (.*?)(?=\n\n|\n###|$)/);
+      if (commentsMatch && commentsMatch[1]) {
+        data.certification.comments = commentsMatch[1].trim();
+      }
+      
+      console.log("Structured data:", data);
+      return data;
+    };
+    
+    // Combine the two steps
+    const processLandingAIData = (extractedData: any) => {
+      console.log("Processing Landing AI data with two-step approach");
+      
+      // Step 1: Extract the markdown
+      const markdown = extractMarkdownFromLandingAI(extractedData);
+      if (!markdown) {
+        console.error("Failed to extract markdown");
+        return null;
+      }
+      
+      // Step 2: Structure the markdown for the certificate
+      const structuredData = structureMarkdownForCertificate(markdown);
+      if (!structuredData) {
+        console.error("Failed to structure data from markdown");
+        return null;
+      }
+      
+      // Return both the structured data and the raw markdown for reference
+      return {
+        structured_data: structuredData,
+        raw_response: {
+          data: {
+            markdown: markdown
+          }
+        }
+      };
+    };
+    
+    // First try the direct two-step approach if we have event_message
     if (rawData.event_message) {
-      const directExtractedData = extractCertificateDataFromMarkdown(rawData);
-      if (directExtractedData) {
-        console.log("Successfully extracted certificate data directly from event_message");
-        return directExtractedData;
+      const processedData = processLandingAIData(rawData);
+      if (processedData) {
+        console.log("Successfully processed data using two-step approach");
+        return processedData;
       }
     }
     
