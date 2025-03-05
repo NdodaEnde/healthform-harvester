@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -270,10 +269,10 @@ function processMedicalQuestionnaireData(apiResponse: any) {
     // Build structured data object from API response
     return {
       patient: {
-        name: extractPath(extractedData, 'patient.name') || 'Unknown',
-        date_of_birth: extractPath(extractedData, 'patient.date_of_birth') || '',
-        employee_id: extractPath(extractedData, 'patient.id') || '',
-        gender: extractPath(extractedData, 'patient.gender') || ''
+        name: cleanValue(extractPath(extractedData, 'patient.name')) || 'Unknown',
+        date_of_birth: cleanValue(extractPath(extractedData, 'patient.date_of_birth')) || '',
+        employee_id: cleanValue(extractPath(extractedData, 'patient.id')) || '',
+        gender: cleanValue(extractPath(extractedData, 'patient.gender')) || ''
       },
       medical_history: {
         has_hypertension: checkCondition(extractedData, 'medical_history.conditions', 'hypertension'),
@@ -283,7 +282,7 @@ function processMedicalQuestionnaireData(apiResponse: any) {
         allergies: extractPath(extractedData, 'medical_history.allergies') || []
       },
       current_medications: extractPath(extractedData, 'medications') || [],
-      questionnaire_date: extractPath(extractedData, 'date') || new Date().toISOString().split('T')[0]
+      questionnaire_date: cleanValue(extractPath(extractedData, 'date')) || new Date().toISOString().split('T')[0]
     };
   } catch (error) {
     console.error('Error processing medical questionnaire data:', error);
@@ -350,17 +349,17 @@ function processCertificateOfFitnessData(apiResponse: any) {
                                markdown.match(/Limitations:\s*(.*?)(?=\n|\r|$)/i);
       
       // Set patient data
-      markdownData.patient.name = nameMatch?.[1]?.trim() || null;
-      markdownData.patient.id_number = idMatch?.[1]?.trim() || null;
-      markdownData.patient.company = companyMatch?.[1]?.trim() || null;
-      markdownData.patient.occupation = occupationMatch?.[1]?.trim() || null;
+      markdownData.patient.name = cleanValue(nameMatch?.[1]?.trim()) || null;
+      markdownData.patient.id_number = cleanValue(idMatch?.[1]?.trim()) || null;
+      markdownData.patient.company = cleanValue(companyMatch?.[1]?.trim()) || null;
+      markdownData.patient.occupation = cleanValue(occupationMatch?.[1]?.trim()) || null;
       
       // Set examination data
-      markdownData.examination.date = examDateMatch?.[1]?.trim() || null;
-      markdownData.examination.next_examination_date = expiryDateMatch?.[1]?.trim() || null;
-      markdownData.examination.physician = physicianMatch?.[1]?.trim() || null;
-      markdownData.examination.fitness_status = fitnessStatusMatch?.[1]?.trim() || null;
-      markdownData.examination.restrictions = restrictionsMatch?.[1]?.trim() || null;
+      markdownData.examination.date = cleanValue(examDateMatch?.[1]?.trim()) || null;
+      markdownData.examination.next_examination_date = cleanValue(expiryDateMatch?.[1]?.trim()) || null;
+      markdownData.examination.physician = cleanValue(physicianMatch?.[1]?.trim()) || null;
+      markdownData.examination.fitness_status = cleanValue(fitnessStatusMatch?.[1]?.trim()) || null;
+      markdownData.examination.restrictions = cleanValue(restrictionsMatch?.[1]?.trim()) || null;
       
       // Get additional fields that may be present
       const allFields = markdown.match(/\*\*(.*?)\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/g) || [];
@@ -369,7 +368,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
         const parts = field.split('**:');
         if (parts.length === 2) {
           const key = parts[0].replace(/\*\*/g, '').trim().toLowerCase();
-          const value = parts[1].trim();
+          const value = cleanValue(parts[1].trim());
           
           // Add any additional fields we haven't explicitly captured
           if (!['initials & surname', 'id no', 'company name', 'date of examination', 'expiry date', 
@@ -446,13 +445,13 @@ function processCertificateOfFitnessData(apiResponse: any) {
         
         if (tableMatch) {
           isDone = tableMatch[1].trim() === 'x';
-          results = tableMatch[2] ? tableMatch[2].trim() : '';
+          results = tableMatch[2] ? cleanValue(tableMatch[2].trim()) : '';
         } else if (listMatch) {
           isDone = listMatch[1].trim() === 'x';
-          results = listMatch[2] ? listMatch[2].trim() : '';
+          results = listMatch[2] ? cleanValue(listMatch[2].trim()) : '';
         } else if (htmlTableMatch) {
           isDone = htmlTableMatch[1].trim() === 'x';
-          results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
+          results = htmlTableMatch[2] ? cleanValue(htmlTableMatch[2].trim()) : '';
         }
         
         if (isDone || results) {
@@ -546,14 +545,14 @@ function processCertificateOfFitnessData(apiResponse: any) {
     
     if (markdown) {
       const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
-      if (followUpMatch && followUpMatch[1]) followUp = followUpMatch[1].trim();
+      if (followUpMatch && followUpMatch[1]) followUp = cleanValue(followUpMatch[1].trim());
       
       const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
-      if (reviewDateMatch && reviewDateMatch[1]) reviewDate = reviewDateMatch[1].trim();
+      if (reviewDateMatch && reviewDateMatch[1]) reviewDate = cleanValue(reviewDateMatch[1].trim());
       
       const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
       if (commentsMatch && commentsMatch[1]) {
-        comments = commentsMatch[1].trim();
+        comments = cleanValue(commentsMatch[1].trim());
         // If it's just "N/A" or empty after HTML tags are removed
         if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || 
             comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
@@ -566,56 +565,56 @@ function processCertificateOfFitnessData(apiResponse: any) {
     const structuredData = {
       patient: {
         name: markdownData.patient.name || 
-              extractPath(extractedData, 'patient.name') || 
-              extractPath(extractedData, 'employee.name') || 'Unknown',
+              cleanValue(extractPath(extractedData, 'patient.name')) || 
+              cleanValue(extractPath(extractedData, 'employee.name')) || 'Unknown',
         date_of_birth: markdownData.patient.date_of_birth || 
-                      extractPath(extractedData, 'patient.date_of_birth') || 
-                      extractPath(extractedData, 'patient.dob') || '',
+                      cleanValue(extractPath(extractedData, 'patient.date_of_birth')) || 
+                      cleanValue(extractPath(extractedData, 'patient.dob')) || '',
         employee_id: markdownData.patient.id_number || 
-                    extractPath(extractedData, 'patient.id') || 
-                    extractPath(extractedData, 'patient.id_number') || 
-                    extractPath(extractedData, 'employee.id') || '',
+                    cleanValue(extractPath(extractedData, 'patient.id')) || 
+                    cleanValue(extractPath(extractedData, 'patient.id_number')) || 
+                    cleanValue(extractPath(extractedData, 'employee.id')) || '',
         company: markdownData.patient.company || 
-                extractPath(extractedData, 'company') || 
-                extractPath(extractedData, 'employer') || 
-                extractPath(extractedData, 'patient.company') || '',
+                cleanValue(extractPath(extractedData, 'company')) || 
+                cleanValue(extractPath(extractedData, 'employer')) || 
+                cleanValue(extractPath(extractedData, 'patient.company')) || '',
         occupation: markdownData.patient.occupation || 
-                  extractPath(extractedData, 'patient.occupation') || 
-                  extractPath(extractedData, 'patient.job_title') || 
-                  extractPath(extractedData, 'occupation') || '',
+                  cleanValue(extractPath(extractedData, 'patient.occupation')) || 
+                  cleanValue(extractPath(extractedData, 'patient.job_title')) || 
+                  cleanValue(extractPath(extractedData, 'occupation')) || '',
         gender: markdownData.patient.gender || 
-               extractPath(extractedData, 'patient.gender') || ''
+               cleanValue(extractPath(extractedData, 'patient.gender')) || ''
       },
       examination_results: {
         date: markdownData.examination.date || 
-              extractPath(extractedData, 'examination.date') || 
-              extractPath(extractedData, 'date') || 
+              cleanValue(extractPath(extractedData, 'examination.date')) || 
+              cleanValue(extractPath(extractedData, 'date')) || 
               new Date().toISOString().split('T')[0],
         physician: markdownData.examination.physician || 
-                  extractPath(extractedData, 'examination.physician') || 
-                  extractPath(extractedData, 'physician') || '',
+                  cleanValue(extractPath(extractedData, 'examination.physician')) || 
+                  cleanValue(extractPath(extractedData, 'physician')) || '',
         fitness_status: markdownData.examination.fitness_status || 
-                       extractPath(extractedData, 'examination.fitness_status') || 
-                       extractPath(extractedData, 'fitness_status') || 'Unknown',
+                       cleanValue(extractPath(extractedData, 'examination.fitness_status')) || 
+                       cleanValue(extractPath(extractedData, 'fitness_status')) || 'Unknown',
         restrictions: markdownData.examination.restrictions || 
-                     extractPath(extractedData, 'examination.restrictions') || 
-                     extractPath(extractedData, 'restrictions') || 'None',
+                     cleanValue(extractPath(extractedData, 'examination.restrictions')) || 
+                     cleanValue(extractPath(extractedData, 'restrictions')) || 'None',
         next_examination_date: markdownData.examination.next_examination_date || 
-                             extractPath(extractedData, 'examination.next_date') || 
-                             extractPath(extractedData, 'valid_until') || 
-                             extractPath(extractedData, 'expiry_date') || '',
+                             cleanValue(extractPath(extractedData, 'examination.next_date')) || 
+                             cleanValue(extractPath(extractedData, 'valid_until')) || 
+                             cleanValue(extractPath(extractedData, 'expiry_date')) || '',
         type: examinationType,
         test_results: testResults
       },
       certification: {
         ...fitnessStatus,
-        follow_up: followUp,
-        review_date: reviewDate,
-        comments: comments,
+        follow_up: cleanValue(followUp),
+        review_date: cleanValue(reviewDate),
+        comments: cleanValue(comments),
         valid_until: markdownData.examination.next_examination_date || 
-                    extractPath(extractedData, 'examination.next_date') || 
-                    extractPath(extractedData, 'valid_until') || 
-                    extractPath(extractedData, 'expiry_date') || ''
+                    cleanValue(extractPath(extractedData, 'examination.next_date')) || 
+                    cleanValue(extractPath(extractedData, 'valid_until')) || 
+                    cleanValue(extractPath(extractedData, 'expiry_date')) || ''
       },
       restrictions: restrictions,
       raw_content: markdown || null
@@ -641,6 +640,28 @@ function processCertificateOfFitnessData(apiResponse: any) {
       restrictions: {}
     };
   }
+}
+
+// Helper function to clean HTML comments from extracted values
+function cleanValue(value: string | null | undefined): string {
+  if (!value) return '';
+  
+  // Remove HTML comments: <!-- ... -->
+  let cleaned = value.replace(/<!--.*?-->/g, '').trim();
+  
+  // Also remove form bounding box coordinates and IDs
+  cleaned = cleaned.replace(/<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->/g, '').trim();
+  
+  // Remove coordinates directly in text (l=0.064,t=0.188,r=0.936,b=0.284)
+  cleaned = cleaned.replace(/\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)/g, '').trim();
+  
+  // Remove IDs in text - with ID 5d5dece1-814c-40b8-ac21-2d9877814985
+  cleaned = cleaned.replace(/with ID [a-f0-9\-]+/g, '').trim();
+  
+  // Clean up any remaining <!-- or --> fragments
+  cleaned = cleaned.replace(/<!--|-->/g, '').trim();
+  
+  return cleaned;
 }
 
 // Helper function to safely extract nested properties from an object
