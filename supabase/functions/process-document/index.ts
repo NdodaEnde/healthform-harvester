@@ -309,7 +309,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
     console.log('Processing certificate of fitness data from API response');
     console.log('Markdown present:', Boolean(markdown));
     
-    // Build structured data object from API response
+    // Build structured data object from API response and markdown
     let structuredData = {
       patient: {
         name: cleanValue(extractPath(extractedData, 'patient.name')) || 
@@ -366,30 +366,37 @@ function processCertificateOfFitnessData(apiResponse: any) {
     
     // If we have markdown, extract more detailed data
     if (markdown) {
+      console.log('Extracting detailed data from markdown');
+      
       // 1. Extract Patient Information using more specific patterns
       const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       if (nameMatch && nameMatch[1]) {
         structuredData.patient.name = cleanValue(nameMatch[1].trim());
+        console.log('Extracted name:', structuredData.patient.name);
       }
       
       const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       if (idMatch && idMatch[1]) {
         structuredData.patient.employee_id = cleanValue(idMatch[1].trim());
+        console.log('Extracted ID:', structuredData.patient.employee_id);
       }
       
       const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       if (companyMatch && companyMatch[1]) {
         structuredData.patient.company = cleanValue(companyMatch[1].trim());
+        console.log('Extracted company:', structuredData.patient.company);
       }
       
       const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       if (examDateMatch && examDateMatch[1]) {
         structuredData.examination_results.date = cleanValue(examDateMatch[1].trim());
+        console.log('Extracted exam date:', structuredData.examination_results.date);
       }
       
       const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       if (expiryDateMatch && expiryDateMatch[1]) {
         structuredData.certification.valid_until = cleanValue(expiryDateMatch[1].trim());
+        console.log('Extracted expiry date:', structuredData.certification.valid_until);
       }
       
       // Job Title extraction - try multiple patterns
@@ -403,6 +410,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
         const match = markdown.match(pattern);
         if (match && match[1]) {
           structuredData.patient.occupation = cleanValue(match[1].trim());
+          console.log('Extracted job title:', structuredData.patient.occupation);
           break;
         }
       }
@@ -414,8 +422,12 @@ function processCertificateOfFitnessData(apiResponse: any) {
         exit: isCheckboxMarked(markdown, 'EXIT')
       };
       
+      console.log('Examination types:', structuredData.examination_results.type);
+      
       // 3. Extract Medical Test Results with multiple marking styles
       structuredData.examination_results.test_results = extractTestResults(markdown);
+      
+      console.log('Test results:', structuredData.examination_results.test_results);
       
       // 4. Extract Fitness Status
       structuredData.certification = {
@@ -430,15 +442,19 @@ function processCertificateOfFitnessData(apiResponse: any) {
         valid_until: structuredData.certification.valid_until
       };
       
+      console.log('Certification status:', {
+        fit: structuredData.certification.fit,
+        with_restrictions: structuredData.certification.fit_with_restrictions,
+        with_condition: structuredData.certification.fit_with_condition,
+        temp_unfit: structuredData.certification.temporarily_unfit,
+        unfit: structuredData.certification.unfit
+      });
+      
       // 5. Extract Restrictions
       structuredData.restrictions = extractRestrictions(markdown);
+      
+      console.log('Restrictions:', structuredData.restrictions);
     }
-    
-    console.log("Extracted patient name:", structuredData.patient.name);
-    console.log("Extracted patient ID:", structuredData.patient.employee_id);
-    console.log("Extracted job title:", structuredData.patient.occupation);
-    console.log("Extracted examination date:", structuredData.examination_results.date);
-    console.log("Extracted expiry date:", structuredData.certification.valid_until);
     
     return structuredData;
     
@@ -466,27 +482,38 @@ function processCertificateOfFitnessData(apiResponse: any) {
 function isCheckboxMarked(markdown: string, fieldName: string): boolean {
   if (!markdown || !fieldName) return false;
   
-  const fieldPattern = new RegExp(fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-  if (!fieldPattern.test(markdown)) return false;
+  // Get the context around the field name
+  const index = markdown.indexOf(fieldName);
+  if (index === -1) return false;
+  
+  const contextStart = Math.max(0, index - 50);
+  const contextEnd = Math.min(markdown.length, index + fieldName.length + 100);
+  const context = markdown.substring(contextStart, contextEnd);
+  
+  console.log(`Checking for '${fieldName}' marking:`, context.substring(0, 100));
   
   // Look for various checkbox marking patterns
-  const patterns = [
-    // Standard markdown checkbox with 'x' (case insensitive)
-    new RegExp(`${fieldName}.*?\\[(x|X)\\]`, 'i'),
-    // HTML table cell with checkbox
-    new RegExp(`<td>${fieldName}</td>.*?<td>\\[(x|X)\\]</td>`, 'i'),
-    // Table with checkmark/tick symbol
-    new RegExp(`${fieldName}.*?<td>[✓✔]</td>`, 'i'),
-    // Markdown with checkmark/tick symbol
-    new RegExp(`${fieldName}.*?[✓✔]`, 'i'),
-    // HTML entities for checkmarks
-    new RegExp(`${fieldName}.*?(&check;|&#10003;|&#10004;)`, 'i'),
-    // Text indicating checked status
-    new RegExp(`${fieldName}.*?(checked|marked|selected|ticked)`, 'i')
-  ];
+  const isMarked = (
+    context.includes('[x]') || 
+    context.includes('[X]') || 
+    context.includes('✓') || 
+    context.includes('✔') || 
+    context.includes('checked') || 
+    context.includes('marked') || 
+    context.includes('selected') || 
+    context.includes('ticked')
+  );
   
-  // Return true if any pattern matches
-  return patterns.some(pattern => pattern.test(markdown));
+  const isCrossedOut = context.includes('crossed out') || context.includes('X drawn over');
+  
+  // Special case for "FIT" - check if it's crossed out
+  if (fieldName === 'FIT' && isCrossedOut) {
+    console.log('FIT is crossed out');
+    return false;
+  }
+  
+  console.log(`Field '${fieldName}' is marked:`, isMarked);
+  return isMarked;
 }
 
 // Helper function to extract test results with multiple marking styles
@@ -507,26 +534,29 @@ function extractTestResults(markdown: string): any {
   ];
   
   tests.forEach(test => {
-    // Mark test as done if checkbox is marked
-    testResults[`${test.key}_done`] = isCheckboxMarked(markdown, test.name);
+    // Check if test is done using multiple detection methods
+    const isDone = isCheckboxMarked(markdown, test.name);
+    testResults[`${test.key}_done`] = isDone;
     
     // Try to extract test results
-    const resultPatterns = [
-      // Result after checkbox in HTML table format
-      new RegExp(`<td>${test.name}</td>.*?<td>(\\[(?:x|X|✓|✔)\\]|✓|✔)</td>.*?<td>(.*?)</td>`, 'i'),
-      // Result in description format
-      new RegExp(`\\*\\*${test.name}\\*\\*:.*?(?:Done|Completed).*?result\\s+is\\s+(.*?)(?=\\.|\\n|<)`, 'i'),
-      // General pattern to find results
-      new RegExp(`${test.name}.*?(\\d+\\/\\d+|Normal|\\d+\\.\\d+|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i')
-    ];
-    
-    for (const pattern of resultPatterns) {
-      const match = markdown.match(pattern);
-      if (match && match.length > 1) {
-        // Use last capturing group as the result
-        const resultIndex = match.length > 2 ? 2 : 1;
-        testResults[`${test.key}_results`] = cleanValue(match[resultIndex].trim());
-        break;
+    if (isDone) {
+      const resultPatterns = [
+        // Result after checkbox in table format
+        new RegExp(`${test.name}.*?(?:\\[(?:x|X|✓|✔)\\]|✓|✔).*?<td>(.*?)</td>`, 'i'),
+        // Result in description format
+        new RegExp(`\\*\\*${test.name}\\*\\*:.*?(?:Done|Completed).*?result\\s+is\\s+(.*?)(?=\\.|\\n|<)`, 'i'),
+        // General pattern to find results
+        new RegExp(`${test.name}.*?(\\d+\\/\\d+|Normal|\\d+\\.\\d+|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i')
+      ];
+      
+      for (const pattern of resultPatterns) {
+        const match = markdown.match(pattern);
+        if (match && match.length > 1) {
+          // Use last capturing group as the result
+          const resultIndex = match.length > 2 ? 2 : 1;
+          testResults[`${test.key}_results`] = cleanValue(match[resultIndex].trim());
+          break;
+        }
       }
     }
   });

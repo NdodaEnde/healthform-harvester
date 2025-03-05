@@ -23,4 +23,40 @@ export const cleanExtractedValue = (value: string | null | undefined): string =>
   return cleaned;
 };
 
+// Helper function to detect if a checkbox is marked, accommodating different marking styles
+export const isCheckboxMarked = (markdown: string, fieldName: string): boolean => {
+  if (!markdown || !fieldName) return false;
+  
+  // Normalize the field name for pattern matching
+  const fieldPattern = new RegExp(fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  
+  // If the field name doesn't exist in the text, return false immediately
+  if (!fieldPattern.test(markdown)) return false;
+  
+  // Get the context around the field name
+  const index = markdown.search(fieldPattern);
+  if (index === -1) return false;
+  
+  const startContext = Math.max(0, index - 100);
+  const endContext = Math.min(markdown.length, index + fieldName.length + 150);
+  const context = markdown.substring(startContext, endContext);
+  
+  // Look for various checkbox marking patterns in the context
+  const patterns = [
+    // Standard markdown checkbox with 'x' (case insensitive)
+    /\[(x|X)\]/i,
+    // HTML table cell with checkbox
+    /<td>\[(x|X)\]<\/td>/i,
+    // Table with checkmark/tick symbol
+    /[✓✔]/,
+    // HTML entities for checkmarks
+    /(&check;|&#10003;|&#10004;)/i,
+    // Text indicating checked status
+    /(checked|marked|selected|ticked)/i
+  ];
+  
+  // Return true if any pattern matches in the context
+  return patterns.some(pattern => pattern.test(context));
+};
+
 export { useHookToast as useToast, hookToast as toast };
