@@ -1,395 +1,348 @@
-import React, { useEffect } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
+import { calculateConfidence, getConfidenceLevel, cleanExtractedValue } from "@/lib/document-utils";
 
 type CertificateTemplateProps = {
   extractedData: any;
+  onSave?: (editedData: any) => void;
 };
 
-const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
-  useEffect(() => {
-    console.log("CertificateTemplate received data:", extractedData);
-  }, [extractedData]);
+// Confidence indicator component
+const ConfidenceIndicator = ({ score }: { score: number }) => {
+  const getColorClass = () => {
+    if (score >= 0.7) return "bg-green-500";
+    if (score >= 0.4) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger>
+          <div className={`w-2 h-2 rounded-full ml-1 ${getColorClass()}`}></div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Confidence: {Math.round(score * 100)}%</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
-  // Helper to check if a value is checked/selected
-  const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
-    if (value === undefined || value === null) return false;
-    
-    const stringValue = String(value).toLowerCase().trim();
-    return trueValues.includes(stringValue);
-  };
-  
-  // Helper to get nested values safely
-  const getValue = (obj: any, path: string, defaultValue: any = '') => {
-    if (!obj || !path) return defaultValue;
-    
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (const key of keys) {
-      if (current === undefined || current === null || typeof current !== 'object') {
-        return defaultValue;
-      }
-      current = current[key];
-    }
-    
-    return current !== undefined && current !== null ? current : defaultValue;
-  };
+// EditableField component
+const EditableField = ({ 
+  value, 
+  onChange, 
+  fieldName, 
+  confidence = 0.9, 
+  className = "" 
+}: { 
+  value: string | null | undefined; 
+  onChange: (field: string, value: string) => void; 
+  fieldName: string; 
+  confidence?: number; 
+  className?: string;
+}) => {
+  return (
+    <div className="flex items-center flex-1">
+      <Input
+        type="text"
+        value={value || ""}
+        onChange={e => onChange(fieldName, e.target.value)}
+        className={`border-b border-gray-400 bg-transparent px-0 ${className}`}
+      />
+      <ConfidenceIndicator score={confidence} />
+    </div>
+  );
+};
 
-  // Extract data directly from markdown
-  const extractDataFromMarkdown = (markdown: string): any => {
-    if (!markdown) return {};
-    
-    console.log("Extracting data from markdown");
-    
-    const extracted: any = {
-      patient: {},
-      examination_results: {
-        type: {},
-        test_results: {}
-      },
-      certification: {},
-      restrictions: {}
-    };
-    
-    // Patient data - more robust pattern matching
-    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (nameMatch && nameMatch[1]) extracted.patient.name = nameMatch[1].trim();
-    
-    const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (idMatch && idMatch[1]) extracted.patient.id_number = idMatch[1].trim();
-    
-    const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (companyMatch && companyMatch[1]) extracted.patient.company = companyMatch[1].trim();
-    
-    const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
-    
-    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
-    
-    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
-    
-    // Examination type - look for [x] markers in different formats
-    extracted.examination_results.type.pre_employment = 
-      markdown.includes('**Pre-Employment**: [x]') || 
-      markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
-      
-    extracted.examination_results.type.periodical = 
-      markdown.includes('**Periodical**: [x]') || 
-      markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
-      
-    extracted.examination_results.type.exit = 
-      markdown.includes('**Exit**: [x]') || 
-      markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
-    
-    // Medical tests - check multiple formats
-    const testsMap = [
-      { name: 'BLOODS', key: 'bloods' },
-      { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
-      { name: 'SIDE & DEPTH', key: 'side_depth' },
-      { name: 'NIGHT VISION', key: 'night_vision' },
-      { name: 'Hearing', key: 'hearing' },
-      { name: 'Working at Heights', key: 'heights' },
-      { name: 'Lung Function', key: 'lung_function' },
-      { name: 'X-Ray', key: 'x_ray' },
-      { name: 'Drug Screen', key: 'drug_screen' }
-    ];
-    
-    testsMap.forEach(test => {
-      // Check table format with pipe separators
-      const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
-      const tableMatch = markdown.match(tableRegex);
-      
-      // Check list format
-      const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
-      const listMatch = markdown.match(listRegex);
-      
-      // Check HTML table format
-      const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
-      const htmlTableMatch = markdown.match(htmlTableRegex);
-      
-      let isDone = false;
-      let results = '';
-      
-      if (tableMatch) {
-        isDone = tableMatch[1].trim() === 'x';
-        results = tableMatch[2] ? tableMatch[2].trim() : '';
-      } else if (listMatch) {
-        isDone = listMatch[1].trim() === 'x';
-        results = listMatch[2] ? listMatch[2].trim() : '';
-      } else if (htmlTableMatch) {
-        isDone = htmlTableMatch[1].trim() === 'x';
-        results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
-      }
-      
-      if (isDone || results) {
-        extracted.examination_results.test_results[`${test.key}_done`] = isDone;
-        extracted.examination_results.test_results[`${test.key}_results`] = results;
-      }
-    });
-    
-    // Fitness status - check various formats
-    const fitnessOptions = [
-      { name: 'FIT', key: 'fit' },
-      { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
-      { name: 'Fit with Condition', key: 'fit_with_condition' },
-      { name: 'Temporary Unfit', key: 'temporarily_unfit' },
-      { name: 'UNFIT', key: 'unfit' }
-    ];
-    
-    fitnessOptions.forEach(option => {
-      // Check multiple formats
-      const patterns = [
-        new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'),
-        new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-      
-      // Check all patterns
-      let isSelected = false;
-      for (const pattern of patterns) {
-        const match = markdown.match(pattern);
-        if (match && match[0].includes('[x]')) {
-          isSelected = true;
-          break;
-        }
-      }
-      
-      extracted.certification[option.key] = isSelected;
-    });
-    
-    // Restrictions - check both table and list formats
-    const restrictions = [
-      { name: 'Heights', key: 'heights' },
-      { name: 'Dust Exposure', key: 'dust_exposure' },
-      { name: 'Motorized Equipment', key: 'motorized_equipment' },
-      { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
-      { name: 'Confined Spaces', key: 'confined_spaces' },
-      { name: 'Chemical Exposure', key: 'chemical_exposure' },
-      { name: 'Wear Spectacles', key: 'wear_spectacles' },
-      { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
-    ];
-    
-    restrictions.forEach(restriction => {
-      // Check multiple formats
-      const patterns = [
-        new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'),
-        new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-      
-      // Check all patterns
-      let isSelected = false;
-      for (const pattern of patterns) {
-        const match = markdown.match(pattern);
-        if (match && match[0].includes('[x]')) {
-          isSelected = true;
-          break;
-        }
-      }
-      
-      extracted.restrictions[restriction.key] = isSelected;
-    });
-    
-    // Follow-up actions and comments
-    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
-    if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
-    
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
-    if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
-    
-    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
-    if (commentsMatch && commentsMatch[1]) {
-      let comments = commentsMatch[1].trim();
-      // If it's just "N/A" or empty after HTML tags are removed
-      if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || 
-          comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
-        extracted.certification.comments = "N/A";
-      } else {
-        extracted.certification.comments = comments;
-      }
-    }
-    
-    console.log("Extracted data from markdown:", extracted);
-    return extracted;
-  };
-  
-  // Enhanced function to extract markdown from the Landing AI response
-  const getMarkdown = (data: any): string | null => {
-    if (!data) return null;
-    
-    console.log("Attempting to extract markdown from data structure");
-    
-    // First, try direct known paths
-    const possiblePaths = [
-      'raw_response.data.markdown',
-      'extracted_data.raw_response.data.markdown',
-      'markdown',
-      'raw_markdown'
-    ];
-    
-    for (const path of possiblePaths) {
-      const value = getValue(data, path);
-      if (value && typeof value === 'string') {
-        console.log(`Found markdown at path: ${path}`);
-        return value;
-      }
-    }
-    
-    // Deep search for any property containing markdown content
-    const searchForMarkdown = (obj: any, path = ''): string | null => {
-      if (!obj || typeof obj !== 'object') return null;
-      
-      if (obj.markdown && typeof obj.markdown === 'string') {
-        console.log(`Found markdown at deep path: ${path}.markdown`);
-        return obj.markdown;
-      }
-      
-      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
-        return obj.raw_response.data.markdown;
-      }
-      
-      if (obj.data && obj.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.data.markdown`);
-        return obj.data.markdown;
-      }
-      
-      for (const key in obj) {
-        if (typeof obj[key] === 'object' && obj[key] !== null) {
-          const result = searchForMarkdown(obj[key], `${path}.${key}`);
-          if (result) return result;
-        }
-      }
-      
-      return null;
-    };
-    
-    const deepMarkdown = searchForMarkdown(data);
-    if (deepMarkdown) return deepMarkdown;
-    
-    // Try to find structured_data.raw_content
-    if (data.structured_data && data.structured_data.raw_content) {
-      console.log("Found structured_data.raw_content, using as markdown");
-      return data.structured_data.raw_content;
-    }
-    
-    console.log("Could not find markdown in provided data");
-    return null;
-  };
-  
-  // Get structured data from either direct input or extracted from markdown
-  let structuredData: any = {};
-  
-  // First try to get structured data directly from the input
-  if (extractedData?.structured_data) {
-    console.log("Using existing structured_data");
-    structuredData = extractedData.structured_data;
-  } else if (extractedData?.extracted_data?.structured_data) {
-    console.log("Using structured_data from extracted_data");
-    structuredData = extractedData.extracted_data.structured_data;
-  } else {
-    // If no structured data, try to extract from markdown
-    const markdown = getMarkdown(extractedData);
-    if (markdown) {
-      console.log("Extracting from markdown content");
-      structuredData = extractDataFromMarkdown(markdown);
-    } else {
-      console.log("No markdown found, using extractedData as is");
-      structuredData = extractedData || {};
-    }
-  }
-  
-  // Get the main sections from the data
-  const patient = structuredData.patient || {};
-  const examination = structuredData.examination_results || structuredData.medical_details || {};
-  const restrictions = structuredData.restrictions || {};
-  const certification = structuredData.certification || structuredData.fitness_assessment || {};
-  const testResults = examination.test_results || examination.tests || {};
-  
-  // Fitness status
-  const fitnessStatus = {
-    fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
-    fitWithRestriction: isChecked(certification.fit_with_restrictions),
-    fitWithCondition: isChecked(certification.fit_with_condition),
-    temporarilyUnfit: isChecked(certification.temporarily_unfit),
-    unfit: isChecked(certification.permanently_unfit) || isChecked(certification.unfit)
-  };
-  
-  // Medical tests status
-  const medicalTests = {
-    bloods: {
-      done: isChecked(testResults.bloods_done) || isChecked(testResults.blood_test),
-      results: getValue(testResults, 'bloods_results') || getValue(testResults, 'blood_test_results')
+// CheckboxField component
+const CheckboxField = ({ 
+  checked, 
+  onChange, 
+  fieldName, 
+  confidence = 0.9 
+}: { 
+  checked: boolean; 
+  onChange: (field: string, value: boolean) => void; 
+  fieldName: string; 
+  confidence?: number;
+}) => {
+  return (
+    <div className="flex items-center justify-center h-8">
+      <input 
+        type="checkbox" 
+        checked={checked} 
+        onChange={() => onChange(fieldName, !checked)}
+        className="w-5 h-5"
+      />
+      <ConfidenceIndicator score={confidence} />
+    </div>
+  );
+};
+
+const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps) => {
+  // Initialize state with empty structure
+  const [formData, setFormData] = useState<any>({
+    patient: {},
+    examination_results: {
+      type: {},
+      test_results: {}
     },
-    farNearVision: {
-      done: isChecked(testResults.far_near_vision_done) || isChecked(testResults.vision_test),
-      results: getValue(testResults, 'far_near_vision_results') || getValue(testResults, 'vision_results')
-    },
-    sideDepth: {
-      done: isChecked(testResults.side_depth_done) || isChecked(testResults.peripheral_vision),
-      results: getValue(testResults, 'side_depth_results') || getValue(testResults, 'peripheral_vision_results')
-    },
-    nightVision: {
-      done: isChecked(testResults.night_vision_done) || isChecked(testResults.night_vision_test),
-      results: getValue(testResults, 'night_vision_results')
-    },
-    hearing: {
-      done: isChecked(testResults.hearing_done) || isChecked(testResults.hearing_test),
-      results: getValue(testResults, 'hearing_results') || getValue(testResults, 'hearing_test_results')
-    },
-    heights: {
-      done: isChecked(testResults.heights_done) || isChecked(testResults.working_at_heights),
-      results: getValue(testResults, 'heights_results') || getValue(testResults, 'working_at_heights_results')
-    },
-    lungFunction: {
-      done: isChecked(testResults.lung_function_done) || isChecked(testResults.pulmonary_function),
-      results: getValue(testResults, 'lung_function_results') || getValue(testResults, 'pulmonary_function_results')
-    },
-    xRay: {
-      done: isChecked(testResults.x_ray_done) || isChecked(testResults.chest_x_ray),
-      results: getValue(testResults, 'x_ray_results') || getValue(testResults, 'chest_x_ray_results')
-    },
-    drugScreen: {
-      done: isChecked(testResults.drug_screen_done) || isChecked(testResults.drug_screen_test),
-      results: getValue(testResults, 'drug_screen_results')
-    }
-  };
-  
-  // Restrictions
-  const restrictionsData = {
-    heights: isChecked(restrictions.heights),
-    dustExposure: isChecked(restrictions.dust_exposure),
-    motorizedEquipment: isChecked(restrictions.motorized_equipment),
-    hearingProtection: isChecked(restrictions.hearing_protection) || isChecked(restrictions.wear_hearing_protection),
-    confinedSpaces: isChecked(restrictions.confined_spaces),
-    chemicalExposure: isChecked(restrictions.chemical_exposure),
-    wearSpectacles: isChecked(restrictions.wear_spectacles),
-    chronicConditions: isChecked(restrictions.chronic_conditions) || isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
-  };
-  
-  // Determine examination type
-  const examinationType = {
-    preEmployment: isChecked(examination.pre_employment) || isChecked(examination.type?.pre_employment),
-    periodical: isChecked(examination.periodical) || isChecked(examination.type?.periodical),
-    exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
-  };
-  
-  // For debugging - log the patient data to console
-  console.log("Certificate template using data:", {
-    name: getValue(patient, 'name'),
-    id: getValue(patient, 'id_number'),
-    company: getValue(patient, 'company'),
-    occupation: getValue(patient, 'occupation'),
-    examDate: getValue(examination, 'date'),
-    expiryDate: getValue(certification, 'valid_until'),
-    examinationType,
-    fitnessStatus,
-    medicalTests,
-    restrictionsData
+    certification: {},
+    restrictions: {}
   });
+  
+  // Initialize confidence scores
+  const [confidenceScores] = useState<any>({
+    patient: {
+      name: 0.85,
+      id_number: 0.85,
+      company: 0.85,
+      occupation: 0.75
+    },
+    examination_results: {
+      date: 0.85,
+      type: {
+        pre_employment: 0.7,
+        periodical: 0.7,
+        exit: 0.7
+      },
+      test_results: {}
+    },
+    certification: {
+      valid_until: 0.85,
+      follow_up: 0.6,
+      review_date: 0.6,
+      comments: 0.6,
+      fit: 0.7,
+      fit_with_restrictions: 0.7,
+      fit_with_condition: 0.7,
+      temporarily_unfit: 0.7,
+      unfit: 0.7
+    },
+    restrictions: {}
+  });
+  
+  // Add confidence scores for tests
+  const tests = [
+    'bloods', 'far_near_vision', 'side_depth', 'night_vision', 
+    'hearing', 'heights', 'lung_function', 'x_ray', 'drug_screen'
+  ];
+  
+  useEffect(() => {
+    // Initialize test confidence scores
+    const testConfidences = { ...confidenceScores };
+    
+    tests.forEach(test => {
+      testConfidences.examination_results.test_results[`${test}_done`] = 0.7;
+      testConfidences.examination_results.test_results[`${test}_results`] = 0.6;
+    });
+    
+    // Initialize restriction confidence scores
+    const restrictionTypes = [
+      'heights', 'dust_exposure', 'motorized_equipment', 'wear_hearing_protection',
+      'confined_spaces', 'chemical_exposure', 'wear_spectacles', 'remain_on_treatment_for_chronic_conditions'
+    ];
+    
+    restrictionTypes.forEach(restriction => {
+      testConfidences.restrictions[restriction] = 0.7;
+    });
+  }, []);
+  
+  // Update form data when extractedData changes
+  useEffect(() => {
+    if (extractedData) {
+      console.log("Certificate template received data:", extractedData);
+      
+      // Helper function to safely get nested values
+      const getValue = (obj: any, path: string, defaultValue: any = '') => {
+        if (!obj || !path) return defaultValue;
+        
+        const keys = path.split('.');
+        let current = obj;
+        
+        for (const key of keys) {
+          if (current === undefined || current === null || typeof current !== 'object') {
+            return defaultValue;
+          }
+          current = current[key];
+        }
+        
+        return current !== undefined && current !== null ? current : defaultValue;
+      };
+      
+      // Helper to check if a value is checked/selected
+      const isChecked = (value: any) => {
+        if (value === undefined || value === null) return false;
+        if (typeof value === 'boolean') return value;
+        
+        const stringValue = String(value).toLowerCase().trim();
+        return ['yes', 'true', 'checked', '1', 'x'].includes(stringValue);
+      };
+      
+      setFormData({
+        patient: {
+          name: cleanExtractedValue(getValue(extractedData, 'patient.name')),
+          id_number: cleanExtractedValue(getValue(extractedData, 'patient.id_number')),
+          company: cleanExtractedValue(getValue(extractedData, 'patient.company')),
+          occupation: cleanExtractedValue(getValue(extractedData, 'patient.occupation'))
+        },
+        examination_results: {
+          date: cleanExtractedValue(getValue(extractedData, 'examination_results.date')),
+          type: {
+            pre_employment: isChecked(getValue(extractedData, 'examination_results.type.pre_employment')),
+            periodical: isChecked(getValue(extractedData, 'examination_results.type.periodical')),
+            exit: isChecked(getValue(extractedData, 'examination_results.type.exit'))
+          },
+          test_results: {
+            bloods_done: isChecked(getValue(extractedData, 'examination_results.test_results.bloods_done')),
+            bloods_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.bloods_results')),
+            far_near_vision_done: isChecked(getValue(extractedData, 'examination_results.test_results.far_near_vision_done')),
+            far_near_vision_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.far_near_vision_results')),
+            side_depth_done: isChecked(getValue(extractedData, 'examination_results.test_results.side_depth_done')),
+            side_depth_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.side_depth_results')),
+            night_vision_done: isChecked(getValue(extractedData, 'examination_results.test_results.night_vision_done')),
+            night_vision_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.night_vision_results')),
+            hearing_done: isChecked(getValue(extractedData, 'examination_results.test_results.hearing_done')),
+            hearing_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.hearing_results')),
+            heights_done: isChecked(getValue(extractedData, 'examination_results.test_results.heights_done')),
+            heights_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.heights_results')),
+            lung_function_done: isChecked(getValue(extractedData, 'examination_results.test_results.lung_function_done')),
+            lung_function_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.lung_function_results')),
+            x_ray_done: isChecked(getValue(extractedData, 'examination_results.test_results.x_ray_done')),
+            x_ray_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.x_ray_results')),
+            drug_screen_done: isChecked(getValue(extractedData, 'examination_results.test_results.drug_screen_done')),
+            drug_screen_results: cleanExtractedValue(getValue(extractedData, 'examination_results.test_results.drug_screen_results'))
+          }
+        },
+        certification: {
+          valid_until: cleanExtractedValue(getValue(extractedData, 'certification.valid_until')),
+          follow_up: cleanExtractedValue(getValue(extractedData, 'certification.follow_up')),
+          review_date: cleanExtractedValue(getValue(extractedData, 'certification.review_date')),
+          comments: cleanExtractedValue(getValue(extractedData, 'certification.comments', 'N/A')),
+          fit: isChecked(getValue(extractedData, 'certification.fit')),
+          fit_with_restrictions: isChecked(getValue(extractedData, 'certification.fit_with_restrictions')),
+          fit_with_condition: isChecked(getValue(extractedData, 'certification.fit_with_condition')),
+          temporarily_unfit: isChecked(getValue(extractedData, 'certification.temporarily_unfit')),
+          unfit: isChecked(getValue(extractedData, 'certification.unfit'))
+        },
+        restrictions: {
+          heights: isChecked(getValue(extractedData, 'restrictions.heights')),
+          dust_exposure: isChecked(getValue(extractedData, 'restrictions.dust_exposure')),
+          motorized_equipment: isChecked(getValue(extractedData, 'restrictions.motorized_equipment')),
+          wear_hearing_protection: isChecked(getValue(extractedData, 'restrictions.wear_hearing_protection')),
+          confined_spaces: isChecked(getValue(extractedData, 'restrictions.confined_spaces')),
+          chemical_exposure: isChecked(getValue(extractedData, 'restrictions.chemical_exposure')),
+          wear_spectacles: isChecked(getValue(extractedData, 'restrictions.wear_spectacles')),
+          remain_on_treatment_for_chronic_conditions: isChecked(getValue(extractedData, 'restrictions.remain_on_treatment_for_chronic_conditions'))
+        }
+      });
+      
+      // Dynamic confidence scores calculation
+      const newConfidenceScores = { ...confidenceScores };
+      
+      // Calculate confidence for text fields
+      newConfidenceScores.patient.name = calculateConfidence(getValue(extractedData, 'patient.name'), 'name');
+      newConfidenceScores.patient.id_number = calculateConfidence(getValue(extractedData, 'patient.id_number'), 'id');
+      newConfidenceScores.patient.company = calculateConfidence(getValue(extractedData, 'patient.company'), 'text');
+      newConfidenceScores.patient.occupation = calculateConfidence(getValue(extractedData, 'patient.occupation'), 'text');
+      
+      newConfidenceScores.examination_results.date = calculateConfidence(getValue(extractedData, 'examination_results.date'), 'date');
+      newConfidenceScores.certification.valid_until = calculateConfidence(getValue(extractedData, 'certification.valid_until'), 'date');
+      newConfidenceScores.certification.follow_up = calculateConfidence(getValue(extractedData, 'certification.follow_up'), 'text');
+      newConfidenceScores.certification.review_date = calculateConfidence(getValue(extractedData, 'certification.review_date'), 'date');
+      newConfidenceScores.certification.comments = calculateConfidence(getValue(extractedData, 'certification.comments'), 'text');
+      
+      // Calculate confidence for checkbox fields (boolean types)
+      newConfidenceScores.examination_results.type.pre_employment = calculateConfidence(getValue(extractedData, 'examination_results.type.pre_employment'), 'boolean');
+      newConfidenceScores.examination_results.type.periodical = calculateConfidence(getValue(extractedData, 'examination_results.type.periodical'), 'boolean');
+      newConfidenceScores.examination_results.type.exit = calculateConfidence(getValue(extractedData, 'examination_results.type.exit'), 'boolean');
+      
+      // Medical tests
+      tests.forEach(test => {
+        newConfidenceScores.examination_results.test_results[`${test}_done`] = calculateConfidence(
+          getValue(extractedData, `examination_results.test_results.${test}_done`), 
+          'boolean'
+        );
+        newConfidenceScores.examination_results.test_results[`${test}_results`] = calculateConfidence(
+          getValue(extractedData, `examination_results.test_results.${test}_results`), 
+          'text'
+        );
+      });
+      
+      // Fitness status
+      newConfidenceScores.certification.fit = calculateConfidence(getValue(extractedData, 'certification.fit'), 'boolean');
+      newConfidenceScores.certification.fit_with_restrictions = calculateConfidence(getValue(extractedData, 'certification.fit_with_restrictions'), 'boolean');
+      newConfidenceScores.certification.fit_with_condition = calculateConfidence(getValue(extractedData, 'certification.fit_with_condition'), 'boolean');
+      newConfidenceScores.certification.temporarily_unfit = calculateConfidence(getValue(extractedData, 'certification.temporarily_unfit'), 'boolean');
+      newConfidenceScores.certification.unfit = calculateConfidence(getValue(extractedData, 'certification.unfit'), 'boolean');
+      
+      // Restrictions
+      const restrictionTypes = [
+        'heights', 'dust_exposure', 'motorized_equipment', 'wear_hearing_protection',
+        'confined_spaces', 'chemical_exposure', 'wear_spectacles', 'remain_on_treatment_for_chronic_conditions'
+      ];
+      
+      restrictionTypes.forEach(restriction => {
+        newConfidenceScores.restrictions[restriction] = calculateConfidence(
+          getValue(extractedData, `restrictions.${restriction}`), 
+          'boolean'
+        );
+      });
+    }
+  }, [extractedData]);
+  
+  // Handle text field changes
+  const handleTextChange = (field: string, value: string) => {
+    const parts = field.split('.');
+    
+    setFormData((prev: any) => {
+      const newData = { ...prev };
+      if (parts.length === 1) {
+        newData[parts[0]] = value;
+      } else if (parts.length === 2) {
+        newData[parts[0]] = { ...newData[parts[0]], [parts[1]]: value };
+      } else if (parts.length === 3) {
+        newData[parts[0]][parts[1]] = { ...newData[parts[0]][parts[1]], [parts[2]]: value };
+      }
+      return newData;
+    });
+  };
+  
+  // Handle checkbox changes
+  const handleCheckboxChange = (field: string, value: boolean) => {
+    const parts = field.split('.');
+    
+    setFormData((prev: any) => {
+      const newData = { ...prev };
+      if (parts.length === 1) {
+        newData[parts[0]] = value;
+      } else if (parts.length === 2) {
+        newData[parts[0]] = { ...newData[parts[0]], [parts[1]]: value };
+      } else if (parts.length === 3) {
+        newData[parts[0]][parts[1]] = { ...newData[parts[0]][parts[1]], [parts[2]]: value };
+      }
+      return newData;
+    });
+  };
+  
+  // Save changes
+  const handleSave = () => {
+    if (onSave) {
+      onSave(formData);
+    }
+  };
   
   return (
     <ScrollArea className="h-full">
@@ -441,7 +394,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             {/* Physician/Practice Info */}
             <div className="text-center text-xs px-4 mb-3">
               <p>
-                Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No: {getValue(examination, 'practice_number') || '0404160'} / Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} / Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
+                Dr. MJ Mphuthi / Practice No: 0404160 / Sr. Sibongile Mahlangu / Practice No: 999 088 0000 8177 91
               </p>
               <p>certify that the following employee:</p>
             </div>
@@ -452,40 +405,70 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Initials & Surname:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'name') || getValue(patient, 'full_name')}</span>
+                    <EditableField 
+                      value={formData.patient.name} 
+                      onChange={handleTextChange} 
+                      fieldName="patient.name"
+                      confidence={confidenceScores.patient.name}
+                    />
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">ID NO:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'id_number') || getValue(patient, 'employee_id') || getValue(patient, 'id')}</span>
+                    <EditableField 
+                      value={formData.patient.id_number} 
+                      onChange={handleTextChange} 
+                      fieldName="patient.id_number"
+                      confidence={confidenceScores.patient.id_number}
+                    />
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Company Name:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'company') || getValue(patient, 'employer') || getValue(patient, 'employment.employer')}</span>
+                <EditableField 
+                  value={formData.patient.company} 
+                  onChange={handleTextChange} 
+                  fieldName="patient.company"
+                  confidence={confidenceScores.patient.company}
+                />
               </div>
               
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(extractedData, 'examination_date')}</span>
+                    <EditableField 
+                      value={formData.examination_results.date} 
+                      onChange={handleTextChange} 
+                      fieldName="examination_results.date"
+                      confidence={confidenceScores.examination_results.date}
+                    />
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(certification, 'valid_until') || getValue(certification, 'expiration_date')}</span>
+                    <EditableField 
+                      value={formData.certification.valid_until} 
+                      onChange={handleTextChange} 
+                      fieldName="certification.valid_until"
+                      confidence={confidenceScores.certification.valid_until}
+                    />
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Job Title:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'occupation') || getValue(patient, 'job_title') || getValue(patient, 'employment.occupation')}</span>
+                <EditableField 
+                  value={formData.patient.occupation} 
+                  onChange={handleTextChange} 
+                  fieldName="patient.occupation"
+                  confidence={confidenceScores.patient.occupation}
+                />
               </div>
             </div>
             
@@ -501,14 +484,29 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.preEmployment ? '✓' : ''}
+                    <td className="border border-gray-400 text-center">
+                      <CheckboxField 
+                        checked={formData.examination_results.type.pre_employment} 
+                        onChange={handleCheckboxChange} 
+                        fieldName="examination_results.type.pre_employment"
+                        confidence={confidenceScores.examination_results.type.pre_employment}
+                      />
                     </td>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.periodical ? '✓' : ''}
+                    <td className="border border-gray-400 text-center">
+                      <CheckboxField 
+                        checked={formData.examination_results.type.periodical} 
+                        onChange={handleCheckboxChange} 
+                        fieldName="examination_results.type.periodical"
+                        confidence={confidenceScores.examination_results.type.periodical}
+                      />
                     </td>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.exit ? '✓' : ''}
+                    <td className="border border-gray-400 text-center">
+                      <CheckboxField 
+                        checked={formData.examination_results.type.exit} 
+                        onChange={handleCheckboxChange} 
+                        fieldName="examination_results.type.exit"
+                        confidence={confidenceScores.examination_results.type.exit}
+                      />
                     </td>
                   </tr>
                 </tbody>
@@ -536,37 +534,81 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.bloods.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.bloods_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.bloods_done"
+                              confidence={confidenceScores.examination_results.test_results.bloods_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.bloods.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.bloods_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.bloods_results"
+                              confidence={confidenceScores.examination_results.test_results.bloods_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.farNearVision.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.far_near_vision_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.far_near_vision_done"
+                              confidence={confidenceScores.examination_results.test_results.far_near_vision_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.farNearVision.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.far_near_vision_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.far_near_vision_results"
+                              confidence={confidenceScores.examination_results.test_results.far_near_vision_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.sideDepth.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.side_depth_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.side_depth_done"
+                              confidence={confidenceScores.examination_results.test_results.side_depth_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.sideDepth.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.side_depth_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.side_depth_results"
+                              confidence={confidenceScores.examination_results.test_results.side_depth_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.nightVision.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.night_vision_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.night_vision_done"
+                              confidence={confidenceScores.examination_results.test_results.night_vision_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.nightVision.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.night_vision_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.night_vision_results"
+                              confidence={confidenceScores.examination_results.test_results.night_vision_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                       </tbody>
@@ -585,46 +627,101 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.hearing.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.hearing_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.hearing_done"
+                              confidence={confidenceScores.examination_results.test_results.hearing_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.hearing.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.hearing_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.hearing_results"
+                              confidence={confidenceScores.examination_results.test_results.hearing_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.heights.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.heights_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.heights_done"
+                              confidence={confidenceScores.examination_results.test_results.heights_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.heights.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.heights_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.heights_results"
+                              confidence={confidenceScores.examination_results.test_results.heights_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.lungFunction.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.lung_function_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.lung_function_done"
+                              confidence={confidenceScores.examination_results.test_results.lung_function_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.lungFunction.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.lung_function_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.lung_function_results"
+                              confidence={confidenceScores.examination_results.test_results.lung_function_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.xRay.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.x_ray_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.x_ray_done"
+                              confidence={confidenceScores.examination_results.test_results.x_ray_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.xRay.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.x_ray_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.x_ray_results"
+                              confidence={confidenceScores.examination_results.test_results.x_ray_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.drugScreen.done ? '✓' : ''}
+                            <CheckboxField 
+                              checked={formData.examination_results.test_results.drug_screen_done} 
+                              onChange={handleCheckboxChange} 
+                              fieldName="examination_results.test_results.drug_screen_done"
+                              confidence={confidenceScores.examination_results.test_results.drug_screen_done}
+                            />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.drugScreen.results}
+                            <EditableField 
+                              value={formData.examination_results.test_results.drug_screen_results} 
+                              onChange={handleTextChange} 
+                              fieldName="examination_results.test_results.drug_screen_results"
+                              confidence={confidenceScores.examination_results.test_results.drug_screen_results}
+                              className="text-center"
+                            />
                           </td>
                         </tr>
                       </tbody>
@@ -638,13 +735,24 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             <div className="px-4 mb-4">
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
-                <div className="border-b border-gray-400 flex-1">
-                  {getValue(certification, 'follow_up') || getValue(certification, 'referral')}
+                <div className="flex-1">
+                  <EditableField 
+                    value={formData.certification.follow_up} 
+                    onChange={handleTextChange} 
+                    fieldName="certification.follow_up"
+                    confidence={confidenceScores.certification.follow_up}
+                  />
                 </div>
                 <div className="ml-2">
                   <div className="text-sm">
                     <span className="font-semibold mr-1">Review Date:</span>
-                    <span className="text-red-600">{getValue(certification, 'review_date')}</span>
+                    <EditableField 
+                      value={formData.certification.review_date} 
+                      onChange={handleTextChange} 
+                      fieldName="certification.review_date"
+                      confidence={confidenceScores.certification.review_date}
+                      className="text-red-600 w-32"
+                    />
                   </div>
                 </div>
               </div>
@@ -660,39 +768,79 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <table className="w-full border border-gray-400 text-sm">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.heights ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Heights</div>
-                        {restrictionsData.heights && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.heights} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.heights"
+                          confidence={confidenceScores.restrictions.heights}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.dust_exposure ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Dust Exposure</div>
-                        {restrictionsData.dustExposure && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.dust_exposure} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.dust_exposure"
+                          confidence={confidenceScores.restrictions.dust_exposure}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.motorized_equipment ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Motorized Equipment</div>
-                        {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.motorized_equipment} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.motorized_equipment"
+                          confidence={confidenceScores.restrictions.motorized_equipment}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.wear_hearing_protection ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Wear Hearing Protection</div>
-                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.wear_hearing_protection} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.wear_hearing_protection"
+                          confidence={confidenceScores.restrictions.wear_hearing_protection}
+                        />
                       </td>
                     </tr>
                     <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.confined_spaces ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Confined Spaces</div>
-                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.confined_spaces} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.confined_spaces"
+                          confidence={confidenceScores.restrictions.confined_spaces}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.chemical_exposure ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Chemical Exposure</div>
-                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.chemical_exposure} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.chemical_exposure"
+                          confidence={confidenceScores.restrictions.chemical_exposure}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.wear_spectacles ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Wear Spectacles</div>
-                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.wear_spectacles} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.wear_spectacles"
+                          confidence={confidenceScores.restrictions.wear_spectacles}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.remain_on_treatment_for_chronic_conditions ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
-                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                        <CheckboxField 
+                          checked={formData.restrictions.remain_on_treatment_for_chronic_conditions} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="restrictions.remain_on_treatment_for_chronic_conditions"
+                          confidence={confidenceScores.restrictions.remain_on_treatment_for_chronic_conditions}
+                        />
                       </td>
                     </tr>
                   </tbody>
@@ -710,25 +858,50 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <table className="w-full border border-gray-400">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.fit ? 'bg-green-100' : ''}`}>
                         <div className="font-semibold text-sm">FIT</div>
-                        {fitnessStatus.fit && <div className="mt-1 text-sm">✓</div>}
+                        <CheckboxField 
+                          checked={formData.certification.fit} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="certification.fit"
+                          confidence={confidenceScores.certification.fit}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.fit_with_restrictions ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold text-sm">Fit with Restriction</div>
-                        {fitnessStatus.fitWithRestriction && <div className="mt-1 text-sm">✓</div>}
+                        <CheckboxField 
+                          checked={formData.certification.fit_with_restrictions} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="certification.fit_with_restrictions"
+                          confidence={confidenceScores.certification.fit_with_restrictions}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.fit_with_condition ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold text-sm">Fit with Condition</div>
-                        {fitnessStatus.fitWithCondition && <div className="mt-1 text-sm">✓</div>}
+                        <CheckboxField 
+                          checked={formData.certification.fit_with_condition} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="certification.fit_with_condition"
+                          confidence={confidenceScores.certification.fit_with_condition}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.temporarily_unfit ? 'bg-red-100' : ''}`}>
                         <div className="font-semibold text-sm">Temporary Unfit</div>
-                        {fitnessStatus.temporarilyUnfit && <div className="mt-1 text-sm">✓</div>}
+                        <CheckboxField 
+                          checked={formData.certification.temporarily_unfit} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="certification.temporarily_unfit"
+                          confidence={confidenceScores.certification.temporarily_unfit}
+                        />
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.unfit ? 'bg-red-100' : ''}`}>
                         <div className="font-semibold text-sm">UNFIT</div>
-                        {fitnessStatus.unfit && <div className="mt-1 text-sm">✓</div>}
+                        <CheckboxField 
+                          checked={formData.certification.unfit} 
+                          onChange={handleCheckboxChange} 
+                          fieldName="certification.unfit"
+                          confidence={confidenceScores.certification.unfit}
+                        />
                       </td>
                     </tr>
                   </tbody>
@@ -740,8 +913,13 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             <div className="px-4 mb-6">
               <div className="flex flex-col">
                 <div className="font-semibold text-sm mb-1">Comments:</div>
-                <div className="border border-gray-400 p-2 min-h-24 text-sm">
-                  {getValue(certification, 'comments') || 'N/A'}
+                <div className="border border-gray-400 p-2 min-h-24">
+                  <Input
+                    type="text"
+                    value={formData.certification.comments || ""}
+                    onChange={(e) => handleTextChange("certification.comments", e.target.value)}
+                    className="w-full h-full border-0 p-0 bg-transparent"
+                  />
                 </div>
               </div>
             </div>
@@ -749,22 +927,16 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             {/* Footer with signature */}
             <div className="px-4 flex justify-between items-end mb-4">
               <div className="w-56">
-                <div className="border-b border-gray-400 h-14 flex items-end justify-center pb-1">
-                  <img 
-                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgODAiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0yMCA0MGMwIDAgMjAtMzAgNjAgMCBjIDMwIDI1IDQwLTEwIDYwIDUgYyAyMCAxNyA0MCA1IDYwLTEwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==" 
-                    alt="Signature" 
-                    className="h-12 opacity-70"
-                  />
-                </div>
+                <div className="border-b border-gray-400 h-14"></div>
                 <div className="text-center text-sm font-semibold mt-1">
-                  Medical Practitioner
+                  Signature
                 </div>
               </div>
               
               <div className="w-56">
-                <div className="border-b border-gray-400 h-14"></div>
+                <div className="border-b border-gray-400 h-14 border-dashed"></div>
                 <div className="text-center text-sm font-semibold mt-1">
-                  Employee Signature
+                  Stamp
                 </div>
               </div>
             </div>
@@ -774,6 +946,18 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
               <p>This certificate is valid for the duration specified above from the date of medical examination, 
                 unless there is a change in the employees' medical condition or the nature of their work.</p>
             </div>
+            
+            {/* Save Button */}
+            {onSave && (
+              <div className="px-4 py-3 bg-gray-50 text-right">
+                <Button 
+                  onClick={handleSave}
+                  className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded"
+                >
+                  Save Changes
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Card>
