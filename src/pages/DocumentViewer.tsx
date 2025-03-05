@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -14,8 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import CertificateTemplate from "@/components/CertificateTemplate";
-import CertificateEditor from "@/components/CertificateEditor";
+import CertificateController from "@/components/CertificateController";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -336,7 +334,6 @@ const DocumentViewer = () => {
     }
   };
 
-  // Add a new handler for saving edited data
   const handleSaveEdits = (updatedData: any) => {
     setDocument(prev => {
       if (!prev) return prev;
@@ -482,21 +479,15 @@ const DocumentViewer = () => {
     
     const extractedData = document.extractedData;
     
-    if (showEditor) {
-      return (
-        <CertificateEditor 
-          documentId={document.id} 
-          extractedData={extractedData} 
-          onSave={handleSaveEdits} 
-        />
-      );
-    }
-    
     if (document.type === 'Certificate of Fitness') {
-      console.log("Passing to CertificateTemplate:", extractedData);
+      console.log("Passing to CertificateController:", extractedData);
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
+          <CertificateController 
+            documentId={document.id} 
+            extractedData={extractedData} 
+            onSave={handleSaveEdits} 
+          />
         </div>
       );
     }
