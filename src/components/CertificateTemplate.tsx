@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,36 +68,10 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
     
-    // More robust expiry date matching with multiple pattern formats
-    const expiryDatePatterns = [
-      /\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i,
-      /Expiry Date:\s*(.*?)(?=\n|\r|$)/i,
-      /Valid Until:\s*(.*?)(?=\n|\r|$)/i,
-      /Certificate Valid Until:\s*(.*?)(?=\n|\r|$)/i,
-      /Expiration Date:\s*(.*?)(?=\n|\r|$)/i
-    ];
-    
-    // Try each pattern until we find a match
-    for (const pattern of expiryDatePatterns) {
-      const expiryMatch = markdown.match(pattern);
-      if (expiryMatch && expiryMatch[1]) {
-        extracted.certification.valid_until = expiryMatch[1].trim();
-        console.log("Found expiry date:", extracted.certification.valid_until);
-        break;
-      }
-    }
-    
-    // If still no match, try looser patterns
-    if (!extracted.certification.valid_until) {
-      const looseMatch = markdown.match(/expir(?:y|ation).*?(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}-\d{1,2}-\d{2,4}|\d{4}-\d{2}-\d{2})/i);
-      if (looseMatch && looseMatch[1]) {
-        extracted.certification.valid_until = looseMatch[1].trim();
-        console.log("Found expiry date with loose pattern:", extracted.certification.valid_until);
-      }
-    }
+    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
+    if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
     
     // Examination type - look for [x] markers in different formats
-    
     extracted.examination_results.type.pre_employment = 
       markdown.includes('**Pre-Employment**: [x]') || 
       markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
@@ -112,7 +85,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
     
     // Medical tests - check multiple formats
-    
     const testsMap = [
       { name: 'BLOODS', key: 'bloods' },
       { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
@@ -158,8 +130,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       }
     });
     
-    // Fitness status and other data extraction
-    
     // Fitness status - check various formats
     const fitnessOptions = [
       { name: 'FIT', key: 'fit' },
@@ -189,8 +159,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       
       extracted.certification[option.key] = isSelected;
     });
-    
-    // Restrictions
     
     // Restrictions - check both table and list formats
     const restrictions = [
@@ -224,8 +192,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       
       extracted.restrictions[restriction.key] = isSelected;
     });
-    
-    // Follow-up actions and comments
     
     // Follow-up actions and comments
     const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
@@ -343,20 +309,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   const certification = structuredData.certification || structuredData.fitness_assessment || {};
   const testResults = examination.test_results || examination.tests || {};
   
-  // Ensure we have dates by checking multiple possible properties
-  const examDate = getValue(examination, 'date') || 
-                 getValue(examination, 'examination_date') || 
-                 getValue(structuredData, 'examination_date');
-  
-  const expiryDate = getValue(certification, 'valid_until') || 
-                   getValue(certification, 'expiration_date') || 
-                   getValue(certification, 'expiry_date') || 
-                   getValue(structuredData, 'expiry_date');
-  
-  // Log dates for debugging
-  console.log("Examination date found:", examDate);
-  console.log("Expiry date found:", expiryDate);
-  
   // Fitness status
   const fitnessStatus = {
     fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
@@ -367,7 +319,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   };
   
   // Medical tests status
-  
   const medicalTests = {
     bloods: {
       done: isChecked(testResults.bloods_done) || isChecked(testResults.blood_test),
@@ -432,15 +383,13 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     id: getValue(patient, 'id_number'),
     company: getValue(patient, 'company'),
     occupation: getValue(patient, 'occupation'),
-    examDate: examDate,
-    expiryDate: expiryDate,
+    examDate: getValue(examination, 'date'),
+    expiryDate: getValue(certification, 'valid_until'),
     examinationType,
     fitnessStatus,
     medicalTests,
     restrictionsData
   });
-  
-  // JSX rendering of the certificate
   
   return (
     <ScrollArea className="h-full">
@@ -523,13 +472,13 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{examDate}</span>
+                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(extractedData, 'examination_date')}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{expiryDate}</span>
+                    <span className="border-b border-gray-400 flex-1">{getValue(certification, 'valid_until') || getValue(certification, 'expiration_date')}</span>
                   </div>
                 </div>
               </div>
@@ -689,158 +638,141 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             <div className="px-4 mb-4">
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
-                <div className="border-b border-gray-400 flex-1 min-h-[1.5rem]">
-                  {getValue(certification, 'follow_up') || 'N/A'}
+                <div className="border-b border-gray-400 flex-1">
+                  {getValue(certification, 'follow_up') || getValue(certification, 'referral')}
+                </div>
+                <div className="ml-2">
+                  <div className="text-sm">
+                    <span className="font-semibold mr-1">Review Date:</span>
+                    <span className="text-red-600">{getValue(certification, 'review_date')}</span>
+                  </div>
                 </div>
               </div>
             </div>
             
-            {/* Fitness Assessment */}
-            <div className="px-4 mb-4">
+            {/* Restrictions Table */}
+            <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
-                FITNESS ASSESSMENT
+                Restrictions:
               </div>
-              <table className="w-full border border-gray-400">
-                <tbody>
-                  <tr>
-                    <th className="border border-gray-400 py-1 w-1/2 text-center bg-blue-50 text-sm">FIT</th>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {fitnessStatus.fit ? '✓' : ''}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">Fit with Restriction</th>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {fitnessStatus.fitWithRestriction ? '✓' : ''}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">Fit with Condition</th>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {fitnessStatus.fitWithCondition ? '✓' : ''}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">Temporary Unfit</th>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {fitnessStatus.temporarilyUnfit ? '✓' : ''}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">UNFIT</th>
-                    <td className="border border-gray-400 h-8 text-center">
-                      {fitnessStatus.unfit ? '✓' : ''}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400 text-sm">
+                  <tbody>
+                    <tr>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Heights</div>
+                        {restrictionsData.heights && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Dust Exposure</div>
+                        {restrictionsData.dustExposure && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Motorized Equipment</div>
+                        {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Hearing Protection</div>
+                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Confined Spaces</div>
+                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Chemical Exposure</div>
+                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Spectacles</div>
+                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
+                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
             
-            {/* Restrictions */}
-            {(fitnessStatus.fitWithRestriction || fitnessStatus.fitWithCondition) && (
-              <div className="px-4 mb-4">
-                <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
-                  RESTRICTIONS
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <table className="w-full border border-gray-400">
-                      <tbody>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Heights</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.heights ? '✓' : ''}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Dust Exposure</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.dustExposure ? '✓' : ''}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Motorized Equipment</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.motorizedEquipment ? '✓' : ''}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Wear Hearing Protection</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.hearingProtection ? '✓' : ''}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div>
-                    <table className="w-full border border-gray-400">
-                      <tbody>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Confined Spaces</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.confinedSpaces ? '✓' : ''}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Chemical Exposure</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.chemicalExposure ? '✓' : ''}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Wear Spectacles</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.wearSpectacles ? '✓' : ''}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Remain on Treatment for Chronic Conditions</th>
-                          <td className="border border-gray-400 h-8 text-center">
-                            {restrictionsData.chronicConditions ? '✓' : ''}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+            {/* Fitness Status */}
+            <div className="mb-6">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                Medical Fitness Declaration
               </div>
-            )}
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400">
+                  <tbody>
+                    <tr>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                        <div className="font-semibold text-sm">FIT</div>
+                        {fitnessStatus.fit && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold text-sm">Fit with Restriction</div>
+                        {fitnessStatus.fitWithRestriction && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold text-sm">Fit with Condition</div>
+                        {fitnessStatus.fitWithCondition && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        <div className="font-semibold text-sm">Temporary Unfit</div>
+                        {fitnessStatus.temporarilyUnfit && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        <div className="font-semibold text-sm">UNFIT</div>
+                        {fitnessStatus.unfit && <div className="mt-1 text-sm">✓</div>}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
             
             {/* Comments */}
-            <div className="px-4 mb-4">
-              <div className="flex items-center mb-2">
-                <div className="font-semibold text-sm mr-1">Comments:</div>
-                <div className="border-b border-gray-400 flex-1 min-h-[1.5rem]">
+            <div className="px-4 mb-6">
+              <div className="flex flex-col">
+                <div className="font-semibold text-sm mb-1">Comments:</div>
+                <div className="border border-gray-400 p-2 min-h-24 text-sm">
                   {getValue(certification, 'comments') || 'N/A'}
                 </div>
               </div>
-              <div className="flex items-center">
-                <div className="font-semibold text-sm mr-1">Review Date:</div>
-                <div className="border-b border-gray-400 flex-1 min-h-[1.5rem]">
-                  {getValue(certification, 'review_date') || 'N/A'}
+            </div>
+            
+            {/* Footer with signature */}
+            <div className="px-4 flex justify-between items-end mb-4">
+              <div className="w-56">
+                <div className="border-b border-gray-400 h-14 flex items-end justify-center pb-1">
+                  <img 
+                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgODAiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0yMCA0MGMwIDAgMjAtMzAgNjAgMCBjIDMwIDI1IDQwLTEwIDYwIDUgYyAyMCAxNyA0MCA1IDYwLTEwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==" 
+                    alt="Signature" 
+                    className="h-12 opacity-70"
+                  />
+                </div>
+                <div className="text-center text-sm font-semibold mt-1">
+                  Medical Practitioner
+                </div>
+              </div>
+              
+              <div className="w-56">
+                <div className="border-b border-gray-400 h-14"></div>
+                <div className="text-center text-sm font-semibold mt-1">
+                  Employee Signature
                 </div>
               </div>
             </div>
             
-            {/* Signatures */}
-            <div className="px-4 mb-4">
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <div className="h-16 border-b border-gray-400 mb-1"></div>
-                  <div className="text-center text-sm font-semibold">DOCTOR / OCCUPATIONAL HEALTH PRACTITIONER</div>
-                </div>
-                <div>
-                  <div className="h-16 border-b border-gray-400 mb-1"></div>
-                  <div className="text-center text-sm font-semibold">SIGNATURE & STAMP</div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Footer */}
-            <div className="bg-gray-800 text-white text-center py-2 text-xs">
-              <p>This certificate is valid for the period stated above unless the health status of the employee changes.</p>
-              <p className="mt-1">© {new Date().getFullYear()} BlueCollar Occupational Health Services. All Rights Reserved.</p>
+            {/* Disclaimer */}
+            <div className="bg-gray-100 p-3 text-xs text-center">
+              <p>This certificate is valid for the duration specified above from the date of medical examination, 
+                unless there is a change in the employees' medical condition or the nature of their work.</p>
             </div>
           </div>
         </div>
