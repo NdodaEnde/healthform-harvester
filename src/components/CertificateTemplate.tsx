@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,489 +11,282 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     console.log("CertificateTemplate received data:", extractedData);
   }, [extractedData]);
 
-  // Helper to check if a value is checked/selected
-  const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
-    if (value === undefined || value === null) return false;
-    
-    const stringValue = String(value).toLowerCase().trim();
-    return trueValues.includes(stringValue);
-  };
+// Extract data from the API response
+const extractDataFromResponse = (response: any) => {
+  console.log("Extracting data from API response");
   
-  // Helper to get nested values safely
-  const getValue = (obj: any, path: string, defaultValue: any = '') => {
-    if (!obj || !path) return defaultValue;
-    
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (const key of keys) {
-      if (current === undefined || current === null || typeof current !== 'object') {
-        return defaultValue;
-      }
-      current = current[key];
-    }
-    
-    return current !== undefined && current !== null ? current : defaultValue;
+  // Initialize the structured data object
+  const structuredData = {
+    patient: {
+      name: "",
+      id_number: "",
+      company: "",
+      occupation: ""
+    },
+    dates: {
+      examination_date: "",
+      expiry_date: ""
+    },
+    examination_type: {
+      pre_employment: false,
+      periodical: false,
+      exit: false
+    },
+    medical_tests: {
+      bloods: { done: false, results: "" },
+      far_near_vision: { done: false, results: "" },
+      side_depth: { done: false, results: "" },
+      night_vision: { done: false, results: "" },
+      hearing: { done: false, results: "" },
+      heights: { done: false, results: "" },
+      lung_function: { done: false, results: "" },
+      x_ray: { done: false, results: "" },
+      drug_screen: { done: false, results: "" }
+    },
+    referral: {
+      actions: "",
+      review_date: ""
+    },
+    restrictions: {
+      heights: false,
+      dust_exposure: false,
+      motorized_equipment: false,
+      hearing_protection: false,
+      confined_spaces: false,
+      chemical_exposure: false,
+      wear_spectacles: false,
+      chronic_conditions: false
+    },
+    fitness_status: {
+      fit: false,
+      fit_with_restriction: false,
+      fit_with_condition: false,
+      temporarily_unfit: false,
+      unfit: false
+    },
+    comments: ""
   };
 
-  // Extract data directly from markdown
-  const extractDataFromMarkdown = (markdown: string): any => {
-    if (!markdown) return {};
-    
-    console.log("Extracting data from markdown");
-    
-    const extracted: any = {
-      patient: {},
-      examination_results: {
-        type: {},
-        test_results: {}
-      },
-      certification: {},
-      restrictions: {}
-    };
-    
-    // Patient data - more robust pattern matching
-    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (nameMatch && nameMatch[1]) extracted.patient.name = nameMatch[1].trim();
-    
-    const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (idMatch && idMatch[1]) extracted.patient.id_number = idMatch[1].trim();
-    
-    const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (companyMatch && companyMatch[1]) extracted.patient.company = companyMatch[1].trim();
-    
-    const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
-    
-    // Add more robust patterns to catch dates in different formats
-    const examDatePatterns = [
-      /\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i,
-      /Date of Examination:?\s*(.*?)(?=\n|\r|$)/i,
-      /Examination Date:?\s*(.*?)(?=\n|\r|$)/i,
-      /\|\s*Date of Examination\s*\|\s*(.*?)\s*\|/i
-    ];
-    
-    // Try each pattern for exam date
-    for (const pattern of examDatePatterns) {
-      const match = markdown.match(pattern);
+  // Get the markdown content from the response
+  let markdown = "";
+  if (response && response.event_message) {
+    try {
+      // Try to extract the markdown from the event_message JSON
+      const match = response.event_message.match(/Response:\s*(\{.*\})/s);
       if (match && match[1]) {
-        extracted.examination_results.date = match[1].trim();
-        break;
-      }
-    }
-    
-    // Multiple patterns for expiry date
-    const expiryDatePatterns = [
-      /\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i,
-      /Expiry Date:?\s*(.*?)(?=\n|\r|$)/i,
-      /Expiration Date:?\s*(.*?)(?=\n|\r|$)/i,
-      /Valid Until:?\s*(.*?)(?=\n|\r|$)/i,
-      /\|\s*Expiry Date\s*\|\s*(.*?)\s*\|/i
-    ];
-    
-    // Try each pattern for expiry date
-    for (const pattern of expiryDatePatterns) {
-      const match = markdown.match(pattern);
-      if (match && match[1]) {
-        extracted.certification.valid_until = match[1].trim();
-        break;
-      }
-    }
-    
-    // Examination type - look for [x] markers in different formats
-    extracted.examination_results.type.pre_employment = 
-      markdown.includes('**Pre-Employment**: [x]') || 
-      markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
-      
-    extracted.examination_results.type.periodical = 
-      markdown.includes('**Periodical**: [x]') || 
-      markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
-      
-    extracted.examination_results.type.exit = 
-      markdown.includes('**Exit**: [x]') || 
-      markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
-    
-    // Medical tests - check multiple formats
-    const testsMap = [
-      { name: 'BLOODS', key: 'bloods' },
-      { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
-      { name: 'SIDE & DEPTH', key: 'side_depth' },
-      { name: 'NIGHT VISION', key: 'night_vision' },
-      { name: 'Hearing', key: 'hearing' },
-      { name: 'Working at Heights', key: 'heights' },
-      { name: 'Lung Function', key: 'lung_function' },
-      { name: 'X-Ray', key: 'x_ray' },
-      { name: 'Drug Screen', key: 'drug_screen' }
-    ];
-    
-    testsMap.forEach(test => {
-      // Check table format with pipe separators
-      const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
-      const tableMatch = markdown.match(tableRegex);
-      
-      // Check list format
-      const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
-      const listMatch = markdown.match(listRegex);
-      
-      // Check HTML table format
-      const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
-      const htmlTableMatch = markdown.match(htmlTableRegex);
-      
-      let isDone = false;
-      let results = '';
-      
-      if (tableMatch) {
-        isDone = tableMatch[1].trim() === 'x';
-        results = tableMatch[2] ? tableMatch[2].trim() : '';
-      } else if (listMatch) {
-        isDone = listMatch[1].trim() === 'x';
-        results = listMatch[2] ? listMatch[2].trim() : '';
-      } else if (htmlTableMatch) {
-        isDone = htmlTableMatch[1].trim() === 'x';
-        results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
-      }
-      
-      if (isDone || results) {
-        extracted.examination_results.test_results[`${test.key}_done`] = isDone;
-        extracted.examination_results.test_results[`${test.key}_results`] = results;
-      }
-    });
-    
-    // Fitness status - check various formats
-    const fitnessOptions = [
-      { name: 'FIT', key: 'fit' },
-      { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
-      { name: 'Fit with Condition', key: 'fit_with_condition' },
-      { name: 'Temporary Unfit', key: 'temporarily_unfit' },
-      { name: 'UNFIT', key: 'unfit' }
-    ];
-    
-    fitnessOptions.forEach(option => {
-      // Check multiple formats
-      const patterns = [
-        new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'),
-        new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-      
-      // Check all patterns
-      let isSelected = false;
-      for (const pattern of patterns) {
-        const match = markdown.match(pattern);
-        if (match && match[0].includes('[x]')) {
-          isSelected = true;
-          break;
+        const parsedData = JSON.parse(match[1]);
+        if (parsedData.data && parsedData.data.markdown) {
+          markdown = parsedData.data.markdown;
+          console.log("Successfully extracted markdown from event_message");
         }
       }
-      
-      extracted.certification[option.key] = isSelected;
-    });
-    
-    // Restrictions - check both table and list formats
-    const restrictions = [
-      { name: 'Heights', key: 'heights' },
-      { name: 'Dust Exposure', key: 'dust_exposure' },
-      { name: 'Motorized Equipment', key: 'motorized_equipment' },
-      { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
-      { name: 'Confined Spaces', key: 'confined_spaces' },
-      { name: 'Chemical Exposure', key: 'chemical_exposure' },
-      { name: 'Wear Spectacles', key: 'wear_spectacles' },
-      { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
-    ];
-    
-    restrictions.forEach(restriction => {
-      // Check multiple formats
-      const patterns = [
-        new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'),
-        new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-      
-      // Check all patterns
-      let isSelected = false;
-      for (const pattern of patterns) {
-        const match = markdown.match(pattern);
-        if (match && match[0].includes('[x]')) {
-          isSelected = true;
-          break;
-        }
-      }
-      
-      extracted.restrictions[restriction.key] = isSelected;
-    });
-    
-    // Follow-up actions and comments
-    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
-    if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
-    
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
-    if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
-    
-    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
-    if (commentsMatch && commentsMatch[1]) {
-      let comments = commentsMatch[1].trim();
-      // If it's just "N/A" or empty after HTML tags are removed
-      if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || 
-          comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
-        extracted.certification.comments = "N/A";
-      } else {
-        extracted.certification.comments = comments;
-      }
-    }
-    
-    console.log("Extracted data from markdown:", extracted);
-    return extracted;
-  };
-  
-  // Enhanced function to extract markdown from the Landing AI response
-  const getMarkdown = (data: any): string | null => {
-    if (!data) return null;
-    
-    console.log("Attempting to extract markdown from data structure");
-    
-    // First, try direct known paths
-    const possiblePaths = [
-      'raw_response.data.markdown',
-      'extracted_data.raw_response.data.markdown',
-      'markdown',
-      'raw_markdown'
-    ];
-    
-    for (const path of possiblePaths) {
-      const value = getValue(data, path);
-      if (value && typeof value === 'string') {
-        console.log(`Found markdown at path: ${path}`);
-        return value;
-      }
-    }
-    
-    // Deep search for any property containing markdown content
-    const searchForMarkdown = (obj: any, path = ''): string | null => {
-      if (!obj || typeof obj !== 'object') return null;
-      
-      if (obj.markdown && typeof obj.markdown === 'string') {
-        console.log(`Found markdown at deep path: ${path}.markdown`);
-        return obj.markdown;
-      }
-      
-      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
-        return obj.raw_response.data.markdown;
-      }
-      
-      if (obj.data && obj.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.data.markdown`);
-        return obj.data.markdown;
-      }
-      
-      for (const key in obj) {
-        if (typeof obj[key] === 'object' && obj[key] !== null) {
-          const result = searchForMarkdown(obj[key], `${path}.${key}`);
-          if (result) return result;
-        }
-      }
-      
-      return null;
-    };
-    
-    const deepMarkdown = searchForMarkdown(data);
-    if (deepMarkdown) return deepMarkdown;
-    
-    // Try to find structured_data.raw_content
-    if (data.structured_data && data.structured_data.raw_content) {
-      console.log("Found structured_data.raw_content, using as markdown");
-      return data.structured_data.raw_content;
-    }
-    
-    // ADDITIONAL: Check for event_message field and try to extract markdown from it
-    if (data.event_message && typeof data.event_message === 'string') {
-      console.log("Checking event_message for potential markdown content");
-      
-      // Look for a JSON structure in the event_message
-      const jsonMatch = data.event_message.match(/\{.*\}/s);
-      if (jsonMatch) {
-        try {
-          const parsedJson = JSON.parse(jsonMatch[0]);
-          if (parsedJson.data && parsedJson.data.markdown) {
-            console.log("Found markdown in event_message JSON");
-            return parsedJson.data.markdown;
-          }
-        } catch (e) {
-          console.log("Failed to parse potential JSON in event_message");
-        }
-      }
-    }
-    
-    // ADDITIONAL: Look for raw text that might contain certificate content
-    if (data.raw_text || data.text || (data.data && data.data.text)) {
-      const rawText = data.raw_text || data.text || (data.data && data.data.text);
-      if (typeof rawText === 'string' && 
-          (rawText.includes("Certificate of Fitness") || 
-           rawText.includes("Initials & Surname") || 
-           rawText.includes("Medical Examination"))) {
-        console.log("Found raw text that looks like certificate content");
-        return rawText;
-      }
-    }
-    
-    console.log("Could not find markdown in provided data");
-    return null;
-  };
-  
-  // IMPORTANT ADDITION: Debug the input data structure
-  console.log("Initial extractedData structure:", JSON.stringify(extractedData, null, 2));
-  
-  // Get structured data from either direct input or extracted from markdown
-  let structuredData: any = {};
-  
-  // First try to get structured data directly from the input
-  if (extractedData?.structured_data) {
-    console.log("Using existing structured_data");
-    structuredData = extractedData.structured_data;
-  } else if (extractedData?.extracted_data?.structured_data) {
-    console.log("Using structured_data from extracted_data");
-    structuredData = extractedData.extracted_data.structured_data;
-  } else {
-    // If no structured data, try to extract from markdown
-    const markdown = getMarkdown(extractedData);
-    if (markdown) {
-      console.log("Extracting from markdown content");
-      structuredData = extractDataFromMarkdown(markdown);
-    } else {
-      console.log("No markdown found, using extractedData as is");
-      
-      // NEW: Try to parse event_message if it exists and looks like it contains API response
-      if (extractedData && extractedData.event_message && 
-          typeof extractedData.event_message === 'string' &&
-          extractedData.event_message.includes('Response:')) {
-        try {
-          console.log("Found event_message, trying to parse API response");
-          
-          // Find the JSON in the event_message
-          const match = extractedData.event_message.match(/Response:\s*(\{.*\})/s);
-          if (match && match[1]) {
-            const parsedData = JSON.parse(match[1]);
-            console.log("Successfully parsed data from event_message");
-            
-            if (parsedData.data && parsedData.data.markdown) {
-              console.log("Found markdown in parsed event_message data");
-              structuredData = extractDataFromMarkdown(parsedData.data.markdown);
-            } else {
-              structuredData = parsedData;
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing event_message:", e);
-          structuredData = extractedData || {};
-        }
-      } else {
-        structuredData = extractedData || {};
-      }
+    } catch (error) {
+      console.error("Error parsing event_message:", error);
     }
   }
+
+  if (!markdown && response.data && response.data.markdown) {
+    markdown = response.data.markdown;
+    console.log("Using markdown directly from response.data");
+  }
+
+  if (!markdown) {
+    console.error("No markdown found in the response");
+    return structuredData;
+  }
+
+  console.log("Parsing markdown content");
+
+  // Extract patient information - handle both markdown and plain text formats
+  const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
+                    markdown.match(/Initials & Surname:\s*(.*?)(?=\n|\r|$)/i);
+  if (nameMatch && nameMatch[1]) {
+    structuredData.patient.name = nameMatch[1].trim();
+  }
+
+  const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
+                  markdown.match(/ID NO:\s*(.*?)(?=\n|\r|$)/i);
+  if (idMatch && idMatch[1]) {
+    structuredData.patient.id_number = idMatch[1].trim();
+  }
+
+  const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
+                       markdown.match(/Company Name:\s*(.*?)(?=\n|\r|$)/i);
+  if (companyMatch && companyMatch[1]) {
+    structuredData.patient.company = companyMatch[1].trim();
+  }
+
+  // Extract job title - handle various formats
+  const jobTitleMatch = markdown.match(/Job Title:\s*(.*?)(?=\n|\r|$)/i) || 
+                        markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i) ||
+                        markdown.match(/TECHNICIAN|TEC\s*HAI\s*TIA/i);
+  if (jobTitleMatch && jobTitleMatch[1]) {
+    structuredData.patient.occupation = jobTitleMatch[1].trim();
+  } else if (jobTitleMatch) {
+    structuredData.patient.occupation = "Technician"; // Default if only the word is found
+  }
+
+  // Extract dates - handle both markdown and plain text formats
+  const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
+                        markdown.match(/Date of Examination:\s*(.*?)(?=\n|\r|$)/i);
+  if (examDateMatch && examDateMatch[1]) {
+    structuredData.dates.examination_date = examDateMatch[1].trim();
+  }
+
+  const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
+                          markdown.match(/Expiry Date:\s*(.*?)(?=\n|\r|$)/i);
+  if (expiryDateMatch && expiryDateMatch[1]) {
+    structuredData.dates.expiry_date = expiryDateMatch[1].trim();
+  }
+
+  // Extract examination type - handle various checkbox formats and OCR variations
+  // Look for PRE-EMPLOYMENT with any mark or indication
+  structuredData.examination_type.pre_employment = 
+    (markdown.includes("PRE-EMPLOYMENT") || markdown.includes("PRE EMPLOYMENT")) && 
+    (markdown.match(/PRE[\s-]EMPLOYMENT[\s\S]*?\[(x|X|✓|√|v)\]/) || 
+     markdown.match(/\[(x|X|✓|√|v)\][\s\S]*?PRE[\s-]EMPLOYMENT/) ||
+     markdown.match(/PRE[\s-]EMPLOYMENT[\s\S]*?checked/) ||
+     markdown.match(/PRE[\s-]EMPLOYMENT[\s\S]*?marked/));
   
-  // Get the main sections from the data
-  const patient = structuredData.patient || {};
-  const examination = structuredData.examination_results || structuredData.medical_details || {};
-  const restrictions = structuredData.restrictions || {};
-  const certification = structuredData.certification || structuredData.fitness_assessment || {};
-  const testResults = examination.test_results || examination.tests || {};
+  // Look for PERIODICAL with any mark or indication
+  structuredData.examination_type.periodical = 
+    markdown.includes("PERIODICAL") && 
+    (markdown.match(/PERIODICAL[\s\S]*?\[(x|X|✓|√|v)\]/) || 
+     markdown.match(/\[(x|X|✓|√|v)\][\s\S]*?PERIODICAL/) ||
+     markdown.match(/PERIODICAL[\s\S]*?checked/) ||
+     markdown.match(/PERIODICAL[\s\S]*?marked/));
   
-  // Create dedicated variables for important dates with multiple fallbacks
-  const examDate = getValue(examination, 'date') || 
-                  getValue(extractedData, 'examination_date') ||
-                  getValue(structuredData, 'exam_date') ||
-                  getValue(structuredData, 'examination_date');
-                  
-  const expiryDate = getValue(certification, 'valid_until') || 
-                    getValue(certification, 'expiration_date') ||
-                    getValue(structuredData, 'expiry_date') ||
-                    getValue(extractedData, 'expiry_date');
-  
-  console.log("Extracted dates:", { examDate, expiryDate });
-  
-  // Fitness status
-  const fitnessStatus = {
-    fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
-    fitWithRestriction: isChecked(certification.fit_with_restrictions),
-    fitWithCondition: isChecked(certification.fit_with_condition),
-    temporarilyUnfit: isChecked(certification.temporarily_unfit),
-    unfit: isChecked(certification.permanently_unfit) || isChecked(certification.unfit)
-  };
-  
-  // Medical tests status
-  const medicalTests = {
-    bloods: {
-      done: isChecked(testResults.bloods_done) || isChecked(testResults.blood_test),
-      results: getValue(testResults, 'bloods_results') || getValue(testResults, 'blood_test_results')
-    },
-    farNearVision: {
-      done: isChecked(testResults.far_near_vision_done) || isChecked(testResults.vision_test),
-      results: getValue(testResults, 'far_near_vision_results') || getValue(testResults, 'vision_results')
-    },
-    sideDepth: {
-      done: isChecked(testResults.side_depth_done) || isChecked(testResults.peripheral_vision),
-      results: getValue(testResults, 'side_depth_results') || getValue(testResults, 'peripheral_vision_results')
-    },
-    nightVision: {
-      done: isChecked(testResults.night_vision_done) || isChecked(testResults.night_vision_test),
-      results: getValue(testResults, 'night_vision_results')
-    },
-    hearing: {
-      done: isChecked(testResults.hearing_done) || isChecked(testResults.hearing_test),
-      results: getValue(testResults, 'hearing_results') || getValue(testResults, 'hearing_test_results')
-    },
-    heights: {
-      done: isChecked(testResults.heights_done) || isChecked(testResults.working_at_heights),
-      results: getValue(testResults, 'heights_results') || getValue(testResults, 'working_at_heights_results')
-    },
-    lungFunction: {
-      done: isChecked(testResults.lung_function_done) || isChecked(testResults.pulmonary_function),
-      results: getValue(testResults, 'lung_function_results') || getValue(testResults, 'pulmonary_function_results')
-    },
-    xRay: {
-      done: isChecked(testResults.x_ray_done) || isChecked(testResults.chest_x_ray),
-      results: getValue(testResults, 'x_ray_results') || getValue(testResults, 'chest_x_ray_results')
-    },
-    drugScreen: {
-      done: isChecked(testResults.drug_screen_done) || isChecked(testResults.drug_screen_test),
-      results: getValue(testResults, 'drug_screen_results')
+  // Look for EXIT with any mark or indication, including OCR variations like "CE"
+  structuredData.examination_type.exit = 
+    (markdown.includes("EXIT") || markdown.includes("CE")) && 
+    (markdown.match(/EXIT[\s\S]*?\[(x|X|✓|√|v)\]/) || 
+     markdown.match(/\[(x|X|✓|√|v)\][\s\S]*?EXIT/) ||
+     markdown.match(/EXIT[\s\S]*?checked/) ||
+     markdown.match(/EXIT[\s\S]*?marked/) ||
+     markdown.match(/CE[\s\S]*?marked/));
+
+  // Extract medical tests - handle various checkbox formats and OCR variations
+  const extractTestResults = (testName: string, markdown: string) => {
+    // Create a flexible regex that can handle various formats of the test name
+    const testNameVariations = testName.replace(/\s+/g, '\\s*').replace(/&/g, '[&]');
+    const regex = new RegExp(`${testNameVariations}[\\s\\S]*?\\[(x|X|✓|√|v| )\\][\\s\\S]*?([^\\n|]*?)(?=\\n|\\r|$)`, 'i');
+    
+    // Also try to match without explicit checkbox notation (for OCR variations)
+    const altRegex = new RegExp(`${testNameVariations}[\\s\\S]*?(done|performed|completed)[\\s\\S]*?([^\\n|]*?)(?=\\n|\\r|$)`, 'i');
+    
+    const match = markdown.match(regex) || markdown.match(altRegex);
+    
+    if (match) {
+      // Check if the checkbox contains x, X, ✓, √, v or if "done" is mentioned
+      const isDone = /[xX✓√v]/.test(match[1]) || /done|performed|completed/i.test(match[1]);
+      return {
+        done: isDone,
+        results: match[2] ? match[2].trim() : ""
+      };
     }
+    
+    // Special case for OCR results that might not follow the pattern
+    if (markdown.includes(testName) && 
+        (markdown.includes(`${testName} done`) || 
+         markdown.includes(`${testName} performed`) || 
+         markdown.includes(`${testName} completed`))) {
+      return {
+        done: true,
+        results: ""
+      };
+    }
+    
+    return { done: false, results: "" };
   };
-  
-  // Restrictions
-  const restrictionsData = {
-    heights: isChecked(restrictions.heights),
-    dustExposure: isChecked(restrictions.dust_exposure),
-    motorizedEquipment: isChecked(restrictions.motorized_equipment),
-    hearingProtection: isChecked(restrictions.hearing_protection) || isChecked(restrictions.wear_hearing_protection),
-    confinedSpaces: isChecked(restrictions.confined_spaces),
-    chemicalExposure: isChecked(restrictions.chemical_exposure),
-    wearSpectacles: isChecked(restrictions.wear_spectacles),
-    chronicConditions: isChecked(restrictions.chronic_conditions) || isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
+
+  // Extract each test result
+  structuredData.medical_tests.bloods = extractTestResults("BLOODS", markdown);
+  structuredData.medical_tests.far_near_vision = extractTestResults("FAR, NEAR VISION", markdown);
+  structuredData.medical_tests.side_depth = extractTestResults("SIDE & DEPTH", markdown);
+  structuredData.medical_tests.night_vision = extractTestResults("NIGHT VISION", markdown);
+  structuredData.medical_tests.hearing = extractTestResults("Hearing", markdown);
+  structuredData.medical_tests.heights = extractTestResults("Working at Heights", markdown);
+  structuredData.medical_tests.lung_function = extractTestResults("Lung Function", markdown);
+  structuredData.medical_tests.x_ray = extractTestResults("X-Ray", markdown);
+  structuredData.medical_tests.drug_screen = extractTestResults("Drug Screen", markdown);
+
+  // Extract referral information
+  const referralMatch = markdown.match(/Referred or follow up actions:\s*(.*?)(?=\n|\r|$)/i);
+  if (referralMatch && referralMatch[1]) {
+    structuredData.referral.actions = referralMatch[1].trim();
+  }
+
+  const reviewDateMatch = markdown.match(/Review Date:\s*(.*?)(?=\n|\r|$)/i);
+  if (reviewDateMatch && reviewDateMatch[1]) {
+    structuredData.referral.review_date = reviewDateMatch[1].trim();
+  }
+
+  // Extract restrictions - handle various checkbox formats and OCR variations
+  const checkRestriction = (restrictionName: string) => {
+    // Create a flexible regex for the restriction name
+    const restrictionNameVariations = restrictionName.replace(/\s+/g, '\\s*');
+    
+    // Look for the restriction name near a checkbox or any indication of selection
+    const regex = new RegExp(
+      `${restrictionNameVariations}[\\s\\S]*?\\[(x|X|✓|√|v)\\]|` +
+      `\\[(x|X|✓|√|v)\\][\\s\\S]*?${restrictionNameVariations}|` +
+      `${restrictionNameVariations}[\\s\\S]*?(selected|checked|marked|applied)`, 'i'
+    );
+    
+    return regex.test(markdown);
   };
+
+  structuredData.restrictions.heights = checkRestriction("Heights");
+  structuredData.restrictions.dust_exposure = checkRestriction("Dust Exposure");
+  structuredData.restrictions.motorized_equipment = checkRestriction("Motorized Equipment");
+  structuredData.restrictions.hearing_protection = checkRestriction("Wear Hearing Protection");
+  structuredData.restrictions.confined_spaces = checkRestriction("Confined Spaces");
+  structuredData.restrictions.chemical_exposure = checkRestriction("Chemical Exposure");
+  structuredData.restrictions.wear_spectacles = checkRestriction("Wear Spectacles");
+  structuredData.restrictions.chronic_conditions = checkRestriction("Remain on Treatment for Chronic Conditions");
+
+  // Extract fitness status - handle various checkbox formats and OCR variations
+  // For FIT status, we need to check if the word "FIT" appears alone (not as part of another status)
+  const fitPattern = /\bFIT\b(?!.*with)/i;
   
-  // Determine examination type
-  const examinationType = {
-    preEmployment: isChecked(examination.pre_employment) || isChecked(examination.type?.pre_employment),
-    periodical: isChecked(examination.periodical) || isChecked(examination.type?.periodical),
-    exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
-  };
+  structuredData.fitness_status.fit = 
+    fitPattern.test(markdown) && 
+    (markdown.match(/FIT[\s\S]*?\[(x|X|✓|√|v)\]|[\s\S]*?FIT[\s\S]*?\[(x|X|✓|√|v)\]/i) ||
+     markdown.match(/FIT[\s\S]*?(selected|checked|marked)/i));
   
-  // For debugging - log the patient data to console
-  console.log("Certificate template using data:", {
-    name: getValue(patient, 'name'),
-    id: getValue(patient, 'id_number'),
-    company: getValue(patient, 'company'),
-    occupation: getValue(patient, 'occupation'),
-    examDate,
-    expiryDate,
-    examinationType,
-    fitnessStatus,
-    medicalTests,
-    restrictionsData
-  });
+  structuredData.fitness_status.fit_with_restriction = 
+    (markdown.includes("Fit with Restriction") || markdown.includes("Fit with Restrictions")) && 
+    (markdown.match(/Fit with Restriction[\s\S]*?\[(x|X|✓|√|v)\]|[\s\S]*?Fit with Restriction[\s\S]*?\[(x|X|✓|√|v)\]/i) ||
+     markdown.match(/Fit with Restriction[\s\S]*?(selected|checked|marked)/i));
   
+  structuredData.fitness_status.fit_with_condition = 
+    markdown.includes("Fit with Condition") && 
+    (markdown.match(/Fit with Condition[\s\S]*?\[(x|X|✓|√|v)\]|[\s\S]*?Fit with Condition[\s\S]*?\[(x|X|✓|√|v)\]/i) ||
+     markdown.match(/Fit with Condition[\s\S]*?(selected|checked|marked)/i));
+  
+  structuredData.fitness_status.temporarily_unfit = 
+    (markdown.includes("Temporary Unfit") || markdown.includes("Temporarily Unfit")) && 
+    (markdown.match(/Temporary Unfit[\s\S]*?\[(x|X|✓|√|v)\]|[\s\S]*?Temporary Unfit[\s\S]*?\[(x|X|✓|√|v)\]/i) ||
+     markdown.match(/Temporary Unfit[\s\S]*?(selected|checked|marked)/i));
+  
+  structuredData.fitness_status.unfit = 
+    markdown.includes("UNFIT") && 
+    (markdown.match(/UNFIT[\s\S]*?\[(x|X|✓|√|v)\]|[\s\S]*?UNFIT[\s\S]*?\[(x|X|✓|√|v)\]/i) ||
+     markdown.match(/UNFIT[\s\S]*?(selected|checked|marked)/i));
+
+  // Extract comments
+  const commentsMatch = markdown.match(/Comments:\s*(.*?)(?=\n\n|\r\r|$)/is);
+  if (commentsMatch && commentsMatch[1]) {
+    structuredData.comments = commentsMatch[1].trim();
+  }
+
+  console.log("Extracted structured data:", structuredData);
+  return structuredData;
+};
+
+  // Process the extracted data
+  const processedData = extractDataFromResponse(extractedData);
+
   return (
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
@@ -545,7 +337,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             {/* Physician/Practice Info */}
             <div className="text-center text-xs px-4 mb-3">
               <p>
-                Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No: {getValue(examination, 'practice_number') || '0404160'} / Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} / Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
+                Dr. MJ Mphuthi / Practice No: 0404160 / Sr. Sibongile Mahlangu / Practice No: 999 088 0000 8177 91
               </p>
               <p>certify that the following employee:</p>
             </div>
@@ -556,40 +348,40 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Initials & Surname:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'name') || getValue(patient, 'full_name')}</span>
+                    <span className="border-b border-gray-400 flex-1">{processedData.patient.name}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">ID NO:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'id_number') || getValue(patient, 'employee_id') || getValue(patient, 'id')}</span>
+                    <span className="border-b border-gray-400 flex-1">{processedData.patient.id_number}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Company Name:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'company') || getValue(patient, 'employer') || getValue(patient, 'employment.employer')}</span>
+                <span className="border-b border-gray-400 flex-1">{processedData.patient.company}</span>
               </div>
               
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{examDate}</span>
+                    <span className="border-b border-gray-400 flex-1">{processedData.dates.examination_date}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{expiryDate}</span>
+                    <span className="border-b border-gray-400 flex-1">{processedData.dates.expiry_date}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Job Title:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'occupation') || getValue(patient, 'job_title') || getValue(patient, 'employment.occupation')}</span>
+                <span className="border-b border-gray-400 flex-1">{processedData.patient.occupation}</span>
               </div>
             </div>
             
@@ -606,13 +398,13 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <tbody>
                   <tr>
                     <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.preEmployment ? '✓' : ''}
+                      {processedData.examination_type.pre_employment ? '✓' : ''}
                     </td>
                     <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.periodical ? '✓' : ''}
+                      {processedData.examination_type.periodical ? '✓' : ''}
                     </td>
                     <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.exit ? '✓' : ''}
+                      {processedData.examination_type.exit ? '✓' : ''}
                     </td>
                   </tr>
                 </tbody>
@@ -631,7 +423,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
+                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">Test</th>
                           <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
                           <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
@@ -640,37 +432,37 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.bloods.done ? '✓' : ''}
+                            {processedData.medical_tests.bloods.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.bloods.results}
+                            {processedData.medical_tests.bloods.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.farNearVision.done ? '✓' : ''}
+                            {processedData.medical_tests.far_near_vision.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.farNearVision.results}
+                            {processedData.medical_tests.far_near_vision.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.sideDepth.done ? '✓' : ''}
+                            {processedData.medical_tests.side_depth.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.sideDepth.results}
+                            {processedData.medical_tests.side_depth.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.nightVision.done ? '✓' : ''}
+                            {processedData.medical_tests.night_vision.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.nightVision.results}
+                            {processedData.medical_tests.night_vision.results}
                           </td>
                         </tr>
                       </tbody>
@@ -680,7 +472,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Hearing</th>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
                           <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
                           <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
@@ -689,46 +481,46 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.hearing.done ? '✓' : ''}
+                            {processedData.medical_tests.hearing.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.hearing.results}
+                            {processedData.medical_tests.hearing.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.heights.done ? '✓' : ''}
+                            {processedData.medical_tests.heights.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.heights.results}
+                            {processedData.medical_tests.heights.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.lungFunction.done ? '✓' : ''}
+                            {processedData.medical_tests.lung_function.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.lungFunction.results}
+                            {processedData.medical_tests.lung_function.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.xRay.done ? '✓' : ''}
+                            {processedData.medical_tests.x_ray.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.xRay.results}
+                            {processedData.medical_tests.x_ray.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.drugScreen.done ? '✓' : ''}
+                            {processedData.medical_tests.drug_screen.done ? '✓' : ''}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.drugScreen.results}
+                            {processedData.medical_tests.drug_screen.results}
                           </td>
                         </tr>
                       </tbody>
@@ -743,12 +535,12 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
                 <div className="border-b border-gray-400 flex-1">
-                  {getValue(certification, 'follow_up') || getValue(certification, 'referral')}
+                  {processedData.referral.actions}
                 </div>
                 <div className="ml-2">
                   <div className="text-sm">
                     <span className="font-semibold mr-1">Review Date:</span>
-                    <span className="text-red-600">{getValue(certification, 'review_date')}</span>
+                    <span className="text-red-600">{processedData.referral.review_date}</span>
                   </div>
                 </div>
               </div>
@@ -764,39 +556,39 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <table className="w-full border border-gray-400 text-sm">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.heights ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Heights</div>
-                        {restrictionsData.heights && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.heights && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.dust_exposure ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Dust Exposure</div>
-                        {restrictionsData.dustExposure && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.dust_exposure && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.motorized_equipment ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Motorized Equipment</div>
-                        {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.motorized_equipment && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.hearing_protection ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Wear Hearing Protection</div>
-                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.hearing_protection && <div className="text-xs">✓</div>}
                       </td>
                     </tr>
                     <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.confined_spaces ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Confined Spaces</div>
-                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.confined_spaces && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.chemical_exposure ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Chemical Exposure</div>
-                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.chemical_exposure && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.wear_spectacles ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Wear Spectacles</div>
-                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.wear_spectacles && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-2 text-center ${processedData.restrictions.chronic_conditions ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
-                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                        {processedData.restrictions.chronic_conditions && <div className="text-xs">✓</div>}
                       </td>
                     </tr>
                   </tbody>
@@ -814,25 +606,25 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <table className="w-full border border-gray-400">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${processedData.fitness_status.fit ? 'bg-green-100' : ''}`}>
                         <div className="font-semibold text-sm">FIT</div>
-                        {fitnessStatus.fit && <div className="mt-1 text-sm">✓</div>}
+                        {processedData.fitness_status.fit && <div className="mt-1 text-sm">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${processedData.fitness_status.fit_with_restriction ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold text-sm">Fit with Restriction</div>
-                        {fitnessStatus.fitWithRestriction && <div className="mt-1 text-sm">✓</div>}
+                        {processedData.fitness_status.fit_with_restriction && <div className="mt-1 text-sm">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${processedData.fitness_status.fit_with_condition ? 'bg-yellow-100' : ''}`}>
                         <div className="font-semibold text-sm">Fit with Condition</div>
-                        {fitnessStatus.fitWithCondition && <div className="mt-1 text-sm">✓</div>}
+                        {processedData.fitness_status.fit_with_condition && <div className="mt-1 text-sm">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${processedData.fitness_status.temporarily_unfit ? 'bg-red-100' : ''}`}>
                         <div className="font-semibold text-sm">Temporary Unfit</div>
-                        {fitnessStatus.temporarilyUnfit && <div className="mt-1 text-sm">✓</div>}
+                        {processedData.fitness_status.temporarily_unfit && <div className="mt-1 text-sm">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                      <td className={`border border-gray-400 p-3 text-center ${processedData.fitness_status.unfit ? 'bg-red-100' : ''}`}>
                         <div className="font-semibold text-sm">UNFIT</div>
-                        {fitnessStatus.unfit && <div className="mt-1 text-sm">✓</div>}
+                        {processedData.fitness_status.unfit && <div className="mt-1 text-sm">✓</div>}
                       </td>
                     </tr>
                   </tbody>
@@ -840,43 +632,38 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
               </div>
             </div>
             
-            {/* Comments */}
+            {/* Comments Section */}
             <div className="px-4 mb-6">
-              <div className="flex flex-col">
-                <div className="font-semibold text-sm mb-1">Comments:</div>
-                <div className="border border-gray-400 p-2 min-h-24 text-sm">
-                  {getValue(certification, 'comments') || 'N/A'}
-                </div>
+              <div className="font-semibold text-sm mb-1">Comments:</div>
+              <div className="border-b border-gray-400 min-h-[2rem]">
+                {processedData.comments}
               </div>
             </div>
             
-            {/* Footer with signature */}
-            <div className="px-4 flex justify-between items-end mb-4">
-              <div className="w-56">
-                <div className="border-b border-gray-400 h-14 flex items-end justify-center pb-1">
-                  <img 
-                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgODAiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0yMCA0MGMwIDAgMjAtMzAgNjAgMCBjIDMwIDI1IDQwLTEwIDYwIDUgYyAyMCAxNyA0MCA1IDYwLTEwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==" 
-                    alt="Signature" 
-                    className="h-12 opacity-70"
-                  />
-                </div>
-                <div className="text-center text-sm font-semibold mt-1">
-                  Medical Practitioner
-                </div>
+            {/* Signature Section */}
+            <div className="px-4 mb-4">
+              <div className="text-center text-xs mb-2">
+                Occupational Health Practitioner / Occupational Medical Practitioner
               </div>
               
-              <div className="w-56">
-                <div className="border-b border-gray-400 h-14"></div>
-                <div className="text-center text-sm font-semibold mt-1">
-                  Employee Signature
+              <div className="flex justify-between items-end">
+                <div className="w-1/3">
+                  <div className="text-xs mb-1">Dr MJ Mphuthi / Practice No. 0404160</div>
+                  <div className="text-xs">Sr. Sibongile Mahlangu</div>
+                  <div className="text-xs">SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</div>
+                  <div className="text-xs">Practice Number: 999 088 0000 8177 91</div>
+                  
+                  <div className="mt-4 border-t border-gray-400 pt-1 text-center">
+                    <div className="text-xs font-semibold">SIGNATURE</div>
+                  </div>
+                </div>
+                
+                <div className="w-1/3">
+                  <div className="border border-gray-400 h-24 flex items-center justify-center">
+                    <div className="text-xs text-gray-400">STAMP</div>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Disclaimer */}
-            <div className="bg-gray-100 p-3 text-xs text-center">
-              <p>This certificate is valid for the duration specified above from the date of medical examination, 
-                unless there is a change in the employees' medical condition or the nature of their work.</p>
             </div>
           </div>
         </div>
