@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -316,52 +317,93 @@ function processCertificateOfFitnessData(apiResponse: any) {
     };
     
     if (markdown) {
-      // Common fields
-      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
-      const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
-      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
-      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
-                           markdown.match(/Date of Examination:\s*(.*?)(?=\n|\r|$)/i) ||
-                           markdown.match(/Examination Date:\s*(.*?)(?=\n|\r|$)/i);
+      // Extract document information from markdown bullet points
+      const docInfoMatch = markdown.match(/## Document Information\s*\n\s*-\s*\*\*Initials & Surname\*\*:([^\n]*)\s*\n\s*-\s*\*\*ID NO\*\*:([^\n]*)\s*\n\s*-\s*\*\*Company Name\*\*:([^\n]*)\s*\n\s*-\s*\*\*Date of Examination\*\*:([^\n]*)\s*\n\s*-\s*\*\*Expiry Date\*\*:([^\n]*)/i);
       
-      // Certificate details
-      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
-                             markdown.match(/Expiry Date:\s*(.*?)(?=\n|\r|$)/i) ||
-                             markdown.match(/valid until:\s*(.*?)(?=\n|\r|$)/i) ||
-                             markdown.match(/Next Examination Date:\s*(.*?)(?=\n|\r|$)/i);
+      if (docInfoMatch) {
+        markdownData.patient.name = cleanValue(docInfoMatch[1].trim());
+        markdownData.patient.id_number = cleanValue(docInfoMatch[2].trim());
+        markdownData.patient.company = cleanValue(docInfoMatch[3].trim());
+        markdownData.examination.date = cleanValue(docInfoMatch[4].trim());
+        markdownData.examination.next_examination_date = cleanValue(docInfoMatch[5].trim());
+        
+        console.log("Extracted from document info section:", {
+          name: markdownData.patient.name,
+          id: markdownData.patient.id_number,
+          company: markdownData.patient.company,
+          exam_date: markdownData.examination.date,
+          expiry_date: markdownData.examination.next_examination_date
+        });
+      } else {
+        // Fallback to individual field extraction
+        // Common fields
+        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+        const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+        const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+        const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) || 
+                             markdown.match(/Date of Examination:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                             markdown.match(/Examination Date:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+        
+        // Certificate details
+        const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) || 
+                               markdown.match(/Expiry Date:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                               markdown.match(/valid until:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                               markdown.match(/Next Examination Date:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+        
+        // Set patient data if matches found
+        if (nameMatch && nameMatch[1]) markdownData.patient.name = cleanValue(nameMatch[1].trim());
+        if (idMatch && idMatch[1]) markdownData.patient.id_number = cleanValue(idMatch[1].trim());
+        if (companyMatch && companyMatch[1]) markdownData.patient.company = cleanValue(companyMatch[1].trim());
+        if (examDateMatch && examDateMatch[1]) markdownData.examination.date = cleanValue(examDateMatch[1].trim());
+        if (expiryDateMatch && expiryDateMatch[1]) markdownData.examination.next_examination_date = cleanValue(expiryDateMatch[1].trim());
+      }
       
-      const occupationMatch = markdown.match(/\*\*Occupation\*\*:\s*(.*?)(?=\n|\r|$)/i) ||
-                             markdown.match(/Occupation:\s*(.*?)(?=\n|\r|$)/i) ||
-                             markdown.match(/Job Title:\s*(.*?)(?=\n|\r|$)/i);
+      // Extract Job Title (with more specific pattern)
+      const jobTitleMatch = markdown.match(/Job Title:\s*(.*?)(?=\n|\r|$|\*\*|<!--)/i) || 
+                           markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$|\*\*|<!--)/i) ||
+                           markdown.match(/Occupation:\s*(.*?)(?=\n|\r|$|\*\*|<!--)/i);
+                           
+      if (jobTitleMatch && jobTitleMatch[1]) {
+        markdownData.patient.occupation = cleanValue(jobTitleMatch[1].trim());
+        console.log("Extracted job title:", markdownData.patient.occupation);
+      }
       
-      const physicianMatch = markdown.match(/\*\*Medical Examiner\*\*:\s*(.*?)(?=\n|\r|$)/i) ||
-                            markdown.match(/Medical Examiner:\s*(.*?)(?=\n|\r|$)/i) ||
-                            markdown.match(/Physician:\s*(.*?)(?=\n|\r|$)/i) ||
-                            markdown.match(/Doctor:\s*(.*?)(?=\n|\r|$)/i);
+      // Extract Examination Type
+      if (markdown.includes('PRE-EMPLOYMENT') && 
+         (markdown.includes('PRE-EMPLOYMENT.*?\\[x\\]') || markdown.includes('<td>PRE-EMPLOYMENT</td>.*?<td>\\[x\\]</td>'))) {
+        markdownData.examination.type = { pre_employment: true, periodical: false, exit: false };
+      } else if (markdown.includes('PERIODICAL') && 
+                (markdown.includes('PERIODICAL.*?\\[x\\]') || markdown.includes('<td>PERIODICAL</td>.*?<td>\\[x\\]</td>'))) {
+        markdownData.examination.type = { pre_employment: false, periodical: true, exit: false };
+      } else if (markdown.includes('EXIT') && 
+                (markdown.includes('EXIT.*?\\[x\\]') || markdown.includes('<td>EXIT</td>.*?<td>\\[x\\]</td>'))) {
+        markdownData.examination.type = { pre_employment: false, periodical: false, exit: true };
+      }
       
-      const fitnessStatusMatch = markdown.match(/\*\*Fitness Status\*\*:\s*(.*?)(?=\n|\r|$)/i) ||
-                                markdown.match(/Fitness Status:\s*(.*?)(?=\n|\r|$)/i) ||
-                                markdown.match(/Certification:\s*(.*?)(?=\n|\r|$)/i) ||
-                                markdown.match(/is certified as:\s*(.*?)(?=\n|\r|$)/i);
+      // Extract physician
+      const physicianMatch = markdown.match(/\*\*Medical Examiner\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                            markdown.match(/Medical Examiner:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                            markdown.match(/Physician:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                            markdown.match(/Doctor:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       
-      const restrictionsMatch = markdown.match(/\*\*Restrictions\*\*:\s*(.*?)(?=\n|\r|$)/i) ||
-                               markdown.match(/Restrictions:\s*(.*?)(?=\n|\r|$)/i) ||
-                               markdown.match(/Limitations:\s*(.*?)(?=\n|\r|$)/i);
+      if (physicianMatch && physicianMatch[1]) markdownData.examination.physician = cleanValue(physicianMatch[1].trim());
       
-      // Set patient data
-      markdownData.patient.name = cleanValue(nameMatch?.[1]?.trim()) || null;
-      markdownData.patient.id_number = cleanValue(idMatch?.[1]?.trim()) || null;
-      markdownData.patient.company = cleanValue(companyMatch?.[1]?.trim()) || null;
-      markdownData.patient.occupation = cleanValue(occupationMatch?.[1]?.trim()) || null;
+      // Extract fitness status
+      const fitnessStatusMatch = markdown.match(/\*\*Fitness Status\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                                markdown.match(/Fitness Status:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                                markdown.match(/Certification:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                                markdown.match(/is certified as:\s*(.*?)(?=\n|\r|$|\*\*)/i);
       
-      // Set examination data
-      markdownData.examination.date = cleanValue(examDateMatch?.[1]?.trim()) || null;
-      markdownData.examination.next_examination_date = cleanValue(expiryDateMatch?.[1]?.trim()) || null;
-      markdownData.examination.physician = cleanValue(physicianMatch?.[1]?.trim()) || null;
-      markdownData.examination.fitness_status = cleanValue(fitnessStatusMatch?.[1]?.trim()) || null;
-      markdownData.examination.restrictions = cleanValue(restrictionsMatch?.[1]?.trim()) || null;
+      if (fitnessStatusMatch && fitnessStatusMatch[1]) markdownData.examination.fitness_status = cleanValue(fitnessStatusMatch[1].trim());
       
-      // Get additional fields that may be present
+      // Extract restrictions
+      const restrictionsMatch = markdown.match(/\*\*Restrictions\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                               markdown.match(/Restrictions:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
+                               markdown.match(/Limitations:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+      
+      if (restrictionsMatch && restrictionsMatch[1]) markdownData.examination.restrictions = cleanValue(restrictionsMatch[1].trim());
+      
+      // Get additional fields from any two-column format
       const allFields = markdown.match(/\*\*(.*?)\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/g) || [];
       
       allFields.forEach(field => {
@@ -428,17 +470,23 @@ function processCertificateOfFitnessData(apiResponse: any) {
     
     if (markdown) {
       testsMap.forEach(test => {
-        // Check table format with pipe separators
+        // Check multiple formats for test results
+        
+        // 1. Check table format with pipe separators
         const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
         const tableMatch = markdown.match(tableRegex);
         
-        // Check list format
+        // 2. Check list format with test name and result
         const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
         const listMatch = markdown.match(listRegex);
         
-        // Check HTML table format
+        // 3. Check HTML table format
         const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
         const htmlTableMatch = markdown.match(htmlTableRegex);
+        
+        // 4. Check description format
+        const descRegex = new RegExp(`\\*\\*${test.name}\\*\\*:\\s*(Done|Not done)(?:,\\s*result is\\s*(.*?))?(?=\\n|\\r|$|\\*\\*)`, 'is');
+        const descMatch = markdown.match(descRegex);
         
         let isDone = false;
         let results = '';
@@ -452,6 +500,9 @@ function processCertificateOfFitnessData(apiResponse: any) {
         } else if (htmlTableMatch) {
           isDone = htmlTableMatch[1].trim() === 'x';
           results = htmlTableMatch[2] ? cleanValue(htmlTableMatch[2].trim()) : '';
+        } else if (descMatch) {
+          isDone = descMatch[1].toLowerCase() === 'done';
+          results = descMatch[2] ? cleanValue(descMatch[2].trim()) : '';
         }
         
         if (isDone || results) {
@@ -544,7 +595,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
     let comments = '';
     
     if (markdown) {
-      const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
+      const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<|Review Date)/i);
       if (followUpMatch && followUpMatch[1]) followUp = cleanValue(followUpMatch[1].trim());
       
       const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
