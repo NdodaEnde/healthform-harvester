@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,11 +66,40 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
     
-    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
+    // Add more robust patterns to catch dates in different formats
+    const examDatePatterns = [
+      /\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i,
+      /Date of Examination:?\s*(.*?)(?=\n|\r|$)/i,
+      /Examination Date:?\s*(.*?)(?=\n|\r|$)/i,
+      /\|\s*Date of Examination\s*\|\s*(.*?)\s*\|/i
+    ];
     
-    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
+    // Try each pattern for exam date
+    for (const pattern of examDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1]) {
+        extracted.examination_results.date = match[1].trim();
+        break;
+      }
+    }
+    
+    // Multiple patterns for expiry date
+    const expiryDatePatterns = [
+      /\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i,
+      /Expiry Date:?\s*(.*?)(?=\n|\r|$)/i,
+      /Expiration Date:?\s*(.*?)(?=\n|\r|$)/i,
+      /Valid Until:?\s*(.*?)(?=\n|\r|$)/i,
+      /\|\s*Expiry Date\s*\|\s*(.*?)\s*\|/i
+    ];
+    
+    // Try each pattern for expiry date
+    for (const pattern of expiryDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1]) {
+        extracted.certification.valid_until = match[1].trim();
+        break;
+      }
+    }
     
     // Examination type - look for [x] markers in different formats
     extracted.examination_results.type.pre_employment = 
@@ -276,9 +306,43 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       return data.structured_data.raw_content;
     }
     
+    // ADDITIONAL: Check for event_message field and try to extract markdown from it
+    if (data.event_message && typeof data.event_message === 'string') {
+      console.log("Checking event_message for potential markdown content");
+      
+      // Look for a JSON structure in the event_message
+      const jsonMatch = data.event_message.match(/\{.*\}/s);
+      if (jsonMatch) {
+        try {
+          const parsedJson = JSON.parse(jsonMatch[0]);
+          if (parsedJson.data && parsedJson.data.markdown) {
+            console.log("Found markdown in event_message JSON");
+            return parsedJson.data.markdown;
+          }
+        } catch (e) {
+          console.log("Failed to parse potential JSON in event_message");
+        }
+      }
+    }
+    
+    // ADDITIONAL: Look for raw text that might contain certificate content
+    if (data.raw_text || data.text || (data.data && data.data.text)) {
+      const rawText = data.raw_text || data.text || (data.data && data.data.text);
+      if (typeof rawText === 'string' && 
+          (rawText.includes("Certificate of Fitness") || 
+           rawText.includes("Initials & Surname") || 
+           rawText.includes("Medical Examination"))) {
+        console.log("Found raw text that looks like certificate content");
+        return rawText;
+      }
+    }
+    
     console.log("Could not find markdown in provided data");
     return null;
   };
+  
+  // IMPORTANT ADDITION: Debug the input data structure
+  console.log("Initial extractedData structure:", JSON.stringify(extractedData, null, 2));
   
   // Get structured data from either direct input or extracted from markdown
   let structuredData: any = {};
@@ -298,7 +362,34 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       structuredData = extractDataFromMarkdown(markdown);
     } else {
       console.log("No markdown found, using extractedData as is");
-      structuredData = extractedData || {};
+      
+      // NEW: Try to parse event_message if it exists and looks like it contains API response
+      if (extractedData && extractedData.event_message && 
+          typeof extractedData.event_message === 'string' &&
+          extractedData.event_message.includes('Response:')) {
+        try {
+          console.log("Found event_message, trying to parse API response");
+          
+          // Find the JSON in the event_message
+          const match = extractedData.event_message.match(/Response:\s*(\{.*\})/s);
+          if (match && match[1]) {
+            const parsedData = JSON.parse(match[1]);
+            console.log("Successfully parsed data from event_message");
+            
+            if (parsedData.data && parsedData.data.markdown) {
+              console.log("Found markdown in parsed event_message data");
+              structuredData = extractDataFromMarkdown(parsedData.data.markdown);
+            } else {
+              structuredData = parsedData;
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing event_message:", e);
+          structuredData = extractedData || {};
+        }
+      } else {
+        structuredData = extractedData || {};
+      }
     }
   }
   
@@ -308,6 +399,19 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   const restrictions = structuredData.restrictions || {};
   const certification = structuredData.certification || structuredData.fitness_assessment || {};
   const testResults = examination.test_results || examination.tests || {};
+  
+  // Create dedicated variables for important dates with multiple fallbacks
+  const examDate = getValue(examination, 'date') || 
+                  getValue(extractedData, 'examination_date') ||
+                  getValue(structuredData, 'exam_date') ||
+                  getValue(structuredData, 'examination_date');
+                  
+  const expiryDate = getValue(certification, 'valid_until') || 
+                    getValue(certification, 'expiration_date') ||
+                    getValue(structuredData, 'expiry_date') ||
+                    getValue(extractedData, 'expiry_date');
+  
+  console.log("Extracted dates:", { examDate, expiryDate });
   
   // Fitness status
   const fitnessStatus = {
@@ -383,8 +487,8 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     id: getValue(patient, 'id_number'),
     company: getValue(patient, 'company'),
     occupation: getValue(patient, 'occupation'),
-    examDate: getValue(examination, 'date'),
-    expiryDate: getValue(certification, 'valid_until'),
+    examDate,
+    expiryDate,
     examinationType,
     fitnessStatus,
     medicalTests,
@@ -472,13 +576,13 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(extractedData, 'examination_date')}</span>
+                    <span className="border-b border-gray-400 flex-1">{examDate}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(certification, 'valid_until') || getValue(certification, 'expiration_date')}</span>
+                    <span className="border-b border-gray-400 flex-1">{expiryDate}</span>
                   </div>
                 </div>
               </div>
