@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -309,7 +310,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
     console.log('Markdown present:', Boolean(markdown));
     
     // Build structured data object from API response
-    return {
+    let structuredData = {
       patient: {
         name: cleanValue(extractPath(extractedData, 'patient.name')) || 
               cleanValue(extractPath(extractedData, 'employee.name')) || 'Unknown',
@@ -340,13 +341,84 @@ function processCertificateOfFitnessData(apiResponse: any) {
                              cleanValue(extractPath(extractedData, 'valid_until')) || 
                              cleanValue(extractPath(extractedData, 'expiry_date')) || '',
         type: {
-          pre_employment: isCheckboxMarked(markdown, 'PRE-EMPLOYMENT'),
-          periodical: isCheckboxMarked(markdown, 'PERIODICAL'),
-          exit: isCheckboxMarked(markdown, 'EXIT')
+          pre_employment: false,
+          periodical: false,
+          exit: false
         },
-        test_results: extractTestResults(markdown)
+        test_results: {}
       },
       certification: {
+        fit: false,
+        fit_with_restrictions: false,
+        fit_with_condition: false,
+        temporarily_unfit: false,
+        unfit: false,
+        follow_up: '',
+        review_date: '',
+        comments: '',
+        valid_until: cleanValue(extractPath(extractedData, 'examination.next_date')) || 
+                    cleanValue(extractPath(extractedData, 'valid_until')) || 
+                    cleanValue(extractPath(extractedData, 'expiry_date')) || ''
+      },
+      restrictions: {},
+      raw_content: markdown || null
+    };
+    
+    // If we have markdown, extract more detailed data
+    if (markdown) {
+      // 1. Extract Patient Information using more specific patterns
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+      if (nameMatch && nameMatch[1]) {
+        structuredData.patient.name = cleanValue(nameMatch[1].trim());
+      }
+      
+      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+      if (idMatch && idMatch[1]) {
+        structuredData.patient.employee_id = cleanValue(idMatch[1].trim());
+      }
+      
+      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+      if (companyMatch && companyMatch[1]) {
+        structuredData.patient.company = cleanValue(companyMatch[1].trim());
+      }
+      
+      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+      if (examDateMatch && examDateMatch[1]) {
+        structuredData.examination_results.date = cleanValue(examDateMatch[1].trim());
+      }
+      
+      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+      if (expiryDateMatch && expiryDateMatch[1]) {
+        structuredData.certification.valid_until = cleanValue(expiryDateMatch[1].trim());
+      }
+      
+      // Job Title extraction - try multiple patterns
+      const jobTitlePatterns = [
+        /Job Title:\s*(.*?)(?=\n|\r|$|<!--)/i,
+        /\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+        /Job\s*Title\s*[:\-]\s*(.*?)(?=\n|\r|$|<)/i
+      ];
+      
+      for (const pattern of jobTitlePatterns) {
+        const match = markdown.match(pattern);
+        if (match && match[1]) {
+          structuredData.patient.occupation = cleanValue(match[1].trim());
+          break;
+        }
+      }
+      
+      // 2. Extract Examination Type with multiple checkbox styles
+      structuredData.examination_results.type = {
+        pre_employment: isCheckboxMarked(markdown, 'PRE-EMPLOYMENT'),
+        periodical: isCheckboxMarked(markdown, 'PERIODICAL'),
+        exit: isCheckboxMarked(markdown, 'EXIT')
+      };
+      
+      // 3. Extract Medical Test Results with multiple marking styles
+      structuredData.examination_results.test_results = extractTestResults(markdown);
+      
+      // 4. Extract Fitness Status
+      structuredData.certification = {
         fit: isCheckboxMarked(markdown, 'FIT') && !markdown.includes('crossed out'),
         fit_with_restrictions: isCheckboxMarked(markdown, 'Fit with Restriction'),
         fit_with_condition: isCheckboxMarked(markdown, 'Fit with Condition'),
@@ -355,13 +427,21 @@ function processCertificateOfFitnessData(apiResponse: any) {
         follow_up: cleanValue(extractFollowUp(markdown)),
         review_date: cleanValue(extractReviewDate(markdown)),
         comments: cleanValue(extractComments(markdown)),
-        valid_until: cleanValue(extractPath(extractedData, 'examination.next_date')) || 
-                    cleanValue(extractPath(extractedData, 'valid_until')) || 
-                    cleanValue(extractPath(extractedData, 'expiry_date')) || ''
-      },
-      restrictions: extractRestrictions(markdown),
-      raw_content: markdown || null
-    };
+        valid_until: structuredData.certification.valid_until
+      };
+      
+      // 5. Extract Restrictions
+      structuredData.restrictions = extractRestrictions(markdown);
+    }
+    
+    console.log("Extracted patient name:", structuredData.patient.name);
+    console.log("Extracted patient ID:", structuredData.patient.employee_id);
+    console.log("Extracted job title:", structuredData.patient.occupation);
+    console.log("Extracted examination date:", structuredData.examination_results.date);
+    console.log("Extracted expiry date:", structuredData.certification.valid_until);
+    
+    return structuredData;
+    
   } catch (error) {
     console.error('Error processing certificate of fitness data:', error);
     // Return basic structure with default values on error
@@ -506,16 +586,16 @@ function cleanValue(value: string | null | undefined): string {
   if (!value) return '';
   
   // Remove HTML comments: <!-- ... -->
-  let cleaned = value.replace(/<!--.*?-->/g, '').trim();
+  let cleaned = value.replace(/\s*<!--.*?-->\s*/g, ' ').trim();
   
   // Also remove form bounding box coordinates and IDs
-  cleaned = cleaned.replace(/<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->/g, '').trim();
+  cleaned = cleaned.replace(/\s*<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->\s*/g, ' ').trim();
   
   // Remove coordinates directly in text (l=0.064,t=0.188,r=0.936,b=0.284)
-  cleaned = cleaned.replace(/\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)/g, '').trim();
+  cleaned = cleaned.replace(/\s*\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)\s*/g, ' ').trim();
   
   // Remove IDs in text - with ID 5d5dece1-814c-40b8-ac21-2d9877814985
-  cleaned = cleaned.replace(/with ID [a-f0-9\-]+/g, '').trim();
+  cleaned = cleaned.replace(/\s*with ID [a-f0-9\-]+\s*/g, ' ').trim();
   
   // Clean up any remaining <!-- or --> fragments
   cleaned = cleaned.replace(/<!--|-->/g, '').trim();

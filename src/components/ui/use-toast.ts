@@ -6,16 +6,16 @@ export const cleanExtractedValue = (value: string | null | undefined): string =>
   if (!value) return '';
   
   // Remove HTML comments: <!-- ... -->
-  let cleaned = value.replace(/<!--.*?-->/g, '').trim();
+  let cleaned = value.replace(/\s*<!--.*?-->\s*/g, ' ').trim();
   
   // Also remove form bounding box coordinates and IDs
-  cleaned = cleaned.replace(/<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->/g, '').trim();
+  cleaned = cleaned.replace(/\s*<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->\s*/g, ' ').trim();
   
   // Remove coordinates directly in text (l=0.064,t=0.188,r=0.936,b=0.284)
-  cleaned = cleaned.replace(/\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)/g, '').trim();
+  cleaned = cleaned.replace(/\s*\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)\s*/g, ' ').trim();
   
   // Remove IDs in text - with ID 5d5dece1-814c-40b8-ac21-2d9877814985
-  cleaned = cleaned.replace(/with ID [a-f0-9\-]+/g, '').trim();
+  cleaned = cleaned.replace(/\s*with ID [a-f0-9\-]+\s*/g, ' ').trim();
   
   // Clean up any remaining <!-- or --> fragments
   cleaned = cleaned.replace(/<!--|-->/g, '').trim();
