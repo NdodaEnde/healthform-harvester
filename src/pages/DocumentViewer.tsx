@@ -346,8 +346,6 @@ const DocumentViewer = () => {
         jsonData: JSON.stringify(updatedData, null, 2)
       };
     });
-    
-    setShowEditor(false);
   };
 
   useEffect(() => {
@@ -488,9 +486,7 @@ const DocumentViewer = () => {
           <CertificateController 
             documentId={document.id} 
             extractedData={extractedData} 
-            onSave={handleSaveEdits}
-            isEditing={showEditor}
-            onEditToggle={setShowEditor}
+            onSave={handleSaveEdits} 
           />
         </div>
       );
