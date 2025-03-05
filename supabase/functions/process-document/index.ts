@@ -304,56 +304,21 @@ function processCertificateOfFitnessData(apiResponse: any) {
     const extractedData = apiResponse.result || {};
     
     // Build structured data object from API response
-    const structuredData = {
+    return {
       patient: {
         name: extractPath(extractedData, 'patient.name') || 'Unknown',
         date_of_birth: extractPath(extractedData, 'patient.date_of_birth') || '',
         employee_id: extractPath(extractedData, 'patient.id') || '',
-        id_number: extractPath(extractedData, 'patient.id_number') || '',
-        gender: extractPath(extractedData, 'patient.gender') || '',
-        company: extractPath(extractedData, 'patient.company') || extractPath(extractedData, 'company') || '',
-        occupation: extractPath(extractedData, 'patient.occupation') || extractPath(extractedData, 'job_title') || ''
+        gender: extractPath(extractedData, 'patient.gender') || ''
       },
-      examination_results: {
-        date: extractPath(extractedData, 'examination.date') || 
-              extractPath(extractedData, 'exam_date') || 
-              extractPath(extractedData, 'examination_date') || 
-              new Date().toISOString().split('T')[0],
+      examination: {
+        date: extractPath(extractedData, 'examination.date') || new Date().toISOString().split('T')[0],
         physician: extractPath(extractedData, 'examination.physician') || '',
-        type: {
-          pre_employment: extractPath(extractedData, 'examination.type') === 'pre-employment',
-          periodical: extractPath(extractedData, 'examination.type') === 'periodical',
-          exit: extractPath(extractedData, 'examination.type') === 'exit'
-        },
-        test_results: {}
-      },
-      certification: {
         fitness_status: extractPath(extractedData, 'examination.fitness_status') || 'Unknown',
         restrictions: extractPath(extractedData, 'examination.restrictions') || 'None',
-        valid_until: extractPath(extractedData, 'examination.next_date') || 
-                    extractPath(extractedData, 'expiry_date') || 
-                    extractPath(extractedData, 'examination.expiry_date') || ''
+        next_examination_date: extractPath(extractedData, 'examination.next_date') || ''
       }
     };
-    
-    // Special handling for examination date and expiry date from markdown
-    if (apiResponse.data && apiResponse.data.markdown) {
-      const markdown = apiResponse.data.markdown;
-      
-      // Try to extract dates using regex
-      const examDateMatch = markdown.match(/Date of Examination.*?:.*?(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})/i);
-      if (examDateMatch && examDateMatch[1] && !structuredData.examination_results.date) {
-        structuredData.examination_results.date = examDateMatch[1].trim();
-      }
-      
-      const expiryDateMatch = markdown.match(/Expiry Date.*?:.*?(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})/i);
-      if (expiryDateMatch && expiryDateMatch[1] && !structuredData.certification.valid_until) {
-        structuredData.certification.valid_until = expiryDateMatch[1].trim();
-      }
-    }
-    
-    console.log("Certificate processing returned structured data:", JSON.stringify(structuredData, null, 2));
-    return structuredData;
   } catch (error) {
     console.error('Error processing certificate of fitness data:', error);
     // Return basic structure with default values on error
@@ -362,12 +327,9 @@ function processCertificateOfFitnessData(apiResponse: any) {
         name: "Unknown",
         employee_id: "Unknown"
       },
-      examination_results: {
+      examination: {
         date: new Date().toISOString().split('T')[0],
-      },
-      certification: {
-        fitness_status: "Unknown",
-        valid_until: ""
+        fitness_status: "Unknown"
       }
     };
   }
