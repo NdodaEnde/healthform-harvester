@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
-  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock
+  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock, Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +14,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
+import CertificateEditor from "@/components/CertificateEditor";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -154,6 +154,7 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -334,6 +335,21 @@ const DocumentViewer = () => {
     }
   };
 
+  // Add a new handler for saving edited data
+  const handleSaveEdits = (updatedData: any) => {
+    setDocument(prev => {
+      if (!prev) return prev;
+      
+      return {
+        ...prev,
+        extractedData: updatedData,
+        patientName: extractPatientName(updatedData),
+        patientId: extractPatientId(updatedData),
+        jsonData: JSON.stringify(updatedData, null, 2)
+      };
+    });
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       if (!id) {
@@ -464,6 +480,16 @@ const DocumentViewer = () => {
     }
     
     const extractedData = document.extractedData;
+    
+    if (showEditor) {
+      return (
+        <CertificateEditor 
+          documentId={document.id} 
+          extractedData={extractedData} 
+          onSave={handleSaveEdits} 
+        />
+      );
+    }
     
     if (document.type === 'Certificate of Fitness') {
       console.log("Passing to CertificateTemplate:", extractedData);
@@ -749,6 +775,23 @@ const DocumentViewer = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowEditor(!showEditor)}
+            >
+              {showEditor ? (
+                <>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Extracted
+                </>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Extracted
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => {
                 if (document.imageUrl) {
                   window.open(document.imageUrl, '_blank');
@@ -852,72 +895,3 @@ const DocumentViewer = () => {
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              <Tabs defaultValue="structured">
-                <CardHeader className="pb-0">
-                  <TabsList className="grid grid-cols-2">
-                    <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                    <TabsTrigger value="json">JSON</TabsTrigger>
-                  </TabsList>
-                </CardHeader>
-                
-                <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
-                  <TabsContent value="structured" className="m-0 h-full">
-                    {renderExtractedData()}
-                  </TabsContent>
-                  
-                  <TabsContent value="json" className="m-0 h-full">
-                    <ScrollArea className="h-full">
-                      <div className="relative">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="absolute top-1 right-1"
-                          onClick={() => {
-                            navigator.clipboard.writeText(document.jsonData);
-                            toast.success("JSON data copied to clipboard");
-                          }}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copy
-                        </Button>
-                        <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                          {document.jsonData}
-                        </pre>
-                      </div>
-                    </ScrollArea>
-                  </TabsContent>
-                </CardContent>
-              </Tabs>
-            </Card>
-            
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => navigate("/dashboard")}
-              >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <Button
-                onClick={() => {
-                  toast("Certificate generated successfully", {
-                    description: "The certificate of fitness has been saved to your downloads folder",
-                    action: {
-                      label: "View",
-                      onClick: () => console.log("Viewing certificate")
-                    }
-                  });
-                }}
-              >
-                <ClipboardCheck className="h-4 w-4 mr-2" />
-                Generate Certificate
-              </Button>
-            </div>
-          </motion.div>
-        </motion.div>
-      </main>
-    </div>
-  );
-};
-
-export default DocumentViewer;
