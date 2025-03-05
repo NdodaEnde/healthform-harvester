@@ -11,32 +11,11 @@ import {
   TooltipTrigger 
 } from "@/components/ui/tooltip";
 import { calculateConfidence, getConfidenceLevel, cleanExtractedValue } from "@/lib/document-utils";
+import FitnessDeclaration, { CheckboxField, ConfidenceIndicator } from "./FitnessDeclaration";
 
 type CertificateTemplateProps = {
   extractedData: any;
   onSave?: (editedData: any) => void;
-};
-
-// Confidence indicator component
-const ConfidenceIndicator = ({ score }: { score: number }) => {
-  const getColorClass = () => {
-    if (score >= 0.7) return "bg-green-500";
-    if (score >= 0.4) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-  
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger>
-          <div className={`w-2 h-2 rounded-full ml-1 ${getColorClass()}`}></div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Confidence: {Math.round(score * 100)}%</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
 };
 
 // EditableField component
@@ -60,31 +39,6 @@ const EditableField = ({
         value={value || ""}
         onChange={e => onChange(fieldName, e.target.value)}
         className={`border-b border-gray-400 bg-transparent px-0 ${className}`}
-      />
-      <ConfidenceIndicator score={confidence} />
-    </div>
-  );
-};
-
-// CheckboxField component
-const CheckboxField = ({ 
-  checked, 
-  onChange, 
-  fieldName, 
-  confidence = 0.9 
-}: { 
-  checked: boolean; 
-  onChange: (field: string, value: boolean) => void; 
-  fieldName: string; 
-  confidence?: number;
-}) => {
-  return (
-    <div className="flex items-center justify-center h-8">
-      <input 
-        type="checkbox" 
-        checked={checked} 
-        onChange={() => onChange(fieldName, !checked)}
-        className="w-5 h-5"
       />
       <ConfidenceIndicator score={confidence} />
     </div>
@@ -490,6 +444,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                         onChange={handleCheckboxChange} 
                         fieldName="examination_results.type.pre_employment"
                         confidence={confidenceScores.examination_results.type.pre_employment}
+                        allowUncheck={true}
                       />
                     </td>
                     <td className="border border-gray-400 text-center">
@@ -498,6 +453,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                         onChange={handleCheckboxChange} 
                         fieldName="examination_results.type.periodical"
                         confidence={confidenceScores.examination_results.type.periodical}
+                        allowUncheck={true}
                       />
                     </td>
                     <td className="border border-gray-400 text-center">
@@ -506,6 +462,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                         onChange={handleCheckboxChange} 
                         fieldName="examination_results.type.exit"
                         confidence={confidenceScores.examination_results.type.exit}
+                        allowUncheck={true}
                       />
                     </td>
                   </tr>
@@ -539,6 +496,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.bloods_done"
                               confidence={confidenceScores.examination_results.test_results.bloods_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -559,6 +517,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.far_near_vision_done"
                               confidence={confidenceScores.examination_results.test_results.far_near_vision_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -579,6 +538,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.side_depth_done"
                               confidence={confidenceScores.examination_results.test_results.side_depth_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -599,6 +559,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.night_vision_done"
                               confidence={confidenceScores.examination_results.test_results.night_vision_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -632,6 +593,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.hearing_done"
                               confidence={confidenceScores.examination_results.test_results.hearing_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -652,6 +614,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.heights_done"
                               confidence={confidenceScores.examination_results.test_results.heights_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -672,6 +635,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.lung_function_done"
                               confidence={confidenceScores.examination_results.test_results.lung_function_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -692,6 +656,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.x_ray_done"
                               confidence={confidenceScores.examination_results.test_results.x_ray_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -712,6 +677,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                               onChange={handleCheckboxChange} 
                               fieldName="examination_results.test_results.drug_screen_done"
                               confidence={confidenceScores.examination_results.test_results.drug_screen_done}
+                              allowUncheck={true}
                             />
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
@@ -775,6 +741,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.heights"
                           confidence={confidenceScores.restrictions.heights}
+                          allowUncheck={true}
                         />
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.dust_exposure ? 'bg-yellow-100' : ''}`}>
@@ -784,6 +751,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.dust_exposure"
                           confidence={confidenceScores.restrictions.dust_exposure}
+                          allowUncheck={true}
                         />
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.motorized_equipment ? 'bg-yellow-100' : ''}`}>
@@ -793,6 +761,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.motorized_equipment"
                           confidence={confidenceScores.restrictions.motorized_equipment}
+                          allowUncheck={true}
                         />
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.wear_hearing_protection ? 'bg-yellow-100' : ''}`}>
@@ -802,6 +771,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.wear_hearing_protection"
                           confidence={confidenceScores.restrictions.wear_hearing_protection}
+                          allowUncheck={true}
                         />
                       </td>
                     </tr>
@@ -813,6 +783,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.confined_spaces"
                           confidence={confidenceScores.restrictions.confined_spaces}
+                          allowUncheck={true}
                         />
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.chemical_exposure ? 'bg-yellow-100' : ''}`}>
@@ -822,6 +793,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.chemical_exposure"
                           confidence={confidenceScores.restrictions.chemical_exposure}
+                          allowUncheck={true}
                         />
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.wear_spectacles ? 'bg-yellow-100' : ''}`}>
@@ -831,6 +803,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.wear_spectacles"
                           confidence={confidenceScores.restrictions.wear_spectacles}
+                          allowUncheck={true}
                         />
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${formData.restrictions.remain_on_treatment_for_chronic_conditions ? 'bg-yellow-100' : ''}`}>
@@ -840,6 +813,7 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
                           onChange={handleCheckboxChange} 
                           fieldName="restrictions.remain_on_treatment_for_chronic_conditions"
                           confidence={confidenceScores.restrictions.remain_on_treatment_for_chronic_conditions}
+                          allowUncheck={true}
                         />
                       </td>
                     </tr>
@@ -848,66 +822,12 @@ const CertificateTemplate = ({ extractedData, onSave }: CertificateTemplateProps
               </div>
             </div>
             
-            {/* Fitness Status */}
-            <div className="mb-6">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
-                Medical Fitness Declaration
-              </div>
-              
-              <div className="px-4">
-                <table className="w-full border border-gray-400">
-                  <tbody>
-                    <tr>
-                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.fit ? 'bg-green-100' : ''}`}>
-                        <div className="font-semibold text-sm">FIT</div>
-                        <CheckboxField 
-                          checked={formData.certification.fit} 
-                          onChange={handleCheckboxChange} 
-                          fieldName="certification.fit"
-                          confidence={confidenceScores.certification.fit}
-                        />
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.fit_with_restrictions ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold text-sm">Fit with Restriction</div>
-                        <CheckboxField 
-                          checked={formData.certification.fit_with_restrictions} 
-                          onChange={handleCheckboxChange} 
-                          fieldName="certification.fit_with_restrictions"
-                          confidence={confidenceScores.certification.fit_with_restrictions}
-                        />
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.fit_with_condition ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold text-sm">Fit with Condition</div>
-                        <CheckboxField 
-                          checked={formData.certification.fit_with_condition} 
-                          onChange={handleCheckboxChange} 
-                          fieldName="certification.fit_with_condition"
-                          confidence={confidenceScores.certification.fit_with_condition}
-                        />
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.temporarily_unfit ? 'bg-red-100' : ''}`}>
-                        <div className="font-semibold text-sm">Temporary Unfit</div>
-                        <CheckboxField 
-                          checked={formData.certification.temporarily_unfit} 
-                          onChange={handleCheckboxChange} 
-                          fieldName="certification.temporarily_unfit"
-                          confidence={confidenceScores.certification.temporarily_unfit}
-                        />
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${formData.certification.unfit ? 'bg-red-100' : ''}`}>
-                        <div className="font-semibold text-sm">UNFIT</div>
-                        <CheckboxField 
-                          checked={formData.certification.unfit} 
-                          onChange={handleCheckboxChange} 
-                          fieldName="certification.unfit"
-                          confidence={confidenceScores.certification.unfit}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {/* Use the new FitnessDeclaration component */}
+            <FitnessDeclaration 
+              formData={formData}
+              handleCheckboxChange={handleCheckboxChange}
+              confidenceScores={confidenceScores}
+            />
             
             {/* Comments */}
             <div className="px-4 mb-6">

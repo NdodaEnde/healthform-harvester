@@ -12,6 +12,7 @@ interface EditableFieldProps {
   fieldType?: 'text' | 'date' | 'name' | 'id' | 'boolean' | 'signature';
   onSave: (newValue: string) => void;
   className?: string;
+  allowUncheck?: boolean;
 }
 
 const EditableField = ({ 
@@ -19,7 +20,8 @@ const EditableField = ({
   value = "", 
   fieldType = 'text', 
   onSave,
-  className 
+  className,
+  allowUncheck = true
 }: EditableFieldProps) => {
   // Clean value first to remove any unwanted elements like signature placeholders
   const cleanedValue = cleanExtractedValue(value);
