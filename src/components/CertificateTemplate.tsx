@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -687,4 +688,165 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             {/* Referral Section */}
             <div className="px-4 mb-4">
               <div className="flex items-center">
-                <div className="font-semibold text-sm mr-1">Referred or follow up actions:
+                <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
+                <div className="border-b border-gray-400 flex-1 min-h-[1.5rem]">
+                  {getValue(certification, 'follow_up') || 'N/A'}
+                </div>
+              </div>
+            </div>
+            
+            {/* Fitness Assessment */}
+            <div className="px-4 mb-4">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                FITNESS ASSESSMENT
+              </div>
+              <table className="w-full border border-gray-400">
+                <tbody>
+                  <tr>
+                    <th className="border border-gray-400 py-1 w-1/2 text-center bg-blue-50 text-sm">FIT</th>
+                    <td className="border border-gray-400 h-8 text-center">
+                      {fitnessStatus.fit ? '✓' : ''}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">Fit with Restriction</th>
+                    <td className="border border-gray-400 h-8 text-center">
+                      {fitnessStatus.fitWithRestriction ? '✓' : ''}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">Fit with Condition</th>
+                    <td className="border border-gray-400 h-8 text-center">
+                      {fitnessStatus.fitWithCondition ? '✓' : ''}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">Temporary Unfit</th>
+                    <td className="border border-gray-400 h-8 text-center">
+                      {fitnessStatus.temporarilyUnfit ? '✓' : ''}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-sm">UNFIT</th>
+                    <td className="border border-gray-400 h-8 text-center">
+                      {fitnessStatus.unfit ? '✓' : ''}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Restrictions */}
+            {(fitnessStatus.fitWithRestriction || fitnessStatus.fitWithCondition) && (
+              <div className="px-4 mb-4">
+                <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                  RESTRICTIONS
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <table className="w-full border border-gray-400">
+                      <tbody>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Heights</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.heights ? '✓' : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Dust Exposure</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.dustExposure ? '✓' : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Motorized Equipment</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.motorizedEquipment ? '✓' : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Wear Hearing Protection</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.hearingProtection ? '✓' : ''}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <table className="w-full border border-gray-400">
+                      <tbody>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Confined Spaces</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.confinedSpaces ? '✓' : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Chemical Exposure</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.chemicalExposure ? '✓' : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Wear Spectacles</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.wearSpectacles ? '✓' : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Remain on Treatment for Chronic Conditions</th>
+                          <td className="border border-gray-400 h-8 text-center">
+                            {restrictionsData.chronicConditions ? '✓' : ''}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Comments */}
+            <div className="px-4 mb-4">
+              <div className="flex items-center mb-2">
+                <div className="font-semibold text-sm mr-1">Comments:</div>
+                <div className="border-b border-gray-400 flex-1 min-h-[1.5rem]">
+                  {getValue(certification, 'comments') || 'N/A'}
+                </div>
+              </div>
+              <div className="flex items-center">
+                <div className="font-semibold text-sm mr-1">Review Date:</div>
+                <div className="border-b border-gray-400 flex-1 min-h-[1.5rem]">
+                  {getValue(certification, 'review_date') || 'N/A'}
+                </div>
+              </div>
+            </div>
+            
+            {/* Signatures */}
+            <div className="px-4 mb-4">
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <div className="h-16 border-b border-gray-400 mb-1"></div>
+                  <div className="text-center text-sm font-semibold">DOCTOR / OCCUPATIONAL HEALTH PRACTITIONER</div>
+                </div>
+                <div>
+                  <div className="h-16 border-b border-gray-400 mb-1"></div>
+                  <div className="text-center text-sm font-semibold">SIGNATURE & STAMP</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="bg-gray-800 text-white text-center py-2 text-xs">
+              <p>This certificate is valid for the period stated above unless the health status of the employee changes.</p>
+              <p className="mt-1">© {new Date().getFullYear()} BlueCollar Occupational Health Services. All Rights Reserved.</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
