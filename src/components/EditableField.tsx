@@ -3,13 +3,13 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckCircle, AlertCircle, AlertTriangle, Edit, Check, X } from "lucide-react";
-import { calculateConfidence, getConfidenceLevel, getConfidenceClass } from "@/lib/document-utils";
+import { calculateConfidence, getConfidenceLevel, getConfidenceClass, cleanExtractedValue } from "@/lib/document-utils";
 import { cn } from "@/lib/utils";
 
 interface EditableFieldProps {
   label: string;
   value: string | null | undefined;
-  fieldType?: 'text' | 'date' | 'name' | 'id' | 'boolean';
+  fieldType?: 'text' | 'date' | 'name' | 'id' | 'boolean' | 'signature';
   onSave: (newValue: string) => void;
   className?: string;
 }
@@ -21,11 +21,14 @@ const EditableField = ({
   onSave,
   className 
 }: EditableFieldProps) => {
+  // Clean value first to remove any unwanted elements like signature placeholders
+  const cleanedValue = cleanExtractedValue(value);
+  
   const [isEditing, setIsEditing] = useState(false);
-  const [editedValue, setEditedValue] = useState(value || "");
+  const [editedValue, setEditedValue] = useState(cleanedValue);
   
   // Calculate confidence score
-  const confidenceScore = calculateConfidence(value, fieldType);
+  const confidenceScore = calculateConfidence(cleanedValue, fieldType);
   const confidenceLevel = getConfidenceLevel(confidenceScore);
   const confidenceClass = getConfidenceClass(confidenceScore);
   
@@ -35,7 +38,7 @@ const EditableField = ({
   };
   
   const handleCancel = () => {
-    setEditedValue(value || "");
+    setEditedValue(cleanedValue);
     setIsEditing(false);
   };
   
@@ -97,7 +100,7 @@ const EditableField = ({
         </div>
       ) : (
         <p className={cn("font-medium p-2 rounded border", confidenceClass)}>
-          {value || "N/A"}
+          {cleanedValue || "N/A"}
         </p>
       )}
     </div>

@@ -38,6 +38,10 @@ export const calculateConfidence = (value: string | null | undefined, fieldType:
       // Boolean fields (e.g., checkboxes) typically have high confidence
       return 0.9;
       
+    case 'signature':
+      // Signatures have low confidence by default as they need human verification
+      return 0.3;
+      
     default:
       // Default confidence based on value length (longer values often more reliable)
       return Math.min(0.5 + (cleanValue.length * 0.03), 0.85);
@@ -70,3 +74,31 @@ export const getConfidenceClass = (score: number): string => {
       return '';
   }
 };
+
+/**
+ * Clean extracted value to remove metadata and signatures
+ */
+export const cleanExtractedValue = (value: string | null | undefined): string => {
+  if (!value) return '';
+  
+  // Remove HTML comments: <!-- ... -->
+  let cleaned = value.toString().replace(/\s*<!--.*?-->\s*/g, ' ').trim();
+  
+  // Remove form bounding box coordinates
+  cleaned = cleaned.replace(/\s*<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->\s*/g, ' ').trim();
+  
+  // Remove coordinates directly in text (l=0.064,t=0.188,r=0.936,b=0.284)
+  cleaned = cleaned.replace(/\s*\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)\s*/g, ' ').trim();
+  
+  // Remove IDs in text - with ID 5d5dece1-814c-40b8-ac21-2d9877814985
+  cleaned = cleaned.replace(/\s*with ID [a-f0-9\-]+\s*/g, ' ').trim();
+  
+  // Remove signature placeholders
+  cleaned = cleaned.replace(/\[signature\]|\[doctor's signature\]|signature here/gi, '').trim();
+  
+  // Clean up any remaining <!-- or --> fragments
+  cleaned = cleaned.replace(/<!--|-->/g, '').trim();
+  
+  return cleaned;
+};
+

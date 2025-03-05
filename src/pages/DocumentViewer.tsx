@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -895,3 +896,17 @@ const DocumentViewer = () => {
             </div>
             
             <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-6">
+                <ScrollArea className="h-[calc(100vh-250px)]">
+                  {renderExtractedData()}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      </main>
+    </div>
+  );
+};
+
+export default DocumentViewer;
