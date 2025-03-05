@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -385,6 +386,182 @@ function processCertificateOfFitnessData(apiResponse: any) {
       console.log('Extracted markdown data:', JSON.stringify(markdownData, null, 2));
     }
     
+    // Extract data for more advanced fields
+
+    // 1. Extract Examination Type (Pre-employment, Periodical, Exit)
+    const examinationType = {
+      pre_employment: false,
+      periodical: false,
+      exit: false
+    };
+
+    if (markdown) {
+      // Check various patterns for examination type
+      if (markdown.match(/pre.?employment.*?\[\s*x\s*\]/is) || 
+          markdown.match(/<td>pre.?employment<\/td>.*?<td>\[\s*x\s*\]<\/td>/is)) {
+        examinationType.pre_employment = true;
+      }
+      
+      if (markdown.match(/periodical.*?\[\s*x\s*\]/is) || 
+          markdown.match(/<td>periodical<\/td>.*?<td>\[\s*x\s*\]<\/td>/is)) {
+        examinationType.periodical = true;
+      }
+      
+      if (markdown.match(/exit.*?\[\s*x\s*\]/is) || 
+          markdown.match(/<td>exit<\/td>.*?<td>\[\s*x\s*\]<\/td>/is)) {
+        examinationType.exit = true;
+      }
+    }
+
+    // 2. Extract Medical Test Results
+    const testResults: any = {};
+    const testsMap = [
+      { name: 'BLOODS', key: 'bloods' },
+      { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
+      { name: 'SIDE & DEPTH', key: 'side_depth' },
+      { name: 'NIGHT VISION', key: 'night_vision' },
+      { name: 'Hearing', key: 'hearing' },
+      { name: 'Working at Heights', key: 'heights' },
+      { name: 'Lung Function', key: 'lung_function' },
+      { name: 'X-Ray', key: 'x_ray' },
+      { name: 'Drug Screen', key: 'drug_screen' }
+    ];
+    
+    if (markdown) {
+      testsMap.forEach(test => {
+        // Check table format with pipe separators
+        const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
+        const tableMatch = markdown.match(tableRegex);
+        
+        // Check list format
+        const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
+        const listMatch = markdown.match(listRegex);
+        
+        // Check HTML table format
+        const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
+        const htmlTableMatch = markdown.match(htmlTableRegex);
+        
+        let isDone = false;
+        let results = '';
+        
+        if (tableMatch) {
+          isDone = tableMatch[1].trim() === 'x';
+          results = tableMatch[2] ? tableMatch[2].trim() : '';
+        } else if (listMatch) {
+          isDone = listMatch[1].trim() === 'x';
+          results = listMatch[2] ? listMatch[2].trim() : '';
+        } else if (htmlTableMatch) {
+          isDone = htmlTableMatch[1].trim() === 'x';
+          results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
+        }
+        
+        if (isDone || results) {
+          testResults[`${test.key}_done`] = isDone;
+          testResults[`${test.key}_results`] = results;
+        }
+      });
+    }
+
+    // 3. Extract Fitness Status
+    const fitnessStatus: any = {
+      fit: false,
+      fit_with_restrictions: false,
+      fit_with_condition: false,
+      temporarily_unfit: false,
+      unfit: false
+    };
+    
+    if (markdown) {
+      const fitnessOptions = [
+        { name: 'FIT', key: 'fit' },
+        { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
+        { name: 'Fit with Condition', key: 'fit_with_condition' },
+        { name: 'Temporary Unfit', key: 'temporarily_unfit' },
+        { name: 'UNFIT', key: 'unfit' }
+      ];
+      
+      fitnessOptions.forEach(option => {
+        // Check multiple formats
+        const patterns = [
+          new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'),
+          new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'),
+          new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
+        ];
+        
+        // Check all patterns
+        let isSelected = false;
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match && match[0].includes('[x]')) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        fitnessStatus[option.key] = isSelected;
+      });
+    }
+
+    // 4. Extract Restrictions
+    const restrictions: any = {};
+    
+    if (markdown) {
+      const restrictionTypes = [
+        { name: 'Heights', key: 'heights' },
+        { name: 'Dust Exposure', key: 'dust_exposure' },
+        { name: 'Motorized Equipment', key: 'motorized_equipment' },
+        { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
+        { name: 'Confined Spaces', key: 'confined_spaces' },
+        { name: 'Chemical Exposure', key: 'chemical_exposure' },
+        { name: 'Wear Spectacles', key: 'wear_spectacles' },
+        { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
+      ];
+      
+      restrictionTypes.forEach(restriction => {
+        // Check multiple formats
+        const patterns = [
+          new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
+          new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'),
+          new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
+        ];
+        
+        // Check all patterns
+        let isSelected = false;
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match && match[0].includes('[x]')) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        restrictions[restriction.key] = isSelected;
+      });
+    }
+
+    // 5. Extract Follow-up and Comments
+    let followUp = '';
+    let reviewDate = '';
+    let comments = '';
+    
+    if (markdown) {
+      const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
+      if (followUpMatch && followUpMatch[1]) followUp = followUpMatch[1].trim();
+      
+      const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
+      if (reviewDateMatch && reviewDateMatch[1]) reviewDate = reviewDateMatch[1].trim();
+      
+      const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
+      if (commentsMatch && commentsMatch[1]) {
+        comments = commentsMatch[1].trim();
+        // If it's just "N/A" or empty after HTML tags are removed
+        if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || 
+            comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
+          comments = "N/A";
+        }
+      }
+    }
+    
     // Merge data from both markdown and extracted JSON
     const structuredData = {
       patient: {
@@ -409,7 +586,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
         gender: markdownData.patient.gender || 
                extractPath(extractedData, 'patient.gender') || ''
       },
-      examination: {
+      examination_results: {
         date: markdownData.examination.date || 
               extractPath(extractedData, 'examination.date') || 
               extractPath(extractedData, 'date') || 
@@ -426,8 +603,21 @@ function processCertificateOfFitnessData(apiResponse: any) {
         next_examination_date: markdownData.examination.next_examination_date || 
                              extractPath(extractedData, 'examination.next_date') || 
                              extractPath(extractedData, 'valid_until') || 
-                             extractPath(extractedData, 'expiry_date') || ''
+                             extractPath(extractedData, 'expiry_date') || '',
+        type: examinationType,
+        test_results: testResults
       },
+      certification: {
+        ...fitnessStatus,
+        follow_up: followUp,
+        review_date: reviewDate,
+        comments: comments,
+        valid_until: markdownData.examination.next_examination_date || 
+                    extractPath(extractedData, 'examination.next_date') || 
+                    extractPath(extractedData, 'valid_until') || 
+                    extractPath(extractedData, 'expiry_date') || ''
+      },
+      restrictions: restrictions,
       raw_content: markdown || null
     };
     
@@ -441,10 +631,14 @@ function processCertificateOfFitnessData(apiResponse: any) {
         name: "Unknown",
         employee_id: "Unknown"
       },
-      examination: {
+      examination_results: {
         date: new Date().toISOString().split('T')[0],
-        fitness_status: "Unknown"
-      }
+        fitness_status: "Unknown",
+        type: {},
+        test_results: {}
+      },
+      certification: {},
+      restrictions: {}
     };
   }
 }
