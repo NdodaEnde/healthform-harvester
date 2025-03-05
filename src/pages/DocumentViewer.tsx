@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
-  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock
+  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock, Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -153,6 +153,7 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
