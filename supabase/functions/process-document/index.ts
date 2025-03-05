@@ -161,6 +161,8 @@ async function processDocumentWithLandingAI(file: File, documentType: string, do
       structuredData = processCertificateOfFitnessData(result);
     }
     
+    console.log('Structured data extracted:', JSON.stringify(structuredData));
+    
     // Try to update the document record multiple times if needed
     let updateSuccess = false;
     let attempts = 0;
@@ -302,23 +304,81 @@ function processCertificateOfFitnessData(apiResponse: any) {
   try {
     // Extract fields from AI response
     const extractedData = apiResponse.result || {};
+    const markdown = apiResponse.data?.markdown || '';
+
+    console.log('Processing certificate of fitness data from API response');
+    console.log('Markdown present:', Boolean(markdown));
+    
+    // Extract data from markdown if present
+    let markdownData = {};
+    if (markdown) {
+      // Extract name from markdown
+      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
+      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i) || 
+                              markdown.match(/Expiry Date:\s*(.*?)(?=\n|\r|$)/i) ||
+                              markdown.match(/valid until:\s*(.*?)(?=\n|\r|$)/i);
+      
+      markdownData = {
+        patient: {
+          name: nameMatch?.[1]?.trim() || null,
+          id_number: idMatch?.[1]?.trim() || null,
+          company: companyMatch?.[1]?.trim() || null
+        },
+        examination: {
+          date: examDateMatch?.[1]?.trim() || null,
+          next_examination_date: expiryDateMatch?.[1]?.trim() || null
+        }
+      };
+      
+      console.log('Extracted markdown data:', markdownData);
+    }
     
     // Build structured data object from API response
-    return {
+    const structuredData = {
       patient: {
-        name: extractPath(extractedData, 'patient.name') || 'Unknown',
-        date_of_birth: extractPath(extractedData, 'patient.date_of_birth') || '',
-        employee_id: extractPath(extractedData, 'patient.id') || '',
+        name: extractPath(markdownData, 'patient.name') || 
+              extractPath(extractedData, 'patient.name') || 
+              extractPath(extractedData, 'employee.name') || 'Unknown',
+        date_of_birth: extractPath(extractedData, 'patient.date_of_birth') || 
+                       extractPath(extractedData, 'patient.dob') || '',
+        employee_id: extractPath(markdownData, 'patient.id_number') || 
+                    extractPath(extractedData, 'patient.id') || 
+                    extractPath(extractedData, 'patient.id_number') || 
+                    extractPath(extractedData, 'employee.id') || '',
+        company: extractPath(markdownData, 'patient.company') || 
+                extractPath(extractedData, 'company') || 
+                extractPath(extractedData, 'employer') || 
+                extractPath(extractedData, 'patient.company') || '',
+        occupation: extractPath(extractedData, 'patient.occupation') || 
+                  extractPath(extractedData, 'patient.job_title') || 
+                  extractPath(extractedData, 'occupation') || '',
         gender: extractPath(extractedData, 'patient.gender') || ''
       },
       examination: {
-        date: extractPath(extractedData, 'examination.date') || new Date().toISOString().split('T')[0],
-        physician: extractPath(extractedData, 'examination.physician') || '',
-        fitness_status: extractPath(extractedData, 'examination.fitness_status') || 'Unknown',
-        restrictions: extractPath(extractedData, 'examination.restrictions') || 'None',
-        next_examination_date: extractPath(extractedData, 'examination.next_date') || ''
-      }
+        date: extractPath(markdownData, 'examination.date') || 
+              extractPath(extractedData, 'examination.date') || 
+              extractPath(extractedData, 'date') || 
+              new Date().toISOString().split('T')[0],
+        physician: extractPath(extractedData, 'examination.physician') || 
+                  extractPath(extractedData, 'physician') || '',
+        fitness_status: extractPath(extractedData, 'examination.fitness_status') || 
+                       extractPath(extractedData, 'fitness_status') || 'Unknown',
+        restrictions: extractPath(extractedData, 'examination.restrictions') || 
+                     extractPath(extractedData, 'restrictions') || 'None',
+        next_examination_date: extractPath(markdownData, 'examination.next_examination_date') || 
+                             extractPath(extractedData, 'examination.next_date') || 
+                             extractPath(extractedData, 'valid_until') || 
+                             extractPath(extractedData, 'expiry_date') || 
+                             extractPath(markdownData, 'examination.expiry_date') || ''
+      },
+      raw_content: markdown || null
     };
+    
+    console.log('Final structured data:', structuredData);
+    return structuredData;
   } catch (error) {
     console.error('Error processing certificate of fitness data:', error);
     // Return basic structure with default values on error
