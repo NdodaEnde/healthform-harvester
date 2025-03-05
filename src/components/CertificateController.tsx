@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import CertificateEditor from "./CertificateEditor";
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 interface CertificateControllerProps {
   documentId: string;
@@ -23,7 +23,6 @@ const CertificateController = ({
 }: CertificateControllerProps) => {
   const [localIsEditing, setLocalIsEditing] = useState(isEditing);
   
-  // Sync with external editing state if provided
   useEffect(() => {
     if (onEditToggle) {
       setLocalIsEditing(isEditing);
@@ -34,7 +33,6 @@ const CertificateController = ({
     const newEditingState = !localIsEditing;
     setLocalIsEditing(newEditingState);
     
-    // If parent component is controlling the editing state, notify it
     if (onEditToggle) {
       onEditToggle(newEditingState);
     }
@@ -44,7 +42,6 @@ const CertificateController = ({
     onSave(editedData);
     setLocalIsEditing(false);
     
-    // If parent component is controlling the editing state, notify it
     if (onEditToggle) {
       onEditToggle(false);
     }
@@ -68,7 +65,6 @@ const CertificateController = ({
     );
   }
   
-  // In view mode, show certificate view with edit button
   return (
     <div className="relative">
       <Button 
@@ -87,7 +83,6 @@ const CertificateController = ({
   );
 };
 
-// Simple viewer component for the certificate data
 const ViewCertificate = ({ data }: { data: any }) => {
   const getValue = (obj: any, path: string, defaultValue: string = 'N/A') => {
     if (!obj || !path) return defaultValue;
@@ -113,7 +108,6 @@ const ViewCertificate = ({ data }: { data: any }) => {
     return current.toString();
   };
 
-  // Get structured data, handle different possible structures
   const structuredData = data.structured_data || data;
   const patient = structuredData.patient || {};
   const examination = structuredData.examination_results || {};
