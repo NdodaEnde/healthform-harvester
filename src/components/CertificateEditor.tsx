@@ -12,39 +12,20 @@ interface CertificateEditorProps {
   documentId: string;
   extractedData: any;
   onSave: (updatedData: any) => void;
-  isEditMode?: boolean; // New prop to control if we start in edit mode
+  isEditMode?: boolean; // Prop to control if we start in edit mode
 }
 
 const CertificateEditor = ({ 
   documentId, 
   extractedData, 
   onSave,
-  isEditMode = false
+  isEditMode = false // Default to view mode (false)
 }: CertificateEditorProps) => {
   // Debug logs
   console.log("CertificateEditor rendering with data:", extractedData);
   console.log("Document ID:", documentId);
   console.log("Initial Edit Mode:", isEditMode);
   
-  const [editedData, setEditedData] = useState(extractedData || {});
-  const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(isEditMode);
-  
-  // Update editedData whenever extractedData changes or is loaded
-  useEffect(() => {
-    console.log("useEffect triggered, new extractedData:", extractedData);
-    if (extractedData) {
-      console.log("Setting editedData from extractedData");
-      setEditedData(extractedData);
-    }
-  }, [extractedData]);
-
-const CertificateEditor = ({ 
-  documentId, 
-  extractedData, 
-  onSave,
-  isEditMode = false // Default to view mode (false) 
-}: CertificateEditorProps) => {
   // Initialize editedData with extractedData when component mounts or extractedData changes
   const [editedData, setEditedData] = useState(extractedData || {});
   const [isSaving, setIsSaving] = useState(false);
@@ -52,7 +33,9 @@ const CertificateEditor = ({
   
   // Update editedData whenever extractedData changes or is loaded
   useEffect(() => {
+    console.log("useEffect triggered, new extractedData:", extractedData);
     if (extractedData) {
+      console.log("Setting editedData from extractedData");
       setEditedData(extractedData);
     }
   }, [extractedData]);
