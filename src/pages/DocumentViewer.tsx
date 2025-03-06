@@ -294,6 +294,8 @@ const DocumentViewer = () => {
       let patientId = extractPatientId(extractedData);
       
       if (documentData.document_type === 'certificate-of-fitness') {
+        console.log('Processing certificate data:', extractedData);
+        
         if (
           typeof extractedData === 'object' && 
           extractedData !== null && 
@@ -338,6 +340,8 @@ const DocumentViewer = () => {
   const handleSaveEdits = (updatedData: any) => {
     setDocument(prev => {
       if (!prev) return prev;
+      
+      setShowEditor(false);
       
       return {
         ...prev,
@@ -481,7 +485,14 @@ const DocumentViewer = () => {
     const extractedData = document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
-      console.log("Passing to CertificateTemplate:", extractedData);
+      console.log("Document viewer state:", { 
+        showEditor, 
+        dataAvailable: !!extractedData,
+        extractedDataKeys: extractedData ? Object.keys(extractedData) : [],
+        structured_data: extractedData?.structured_data,
+        extracted_data: extractedData 
+      });
+      
       return (
         <div className="certificate-container pb-6">
           {showEditor ? (
@@ -778,12 +789,12 @@ const DocumentViewer = () => {
               {showEditor ? (
                 <>
                   <Eye className="h-4 w-4 mr-2" />
-                  View Extracted
+                  View Data
                 </>
               ) : (
                 <>
                   <Edit className="h-4 w-4 mr-2" />
-                  Edit Extracted
+                  Edit Data
                 </>
               )}
             </Button>
