@@ -12,6 +12,7 @@ interface EditableFieldProps {
   fieldType?: 'text' | 'date' | 'name' | 'id' | 'boolean' | 'signature';
   onSave: (newValue: string) => void;
   className?: string;
+  isEditMode?: boolean; // New prop to control editing mode from parent
 }
 
 const EditableField = ({ 
@@ -19,12 +20,13 @@ const EditableField = ({
   value = "", 
   fieldType = 'text', 
   onSave,
-  className 
+  className,
+  isEditMode = false // Default to false (view mode)
 }: EditableFieldProps) => {
   // Clean value first to remove any unwanted elements like signature placeholders
   const cleanedValue = cleanExtractedValue(value);
   
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isEditMode);
   const [editedValue, setEditedValue] = useState(cleanedValue);
   
   // Calculate confidence score
@@ -41,6 +43,11 @@ const EditableField = ({
     setEditedValue(cleanedValue);
     setIsEditing(false);
   };
+  
+  // Update local editing state if parent's isEditMode changes
+  React.useEffect(() => {
+    setIsEditing(isEditMode);
+  }, [isEditMode]);
   
   return (
     <div className={cn("space-y-1", className)}>

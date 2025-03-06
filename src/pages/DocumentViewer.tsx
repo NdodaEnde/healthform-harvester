@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -336,7 +335,6 @@ const DocumentViewer = () => {
     }
   };
 
-  // Add a new handler for saving edited data
   const handleSaveEdits = (updatedData: any) => {
     setDocument(prev => {
       if (!prev) return prev;
@@ -482,21 +480,20 @@ const DocumentViewer = () => {
     
     const extractedData = document.extractedData;
     
-    if (showEditor) {
-      return (
-        <CertificateEditor 
-          documentId={document.id} 
-          extractedData={extractedData} 
-          onSave={handleSaveEdits} 
-        />
-      );
-    }
-    
     if (document.type === 'Certificate of Fitness') {
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
+          {showEditor ? (
+            <CertificateEditor 
+              documentId={document.id} 
+              extractedData={extractedData} 
+              onSave={handleSaveEdits}
+              isEditMode={false}
+            />
+          ) : (
+            <CertificateTemplate extractedData={extractedData} />
+          )}
         </div>
       );
     }
