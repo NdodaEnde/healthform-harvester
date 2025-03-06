@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -22,9 +21,17 @@ const CertificateEditor = ({
   onSave,
   isEditMode = false // Default to view mode (false) 
 }: CertificateEditorProps) => {
-  const [editedData, setEditedData] = useState(extractedData);
+  // Initialize editedData with extractedData when component mounts or extractedData changes
+  const [editedData, setEditedData] = useState(extractedData || {});
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(isEditMode); // Control edit mode locally
+  
+  // Update editedData whenever extractedData changes or is loaded
+  useEffect(() => {
+    if (extractedData) {
+      setEditedData(extractedData);
+    }
+  }, [extractedData]);
   
   if (!extractedData || !extractedData.structured_data) {
     return (
@@ -34,7 +41,7 @@ const CertificateEditor = ({
     );
   }
   
-  const structuredData = extractedData.structured_data;
+  const structuredData = editedData.structured_data || {};
   
   const handleFieldUpdate = (section: string, subSection: string | null, field: string, value: string) => {
     setEditedData(prev => {
