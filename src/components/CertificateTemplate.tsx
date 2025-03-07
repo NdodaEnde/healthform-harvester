@@ -701,11 +701,11 @@ const CertificateTemplate = ({
                   </div>
                 </div>
                 
-                <div className="flex-1 px-2">
-                  <div className="text-[0.65rem] space-y-0.5 text-center">
-                    <p className="font-semibold">Occupational Health Practitioner/Occupational Medical</p>
-                    <p className="font-semibold">Practitioner</p>
-                    <p className="text-xs">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
+                <div className="flex-1 px-2 flex justify-center">
+                  <div className="w-fit max-w-md text-center">
+                    <p className="text-sm font-semibold">Occupational Health Practitioner / Occupational Medical</p>
+                    <p className="text-sm font-semibold">Practitioner</p>
+                    <p className="text-xs italic">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
                     <p className="text-xs">Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
                     <p className="text-xs">SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
                     <p className="text-xs">Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
