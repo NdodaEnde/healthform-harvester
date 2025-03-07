@@ -749,22 +749,16 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
             {/* Footer with signature */}
             <div className="px-4 flex justify-between items-end mb-4">
               <div className="w-56">
-                <div className="border-b border-gray-400 h-14 flex items-end justify-center pb-1">
-                  <img 
-                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgODAiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0yMCA0MGMwIDAgMjAtMzAgNjAgMCBjIDMwIDI1IDQwLTEwIDYwIDUgYyAyMCAxNyA0MCA1IDYwLTEwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==" 
-                    alt="Signature" 
-                    className="h-12 opacity-70"
-                  />
-                </div>
+                <div className="border-b border-gray-400 h-14"></div>
                 <div className="text-center text-sm font-semibold mt-1">
-                  Medical Practitioner
+                  Signature
                 </div>
               </div>
               
               <div className="w-56">
-                <div className="border-b border-gray-400 h-14"></div>
+                <div className="border border-gray-400 border-dashed h-14"></div>
                 <div className="text-center text-sm font-semibold mt-1">
-                  Employee Signature
+                  Stamp
                 </div>
               </div>
             </div>
