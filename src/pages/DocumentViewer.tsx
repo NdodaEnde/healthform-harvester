@@ -4,8 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
-  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  CheckSquare, Edit, Save
+  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -155,9 +154,6 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState<any>(null);
-  const [saveLoading, setSaveLoading] = useState(false);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -287,45 +283,32 @@ const DocumentViewer = () => {
       
       console.log('Fetched document data:', documentData);
       
-      const { data: certificateData } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq('document_id', documentId)
-        .maybeSingle();
-      
-      console.log('Fetched certificate data:', certificateData);
-      
       const { data: urlData } = await supabase
         .storage
         .from('medical-documents')
         .createSignedUrl(documentData.file_path, 3600);
       
-      // Use certificateData if available, otherwise use document's extracted_data
-      let extractedData = certificateData || documentData.extracted_data || {};
+      let extractedData = documentData.extracted_data || {};
       let patientName = extractPatientName(extractedData);
       let patientId = extractPatientId(extractedData);
       
       if (documentData.document_type === 'certificate-of-fitness') {
-        // Check if we need to reformat data for consistency
         if (
           typeof extractedData === 'object' && 
           extractedData !== null && 
-          !Array.isArray(extractedData)
+          !Array.isArray(extractedData) && 
+          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
+          extractedData.raw_response
         ) {
-          // Check if we're working with raw extracted data
-          const hasRawResponse = extractedData.hasOwnProperty('raw_response');
-          const hasPatient = extractedData.hasOwnProperty('patient');
-          
-          // If we have raw response but no patient info, create a basic structure
-          if (hasRawResponse && !hasPatient) {
-            extractedData = {
-              ...extractedData,
+          extractedData = {
+            ...extractedData,
+            structured_data: {
               patient: {
                 name: patientName,
                 id_number: patientId
               }
-            };
-          }
+            }
+          };
         }
       }
       
@@ -343,9 +326,7 @@ const DocumentViewer = () => {
         patientId: patientId,
         imageUrl: urlData?.signedUrl || null,
         extractedData: extractedData,
-        jsonData: JSON.stringify(extractedData, null, 2),
-        validated: !!certificateData,
-        certificateId: certificateData?.id || null
+        jsonData: JSON.stringify(extractedData, null, 2)
       };
     } catch (error) {
       console.error('Error fetching document from Supabase:', error);
@@ -473,137 +454,6 @@ const DocumentViewer = () => {
     };
   }, [id, document?.status, processingTimeout]);
 
-  const handleDataChange = (newData: any) => {
-    setEditedData(newData);
-  };
-
-  const saveValidatedCertificate = async () => {
-    if (!id || !editedData) return;
-    
-    setSaveLoading(true);
-    try {
-      console.log("Starting certificate save process...");
-      console.log("Original edited data:", editedData);
-      
-      // Handle different potential shapes of data
-      let patientInfo = editedData.patient || editedData.patient_info || {};
-      let fitnessDeclaration = editedData.certification || editedData.fitness_declaration || {};
-      let restrictions = editedData.restrictions || editedData.restrictionsData || [];
-      
-      console.log("Extracted patient info:", patientInfo);
-      console.log("Extracted fitness declaration:", fitnessDeclaration);
-      console.log("Extracted restrictions:", restrictions);
-      
-      // Format restrictions to always be an array
-      if (typeof restrictions === 'object' && !Array.isArray(restrictions)) {
-        restrictions = Object.keys(restrictions).filter(key => restrictions[key]);
-      }
-      
-      // Create certificate data object matching DB schema
-      const certificateData = {
-        document_id: id,
-        patient_info: patientInfo,
-        fitness_declaration: fitnessDeclaration,
-        restrictions: Array.isArray(restrictions) ? restrictions : [],
-        medical_tests: editedData.examination_results?.test_results || 
-                     editedData.medicalTests || 
-                     editedData.medical_tests || {},
-        vision_tests: editedData.vision_tests || {
-          far_near_vision: editedData.examination_results?.test_results?.far_near_vision_results || 
-                         editedData.medicalTests?.farNearVision?.results || null,
-          side_depth: editedData.examination_results?.test_results?.side_depth_results || 
-                    editedData.medicalTests?.sideDepth?.results || null,
-          night_vision: editedData.examination_results?.test_results?.night_vision_results || 
-                      editedData.medicalTests?.nightVision?.results || null
-        },
-        company_info: {
-          name: patientInfo.company || ''
-        },
-        validated: true
-      };
-      
-      console.log("Formatted certificate data for save:", JSON.stringify(certificateData));
-      
-      // Log the current authentication status to help with debugging
-      const { data: authData } = await supabase.auth.getSession();
-      console.log("Current auth status:", authData?.session ? "Authenticated" : "Not authenticated");
-      
-      let result;
-      
-      // Update or insert the certificate based on whether it already exists
-      if (document.certificateId) {
-        console.log("Updating existing certificate:", document.certificateId);
-        result = await supabase
-          .from('certificates')
-          .update(certificateData)
-          .eq('id', document.certificateId)
-          .select();
-      } else {
-        console.log("Creating new certificate");
-        result = await supabase
-          .from('certificates')
-          .insert(certificateData)
-          .select();
-      }
-      
-      if (result.error) {
-        console.error("Supabase error:", result.error);
-        throw result.error;
-      }
-      
-      console.log("Certificate saved successfully:", result.data);
-      
-      // Update document state with new data
-      setDocument(prev => ({
-        ...prev,
-        extractedData: editedData,
-        jsonData: JSON.stringify(editedData, null, 2),
-        validated: true,
-        certificateId: result.data?.[0]?.id || document.certificateId
-      }));
-      
-      // Explicitly fetch the saved certificate to confirm data is saved correctly
-      const { data: savedCertificate, error: fetchError } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq(document.certificateId ? 'id' : 'document_id', document.certificateId || id)
-        .maybeSingle();
-        
-      if (fetchError) {
-        console.error("Error fetching saved certificate:", fetchError);
-      } else {
-        console.log("Fetched saved certificate data:", savedCertificate);
-      }
-      
-      // Also force an update to the document record to ensure it has the correct reference
-      try {
-        await supabase
-          .from('documents')
-          .update({
-            status: 'processed',
-            extracted_data: editedData // ensure document also has latest data
-          })
-          .eq('id', id);
-          
-        console.log("Document record updated with latest extracted data");
-      } catch (docUpdateError) {
-        console.error("Error updating document record:", docUpdateError);
-      }
-      
-      setIsEditing(false);
-      toast.success("Certificate validated successfully", {
-        description: "The validated certificate has been saved to the database."
-      });
-    } catch (error) {
-      console.error('Error saving validated certificate:', error);
-      toast.error("Failed to save certificate", {
-        description: `Error: ${error.message || "Unknown error occurred"}`
-      });
-    } finally {
-      setSaveLoading(false);
-    }
-  };
-
   const renderExtractedData = () => {
     if (!document || !document.extractedData) {
       return (
@@ -619,11 +469,7 @@ const DocumentViewer = () => {
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate 
-            extractedData={extractedData} 
-            isEditable={isEditing}
-            onDataChange={handleDataChange}
-          />
+          <CertificateTemplate extractedData={extractedData} />
         </div>
       );
     }
@@ -632,10 +478,9 @@ const DocumentViewer = () => {
       typeof extractedData === 'object' && 
       extractedData !== null && 
       !Array.isArray(extractedData) && 
-      (extractedData.patient || extractedData.medical_details || 
-       extractedData.examination_results || extractedData.certification)
+      extractedData.structured_data
     ) {
-      const structuredData = extractedData;
+      const structuredData = extractedData.structured_data;
       
       return (
         <div className="space-y-6">
@@ -881,12 +726,6 @@ const DocumentViewer = () => {
             <h1 className="text-lg font-medium truncate">{document.name}</h1>
             <p className="text-sm text-muted-foreground">
               {document.type} | {document.patientName || "Unknown Patient"}
-              {document.validated && (
-                <Badge variant="outline" className="ml-2 text-emerald-600 border-emerald-600">
-                  <CheckSquare className="h-3 w-3 mr-1" />
-                  Validated
-                </Badge>
-              )}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -932,35 +771,6 @@ const DocumentViewer = () => {
               <Copy className="h-4 w-4 mr-2" />
               Copy JSON
             </Button>
-            {document.type === 'Certificate of Fitness' && !isEditing && (
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditing(true)}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-            )}
-            {isEditing && (
-              <Button 
-                size="sm"
-                onClick={saveValidatedCertificate}
-                disabled={saveLoading}
-              >
-                {saveLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </>
-                )}
-              </Button>
-            )}
             <Button 
               size="sm"
               onClick={() => {
@@ -1025,80 +835,59 @@ const DocumentViewer = () => {
             className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {isEditing ? "Edit Certificate" : document.validated ? "Validated Certificate" : "Extracted Data"}
-              </h2>
-              <div className="flex items-center space-x-2">
-                {document.validated && !isEditing && (
-                  <Badge variant="default" className="text-xs bg-emerald-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Validated
-                  </Badge>
-                )}
-                {isEditing && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Edit className="h-3 w-3 mr-1" />
-                    Editing
-                  </Badge>
-                )}
-                {!document.validated && document.status === 'processed' && !isEditing && (
-                  <Badge variant="default" className="text-xs">
+              <h2 className="text-xl font-semibold">Extracted Data</h2>
+              <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
+                {document.status === 'processed' ? (
+                  <>
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Processed
-                  </Badge>
-                )}
-                {document.status === 'processing' && (
-                  <Badge variant="secondary" className="text-xs">
+                  </>
+                ) : (
+                  <>
                     <Clock className="h-3 w-3 mr-1 animate-pulse" />
                     Processing
-                  </Badge>
+                  </>
                 )}
-              </div>
+              </Badge>
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              {isEditing ? (
-                <CardContent className="pt-6 h-[calc(100vh-270px)] overflow-hidden">
-                  {renderExtractedData()}
-                </CardContent>
-              ) : (
-                <Tabs defaultValue="structured">
-                  <CardHeader className="pb-0">
-                    <TabsList className="grid grid-cols-2">
-                      <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                      <TabsTrigger value="json">JSON</TabsTrigger>
-                    </TabsList>
-                  </CardHeader>
+              <Tabs defaultValue="structured">
+                <CardHeader className="pb-0">
+                  <TabsList className="grid grid-cols-2">
+                    <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                    <TabsTrigger value="json">JSON</TabsTrigger>
+                  </TabsList>
+                </CardHeader>
+                
+                <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
+                  <TabsContent value="structured" className="m-0 h-full">
+                    {renderExtractedData()}
+                  </TabsContent>
                   
-                  <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
-                    <TabsContent value="structured" className="m-0 h-full">
-                      {renderExtractedData()}
-                    </TabsContent>
-                    
-                    <TabsContent value="json" className="m-0 h-full">
-                      <ScrollArea className="h-full">
-                        <div className="relative">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="absolute top-1 right-1"
-                            onClick={() => {
-                              navigator.clipboard.writeText(document.jsonData);
-                              toast.success("JSON data copied to clipboard");
-                            }}
-                          >
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copy
-                          </Button>
-                          <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                            {document.jsonData}
-                          </pre>
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-                  </CardContent>
-                </Tabs>
-              )}
+                  <TabsContent value="json" className="m-0 h-full">
+                    <ScrollArea className="h-full">
+                      <div className="relative">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="absolute top-1 right-1"
+                          onClick={() => {
+                            navigator.clipboard.writeText(document.jsonData);
+                            toast.success("JSON data copied to clipboard");
+                          }}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy
+                        </Button>
+                        <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
+                          {document.jsonData}
+                        </pre>
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
             </Card>
             
             <div className="flex justify-end space-x-2">
@@ -1109,58 +898,20 @@ const DocumentViewer = () => {
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard
               </Button>
-              {isEditing ? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsEditing(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={saveValidatedCertificate}
-                    disabled={saveLoading}
-                  >
-                    {saveLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Validate & Save
-                      </>
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {document.type === 'Certificate of Fitness' && !isEditing && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEditing(true)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Certificate
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => {
-                      toast("Certificate generated successfully", {
-                        description: "The certificate of fitness has been saved to your downloads folder",
-                        action: {
-                          label: "View",
-                          onClick: () => console.log("Viewing certificate")
-                        }
-                      });
-                    }}
-                  >
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Generate Certificate
-                  </Button>
-                </>
-              )}
+              <Button
+                onClick={() => {
+                  toast("Certificate generated successfully", {
+                    description: "The certificate of fitness has been saved to your downloads folder",
+                    action: {
+                      label: "View",
+                      onClick: () => console.log("Viewing certificate")
+                    }
+                  });
+                }}
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Generate Certificate
+              </Button>
             </div>
           </motion.div>
         </motion.div>
