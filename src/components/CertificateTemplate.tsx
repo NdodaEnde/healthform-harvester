@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -702,14 +701,14 @@ const CertificateTemplate = ({
                   </div>
                 </div>
                 
-                <div className="flex-1 text-center px-2">
-                  <div className="text-center text-[0.65rem] space-y-1">
-                    <p className="font-semibold">Occupational Health Practitioner / Occupational Medical</p>
-                    <p className="font-semibold">Practitioner</p>
-                    <p>Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
-                    <p>Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
-                    <p>SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
-                    <p>Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
+                <div className="flex-1 px-2">
+                  <div className="text-[0.65rem] space-y-1">
+                    <p className="font-semibold text-left">Occupational Health Practitioner / Occupational Medical</p>
+                    <p className="font-semibold text-center">Practitioner</p>
+                    <p className="text-center">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
+                    <p className="text-center">Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
+                    <p className="text-center">SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
+                    <p className="text-center">Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
                   </div>
                 </div>
                 
