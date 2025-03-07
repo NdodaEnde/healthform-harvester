@@ -1,9 +1,12 @@
+
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 type CertificateTemplateProps = {
   extractedData: any;
 };
+
 const CertificateTemplate = ({
   extractedData
 }: CertificateTemplateProps) => {
@@ -378,6 +381,7 @@ const CertificateTemplate = ({
     medicalTests,
     restrictionsData
   });
+  
   return <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
@@ -407,11 +411,11 @@ const CertificateTemplate = ({
                   </div>
                 </div>
                 <div className="bg-gray-800 text-white px-3 py-1">
-                  <div className="text-sm font-bold">    BLUECOLLAR OCCUPATIONAL HEALTH</div>
-                  <div className="text-xs mt-1">                          Tel: +27 11 892 0771/011 892 0627</div>
-                  <div className="text-xs">                       Email: admin@bluecollarhealth.co.za</div>
-                  <div className="text-xs">                                   office@bluecollarhealth.co.za</div>
-                  <div className="text-xs">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
+                  <div className="text-sm font-bold text-right">BLUECOLLAR OCCUPATIONAL HEALTH</div>
+                  <div className="text-xs mt-1 text-right">Tel: +27 11 892 0771/011 892 0627</div>
+                  <div className="text-xs text-right">Email: admin@bluecollarhealth.co.za</div>
+                  <div className="text-xs text-right">office@bluecollarhealth.co.za</div>
+                  <div className="text-xs text-right">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
                 </div>
               </div>
             </div>
@@ -422,7 +426,7 @@ const CertificateTemplate = ({
             </div>
             
             {/* Physician/Practice Info */}
-            <div className="text-center text-xs px-4 mb-3">
+            <div className="text-right text-xs px-4 mb-3">
               <p>
                 Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No: {getValue(examination, 'practice_number') || '0404160'} / Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} / Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
               </p>
@@ -435,40 +439,40 @@ const CertificateTemplate = ({
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Initials & Surname:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'name') || getValue(patient, 'full_name')}</span>
+                    <span className="border-b border-gray-400 flex-1 text-right">{getValue(patient, 'name') || getValue(patient, 'full_name')}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">ID NO:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'id_number') || getValue(patient, 'employee_id') || getValue(patient, 'id')}</span>
+                    <span className="border-b border-gray-400 flex-1 text-right">{getValue(patient, 'id_number') || getValue(patient, 'employee_id') || getValue(patient, 'id')}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Company Name:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'company') || getValue(patient, 'employer') || getValue(patient, 'employment.employer')}</span>
+                <span className="border-b border-gray-400 flex-1 text-right">{getValue(patient, 'company') || getValue(patient, 'employer') || getValue(patient, 'employment.employer')}</span>
               </div>
               
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(extractedData, 'examination_date')}</span>
+                    <span className="border-b border-gray-400 flex-1 text-right">{getValue(examination, 'date') || getValue(extractedData, 'examination_date')}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(certification, 'valid_until') || getValue(certification, 'expiration_date')}</span>
+                    <span className="border-b border-gray-400 flex-1 text-right">{getValue(certification, 'valid_until') || getValue(certification, 'expiration_date')}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Job Title:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'occupation') || getValue(patient, 'job_title') || getValue(patient, 'employment.occupation')}</span>
+                <span className="border-b border-gray-400 flex-1 text-right">{getValue(patient, 'occupation') || getValue(patient, 'job_title') || getValue(patient, 'employment.occupation')}</span>
               </div>
             </div>
             
@@ -521,7 +525,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.bloods.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.bloods.results}
                           </td>
                         </tr>
@@ -530,7 +534,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.farNearVision.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.farNearVision.results}
                           </td>
                         </tr>
@@ -539,7 +543,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.sideDepth.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.sideDepth.results}
                           </td>
                         </tr>
@@ -548,7 +552,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.nightVision.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.nightVision.results}
                           </td>
                         </tr>
@@ -570,7 +574,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.hearing.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.hearing.results}
                           </td>
                         </tr>
@@ -579,7 +583,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.heights.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.heights.results}
                           </td>
                         </tr>
@@ -588,7 +592,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.lungFunction.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.lungFunction.results}
                           </td>
                         </tr>
@@ -597,7 +601,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.xRay.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.xRay.results}
                           </td>
                         </tr>
@@ -606,7 +610,7 @@ const CertificateTemplate = ({
                           <td className="border border-gray-400 text-center">
                             {medicalTests.drugScreen.done ? '✓' : ''}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border border-gray-400 p-1 text-sm text-right">
                             {medicalTests.drugScreen.results}
                           </td>
                         </tr>
@@ -621,11 +625,11 @@ const CertificateTemplate = ({
             <div className="px-4 mb-4">
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
-                <div className="border-b border-gray-400 flex-1">
+                <div className="border-b border-gray-400 flex-1 text-right">
                   {getValue(certification, 'follow_up') || getValue(certification, 'referral')}
                 </div>
                 <div className="ml-2">
-                  <div className="text-sm">
+                  <div className="text-sm text-right">
                     <span className="font-semibold mr-1">Review Date:</span>
                     <span className="text-red-600">{getValue(certification, 'review_date')}</span>
                   </div>
@@ -723,7 +727,7 @@ const CertificateTemplate = ({
             <div className="px-4 mb-6">
               <div className="flex flex-col">
                 <div className="font-semibold text-sm mb-1">Comments:</div>
-                <div className="border border-gray-400 p-2 min-h-24 text-sm">
+                <div className="border border-gray-400 p-2 min-h-24 text-sm text-right">
                   {getValue(certification, 'comments') || 'N/A'}
                 </div>
               </div>
@@ -747,7 +751,7 @@ const CertificateTemplate = ({
             </div>
             
             {/* Disclaimer */}
-            <div className="bg-gray-100 p-3 text-xs text-center">
+            <div className="bg-gray-100 p-3 text-xs text-right">
               <p>This certificate is valid for the duration specified above from the date of medical examination, 
                 unless there is a change in the employees' medical condition or the nature of their work.</p>
             </div>
@@ -756,4 +760,5 @@ const CertificateTemplate = ({
       </Card>
     </ScrollArea>;
 };
+
 export default CertificateTemplate;
