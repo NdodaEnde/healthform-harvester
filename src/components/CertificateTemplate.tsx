@@ -701,15 +701,19 @@ const CertificateTemplate = ({
                   </div>
                 </div>
                 
-                <div className="flex-1 text-center">
-                  <div className="border border-gray-300 rounded-full w-24 h-24 mx-auto mb-2 flex items-center justify-center">
-                    <div className="text-xs text-gray-400">STAMP</div>
+                <div className="flex-1 text-center px-2">
+                  <div className="text-center text-xs space-y-1">
+                    <p className="font-semibold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
+                    <p>Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
+                    <p>Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
+                    <p>SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
+                    <p>Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
                   </div>
                 </div>
                 
                 <div className="flex-1 text-right">
-                  <div className="border-t border-gray-400 pt-1 mt-8 ml-auto max-w-40">
-                    <div className="text-xs">Date</div>
+                  <div className="border border-gray-300 rounded-full w-24 h-24 mx-auto mb-2 flex items-center justify-center">
+                    <div className="text-xs text-gray-400">STAMP</div>
                   </div>
                 </div>
               </div>
@@ -727,3 +731,4 @@ const CertificateTemplate = ({
 };
 
 export default CertificateTemplate;
+
