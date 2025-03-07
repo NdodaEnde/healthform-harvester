@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -393,7 +392,7 @@ const CertificateTemplate = ({
           <div className="relative z-10">
             {/* Header */}
             <div className="px-4 pt-4">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center">
                   {/* Logo placeholder */}
                   <div className="w-16 h-16 rounded overflow-hidden bg-blue-100 flex items-center justify-center mr-2">
@@ -408,11 +407,11 @@ const CertificateTemplate = ({
                   </div>
                 </div>
                 <div className="bg-white text-right">
-                  <div className="text-sm font-bold bg-gray-800 text-white px-3 py-1">    BLUECOLLAR OCCUPATIONAL HEALTH</div>
-                  <div className="text-xs mt-1 px-3 text-black">                          Tel: +27 11 892 0771/011 892 0627</div>
-                  <div className="text-xs px-3 text-black">                       Email: admin@bluecollarhealth.co.za</div>
-                  <div className="text-xs px-3 text-black">                                   office@bluecollarhealth.co.za</div>
-                  <div className="text-xs px-3 text-black">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
+                  <div className="text-sm font-bold bg-gray-800 text-white px-3 py-1 text-right">BLUECOLLAR OCCUPATIONAL HEALTH</div>
+                  <div className="text-[0.65rem] mt-1 px-3 text-black text-right">Tel: +27 11 892 0771/011 892 0627</div>
+                  <div className="text-[0.65rem] px-3 text-black text-right">Email: admin@bluecollarhealth.co.za</div>
+                  <div className="text-[0.65rem] px-3 text-black text-right">office@bluecollarhealth.co.za</div>
+                  <div className="text-[0.65rem] px-3 text-black text-right">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
                 </div>
               </div>
             </div>
@@ -657,104 +656,4 @@ const CertificateTemplate = ({
                         {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Wear Hearing Protection</div>
-                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Confined Spaces</div>
-                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Chemical Exposure</div>
-                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Wear Spectacles</div>
-                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
-                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            {/* Fitness Status */}
-            <div className="mb-6">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
-                Medical Fitness Declaration
-              </div>
-              
-              <div className="px-4">
-                <table className="w-full border border-gray-400">
-                  <tbody>
-                    <tr>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
-                        <div className="font-semibold text-sm">FIT</div>
-                        {fitnessStatus.fit && <div className="mt-1 text-sm">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold text-sm">Fit with Restriction</div>
-                        {fitnessStatus.fitWithRestriction && <div className="mt-1 text-sm">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold text-sm">Fit with Condition</div>
-                        {fitnessStatus.fitWithCondition && <div className="mt-1 text-sm">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
-                        <div className="font-semibold text-sm">Temporary Unfit</div>
-                        {fitnessStatus.temporarilyUnfit && <div className="mt-1 text-sm">✓</div>}
-                      </td>
-                      <td className={`border border-gray-400 p-3 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
-                        <div className="font-semibold text-sm">UNFIT</div>
-                        {fitnessStatus.unfit && <div className="mt-1 text-sm">✓</div>}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            {/* Comments */}
-            <div className="px-4 mb-6">
-              <div className="flex flex-col">
-                <div className="font-semibold text-sm mb-1">Comments:</div>
-                <div className="border border-gray-400 p-2 min-h-24 text-sm">
-                  {getValue(certification, 'comments') || 'N/A'}
-                </div>
-              </div>
-            </div>
-            
-            {/* Footer with signature */}
-            <div className="px-4 flex justify-between items-end mb-4">
-              <div className="w-56">
-                <div className="border-b border-gray-400 h-14"></div>
-                <div className="text-center text-sm font-semibold mt-1">
-                  Signature
-                </div>
-              </div>
-              
-              <div className="w-56">
-                <div className="border border-gray-400 border-dashed h-14"></div>
-                <div className="text-center text-sm font-semibold mt-1">
-                  Stamp
-                </div>
-              </div>
-            </div>
-            
-            {/* Disclaimer */}
-            <div className="bg-gray-100 p-3 text-xs text-center">
-              <p>This certificate is valid for the duration specified above from the date of medical examination, 
-                unless there is a change in the employees' medical condition or the nature of their work.</p>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </ScrollArea>;
-};
-export default CertificateTemplate;
+                        <div className="font-
