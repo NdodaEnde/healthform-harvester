@@ -702,7 +702,7 @@ const CertificateTemplate = ({
                 </div>
                 
                 <div className="flex-1 text-center px-2">
-                  <div className="text-center text-xs space-y-1">
+                  <div className="text-center text-[0.65rem] space-y-1">
                     <p className="font-semibold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
                     <p>Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
                     <p>Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
@@ -731,4 +731,3 @@ const CertificateTemplate = ({
 };
 
 export default CertificateTemplate;
-
