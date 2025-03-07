@@ -13,14 +13,12 @@ const CertificateTemplate = ({
     console.log("CertificateTemplate received data:", extractedData);
   }, [extractedData]);
 
-  // Helper to check if a value is checked/selected
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value).toLowerCase().trim();
     return trueValues.includes(stringValue);
   };
 
-  // Helper to get nested values safely
   const getValue = (obj: any, path: string, defaultValue: any = '') => {
     if (!obj || !path) return defaultValue;
     const keys = path.split('.');
@@ -34,7 +32,6 @@ const CertificateTemplate = ({
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
-  // Extract data directly from markdown
   const extractDataFromMarkdown = (markdown: string): any => {
     if (!markdown) return {};
     console.log("Extracting data from markdown");
@@ -48,7 +45,6 @@ const CertificateTemplate = ({
       restrictions: {}
     };
 
-    // Patient data - more robust pattern matching
     const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (nameMatch && nameMatch[1]) extracted.patient.name = nameMatch[1].trim();
     const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
@@ -62,12 +58,10 @@ const CertificateTemplate = ({
     const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
 
-    // Examination type - look for [x] markers in different formats
     extracted.examination_results.type.pre_employment = markdown.includes('**Pre-Employment**: [x]') || markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
     extracted.examination_results.type.periodical = markdown.includes('**Periodical**: [x]') || markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
     extracted.examination_results.type.exit = markdown.includes('**Exit**: [x]') || markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
 
-    // Medical tests - check multiple formats
     const testsMap = [{
       name: 'BLOODS',
       key: 'bloods'
@@ -98,15 +92,10 @@ const CertificateTemplate = ({
     }];
     
     testsMap.forEach(test => {
-      // Check table format with pipe separators
       const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
       const tableMatch = markdown.match(tableRegex);
-
-      // Check list format
       const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
       const listMatch = markdown.match(listRegex);
-
-      // Check HTML table format
       const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
       const htmlTableMatch = markdown.match(htmlTableRegex);
       let isDone = false;
@@ -127,7 +116,6 @@ const CertificateTemplate = ({
       }
     });
 
-    // Fitness status - check various formats
     const fitnessOptions = [{
       name: 'FIT',
       key: 'fit'
@@ -146,14 +134,12 @@ const CertificateTemplate = ({
     }];
     
     fitnessOptions.forEach(option => {
-      // Check multiple formats
       const patterns = [
         new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'), 
         new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'), 
         new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
       ];
 
-      // Check all patterns
       let isSelected = false;
       for (const pattern of patterns) {
         const match = markdown.match(pattern);
@@ -165,7 +151,6 @@ const CertificateTemplate = ({
       extracted.certification[option.key] = isSelected;
     });
 
-    // Restrictions - check both table and list formats
     const restrictions = [{
       name: 'Heights',
       key: 'heights'
@@ -193,14 +178,12 @@ const CertificateTemplate = ({
     }];
     
     restrictions.forEach(restriction => {
-      // Check multiple formats
       const patterns = [
         new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'), 
         new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'), 
         new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
       ];
 
-      // Check all patterns
       let isSelected = false;
       for (const pattern of patterns) {
         const match = markdown.match(pattern);
@@ -212,7 +195,6 @@ const CertificateTemplate = ({
       extracted.restrictions[restriction.key] = isSelected;
     });
 
-    // Follow-up actions and comments
     const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
     if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
     const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
@@ -220,7 +202,6 @@ const CertificateTemplate = ({
     const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
     if (commentsMatch && commentsMatch[1]) {
       let comments = commentsMatch[1].trim();
-      // If it's just "N/A" or empty after HTML tags are removed
       if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
         extracted.certification.comments = "N/A";
       } else {
@@ -231,12 +212,10 @@ const CertificateTemplate = ({
     return extracted;
   };
 
-  // Enhanced function to extract markdown from the Landing AI response
   const getMarkdown = (data: any): string | null => {
     if (!data) return null;
     console.log("Attempting to extract markdown from data structure");
 
-    // First, try direct known paths
     const possiblePaths = ['raw_response.data.markdown', 'extracted_data.raw_response.data.markdown', 'markdown', 'raw_markdown'];
     for (const path of possiblePaths) {
       const value = getValue(data, path);
@@ -246,7 +225,6 @@ const CertificateTemplate = ({
       }
     }
 
-    // Deep search for any property containing markdown content
     const searchForMarkdown = (obj: any, path = ''): string | null => {
       if (!obj || typeof obj !== 'object') return null;
       if (obj.markdown && typeof obj.markdown === 'string') {
@@ -273,7 +251,6 @@ const CertificateTemplate = ({
     const deepMarkdown = searchForMarkdown(data);
     if (deepMarkdown) return deepMarkdown;
 
-    // Try to find structured_data.raw_content
     if (data.structured_data && data.structured_data.raw_content) {
       console.log("Found structured_data.raw_content, using as markdown");
       return data.structured_data.raw_content;
@@ -282,10 +259,8 @@ const CertificateTemplate = ({
     return null;
   };
 
-  // Get structured data from either direct input or extracted from markdown
   let structuredData: any = {};
 
-  // First try to get structured data directly from the input
   if (extractedData?.structured_data) {
     console.log("Using existing structured_data");
     structuredData = extractedData.structured_data;
@@ -293,7 +268,6 @@ const CertificateTemplate = ({
     console.log("Using structured_data from extracted_data");
     structuredData = extractedData.extracted_data.structured_data;
   } else {
-    // If no structured data, try to extract from markdown
     const markdown = getMarkdown(extractedData);
     if (markdown) {
       console.log("Extracting from markdown content");
@@ -304,14 +278,12 @@ const CertificateTemplate = ({
     }
   }
 
-  // Get the main sections from the data
   const patient = structuredData.patient || {};
   const examination = structuredData.examination_results || structuredData.medical_details || {};
   const restrictions = structuredData.restrictions || {};
   const certification = structuredData.certification || structuredData.fitness_assessment || {};
   const testResults = examination.test_results || examination.tests || {};
 
-  // Fitness status
   const fitnessStatus = {
     fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
     fitWithRestriction: isChecked(certification.fit_with_restrictions),
@@ -320,7 +292,6 @@ const CertificateTemplate = ({
     unfit: isChecked(certification.permanently_unfit) || isChecked(certification.unfit)
   };
 
-  // Medical tests status
   const medicalTests = {
     bloods: {
       done: isChecked(testResults.bloods_done) || isChecked(testResults.blood_test),
@@ -360,7 +331,6 @@ const CertificateTemplate = ({
     }
   };
 
-  // Restrictions
   const restrictionsData = {
     heights: isChecked(restrictions.heights),
     dustExposure: isChecked(restrictions.dust_exposure),
@@ -372,14 +342,12 @@ const CertificateTemplate = ({
     chronicConditions: isChecked(restrictions.chronic_conditions) || isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
   };
 
-  // Determine examination type
   const examinationType = {
     preEmployment: isChecked(examination.pre_employment) || isChecked(examination.type?.pre_employment),
     periodical: isChecked(examination.periodical) || isChecked(examination.type?.periodical),
     exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
   };
 
-  // For debugging - log the patient data to console
   console.log("Certificate template using data:", {
     name: getValue(patient, 'name'),
     id: getValue(patient, 'id_number'),
@@ -397,24 +365,20 @@ const CertificateTemplate = ({
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
-          {/* Certificate watermark (faint background) */}
           <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none" aria-hidden="true">
             <span className="text-8xl font-bold tracking-widest text-gray-400 rotate-45">
               OCCUPATIONAL HEALTH
             </span>
           </div>
           
-          {/* Certificate content */}
           <div className="relative z-10">
-            {/* Header */}
             <div className="px-4 pt-4">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  {/* Replaced logo placeholder with the company logo image */}
                   <img 
                     src="/lovable-uploads/b75ebd30-51c1-441a-8b04-eec2746a7ebd.png" 
                     alt="BlueCollar Health & Wellness Logo" 
-                    className="h-16 object-contain"
+                    className="h-20 object-contain"
                   />
                 </div>
                 <div className="bg-white text-right">
@@ -427,12 +391,10 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Certificate Title */}
             <div className="bg-gray-800 text-white text-center py-2 mb-2">
               <h2 className="text-lg font-bold">CERTIFICATE OF FITNESS</h2>
             </div>
             
-            {/* Physician/Practice Info */}
             <div className="text-center text-xs px-4 mb-3">
               <p>
                 Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No: {getValue(examination, 'practice_number') || '0404160'} / Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} / Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
@@ -440,7 +402,6 @@ const CertificateTemplate = ({
               <p>certify that the following employee:</p>
             </div>
             
-            {/* Employee Details Section */}
             <div className="px-4 space-y-4 mb-4">
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
@@ -483,7 +444,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Examination Type */}
             <div className="px-4 mb-4">
               <table className="w-full border border-gray-400">
                 <thead>
@@ -509,7 +469,6 @@ const CertificateTemplate = ({
               </table>
             </div>
             
-            {/* Medical Examination Tests */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
@@ -628,7 +587,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Referral Section */}
             <div className="px-4 mb-4">
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
@@ -644,7 +602,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Restrictions Table */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 Restrictions:
@@ -694,7 +651,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Comments Section */}
             <div className="px-4 mb-4">
               <div className="font-semibold text-sm mb-1">Comments:</div>
               <div className="border border-gray-400 p-2 min-h-16 text-sm">
@@ -702,7 +658,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Fitness Assessment */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 FITNESS ASSESSMENT
@@ -738,7 +693,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Signature Section */}
             <div className="px-4 mb-4">
               <div className="flex justify-between items-end">
                 <div className="flex-1">
@@ -761,7 +715,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Footer */}
             <div className="bg-gray-800 text-white text-center py-2 text-xs">
               <p>This certificate was electronically generated by BlueCollar Occupational Health Services.</p>
               <p>© {new Date().getFullYear()} BlueCollar Health & Wellness</p>
