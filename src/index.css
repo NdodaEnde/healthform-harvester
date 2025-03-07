@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -106,6 +107,12 @@
   
   .text-balance {
     text-wrap: balance;
+  }
+  
+  .validation-scroll-area {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 16px;
   }
 }
 

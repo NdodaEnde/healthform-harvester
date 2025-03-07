@@ -235,7 +235,7 @@ const CertificateValidator = ({
               <TabsTrigger value="certification">Certification</TabsTrigger>
             </TabsList>
             
-            <ScrollArea className="h-[500px] pr-4">
+            <ScrollArea className="h-[60vh] overflow-y-auto pr-4">
               <TabsContent value="patient" className="space-y-4 mt-0">
                 {renderPatientFields()}
               </TabsContent>
