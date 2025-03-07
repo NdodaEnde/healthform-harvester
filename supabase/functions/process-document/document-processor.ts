@@ -33,10 +33,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       const { data: updateData, error: updateError } = await supabase
         .from('documents')
         .update({
-          extracted_data: {
-            structured_data: structuredData,
-            raw_response: result
-          },
+          extracted_data: structuredData, // Store directly without nesting
           status: 'processed',
           processed_at: new Date().toISOString()
         })
@@ -76,6 +73,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
         console.error('Error verifying document update:', verifyError);
       } else {
         console.log(`Verified document status is now: ${verifyData.status}`);
+        console.log(`Verified extracted data:`, JSON.stringify(verifyData.extracted_data));
         
         if (verifyData.status !== 'processed') {
           console.log(`Document status is not 'processed', forcing update one more time...`);

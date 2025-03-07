@@ -487,7 +487,7 @@ const DocumentViewer = () => {
       // Handle different potential shapes of data
       let patientInfo = editedData.patient || editedData.patient_info || {};
       let fitnessDeclaration = editedData.certification || editedData.fitness_declaration || {};
-      let restrictions = editedData.restrictions || [];
+      let restrictions = editedData.restrictions || editedData.restrictionsData || [];
       
       // Format restrictions to always be an array
       if (typeof restrictions === 'object' && !Array.isArray(restrictions)) {
@@ -553,6 +553,19 @@ const DocumentViewer = () => {
         validated: true,
         certificateId: result.data?.[0]?.id || document.certificateId
       }));
+      
+      // Explicitly fetch the saved certificate to confirm data is saved correctly
+      const { data: savedCertificate, error: fetchError } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq(document.certificateId ? 'id' : 'document_id', document.certificateId || id)
+        .maybeSingle();
+        
+      if (fetchError) {
+        console.error("Error fetching saved certificate:", fetchError);
+      } else {
+        console.log("Fetched saved certificate data:", savedCertificate);
+      }
       
       setIsEditing(false);
       toast.success("Certificate validated successfully", {
