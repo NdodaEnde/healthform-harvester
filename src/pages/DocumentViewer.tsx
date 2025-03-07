@@ -888,7 +888,7 @@ const DocumentViewer = () => {
                 </Badge>
               )}
               {!isValidating && document.validationStatus === 'validated' && (
-                <Badge variant="success" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+                <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
                   <Check className="h-3 w-3 mr-1" />
                   Validated
                 </Badge>
