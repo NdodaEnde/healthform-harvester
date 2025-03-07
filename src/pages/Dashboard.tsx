@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -28,7 +27,6 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   
-  // Store processed document data in sessionStorage to access in DocumentViewer
   const saveDocumentData = (data: any) => {
     if (data) {
       sessionStorage.setItem(`document-${data.id}`, JSON.stringify(data));
@@ -51,7 +49,6 @@ const Dashboard = () => {
       }
       
       if (data) {
-        // Format documents to match the UI expectations
         const formattedDocuments = data.map(doc => ({
           id: doc.id,
           name: doc.file_name,
@@ -75,7 +72,6 @@ const Dashboard = () => {
     }
   }, []);
   
-  // Helper functions to extract patient info from extracted data
   const extractPatientName = (extractedData: any) => {
     if (!extractedData || !extractedData.structured_data || !extractedData.structured_data.patient) {
       return "Unknown";
@@ -92,10 +88,27 @@ const Dashboard = () => {
            "No ID";
   };
   
+  const getCheckboxState = (extractedData: any, fieldPath: string) => {
+    if (!extractedData || !extractedData.structured_data) {
+      return false;
+    }
+    
+    const parts = fieldPath.split('.');
+    let current = extractedData.structured_data;
+    
+    for (const part of parts) {
+      if (!current || typeof current !== 'object') {
+        return false;
+      }
+      current = current[part];
+    }
+    
+    return !!current;
+  };
+  
   useEffect(() => {
     fetchDocuments();
     
-    // Set up polling to refresh documents every 5 seconds
     const interval = setInterval(() => {
       fetchDocuments();
     }, 5000);
@@ -107,11 +120,9 @@ const Dashboard = () => {
     setIsUploadDialogOpen(false);
     
     if (data) {
-      // Add the new document to the list
       const newDocuments = [data, ...documents];
       setDocuments(newDocuments);
       
-      // Save the document data for retrieval in DocumentViewer
       saveDocumentData(data);
       
       toast.success("Document uploaded and processed", {
@@ -119,7 +130,6 @@ const Dashboard = () => {
       });
     }
     
-    // Refresh documents
     fetchDocuments();
   };
   
@@ -146,7 +156,6 @@ const Dashboard = () => {
 
   const handleDeleteDocument = async (docId: string) => {
     try {
-      // Delete document from database
       const { error } = await supabase
         .from('documents')
         .delete()
@@ -158,11 +167,9 @@ const Dashboard = () => {
         return;
       }
       
-      // Remove from state
       const updatedDocuments = documents.filter(doc => doc.id !== docId);
       setDocuments(updatedDocuments);
       
-      // Remove from sessionStorage
       sessionStorage.removeItem(`document-${docId}`);
       
       toast.success("Document deleted successfully");
