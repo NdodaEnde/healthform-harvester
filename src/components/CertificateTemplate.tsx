@@ -1,10 +1,11 @@
-<lov-code>
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 type CertificateTemplateProps = {
   extractedData: any;
 };
+
 const CertificateTemplate = ({
   extractedData
 }: CertificateTemplateProps) => {
@@ -95,6 +96,7 @@ const CertificateTemplate = ({
       name: 'Drug Screen',
       key: 'drug_screen'
     }];
+    
     testsMap.forEach(test => {
       // Check table format with pipe separators
       const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
@@ -142,9 +144,14 @@ const CertificateTemplate = ({
       name: 'UNFIT',
       key: 'unfit'
     }];
+    
     fitnessOptions.forEach(option => {
       // Check multiple formats
-      const patterns = [new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'), new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'), new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')];
+      const patterns = [
+        new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'), 
+        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'), 
+        new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
+      ];
 
       // Check all patterns
       let isSelected = false;
@@ -184,9 +191,14 @@ const CertificateTemplate = ({
       name: 'Remain on Treatment for Chronic Conditions',
       key: 'remain_on_treatment_for_chronic_conditions'
     }];
+    
     restrictions.forEach(restriction => {
       // Check multiple formats
-      const patterns = [new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'), new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'), new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')];
+      const patterns = [
+        new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'), 
+        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'), 
+        new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
+      ];
 
       // Check all patterns
       let isSelected = false;
@@ -257,6 +269,7 @@ const CertificateTemplate = ({
       }
       return null;
     };
+    
     const deepMarkdown = searchForMarkdown(data);
     if (deepMarkdown) return deepMarkdown;
 
@@ -379,7 +392,9 @@ const CertificateTemplate = ({
     medicalTests,
     restrictionsData
   });
-  return <ScrollArea className="h-full">
+
+  return (
+    <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
           {/* Certificate watermark (faint background) */}
@@ -665,4 +680,97 @@ const CertificateTemplate = ({
                         <div className="font-semibold">Chemical Exposure</div>
                         {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Spectacles</div>
+                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
+                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Comments Section */}
+            <div className="px-4 mb-4">
+              <div className="font-semibold text-sm mb-1">Comments:</div>
+              <div className="border border-gray-400 p-2 min-h-16 text-sm">
+                {getValue(certification, 'comments')}
+              </div>
+            </div>
+            
+            {/* Fitness Assessment */}
+            <div className="mb-4">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                FITNESS ASSESSMENT
+              </div>
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400">
+                  <tbody>
+                    <tr>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                        FIT
+                        {fitnessStatus.fit && <div className="text-green-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        Fit with Restriction
+                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        Fit with Condition
+                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        Temporary Unfit
+                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        UNFIT
+                        {fitnessStatus.unfit && <div className="text-red-600 text-lg">✓</div>}
+                      </th>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Signature Section */}
+            <div className="px-4 mb-4">
+              <div className="flex justify-between items-end">
+                <div className="flex-1">
+                  <div className="border-t border-gray-400 pt-1 mt-8 max-w-40">
+                    <div className="text-xs">Doctor's Signature</div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 text-center">
+                  <div className="border border-gray-300 rounded-full w-24 h-24 mx-auto mb-2 flex items-center justify-center">
+                    <div className="text-xs text-gray-400">STAMP</div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 text-right">
+                  <div className="border-t border-gray-400 pt-1 mt-8 ml-auto max-w-40">
+                    <div className="text-xs">Date</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="bg-gray-800 text-white text-center py-2 text-xs">
+              <p>This certificate was electronically generated by BlueCollar Occupational Health Services.</p>
+              <p>© {new Date().getFullYear()} BlueCollar Health & Wellness</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
