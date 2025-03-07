@@ -415,27 +415,37 @@ function processCertificateOfFitnessData(apiResponse: any) {
         }
       }
       
-      // 2. Extract Examination Type with multiple checkbox styles
+      // 2. Extract Examination Type - IMPROVED to better detect checkboxes
+      const preEmploymentMatch = markdown.includes('Pre-Employment') && checkboxIsMarked(markdown, 'Pre-Employment');
+      const periodicalMatch = markdown.includes('Periodical') && checkboxIsMarked(markdown, 'Periodical');
+      const exitMatch = markdown.includes('Exit') && checkboxIsMarked(markdown, 'Exit');
+      
       structuredData.examination_results.type = {
-        pre_employment: isCheckboxMarked(markdown, 'PRE-EMPLOYMENT'),
-        periodical: isCheckboxMarked(markdown, 'PERIODICAL'),
-        exit: isCheckboxMarked(markdown, 'EXIT')
+        pre_employment: preEmploymentMatch,
+        periodical: periodicalMatch,
+        exit: exitMatch
       };
       
       console.log('Examination types:', structuredData.examination_results.type);
       
-      // 3. Extract Medical Test Results with multiple marking styles
+      // 3. Extract Medical Test Results - IMPROVED to better detect checked boxes and results
       structuredData.examination_results.test_results = extractTestResults(markdown);
       
       console.log('Test results:', structuredData.examination_results.test_results);
       
-      // 4. Extract Fitness Status
+      // 4. Extract Fitness Status - IMPROVED to detect crossed out status
+      const fitStatusCrossedOut = markdown.includes('FIT') && 
+                                 (markdown.includes('crossed out') || 
+                                  markdown.includes('drawn over') || 
+                                  markdown.includes('large "X"') ||
+                                  markdown.toLowerCase().includes('crossing it out'));
+      
       structuredData.certification = {
-        fit: isCheckboxMarked(markdown, 'FIT') && !markdown.includes('crossed out'),
-        fit_with_restrictions: isCheckboxMarked(markdown, 'Fit with Restriction'),
-        fit_with_condition: isCheckboxMarked(markdown, 'Fit with Condition'),
-        temporarily_unfit: isCheckboxMarked(markdown, 'Temporary Unfit'),
-        unfit: isCheckboxMarked(markdown, 'UNFIT'),
+        fit: markdown.includes('FIT') && !fitStatusCrossedOut,
+        fit_with_restrictions: checkboxIsMarked(markdown, 'Fit with Restriction'),
+        fit_with_condition: checkboxIsMarked(markdown, 'Fit with Condition'),
+        temporarily_unfit: checkboxIsMarked(markdown, 'Temporary Unfit'),
+        unfit: checkboxIsMarked(markdown, 'UNFIT') || fitStatusCrossedOut,
         follow_up: cleanValue(extractFollowUp(markdown)),
         review_date: cleanValue(extractReviewDate(markdown)),
         comments: cleanValue(extractComments(markdown)),
@@ -450,7 +460,7 @@ function processCertificateOfFitnessData(apiResponse: any) {
         unfit: structuredData.certification.unfit
       });
       
-      // 5. Extract Restrictions
+      // 5. Extract Restrictions - IMPROVED to better detect restrictions
       structuredData.restrictions = extractRestrictions(markdown);
       
       console.log('Restrictions:', structuredData.restrictions);
@@ -478,54 +488,87 @@ function processCertificateOfFitnessData(apiResponse: any) {
   }
 }
 
-// Helper function to check if a checkbox is marked with various styles
-function isCheckboxMarked(markdown: string, fieldName: string): boolean {
+// NEW IMPROVED function to check if a checkbox is marked with improved detection
+function checkboxIsMarked(markdown: string, fieldName: string): boolean {
   if (!markdown || !fieldName) return false;
   
-  // Get the context around the field name
-  const index = markdown.indexOf(fieldName);
-  if (index === -1) return false;
+  // Find the line or context containing the field name
+  const lines = markdown.split('\n');
+  let fieldLine = '';
+  let windowStart = 0;
   
-  const contextStart = Math.max(0, index - 50);
-  const contextEnd = Math.min(markdown.length, index + fieldName.length + 100);
-  const context = markdown.substring(contextStart, contextEnd);
-  
-  console.log(`Checking for '${fieldName}' marking:`, context.substring(0, 100));
-  
-  // Look for various checkbox marking patterns
-  const isMarked = (
-    context.includes('[x]') || 
-    context.includes('[X]') || 
-    context.includes('✓') || 
-    context.includes('✔') || 
-    context.includes('checked') || 
-    context.includes('marked') || 
-    context.includes('selected') || 
-    context.includes('ticked')
-  );
-  
-  const isCrossedOut = context.includes('crossed out') || context.includes('X drawn over');
-  
-  // Special case for "FIT" - check if it's crossed out
-  if (fieldName === 'FIT' && isCrossedOut) {
-    console.log('FIT is crossed out');
-    return false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes(fieldName)) {
+      fieldLine = lines[i];
+      windowStart = Math.max(0, i - 2);
+      break;
+    }
   }
   
-  console.log(`Field '${fieldName}' is marked:`, isMarked);
-  return isMarked;
+  if (!fieldLine) return false;
+  
+  // Check the line containing the field and a few lines after for checkbox markers
+  const contextWindow = lines.slice(windowStart, windowStart + 5).join('\n');
+  
+  // Look for checkbox markers near the field name
+  const markerPatterns = [
+    new RegExp(`${fieldName}.*?\\[x\\]`, 'i'),
+    new RegExp(`${fieldName}.*?\\[X\\]`, 'i'),
+    new RegExp(`\\[x\\].*?${fieldName}`, 'i'),
+    new RegExp(`\\[X\\].*?${fieldName}`, 'i'),
+    new RegExp(`${fieldName}.*?✓`, 'i'),
+    new RegExp(`${fieldName}.*?✔`, 'i'),
+    new RegExp(`${fieldName}.*?checked`, 'i'),
+    new RegExp(`${fieldName}.*?marked`, 'i'),
+    new RegExp(`${fieldName}.*?selected`, 'i')
+  ];
+  
+  for (const pattern of markerPatterns) {
+    if (pattern.test(contextWindow)) {
+      console.log(`Field '${fieldName}' is marked (pattern match)`);
+      return true;
+    }
+  }
+  
+  // If the field appears in a table row with [x] anywhere in that row
+  if (fieldLine.includes('<td>') && (
+    contextWindow.includes('[x]') || 
+    contextWindow.includes('[X]') || 
+    contextWindow.includes('✓') || 
+    contextWindow.includes('✔')
+  )) {
+    console.log(`Field '${fieldName}' is marked (table row with checkbox)`);
+    return true;
+  }
+  
+  // Special handling for exam type checkboxes which might be in a list style
+  if (fieldName === 'Pre-Employment' || fieldName === 'Periodical' || fieldName === 'Exit') {
+    const examTypeContext = markdown.substring(
+      markdown.indexOf('Examination Type') - 10, 
+      markdown.indexOf('Examination Type') + 150
+    );
+    
+    const specificPattern = new RegExp(`\\*\\*${fieldName}\\*\\*:\\s*\\[(x|X)\\]`, 'i');
+    if (specificPattern.test(examTypeContext)) {
+      console.log(`Exam type '${fieldName}' is marked (specific match)`);
+      return true;
+    }
+  }
+  
+  console.log(`Field '${fieldName}' is NOT marked`);
+  return false;
 }
 
-// Helper function to extract test results with multiple marking styles
+// IMPROVED helper function to extract test results more accurately
 function extractTestResults(markdown: string): any {
   const testResults: any = {};
   
   // Define tests to look for
   const tests = [
-    { name: 'BLOODS', key: 'bloods' },
-    { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
-    { name: 'SIDE & DEPTH', key: 'side_depth' },
-    { name: 'NIGHT VISION', key: 'night_vision' },
+    { name: 'Bloods', key: 'bloods' },
+    { name: 'Far, Near Vision', key: 'far_near_vision' },
+    { name: 'Side & Depth', key: 'side_depth' },
+    { name: 'Night Vision', key: 'night_vision' },
     { name: 'Hearing', key: 'hearing' },
     { name: 'Working at Heights', key: 'heights' },
     { name: 'Lung Function', key: 'lung_function' },
@@ -533,38 +576,109 @@ function extractTestResults(markdown: string): any {
     { name: 'Drug Screen', key: 'drug_screen' }
   ];
   
+  // Check if there are tables in the markdown
+  const hasTables = markdown.includes('<table>');
+  
   tests.forEach(test => {
-    // Check if test is done using multiple detection methods
-    const isDone = isCheckboxMarked(markdown, test.name);
-    testResults[`${test.key}_done`] = isDone;
-    
-    // Try to extract test results
-    if (isDone) {
-      const resultPatterns = [
-        // Result after checkbox in table format
-        new RegExp(`${test.name}.*?(?:\\[(?:x|X|✓|✔)\\]|✓|✔).*?<td>(.*?)</td>`, 'i'),
-        // Result in description format
-        new RegExp(`\\*\\*${test.name}\\*\\*:.*?(?:Done|Completed).*?result\\s+is\\s+(.*?)(?=\\.|\\n|<)`, 'i'),
-        // General pattern to find results
-        new RegExp(`${test.name}.*?(\\d+\\/\\d+|Normal|\\d+\\.\\d+|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i')
-      ];
+    // First check if the test is mentioned anywhere
+    if (markdown.includes(test.name)) {
+      // Look for checkbox markers in context of the test name
+      const isDone = isTestChecked(markdown, test.name, hasTables);
+      testResults[`${test.key}_done`] = isDone;
       
-      for (const pattern of resultPatterns) {
-        const match = markdown.match(pattern);
-        if (match && match.length > 1) {
-          // Use last capturing group as the result
-          const resultIndex = match.length > 2 ? 2 : 1;
-          testResults[`${test.key}_results`] = cleanValue(match[resultIndex].trim());
-          break;
+      // Attempt to extract test results if the test was done
+      if (isDone) {
+        let resultValue = extractTestResult(markdown, test.name, hasTables);
+        if (resultValue) {
+          testResults[`${test.key}_results`] = resultValue;
         }
       }
+    } else {
+      // Test not found in document
+      testResults[`${test.key}_done`] = false;
     }
   });
   
   return testResults;
 }
 
-// Helper function to extract restrictions with multiple marking styles
+// NEW helper function to check if a medical test is checked/done
+function isTestChecked(markdown: string, testName: string, hasTables: boolean): boolean {
+  if (hasTables) {
+    // For table format, look for a row with test name and a checked box
+    const tablePattern = new RegExp(`<tr>[\\s\\S]*?<td>${testName}</td>[\\s\\S]*?<td>\\[(x|X)\\]</td>`, 'i');
+    const tableMarked = tablePattern.test(markdown);
+    
+    if (tableMarked) {
+      console.log(`Test '${testName}' is marked in table`);
+      return true;
+    }
+  }
+  
+  // General context check for checkbox markers near test name
+  const testNameIndex = markdown.indexOf(testName);
+  if (testNameIndex === -1) return false;
+  
+  const contextStart = Math.max(0, testNameIndex - 30);
+  const contextEnd = Math.min(markdown.length, testNameIndex + testName.length + 50);
+  const context = markdown.substring(contextStart, contextEnd);
+  
+  // Look for checkbox markers in context
+  const isMarked = (
+    context.includes('[x]') || 
+    context.includes('[X]') || 
+    context.includes('✓') || 
+    context.includes('✔') || 
+    context.includes('Done') ||
+    context.includes('Completed') ||
+    context.includes('checked') || 
+    context.includes('marked')
+  );
+  
+  console.log(`Test '${testName}' is marked: ${isMarked} (context check)`);
+  return isMarked;
+}
+
+// NEW helper function to extract test result values
+function extractTestResult(markdown: string, testName: string, hasTables: boolean): string | null {
+  let result = null;
+  
+  if (hasTables) {
+    // For table format, extract result from the third column
+    const tableRowPattern = new RegExp(`<tr>[\\s\\S]*?<td>${testName}</td>[\\s\\S]*?<td>\\[(x|X)\\]</td>[\\s\\S]*?<td>(.*?)</td>`, 'i');
+    const tableMatch = markdown.match(tableRowPattern);
+    
+    if (tableMatch && tableMatch[2]) {
+      result = tableMatch[2].trim();
+      if (result === 'N/A' || result === '') return null;
+      console.log(`Extracted table result for ${testName}: ${result}`);
+      return result;
+    }
+  }
+  
+  // Try other common patterns for results
+  const patterns = [
+    // Test followed by result
+    new RegExp(`${testName}[\\s\\S]*?(\\d+\\.\\d+|\\d+\\/\\d+|Normal|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i'),
+    // Result in nearby text
+    new RegExp(`${testName}[\\s\\S]{1,50}result[\\s:\\s]+(\\d+\\.\\d+|\\d+\\/\\d+|Normal|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i'),
+    // Vision test format
+    new RegExp(`${testName}[\\s\\S]{1,50}(20\\/\\d+)`, 'i')
+  ];
+  
+  for (const pattern of patterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      result = match[1].trim();
+      console.log(`Extracted pattern result for ${testName}: ${result}`);
+      return result;
+    }
+  }
+  
+  return null;
+}
+
+// IMPROVED helper function to extract restrictions
 function extractRestrictions(markdown: string): any {
   const restrictions: any = {};
   
@@ -579,11 +693,90 @@ function extractRestrictions(markdown: string): any {
     { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
   ];
   
-  restrictionTypes.forEach(restriction => {
-    restrictions[restriction.key] = isCheckboxMarked(markdown, restriction.name);
-  });
+  // Check if there's a restrictions section
+  const restrictionsSection = markdown.indexOf('Restrictions') > -1 ? 
+    markdown.substring(markdown.indexOf('Restrictions'), 
+                     markdown.indexOf('Restrictions') + 500) : 
+    '';
+  
+  if (restrictionsSection) {
+    restrictionTypes.forEach(restriction => {
+      // Check if the restriction is specifically marked
+      restrictions[restriction.key] = restrictionsSection.includes(restriction.name) && 
+                                    (restrictionsSection.includes(`${restriction.name}.*?\\[x\\]`) || 
+                                     restrictionsSection.includes(`${restriction.name}.*?\\[X\\]`) ||
+                                     restrictionsSection.includes(`${restriction.name}.*?✓`) ||
+                                     restrictionsSection.includes(`${restriction.name}.*?✔`) ||
+                                     restrictionsSection.includes(`${restriction.name}.*?checked`) ||
+                                     restrictionsSection.includes(`${restriction.name}.*?Marked`));
+      
+      // As a fallback, check if the restriction is in the highlighted or emphasized section
+      if (!restrictions[restriction.key]) {
+        restrictions[restriction.key] = restrictionsSection.includes(restriction.name) && 
+                                      (restrictionsSection.includes(`<strong>${restriction.name}</strong>`) ||
+                                       restrictionsSection.includes(`<b>${restriction.name}</b>`) ||
+                                       restrictionsSection.includes(`<em>${restriction.name}</em>`) ||
+                                       restrictionsSection.includes(`<i>${restriction.name}</i>`) ||
+                                       restrictionsSection.includes(`**${restriction.name}**`));
+      }
+    });
+  } else {
+    // If no restrictions section found, check the entire document for each restriction
+    restrictionTypes.forEach(restriction => {
+      restrictions[restriction.key] = checkboxIsMarked(markdown, restriction.name);
+    });
+  }
   
   return restrictions;
+}
+
+// Helper function to check if a condition exists in an array of conditions
+function checkCondition(data: any, path: string, condition: string): boolean {
+  const conditions = extractPath(data, path);
+  if (!Array.isArray(conditions)) return false;
+  
+  return conditions.some((item: string) => 
+    typeof item === 'string' && item.toLowerCase().includes(condition.toLowerCase())
+  );
+}
+
+// Helper function to safely extract nested properties from an object
+function extractPath(obj: any, path: string): any {
+  if (!obj) return undefined;
+  
+  const parts = path.split('.');
+  let current = obj;
+  
+  for (const part of parts) {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+    current = current[part];
+  }
+  
+  return current;
+}
+
+// Helper function to clean HTML comments from extracted values
+function cleanValue(value: string | null | undefined): string {
+  if (!value) return '';
+  
+  // Remove HTML comments: <!-- ... -->
+  let cleaned = value.replace(/\s*<!--.*?-->\s*/g, ' ').trim();
+  
+  // Also remove form bounding box coordinates and IDs
+  cleaned = cleaned.replace(/\s*<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->\s*/g, ' ').trim();
+  
+  // Remove coordinates directly in text (l=0.064,t=0.188,r=0.936,b=0.284)
+  cleaned = cleaned.replace(/\s*\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)\s*/g, ' ').trim();
+  
+  // Remove IDs in text - with ID 5d5dece1-814c-40b8-ac21-2d9877814985
+  cleaned = cleaned.replace(/\s*with ID [a-f0-9\-]+\s*/g, ' ').trim();
+  
+  // Clean up any remaining <!-- or --> fragments
+  cleaned = cleaned.replace(/<!--|-->/g, '').trim();
+  
+  return cleaned;
 }
 
 // Helper functions to extract specific fields
@@ -611,51 +804,7 @@ function extractComments(markdown: string): string {
   return '';
 }
 
-// Helper function to clean HTML comments from extracted values
-function cleanValue(value: string | null | undefined): string {
-  if (!value) return '';
-  
-  // Remove HTML comments: <!-- ... -->
-  let cleaned = value.replace(/\s*<!--.*?-->\s*/g, ' ').trim();
-  
-  // Also remove form bounding box coordinates and IDs
-  cleaned = cleaned.replace(/\s*<!\-\- \w+, from page \d+ \(.*?\), with ID .*? \-\->\s*/g, ' ').trim();
-  
-  // Remove coordinates directly in text (l=0.064,t=0.188,r=0.936,b=0.284)
-  cleaned = cleaned.replace(/\s*\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)\s*/g, ' ').trim();
-  
-  // Remove IDs in text - with ID 5d5dece1-814c-40b8-ac21-2d9877814985
-  cleaned = cleaned.replace(/\s*with ID [a-f0-9\-]+\s*/g, ' ').trim();
-  
-  // Clean up any remaining <!-- or --> fragments
-  cleaned = cleaned.replace(/<!--|-->/g, '').trim();
-  
-  return cleaned;
-}
-
-// Helper function to safely extract nested properties from an object
-function extractPath(obj: any, path: string): any {
-  if (!obj) return undefined;
-  
-  const parts = path.split('.');
-  let current = obj;
-  
-  for (const part of parts) {
-    if (current === null || current === undefined) {
-      return undefined;
-    }
-    current = current[part];
-  }
-  
-  return current;
-}
-
-// Helper function to check if a condition exists in an array of conditions
-function checkCondition(data: any, path: string, condition: string): boolean {
-  const conditions = extractPath(data, path);
-  if (!Array.isArray(conditions)) return false;
-  
-  return conditions.some((item: string) => 
-    typeof item === 'string' && item.toLowerCase().includes(condition.toLowerCase())
-  );
+// Legacy helper function kept for backward compatibility
+function isCheckboxMarked(markdown: string, fieldName: string): boolean {
+  return checkboxIsMarked(markdown, fieldName);
 }
