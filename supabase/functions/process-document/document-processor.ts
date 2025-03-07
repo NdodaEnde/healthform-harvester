@@ -22,6 +22,9 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     
     console.log('Structured data extracted:', JSON.stringify(structuredData));
     
+    // Clean any problematic data in the structuredData
+    cleanStructuredData(structuredData);
+    
     // Try to update the document record multiple times if needed
     let updateSuccess = false;
     let attempts = 0;
@@ -117,5 +120,54 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     } catch (updateError) {
       console.error('Error updating document status after processing failure:', updateError);
     }
+  }
+}
+
+// Helper function to clean any problematic data in the structured data
+function cleanStructuredData(data: any) {
+  if (!data || typeof data !== 'object') return;
+  
+  // Process each key in the object
+  Object.keys(data).forEach(key => {
+    // If it's an object, recursively clean it
+    if (data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
+      cleanStructuredData(data[key]);
+    } 
+    // If it's an array, clean each item in the array
+    else if (Array.isArray(data[key])) {
+      data[key].forEach((item: any, index: number) => {
+        if (typeof item === 'object') {
+          cleanStructuredData(item);
+        } else if (typeof item === 'string') {
+          // Clean HTML table cells from array items
+          if (item.includes('<td>[ ]</td>') || item === '[ ]' || item === '[]') {
+            data[key][index] = 'N/A';
+          }
+        }
+      });
+    }
+    // If it's a string, clean HTML table cells
+    else if (typeof data[key] === 'string') {
+      if (data[key].includes('<td>[ ]</td>') || data[key] === '[ ]' || data[key] === '[]') {
+        data[key] = 'N/A';
+      }
+    }
+  });
+  
+  // Process examination_results.test_results specifically for certificate of fitness
+  if (data.examination_results && data.examination_results.test_results) {
+    const testResults = data.examination_results.test_results;
+    
+    Object.keys(testResults).forEach(key => {
+      if (key.endsWith('_results')) {
+        if (!testResults[key] || 
+            testResults[key] === '' || 
+            testResults[key].includes('<td>[ ]</td>') || 
+            testResults[key] === '[ ]' || 
+            testResults[key] === '[]') {
+          testResults[key] = 'N/A';
+        }
+      }
+    });
   }
 }
