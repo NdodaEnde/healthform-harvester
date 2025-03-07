@@ -703,7 +703,8 @@ const CertificateTemplate = ({
                 
                 <div className="flex-1 text-center px-2">
                   <div className="text-center text-[0.65rem] space-y-1">
-                    <p className="font-semibold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
+                    <p className="font-semibold">Occupational Health Practitioner / Occupational Medical</p>
+                    <p className="font-semibold">Practitioner</p>
                     <p>Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
                     <p>Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
                     <p>SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
