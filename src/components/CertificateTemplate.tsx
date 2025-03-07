@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -393,18 +394,13 @@ const CertificateTemplate = ({
             {/* Header */}
             <div className="px-4 pt-4">
               <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center">
-                  {/* Logo placeholder */}
-                  <div className="w-16 h-16 rounded overflow-hidden bg-blue-100 flex items-center justify-center mr-2">
-                    <svg viewBox="0 0 100 100" className="w-14 h-14 text-blue-500">
-                      <path d="M50,20 C70,20 85,35 85,55 C85,75 70,90 50,90 C30,90 15,75 15,55 C15,35 30,20 50,20 Z" fill="none" stroke="currentColor" strokeWidth="4"></path>
-                      <path d="M30,55 Q40,30 50,55 Q60,80 70,55" fill="none" stroke="currentColor" strokeWidth="4"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold">Blue<span className="font-bold">Collar</span></div>
-                    <div className="text-xs">Occupational Health Services</div>
-                  </div>
+                <div>
+                  {/* Replaced logo placeholder with the company logo image */}
+                  <img 
+                    src="/lovable-uploads/b75ebd30-51c1-441a-8b04-eec2746a7ebd.png" 
+                    alt="BlueCollar Health & Wellness Logo" 
+                    className="h-16 object-contain"
+                  />
                 </div>
                 <div className="bg-white text-right">
                   <div className="text-sm font-bold bg-gray-800 text-white px-3 py-1 text-right">BLUECOLLAR OCCUPATIONAL HEALTH</div>
@@ -656,4 +652,17 @@ const CertificateTemplate = ({
                         {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
                       </td>
                       <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-
+                        <div className="font-semibold">Wear Hearing Protection</div>
+                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Confined Spaces</div>
+                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Chemical Exposure</div>
+                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                      </td>
+                      <td className={`border border-gray-400 p
