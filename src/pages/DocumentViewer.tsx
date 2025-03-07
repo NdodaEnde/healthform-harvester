@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
-  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock
+  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
+  CheckSquare, Edit, Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -154,6 +154,9 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<any>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -283,12 +286,20 @@ const DocumentViewer = () => {
       
       console.log('Fetched document data:', documentData);
       
+      const { data: certificateData } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('document_id', documentId)
+        .maybeSingle();
+      
+      console.log('Fetched certificate data:', certificateData);
+      
       const { data: urlData } = await supabase
         .storage
         .from('medical-documents')
         .createSignedUrl(documentData.file_path, 3600);
       
-      let extractedData = documentData.extracted_data || {};
+      let extractedData = certificateData || documentData.extracted_data || {};
       let patientName = extractPatientName(extractedData);
       let patientId = extractPatientId(extractedData);
       
@@ -326,7 +337,9 @@ const DocumentViewer = () => {
         patientId: patientId,
         imageUrl: urlData?.signedUrl || null,
         extractedData: extractedData,
-        jsonData: JSON.stringify(extractedData, null, 2)
+        jsonData: JSON.stringify(extractedData, null, 2),
+        validated: !!certificateData,
+        certificateId: certificateData?.id || null
       };
     } catch (error) {
       console.error('Error fetching document from Supabase:', error);
@@ -454,6 +467,77 @@ const DocumentViewer = () => {
     };
   }, [id, document?.status, processingTimeout]);
 
+  const handleDataChange = (newData: any) => {
+    setEditedData(newData);
+  };
+
+  const saveValidatedCertificate = async () => {
+    if (!id || !editedData) return;
+    
+    setSaveLoading(true);
+    try {
+      const structuredData = editedData.structured_data || {};
+      const patient = structuredData.patient || {};
+      const certification = structuredData.certification || {};
+      const restrictions = structuredData.restrictions || {};
+      const medicalTests = structuredData.examination_results?.test_results || {};
+      const visionTests = {
+        far_near_vision: medicalTests.far_near_vision_results,
+        side_depth: medicalTests.side_depth_results,
+        night_vision: medicalTests.night_vision_results
+      };
+      
+      const certificateData = {
+        document_id: id,
+        patient_info: patient,
+        fitness_declaration: certification,
+        restrictions: Object.keys(restrictions).filter(key => restrictions[key]),
+        medical_tests: medicalTests,
+        vision_tests: visionTests,
+        validated: true
+      };
+      
+      let result;
+      
+      if (document.certificateId) {
+        result = await supabase
+          .from('certificates')
+          .update(certificateData)
+          .eq('id', document.certificateId)
+          .select();
+      } else {
+        result = await supabase
+          .from('certificates')
+          .insert(certificateData)
+          .select();
+      }
+      
+      if (result.error) {
+        throw result.error;
+      }
+      
+      setDocument(prev => ({
+        ...prev,
+        extractedData: editedData,
+        jsonData: JSON.stringify(editedData, null, 2),
+        validated: true,
+        certificateId: result.data?.[0]?.id || document.certificateId
+      }));
+      
+      setIsEditing(false);
+      toast.success("Certificate validated successfully", {
+        description: "The validated certificate has been saved to the database."
+      });
+    } catch (error) {
+      console.error('Error saving validated certificate:', error);
+      toast.error("Failed to save certificate", {
+        description: "There was an error while saving the validated certificate."
+      });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
   const renderExtractedData = () => {
     if (!document || !document.extractedData) {
       return (
@@ -469,7 +553,11 @@ const DocumentViewer = () => {
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
+          <CertificateTemplate 
+            extractedData={extractedData} 
+            isEditable={isEditing}
+            onDataChange={handleDataChange}
+          />
         </div>
       );
     }
@@ -726,6 +814,12 @@ const DocumentViewer = () => {
             <h1 className="text-lg font-medium truncate">{document.name}</h1>
             <p className="text-sm text-muted-foreground">
               {document.type} | {document.patientName || "Unknown Patient"}
+              {document.validated && (
+                <Badge variant="outline" className="ml-2 text-emerald-600 border-emerald-600">
+                  <CheckSquare className="h-3 w-3 mr-1" />
+                  Validated
+                </Badge>
+              )}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -771,6 +865,35 @@ const DocumentViewer = () => {
               <Copy className="h-4 w-4 mr-2" />
               Copy JSON
             </Button>
+            {document.type === 'Certificate of Fitness' && !isEditing && (
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
+            {isEditing && (
+              <Button 
+                size="sm"
+                onClick={saveValidatedCertificate}
+                disabled={saveLoading}
+              >
+                {saveLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
+            )}
             <Button 
               size="sm"
               onClick={() => {
@@ -835,59 +958,80 @@ const DocumentViewer = () => {
             className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Extracted Data</h2>
-              <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
-                {document.status === 'processed' ? (
-                  <>
+              <h2 className="text-xl font-semibold">
+                {isEditing ? "Edit Certificate" : document.validated ? "Validated Certificate" : "Extracted Data"}
+              </h2>
+              <div className="flex items-center space-x-2">
+                {document.validated && !isEditing && (
+                  <Badge variant="default" className="text-xs bg-emerald-600">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Validated
+                  </Badge>
+                )}
+                {isEditing && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Edit className="h-3 w-3 mr-1" />
+                    Editing
+                  </Badge>
+                )}
+                {!document.validated && document.status === 'processed' && !isEditing && (
+                  <Badge variant="default" className="text-xs">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Processed
-                  </>
-                ) : (
-                  <>
+                  </Badge>
+                )}
+                {document.status === 'processing' && (
+                  <Badge variant="secondary" className="text-xs">
                     <Clock className="h-3 w-3 mr-1 animate-pulse" />
                     Processing
-                  </>
+                  </Badge>
                 )}
-              </Badge>
+              </div>
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              <Tabs defaultValue="structured">
-                <CardHeader className="pb-0">
-                  <TabsList className="grid grid-cols-2">
-                    <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                    <TabsTrigger value="json">JSON</TabsTrigger>
-                  </TabsList>
-                </CardHeader>
-                
-                <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
-                  <TabsContent value="structured" className="m-0 h-full">
-                    {renderExtractedData()}
-                  </TabsContent>
-                  
-                  <TabsContent value="json" className="m-0 h-full">
-                    <ScrollArea className="h-full">
-                      <div className="relative">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="absolute top-1 right-1"
-                          onClick={() => {
-                            navigator.clipboard.writeText(document.jsonData);
-                            toast.success("JSON data copied to clipboard");
-                          }}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copy
-                        </Button>
-                        <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                          {document.jsonData}
-                        </pre>
-                      </div>
-                    </ScrollArea>
-                  </TabsContent>
+              {isEditing ? (
+                <CardContent className="pt-6 h-[calc(100vh-270px)] overflow-hidden">
+                  {renderExtractedData()}
                 </CardContent>
-              </Tabs>
+              ) : (
+                <Tabs defaultValue="structured">
+                  <CardHeader className="pb-0">
+                    <TabsList className="grid grid-cols-2">
+                      <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                      <TabsTrigger value="json">JSON</TabsTrigger>
+                    </TabsList>
+                  </CardHeader>
+                  
+                  <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
+                    <TabsContent value="structured" className="m-0 h-full">
+                      {renderExtractedData()}
+                    </TabsContent>
+                    
+                    <TabsContent value="json" className="m-0 h-full">
+                      <ScrollArea className="h-full">
+                        <div className="relative">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="absolute top-1 right-1"
+                            onClick={() => {
+                              navigator.clipboard.writeText(document.jsonData);
+                              toast.success("JSON data copied to clipboard");
+                            }}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy
+                          </Button>
+                          <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
+                            {document.jsonData}
+                          </pre>
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+                  </CardContent>
+                </Tabs>
+              )}
             </Card>
             
             <div className="flex justify-end space-x-2">
@@ -898,20 +1042,58 @@ const DocumentViewer = () => {
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard
               </Button>
-              <Button
-                onClick={() => {
-                  toast("Certificate generated successfully", {
-                    description: "The certificate of fitness has been saved to your downloads folder",
-                    action: {
-                      label: "View",
-                      onClick: () => console.log("Viewing certificate")
-                    }
-                  });
-                }}
-              >
-                <ClipboardCheck className="h-4 w-4 mr-2" />
-                Generate Certificate
-              </Button>
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveValidatedCertificate}
+                    disabled={saveLoading}
+                  >
+                    {saveLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Validate & Save
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {document.type === 'Certificate of Fitness' && !isEditing && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Certificate
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => {
+                      toast("Certificate generated successfully", {
+                        description: "The certificate of fitness has been saved to your downloads folder",
+                        action: {
+                          label: "View",
+                          onClick: () => console.log("Viewing certificate")
+                        }
+                      });
+                    }}
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Generate Certificate
+                  </Button>
+                </>
+              )}
             </div>
           </motion.div>
         </motion.div>
