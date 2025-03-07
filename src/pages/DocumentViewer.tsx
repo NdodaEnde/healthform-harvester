@@ -312,9 +312,12 @@ const DocumentViewer = () => {
           extractedData !== null && 
           !Array.isArray(extractedData)
         ) {
-          // If we're working with raw extracted data from the processor
-          if (extractedData.raw_response && !extractedData.patient) {
-            // Extract patient info from the raw_response if needed
+          // Check if we're working with raw extracted data
+          const hasRawResponse = extractedData.hasOwnProperty('raw_response');
+          const hasPatient = extractedData.hasOwnProperty('patient');
+          
+          // If we have raw response but no patient info, create a basic structure
+          if (hasRawResponse && !hasPatient) {
             extractedData = {
               ...extractedData,
               patient: {
@@ -479,34 +482,52 @@ const DocumentViewer = () => {
     
     setSaveLoading(true);
     try {
+      console.log("Saving certificate data...", editedData);
+      
+      // Handle different potential shapes of data
+      let patientInfo = editedData.patient || editedData.patient_info || {};
+      let fitnessDeclaration = editedData.certification || editedData.fitness_declaration || {};
+      let restrictions = editedData.restrictions || [];
+      
+      // Format restrictions to always be an array
+      if (typeof restrictions === 'object' && !Array.isArray(restrictions)) {
+        restrictions = Object.keys(restrictions).filter(key => restrictions[key]);
+      }
+      
+      // Create certificate data object matching DB schema
       const certificateData = {
         document_id: id,
-        patient_info: editedData.patient || {},
-        fitness_declaration: editedData.certification || {},
-        restrictions: Array.isArray(editedData.restrictions) 
-          ? editedData.restrictions 
-          : Object.keys(editedData.restrictions || {}).filter(key => editedData.restrictions[key]),
-        medical_tests: editedData.examination_results?.test_results || editedData.medicalTests || {},
+        patient_info: patientInfo,
+        fitness_declaration: fitnessDeclaration,
+        restrictions: Array.isArray(restrictions) ? restrictions : [],
+        medical_tests: editedData.examination_results?.test_results || 
+                     editedData.medicalTests || 
+                     editedData.medical_tests || {},
         vision_tests: editedData.vision_tests || {
           far_near_vision: editedData.examination_results?.test_results?.far_near_vision_results || 
-                         editedData.medicalTests?.farNearVision?.results,
+                         editedData.medicalTests?.farNearVision?.results || null,
           side_depth: editedData.examination_results?.test_results?.side_depth_results || 
-                    editedData.medicalTests?.sideDepth?.results,
+                    editedData.medicalTests?.sideDepth?.results || null,
           night_vision: editedData.examination_results?.test_results?.night_vision_results || 
-                      editedData.medicalTests?.nightVision?.results
+                      editedData.medicalTests?.nightVision?.results || null
         },
         validated: true
       };
       
+      console.log("Formatted certificate data for save:", certificateData);
+      
       let result;
       
+      // Update or insert the certificate based on whether it already exists
       if (document.certificateId) {
+        console.log("Updating existing certificate:", document.certificateId);
         result = await supabase
           .from('certificates')
           .update(certificateData)
           .eq('id', document.certificateId)
           .select();
       } else {
+        console.log("Creating new certificate");
         result = await supabase
           .from('certificates')
           .insert(certificateData)
@@ -514,9 +535,13 @@ const DocumentViewer = () => {
       }
       
       if (result.error) {
+        console.error("Supabase error:", result.error);
         throw result.error;
       }
       
+      console.log("Certificate saved successfully:", result.data);
+      
+      // Update document state with new data
       setDocument(prev => ({
         ...prev,
         extractedData: editedData,
@@ -532,7 +557,7 @@ const DocumentViewer = () => {
     } catch (error) {
       console.error('Error saving validated certificate:', error);
       toast.error("Failed to save certificate", {
-        description: "There was an error while saving the validated certificate."
+        description: `Error: ${error.message || "Unknown error occurred"}`
       });
     } finally {
       setSaveLoading(false);

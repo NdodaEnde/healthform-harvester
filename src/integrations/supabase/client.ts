@@ -18,6 +18,9 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
     },
     global: {
+      headers: {
+        'Content-Type': 'application/json',
+      },
       fetch: fetch
     },
   }
