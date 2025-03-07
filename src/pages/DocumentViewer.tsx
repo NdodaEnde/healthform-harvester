@@ -476,24 +476,22 @@ const DocumentViewer = () => {
     
     setSaveLoading(true);
     try {
-      const structuredData = editedData.structured_data || {};
-      const patient = structuredData.patient || {};
-      const certification = structuredData.certification || {};
-      const restrictions = structuredData.restrictions || {};
-      const medicalTests = structuredData.examination_results?.test_results || {};
-      const visionTests = {
-        far_near_vision: medicalTests.far_near_vision_results,
-        side_depth: medicalTests.side_depth_results,
-        night_vision: medicalTests.night_vision_results
-      };
-      
       const certificateData = {
         document_id: id,
-        patient_info: patient,
-        fitness_declaration: certification,
-        restrictions: Object.keys(restrictions).filter(key => restrictions[key]),
-        medical_tests: medicalTests,
-        vision_tests: visionTests,
+        patient_info: editedData.patient || {},
+        fitness_declaration: editedData.certification || {},
+        restrictions: Array.isArray(editedData.restrictions) 
+          ? editedData.restrictions 
+          : Object.keys(editedData.restrictions || {}).filter(key => editedData.restrictions[key]),
+        medical_tests: editedData.examination_results?.test_results || editedData.medicalTests || {},
+        vision_tests: editedData.vision_tests || {
+          far_near_vision: editedData.examination_results?.test_results?.far_near_vision_results || 
+                         editedData.medicalTests?.farNearVision?.results,
+          side_depth: editedData.examination_results?.test_results?.side_depth_results || 
+                    editedData.medicalTests?.sideDepth?.results,
+          night_vision: editedData.examination_results?.test_results?.night_vision_results || 
+                      editedData.medicalTests?.nightVision?.results
+        },
         validated: true
       };
       
@@ -566,9 +564,10 @@ const DocumentViewer = () => {
       typeof extractedData === 'object' && 
       extractedData !== null && 
       !Array.isArray(extractedData) && 
-      extractedData.structured_data
+      (extractedData.patient || extractedData.medical_details || 
+       extractedData.examination_results || extractedData.certification)
     ) {
-      const structuredData = extractedData.structured_data;
+      const structuredData = extractedData;
       
       return (
         <div className="space-y-6">
