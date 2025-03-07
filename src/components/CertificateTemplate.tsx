@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -406,12 +407,12 @@ const CertificateTemplate = ({
                     <div className="text-xs">Occupational Health Services</div>
                   </div>
                 </div>
-                <div className="bg-gray-800 text-white px-3 py-1">
-                  <div className="text-sm font-bold">    BLUECOLLAR OCCUPATIONAL HEALTH</div>
-                  <div className="text-xs mt-1">                          Tel: +27 11 892 0771/011 892 0627</div>
-                  <div className="text-xs">                       Email: admin@bluecollarhealth.co.za</div>
-                  <div className="text-xs">                                   office@bluecollarhealth.co.za</div>
-                  <div className="text-xs">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
+                <div className="bg-white text-right">
+                  <div className="text-sm font-bold bg-gray-800 text-white px-3 py-1">    BLUECOLLAR OCCUPATIONAL HEALTH</div>
+                  <div className="text-xs mt-1 px-3 text-black">                          Tel: +27 11 892 0771/011 892 0627</div>
+                  <div className="text-xs px-3 text-black">                       Email: admin@bluecollarhealth.co.za</div>
+                  <div className="text-xs px-3 text-black">                                   office@bluecollarhealth.co.za</div>
+                  <div className="text-xs px-3 text-black">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
                 </div>
               </div>
             </div>
