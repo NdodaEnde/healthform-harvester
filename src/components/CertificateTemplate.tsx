@@ -1,12 +1,12 @@
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
 type CertificateTemplateProps = {
   extractedData: any;
 };
-
-const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
+const CertificateTemplate = ({
+  extractedData
+}: CertificateTemplateProps) => {
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
   }, [extractedData]);
@@ -14,34 +14,28 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
   // Helper to check if a value is checked/selected
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
     if (value === undefined || value === null) return false;
-    
     const stringValue = String(value).toLowerCase().trim();
     return trueValues.includes(stringValue);
   };
-  
+
   // Helper to get nested values safely
   const getValue = (obj: any, path: string, defaultValue: any = '') => {
     if (!obj || !path) return defaultValue;
-    
     const keys = path.split('.');
     let current = obj;
-    
     for (const key of keys) {
       if (current === undefined || current === null || typeof current !== 'object') {
         return defaultValue;
       }
       current = current[key];
     }
-    
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
   // Extract data directly from markdown
   const extractDataFromMarkdown = (markdown: string): any => {
     if (!markdown) return {};
-    
     console.log("Extracting data from markdown");
-    
     const extracted: any = {
       patient: {},
       examination_results: {
@@ -51,68 +45,69 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       certification: {},
       restrictions: {}
     };
-    
+
     // Patient data - more robust pattern matching
     const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (nameMatch && nameMatch[1]) extracted.patient.name = nameMatch[1].trim();
-    
     const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (idMatch && idMatch[1]) extracted.patient.id_number = idMatch[1].trim();
-    
     const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (companyMatch && companyMatch[1]) extracted.patient.company = companyMatch[1].trim();
-    
     const jobTitleMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
-    
     const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
-    
     const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
     if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
-    
+
     // Examination type - look for [x] markers in different formats
-    extracted.examination_results.type.pre_employment = 
-      markdown.includes('**Pre-Employment**: [x]') || 
-      markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
-      
-    extracted.examination_results.type.periodical = 
-      markdown.includes('**Periodical**: [x]') || 
-      markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
-      
-    extracted.examination_results.type.exit = 
-      markdown.includes('**Exit**: [x]') || 
-      markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
-    
+    extracted.examination_results.type.pre_employment = markdown.includes('**Pre-Employment**: [x]') || markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
+    extracted.examination_results.type.periodical = markdown.includes('**Periodical**: [x]') || markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
+    extracted.examination_results.type.exit = markdown.includes('**Exit**: [x]') || markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
+
     // Medical tests - check multiple formats
-    const testsMap = [
-      { name: 'BLOODS', key: 'bloods' },
-      { name: 'FAR, NEAR VISION', key: 'far_near_vision' },
-      { name: 'SIDE & DEPTH', key: 'side_depth' },
-      { name: 'NIGHT VISION', key: 'night_vision' },
-      { name: 'Hearing', key: 'hearing' },
-      { name: 'Working at Heights', key: 'heights' },
-      { name: 'Lung Function', key: 'lung_function' },
-      { name: 'X-Ray', key: 'x_ray' },
-      { name: 'Drug Screen', key: 'drug_screen' }
-    ];
-    
+    const testsMap = [{
+      name: 'BLOODS',
+      key: 'bloods'
+    }, {
+      name: 'FAR, NEAR VISION',
+      key: 'far_near_vision'
+    }, {
+      name: 'SIDE & DEPTH',
+      key: 'side_depth'
+    }, {
+      name: 'NIGHT VISION',
+      key: 'night_vision'
+    }, {
+      name: 'Hearing',
+      key: 'hearing'
+    }, {
+      name: 'Working at Heights',
+      key: 'heights'
+    }, {
+      name: 'Lung Function',
+      key: 'lung_function'
+    }, {
+      name: 'X-Ray',
+      key: 'x_ray'
+    }, {
+      name: 'Drug Screen',
+      key: 'drug_screen'
+    }];
     testsMap.forEach(test => {
       // Check table format with pipe separators
       const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
       const tableMatch = markdown.match(tableRegex);
-      
+
       // Check list format
       const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
       const listMatch = markdown.match(listRegex);
-      
+
       // Check HTML table format
       const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
       const htmlTableMatch = markdown.match(htmlTableRegex);
-      
       let isDone = false;
       let results = '';
-      
       if (tableMatch) {
         isDone = tableMatch[1].trim() === 'x';
         results = tableMatch[2] ? tableMatch[2].trim() : '';
@@ -123,30 +118,33 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
         isDone = htmlTableMatch[1].trim() === 'x';
         results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
       }
-      
       if (isDone || results) {
         extracted.examination_results.test_results[`${test.key}_done`] = isDone;
         extracted.examination_results.test_results[`${test.key}_results`] = results;
       }
     });
-    
+
     // Fitness status - check various formats
-    const fitnessOptions = [
-      { name: 'FIT', key: 'fit' },
-      { name: 'Fit with Restriction', key: 'fit_with_restrictions' },
-      { name: 'Fit with Condition', key: 'fit_with_condition' },
-      { name: 'Temporary Unfit', key: 'temporarily_unfit' },
-      { name: 'UNFIT', key: 'unfit' }
-    ];
-    
+    const fitnessOptions = [{
+      name: 'FIT',
+      key: 'fit'
+    }, {
+      name: 'Fit with Restriction',
+      key: 'fit_with_restrictions'
+    }, {
+      name: 'Fit with Condition',
+      key: 'fit_with_condition'
+    }, {
+      name: 'Temporary Unfit',
+      key: 'temporarily_unfit'
+    }, {
+      name: 'UNFIT',
+      key: 'unfit'
+    }];
     fitnessOptions.forEach(option => {
       // Check multiple formats
-      const patterns = [
-        new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'),
-        new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-      
+      const patterns = [new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'), new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'), new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')];
+
       // Check all patterns
       let isSelected = false;
       for (const pattern of patterns) {
@@ -156,30 +154,39 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
           break;
         }
       }
-      
       extracted.certification[option.key] = isSelected;
     });
-    
+
     // Restrictions - check both table and list formats
-    const restrictions = [
-      { name: 'Heights', key: 'heights' },
-      { name: 'Dust Exposure', key: 'dust_exposure' },
-      { name: 'Motorized Equipment', key: 'motorized_equipment' },
-      { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
-      { name: 'Confined Spaces', key: 'confined_spaces' },
-      { name: 'Chemical Exposure', key: 'chemical_exposure' },
-      { name: 'Wear Spectacles', key: 'wear_spectacles' },
-      { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
-    ];
-    
+    const restrictions = [{
+      name: 'Heights',
+      key: 'heights'
+    }, {
+      name: 'Dust Exposure',
+      key: 'dust_exposure'
+    }, {
+      name: 'Motorized Equipment',
+      key: 'motorized_equipment'
+    }, {
+      name: 'Wear Hearing Protection',
+      key: 'wear_hearing_protection'
+    }, {
+      name: 'Confined Spaces',
+      key: 'confined_spaces'
+    }, {
+      name: 'Chemical Exposure',
+      key: 'chemical_exposure'
+    }, {
+      name: 'Wear Spectacles',
+      key: 'wear_spectacles'
+    }, {
+      name: 'Remain on Treatment for Chronic Conditions',
+      key: 'remain_on_treatment_for_chronic_conditions'
+    }];
     restrictions.forEach(restriction => {
       // Check multiple formats
-      const patterns = [
-        new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'),
-        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'),
-        new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-      
+      const patterns = [new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'), new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'), new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')];
+
       // Check all patterns
       let isSelected = false;
       for (const pattern of patterns) {
@@ -189,47 +196,35 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
           break;
         }
       }
-      
       extracted.restrictions[restriction.key] = isSelected;
     });
-    
+
     // Follow-up actions and comments
     const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
     if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
-    
     const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
     if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
-    
     const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
     if (commentsMatch && commentsMatch[1]) {
       let comments = commentsMatch[1].trim();
       // If it's just "N/A" or empty after HTML tags are removed
-      if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || 
-          comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
+      if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
         extracted.certification.comments = "N/A";
       } else {
         extracted.certification.comments = comments;
       }
     }
-    
     console.log("Extracted data from markdown:", extracted);
     return extracted;
   };
-  
+
   // Enhanced function to extract markdown from the Landing AI response
   const getMarkdown = (data: any): string | null => {
     if (!data) return null;
-    
     console.log("Attempting to extract markdown from data structure");
-    
+
     // First, try direct known paths
-    const possiblePaths = [
-      'raw_response.data.markdown',
-      'extracted_data.raw_response.data.markdown',
-      'markdown',
-      'raw_markdown'
-    ];
-    
+    const possiblePaths = ['raw_response.data.markdown', 'extracted_data.raw_response.data.markdown', 'markdown', 'raw_markdown'];
     for (const path of possiblePaths) {
       const value = getValue(data, path);
       if (value && typeof value === 'string') {
@@ -237,52 +232,45 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
         return value;
       }
     }
-    
+
     // Deep search for any property containing markdown content
     const searchForMarkdown = (obj: any, path = ''): string | null => {
       if (!obj || typeof obj !== 'object') return null;
-      
       if (obj.markdown && typeof obj.markdown === 'string') {
         console.log(`Found markdown at deep path: ${path}.markdown`);
         return obj.markdown;
       }
-      
       if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
         console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
         return obj.raw_response.data.markdown;
       }
-      
       if (obj.data && obj.data.markdown) {
         console.log(`Found markdown at deep path: ${path}.data.markdown`);
         return obj.data.markdown;
       }
-      
       for (const key in obj) {
         if (typeof obj[key] === 'object' && obj[key] !== null) {
           const result = searchForMarkdown(obj[key], `${path}.${key}`);
           if (result) return result;
         }
       }
-      
       return null;
     };
-    
     const deepMarkdown = searchForMarkdown(data);
     if (deepMarkdown) return deepMarkdown;
-    
+
     // Try to find structured_data.raw_content
     if (data.structured_data && data.structured_data.raw_content) {
       console.log("Found structured_data.raw_content, using as markdown");
       return data.structured_data.raw_content;
     }
-    
     console.log("Could not find markdown in provided data");
     return null;
   };
-  
+
   // Get structured data from either direct input or extracted from markdown
   let structuredData: any = {};
-  
+
   // First try to get structured data directly from the input
   if (extractedData?.structured_data) {
     console.log("Using existing structured_data");
@@ -301,14 +289,14 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       structuredData = extractedData || {};
     }
   }
-  
+
   // Get the main sections from the data
   const patient = structuredData.patient || {};
   const examination = structuredData.examination_results || structuredData.medical_details || {};
   const restrictions = structuredData.restrictions || {};
   const certification = structuredData.certification || structuredData.fitness_assessment || {};
   const testResults = examination.test_results || examination.tests || {};
-  
+
   // Fitness status
   const fitnessStatus = {
     fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
@@ -317,7 +305,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     temporarilyUnfit: isChecked(certification.temporarily_unfit),
     unfit: isChecked(certification.permanently_unfit) || isChecked(certification.unfit)
   };
-  
+
   // Medical tests status
   const medicalTests = {
     bloods: {
@@ -357,7 +345,7 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
       results: getValue(testResults, 'drug_screen_results')
     }
   };
-  
+
   // Restrictions
   const restrictionsData = {
     heights: isChecked(restrictions.heights),
@@ -369,14 +357,14 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     wearSpectacles: isChecked(restrictions.wear_spectacles),
     chronicConditions: isChecked(restrictions.chronic_conditions) || isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
   };
-  
+
   // Determine examination type
   const examinationType = {
     preEmployment: isChecked(examination.pre_employment) || isChecked(examination.type?.pre_employment),
     periodical: isChecked(examination.periodical) || isChecked(examination.type?.periodical),
     exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
   };
-  
+
   // For debugging - log the patient data to console
   console.log("Certificate template using data:", {
     name: getValue(patient, 'name'),
@@ -390,16 +378,11 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
     medicalTests,
     restrictionsData
   });
-  
-  return (
-    <ScrollArea className="h-full">
+  return <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
           {/* Certificate watermark (faint background) */}
-          <div 
-            className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none"
-            aria-hidden="true"
-          >
+          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none" aria-hidden="true">
             <span className="text-8xl font-bold tracking-widest text-gray-400 rotate-45">
               OCCUPATIONAL HEALTH
             </span>
@@ -424,10 +407,10 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
                   </div>
                 </div>
                 <div className="bg-gray-800 text-white px-3 py-1">
-                  <div className="text-sm font-bold">BLUECOLLAR OCCUPATIONAL HEALTH</div>
-                  <div className="text-xs mt-1">Tel: +27 11 892 0771/011 892 0627</div>
-                  <div className="text-xs">Email: admin@bluecollarhealth.co.za</div>
-                  <div className="text-xs">office@bluecollarhealth.co.za</div>
+                  <div className="text-sm font-bold">    BLUECOLLAR OCCUPATIONAL HEALTH</div>
+                  <div className="text-xs mt-1">                          Tel: +27 11 892 0771/011 892 0627</div>
+                  <div className="text-xs">                       Email: admin@bluecollarhealth.co.za</div>
+                  <div className="text-xs">                                   office@bluecollarhealth.co.za</div>
                   <div className="text-xs">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
                 </div>
               </div>
@@ -771,8 +754,6 @@ const CertificateTemplate = ({ extractedData }: CertificateTemplateProps) => {
           </div>
         </div>
       </Card>
-    </ScrollArea>
-  );
+    </ScrollArea>;
 };
-
 export default CertificateTemplate;
