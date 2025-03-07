@@ -21,7 +21,7 @@ export const supabase = createClient<Database>(
       headers: {
         'Content-Type': 'application/json',
       },
-      fetch: (url, options = {}) => {
+      fetch: (url: RequestInfo | URL, options: RequestInit = {}) => {
         return fetch(url, {
           ...options,
           headers: {
