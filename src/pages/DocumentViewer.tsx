@@ -516,6 +516,10 @@ const DocumentViewer = () => {
       
       console.log("Formatted certificate data for save:", certificateData);
       
+      // Log the current authentication status to help with debugging
+      const { data: authData } = await supabase.auth.getSession();
+      console.log("Current auth status:", authData?.session ? "Authenticated" : "Not authenticated");
+      
       let result;
       
       // Update or insert the certificate based on whether it already exists

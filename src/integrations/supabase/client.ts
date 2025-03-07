@@ -21,7 +21,16 @@ export const supabase = createClient<Database>(
       headers: {
         'Content-Type': 'application/json',
       },
-      fetch: fetch
+      fetch: (url, options = {}) => {
+        return fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+          }
+        });
+      }
     },
   }
 );
