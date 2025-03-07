@@ -1,20 +1,21 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
-  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock
+  EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
+import CertificateValidator from "@/components/CertificateValidator";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -154,6 +155,7 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -454,7 +456,35 @@ const DocumentViewer = () => {
     };
   }, [id, document?.status, processingTimeout]);
 
+  const handleValidationSave = (validatedData: any) => {
+    setDocument(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        extractedData: validatedData,
+        jsonData: JSON.stringify(validatedData, null, 2),
+        validationStatus: 'validated'
+      };
+    });
+    setIsValidating(false);
+    
+    toast.success("Validation completed", {
+      description: "The document data has been validated and saved."
+    });
+  };
+
   const renderExtractedData = () => {
+    if (isValidating && document) {
+      return (
+        <CertificateValidator 
+          documentId={document.id}
+          extractedData={document.extractedData}
+          onSave={handleValidationSave}
+          onCancel={() => setIsValidating(false)}
+        />
+      );
+    }
+    
     if (!document || !document.extractedData) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -771,21 +801,25 @@ const DocumentViewer = () => {
               <Copy className="h-4 w-4 mr-2" />
               Copy JSON
             </Button>
-            <Button 
-              size="sm"
-              onClick={() => {
-                toast("Certificate generated successfully", {
-                  description: "The certificate of fitness has been saved to your downloads folder",
-                  action: {
-                    label: "View",
-                    onClick: () => console.log("Viewing certificate")
-                  }
-                });
-              }}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Generate Certificate
-            </Button>
+            {!isValidating && (
+              <Button 
+                variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
+                size="sm"
+                onClick={() => setIsValidating(true)}
+              >
+                {document.validationStatus === 'validated' ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Edit Validation
+                  </>
+                ) : (
+                  <>
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Validate
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -835,84 +869,100 @@ const DocumentViewer = () => {
             className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Extracted Data</h2>
-              <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
-                {document.status === 'processed' ? (
-                  <>
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Processed
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-3 w-3 mr-1 animate-pulse" />
-                    Processing
-                  </>
-                )}
-              </Badge>
+              <h2 className="text-xl font-semibold">
+                {isValidating ? "Validate Document Data" : "Extracted Data"}
+              </h2>
+              {!isValidating && (
+                <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
+                  {document.status === 'processed' ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Processed
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3 w-3 mr-1 animate-pulse" />
+                      Processing
+                    </>
+                  )}
+                </Badge>
+              )}
+              {!isValidating && document.validationStatus === 'validated' && (
+                <Badge variant="success" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+                  <Check className="h-3 w-3 mr-1" />
+                  Validated
+                </Badge>
+              )}
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              <Tabs defaultValue="structured">
-                <CardHeader className="pb-0">
-                  <TabsList className="grid grid-cols-2">
-                    <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                    <TabsTrigger value="json">JSON</TabsTrigger>
-                  </TabsList>
-                </CardHeader>
-                
-                <CardContent className="pt-4 h-[calc(100vh-270px)] overflow-hidden">
-                  <TabsContent value="structured" className="m-0 h-full">
-                    {renderExtractedData()}
-                  </TabsContent>
-                  
-                  <TabsContent value="json" className="m-0 h-full">
-                    <ScrollArea className="h-full">
-                      <div className="relative">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="absolute top-1 right-1"
-                          onClick={() => {
-                            navigator.clipboard.writeText(document.jsonData);
-                            toast.success("JSON data copied to clipboard");
-                          }}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copy
-                        </Button>
-                        <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                          {document.jsonData}
-                        </pre>
-                      </div>
-                    </ScrollArea>
-                  </TabsContent>
+              {isValidating ? (
+                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
+                  {renderExtractedData()}
                 </CardContent>
-              </Tabs>
+              ) : (
+                <>
+                  <Tabs defaultValue="structured">
+                    <CardContent className="pb-0 pt-4">
+                      <TabsList className="grid grid-cols-2">
+                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                        <TabsTrigger value="json">JSON</TabsTrigger>
+                      </TabsList>
+                    </CardContent>
+                    
+                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
+                      <TabsContent value="structured" className="m-0 h-full">
+                        <ScrollArea className="h-full pr-4">
+                          {renderExtractedData()}
+                        </ScrollArea>
+                      </TabsContent>
+                      
+                      <TabsContent value="json" className="m-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="relative">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="absolute top-1 right-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(document.jsonData);
+                                toast.success("JSON data copied to clipboard");
+                              }}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </Button>
+                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
+                              {document.jsonData}
+                            </pre>
+                          </div>
+                        </ScrollArea>
+                      </TabsContent>
+                    </CardContent>
+                  </Tabs>
+                </>
+              )}
             </Card>
             
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => navigate("/dashboard")}
-              >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <Button
-                onClick={() => {
-                  toast("Certificate generated successfully", {
-                    description: "The certificate of fitness has been saved to your downloads folder",
-                    action: {
-                      label: "View",
-                      onClick: () => console.log("Viewing certificate")
-                    }
-                  });
-                }}
-              >
-                <ClipboardCheck className="h-4 w-4 mr-2" />
-                Generate Certificate
-              </Button>
-            </div>
+            {!isValidating && (
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/dashboard")}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Back to Dashboard
+                </Button>
+                {document.status === 'processed' && !isValidating && (
+                  <Button
+                    onClick={() => setIsValidating(true)}
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
+                  </Button>
+                )}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       </main>
