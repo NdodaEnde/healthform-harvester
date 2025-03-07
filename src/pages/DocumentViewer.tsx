@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -299,27 +300,29 @@ const DocumentViewer = () => {
         .from('medical-documents')
         .createSignedUrl(documentData.file_path, 3600);
       
+      // Use certificateData if available, otherwise use document's extracted_data
       let extractedData = certificateData || documentData.extracted_data || {};
       let patientName = extractPatientName(extractedData);
       let patientId = extractPatientId(extractedData);
       
       if (documentData.document_type === 'certificate-of-fitness') {
+        // Check if we need to reformat data for consistency
         if (
           typeof extractedData === 'object' && 
           extractedData !== null && 
-          !Array.isArray(extractedData) && 
-          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
-          extractedData.raw_response
+          !Array.isArray(extractedData)
         ) {
-          extractedData = {
-            ...extractedData,
-            structured_data: {
+          // If we're working with raw extracted data from the processor
+          if (extractedData.raw_response && !extractedData.patient) {
+            // Extract patient info from the raw_response if needed
+            extractedData = {
+              ...extractedData,
               patient: {
                 name: patientName,
                 id_number: patientId
               }
-            }
-          };
+            };
+          }
         }
       }
       
