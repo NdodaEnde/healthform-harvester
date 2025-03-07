@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -368,89 +367,21 @@ function processCertificateOfFitnessData(apiResponse: any) {
     if (markdown) {
       console.log('Extracting detailed data from markdown');
       
-      // 1. Extract Patient Information using more specific patterns
-      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-      if (nameMatch && nameMatch[1]) {
-        structuredData.patient.name = cleanValue(nameMatch[1].trim());
-        console.log('Extracted name:', structuredData.patient.name);
-      }
+      // Extract Patient Information using more specific patterns
+      structuredData = extractPatientInfoFromMarkdown(markdown, structuredData);
       
-      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-      if (idMatch && idMatch[1]) {
-        structuredData.patient.employee_id = cleanValue(idMatch[1].trim());
-        console.log('Extracted ID:', structuredData.patient.employee_id);
-      }
-      
-      const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-      if (companyMatch && companyMatch[1]) {
-        structuredData.patient.company = cleanValue(companyMatch[1].trim());
-        console.log('Extracted company:', structuredData.patient.company);
-      }
-      
-      const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-      if (examDateMatch && examDateMatch[1]) {
-        structuredData.examination_results.date = cleanValue(examDateMatch[1].trim());
-        console.log('Extracted exam date:', structuredData.examination_results.date);
-      }
-      
-      const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-      if (expiryDateMatch && expiryDateMatch[1]) {
-        structuredData.certification.valid_until = cleanValue(expiryDateMatch[1].trim());
-        console.log('Extracted expiry date:', structuredData.certification.valid_until);
-      }
-      
-      // Job Title extraction - try multiple patterns
-      const jobTitlePatterns = [
-        /Job Title:\s*(.*?)(?=\n|\r|$|<!--)/i,
-        /\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
-        /Job\s*Title\s*[:\-]\s*(.*?)(?=\n|\r|$|<)/i
-      ];
-      
-      for (const pattern of jobTitlePatterns) {
-        const match = markdown.match(pattern);
-        if (match && match[1]) {
-          structuredData.patient.occupation = cleanValue(match[1].trim());
-          console.log('Extracted job title:', structuredData.patient.occupation);
-          break;
-        }
-      }
-      
-      // 2. Extract Examination Type - IMPROVED to better detect checkboxes
-      const preEmploymentMatch = markdown.includes('Pre-Employment') && checkboxIsMarked(markdown, 'Pre-Employment');
-      const periodicalMatch = markdown.includes('Periodical') && checkboxIsMarked(markdown, 'Periodical');
-      const exitMatch = markdown.includes('Exit') && checkboxIsMarked(markdown, 'Exit');
-      
-      structuredData.examination_results.type = {
-        pre_employment: preEmploymentMatch,
-        periodical: periodicalMatch,
-        exit: exitMatch
-      };
+      // Extract Examination Type
+      structuredData.examination_results.type = extractExaminationTypeFromMarkdown(markdown);
       
       console.log('Examination types:', structuredData.examination_results.type);
       
-      // 3. Extract Medical Test Results - IMPROVED to better detect checked boxes and results
-      structuredData.examination_results.test_results = extractTestResults(markdown);
+      // Extract Medical Test Results - improved to better extract test results
+      structuredData.examination_results.test_results = extractTestResultsFromMarkdown(markdown);
       
       console.log('Test results:', structuredData.examination_results.test_results);
       
-      // 4. Extract Fitness Status - IMPROVED to detect crossed out status
-      const fitStatusCrossedOut = markdown.includes('FIT') && 
-                                 (markdown.includes('crossed out') || 
-                                  markdown.includes('drawn over') || 
-                                  markdown.includes('large "X"') ||
-                                  markdown.toLowerCase().includes('crossing it out'));
-      
-      structuredData.certification = {
-        fit: markdown.includes('FIT') && !fitStatusCrossedOut,
-        fit_with_restrictions: checkboxIsMarked(markdown, 'Fit with Restriction'),
-        fit_with_condition: checkboxIsMarked(markdown, 'Fit with Condition'),
-        temporarily_unfit: checkboxIsMarked(markdown, 'Temporary Unfit'),
-        unfit: checkboxIsMarked(markdown, 'UNFIT') || fitStatusCrossedOut,
-        follow_up: cleanValue(extractFollowUp(markdown)),
-        review_date: cleanValue(extractReviewDate(markdown)),
-        comments: cleanValue(extractComments(markdown)),
-        valid_until: structuredData.certification.valid_until
-      };
+      // Extract Fitness Status
+      structuredData.certification = extractFitnessStatusFromMarkdown(markdown, structuredData.certification);
       
       console.log('Certification status:', {
         fit: structuredData.certification.fit,
@@ -460,8 +391,8 @@ function processCertificateOfFitnessData(apiResponse: any) {
         unfit: structuredData.certification.unfit
       });
       
-      // 5. Extract Restrictions - IMPROVED to better detect restrictions
-      structuredData.restrictions = extractRestrictions(markdown);
+      // Extract Restrictions
+      structuredData.restrictions = extractRestrictionsFromMarkdown(markdown);
       
       console.log('Restrictions:', structuredData.restrictions);
     }
@@ -488,82 +419,106 @@ function processCertificateOfFitnessData(apiResponse: any) {
   }
 }
 
-// NEW IMPROVED function to check if a checkbox is marked with improved detection
-function checkboxIsMarked(markdown: string, fieldName: string): boolean {
-  if (!markdown || !fieldName) return false;
+// Helper function to extract patient information from markdown
+function extractPatientInfoFromMarkdown(markdown, structuredData) {
+  // Name extraction
+  const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+  if (nameMatch && nameMatch[1]) {
+    structuredData.patient.name = cleanValue(nameMatch[1].trim());
+    console.log('Extracted name:', structuredData.patient.name);
+  }
   
-  // Find the line or context containing the field name
-  const lines = markdown.split('\n');
-  let fieldLine = '';
-  let windowStart = 0;
+  // ID extraction
+  const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+  if (idMatch && idMatch[1]) {
+    structuredData.patient.employee_id = cleanValue(idMatch[1].trim());
+    console.log('Extracted ID:', structuredData.patient.employee_id);
+  }
   
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes(fieldName)) {
-      fieldLine = lines[i];
-      windowStart = Math.max(0, i - 2);
+  // Company extraction
+  const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+  if (companyMatch && companyMatch[1]) {
+    structuredData.patient.company = cleanValue(companyMatch[1].trim());
+    console.log('Extracted company:', structuredData.patient.company);
+  }
+  
+  // Exam date extraction
+  const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+  if (examDateMatch && examDateMatch[1]) {
+    structuredData.examination_results.date = cleanValue(examDateMatch[1].trim());
+    console.log('Extracted exam date:', structuredData.examination_results.date);
+  }
+  
+  // Expiry date extraction
+  const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i);
+  if (expiryDateMatch && expiryDateMatch[1]) {
+    structuredData.certification.valid_until = cleanValue(expiryDateMatch[1].trim());
+    console.log('Extracted expiry date:', structuredData.certification.valid_until);
+  }
+  
+  // Job Title extraction - try multiple patterns
+  const jobTitlePatterns = [
+    /\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Job Title:\s*(.*?)(?=\n|\r|$|<!--)/i,
+    /Job\s*Title\s*[:\-]\s*(.*?)(?=\n|\r|$|<)/i
+  ];
+  
+  for (const pattern of jobTitlePatterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      structuredData.patient.occupation = cleanValue(match[1].trim());
+      console.log('Extracted job title:', structuredData.patient.occupation);
       break;
     }
   }
   
-  if (!fieldLine) return false;
-  
-  // Check the line containing the field and a few lines after for checkbox markers
-  const contextWindow = lines.slice(windowStart, windowStart + 5).join('\n');
-  
-  // Look for checkbox markers near the field name
-  const markerPatterns = [
-    new RegExp(`${fieldName}.*?\\[x\\]`, 'i'),
-    new RegExp(`${fieldName}.*?\\[X\\]`, 'i'),
-    new RegExp(`\\[x\\].*?${fieldName}`, 'i'),
-    new RegExp(`\\[X\\].*?${fieldName}`, 'i'),
-    new RegExp(`${fieldName}.*?✓`, 'i'),
-    new RegExp(`${fieldName}.*?✔`, 'i'),
-    new RegExp(`${fieldName}.*?checked`, 'i'),
-    new RegExp(`${fieldName}.*?marked`, 'i'),
-    new RegExp(`${fieldName}.*?selected`, 'i')
-  ];
-  
-  for (const pattern of markerPatterns) {
-    if (pattern.test(contextWindow)) {
-      console.log(`Field '${fieldName}' is marked (pattern match)`);
-      return true;
-    }
-  }
-  
-  // If the field appears in a table row with [x] anywhere in that row
-  if (fieldLine.includes('<td>') && (
-    contextWindow.includes('[x]') || 
-    contextWindow.includes('[X]') || 
-    contextWindow.includes('✓') || 
-    contextWindow.includes('✔')
-  )) {
-    console.log(`Field '${fieldName}' is marked (table row with checkbox)`);
-    return true;
-  }
-  
-  // Special handling for exam type checkboxes which might be in a list style
-  if (fieldName === 'Pre-Employment' || fieldName === 'Periodical' || fieldName === 'Exit') {
-    const examTypeContext = markdown.substring(
-      markdown.indexOf('Examination Type') - 10, 
-      markdown.indexOf('Examination Type') + 150
-    );
-    
-    const specificPattern = new RegExp(`\\*\\*${fieldName}\\*\\*:\\s*\\[(x|X)\\]`, 'i');
-    if (specificPattern.test(examTypeContext)) {
-      console.log(`Exam type '${fieldName}' is marked (specific match)`);
-      return true;
-    }
-  }
-  
-  console.log(`Field '${fieldName}' is NOT marked`);
-  return false;
+  return structuredData;
 }
 
-// IMPROVED helper function to extract test results more accurately
-function extractTestResults(markdown: string): any {
-  const testResults: any = {};
+// Helper function to extract examination type from markdown
+function extractExaminationTypeFromMarkdown(markdown) {
+  // Look for examination type markers in the markdown
+  const preEmploymentMatch = directlyExtractCheckedBox(markdown, "Pre-Employment");
+  const periodicalMatch = directlyExtractCheckedBox(markdown, "Periodical");
+  const exitMatch = directlyExtractCheckedBox(markdown, "Exit");
   
-  // Define tests to look for
+  console.log('Examination types found:', {
+    preEmploymentMatch,
+    periodicalMatch,
+    exitMatch
+  });
+  
+  return {
+    pre_employment: preEmploymentMatch,
+    periodical: periodicalMatch,
+    exit: exitMatch
+  };
+}
+
+// Helper function to directly extract if a checkbox is checked from markdown
+function directlyExtractCheckedBox(markdown, label) {
+  // First, find the section containing the label
+  const lines = markdown.split('\n');
+  let labelLine = '';
+  
+  for (const line of lines) {
+    if (line.includes(label)) {
+      labelLine = line;
+      break;
+    }
+  }
+  
+  if (!labelLine) return false;
+  
+  // Check if this line contains a checked box
+  return labelLine.includes('[x]') || labelLine.includes('[X]');
+}
+
+// Helper function to extract test results from markdown
+function extractTestResultsFromMarkdown(markdown) {
+  const testResults = {};
+  
+  // Define common tests to look for
   const tests = [
     { name: 'Bloods', key: 'bloods' },
     { name: 'Far, Near Vision', key: 'far_near_vision' },
@@ -576,155 +531,197 @@ function extractTestResults(markdown: string): any {
     { name: 'Drug Screen', key: 'drug_screen' }
   ];
   
-  // Check if there are tables in the markdown
-  const hasTables = markdown.includes('<table>');
+  // Look for a table section with test results
+  const tablePattern = /<table>[\s\S]*?<\/table>/g;
+  const tables = markdown.match(tablePattern) || [];
   
-  tests.forEach(test => {
-    // First check if the test is mentioned anywhere
-    if (markdown.includes(test.name)) {
-      // Look for checkbox markers in context of the test name
-      const isDone = isTestChecked(markdown, test.name, hasTables);
-      testResults[`${test.key}_done`] = isDone;
+  console.log(`Found ${tables.length} tables in the markdown`);
+  
+  if (tables.length > 0) {
+    // Process each test directly from the table
+    for (const test of tests) {
+      // Normalize test name for case-insensitive matching
+      const testNameVariants = [
+        test.name,
+        test.name.toUpperCase(),
+        test.name.toLowerCase(),
+        test.name.replace(/\s/g, '')
+      ];
       
-      // Attempt to extract test results if the test was done
-      if (isDone) {
-        let resultValue = extractTestResult(markdown, test.name, hasTables);
-        if (resultValue) {
-          testResults[`${test.key}_results`] = resultValue;
+      let isDone = false;
+      let result = null;
+      
+      // Check each table for the test
+      for (const table of tables) {
+        for (const variant of testNameVariants) {
+          // Create a pattern to match the row containing this test
+          const rowPattern = new RegExp(`<tr>\\s*<td>[^<]*${variant}[^<]*</td>\\s*<td>\\[(x|X|)\\]</td>\\s*<td>([^<]*)</td>`, 'i');
+          const match = table.match(rowPattern);
+          
+          if (match) {
+            // Check if the checkbox is marked
+            isDone = match[1] === 'x' || match[1] === 'X';
+            result = match[2].trim();
+            if (result === 'N/A') result = null;
+            
+            console.log(`Found test ${test.name}: done=${isDone}, result=${result}`);
+            break;
+          }
+        }
+        
+        if (isDone || result) break;
+      }
+      
+      // Regular expression fallback for non-table formats
+      if (!isDone && !result) {
+        // Look for alternative formats like lists
+        for (const variant of testNameVariants) {
+          const listPattern = new RegExp(`\\| ${variant}\\s*\\| \\[(x|X|)\\]\\s*\\| ([^\\|]*)\\|`, 'i');
+          const match = markdown.match(listPattern);
+          
+          if (match) {
+            isDone = match[1] === 'x' || match[1] === 'X';
+            result = match[2].trim();
+            if (result === 'N/A') result = null;
+            
+            console.log(`Found test in list format ${test.name}: done=${isDone}, result=${result}`);
+            break;
+          }
         }
       }
-    } else {
-      // Test not found in document
-      testResults[`${test.key}_done`] = false;
+      
+      // Set the test status and result in our return object
+      testResults[`${test.key}_done`] = isDone;
+      if (result) {
+        testResults[`${test.key}_results`] = result;
+      }
     }
-  });
+  } else {
+    // If no tables, try to extract from other formats (lists, paragraphs)
+    for (const test of tests) {
+      const isDone = directlyExtractCheckedBox(markdown, test.name);
+      testResults[`${test.key}_done`] = isDone;
+      
+      // Try to extract results if the test is done
+      if (isDone) {
+        const resultPattern = new RegExp(`${test.name}[^\\n]*?:\\s*([^\\n,]*?)(?:\\n|,|$)`, 'i');
+        const match = markdown.match(resultPattern);
+        if (match && match[1] && match[1].trim() !== 'N/A') {
+          testResults[`${test.key}_results`] = match[1].trim();
+        }
+      }
+    }
+  }
   
   return testResults;
 }
 
-// NEW helper function to check if a medical test is checked/done
-function isTestChecked(markdown: string, testName: string, hasTables: boolean): boolean {
-  if (hasTables) {
-    // For table format, look for a row with test name and a checked box
-    const tablePattern = new RegExp(`<tr>[\\s\\S]*?<td>${testName}</td>[\\s\\S]*?<td>\\[(x|X)\\]</td>`, 'i');
-    const tableMarked = tablePattern.test(markdown);
+// Helper function to extract fitness status from markdown
+function extractFitnessStatusFromMarkdown(markdown, certification) {
+  // Look for fitness declaration section
+  const fitnessSection = extractSection(markdown, 'Medical Fitness Declaration', 'Comments');
+  
+  if (fitnessSection) {
+    certification.fit = directlyExtractCheckedBox(fitnessSection, 'FIT');
+    certification.fit_with_restrictions = directlyExtractCheckedBox(fitnessSection, 'Fit with Restriction');
+    certification.fit_with_condition = directlyExtractCheckedBox(fitnessSection, 'Fit with Condition');
+    certification.temporarily_unfit = directlyExtractCheckedBox(fitnessSection, 'Temporary Unfit');
+    certification.unfit = directlyExtractCheckedBox(fitnessSection, 'UNFIT');
     
-    if (tableMarked) {
-      console.log(`Test '${testName}' is marked in table`);
-      return true;
+    // Special case: Check if FIT is crossed out
+    const fitCrossedOut = fitnessSection.includes('crossing it out') || 
+                         fitnessSection.includes('crossed out') || 
+                         fitnessSection.includes('large "X"') ||
+                         markdown.includes('crossing out of the word "FIT"');
+                         
+    if (fitCrossedOut) {
+      certification.fit = false;
+      certification.unfit = true;
+    }
+  } else {
+    // Fallback: check whole document
+    certification.fit = directlyExtractCheckedBox(markdown, 'FIT') && 
+                      !markdown.includes('crossing it out') && 
+                      !markdown.includes('crossed out');
+    certification.fit_with_restrictions = directlyExtractCheckedBox(markdown, 'Fit with Restriction');
+    certification.fit_with_condition = directlyExtractCheckedBox(markdown, 'Fit with Condition');
+    certification.temporarily_unfit = directlyExtractCheckedBox(markdown, 'Temporary Unfit');
+    certification.unfit = directlyExtractCheckedBox(markdown, 'UNFIT') || 
+                         markdown.includes('crossing it out') || 
+                         markdown.includes('crossed out');
+  }
+  
+  // Extract follow-up actions if available
+  const followUpMatch = markdown.match(/Referred or follow up actions:\s*(.*?)(?=\n\n|\r\n\r\n|$|Review Date)/is);
+  if (followUpMatch && followUpMatch[1] && followUpMatch[1].trim() !== '') {
+    certification.follow_up = cleanValue(followUpMatch[1].trim());
+  }
+  
+  // Extract review date if available
+  const reviewDateMatch = markdown.match(/Review Date:\s*(.*?)(?=\n|\r|$|<)/i);
+  if (reviewDateMatch && reviewDateMatch[1] && reviewDateMatch[1].trim() !== '') {
+    certification.review_date = cleanValue(reviewDateMatch[1].trim());
+  }
+  
+  // Extract comments if available
+  const commentsMatch = markdown.match(/Comments:\s*(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
+  if (commentsMatch && commentsMatch[1]) {
+    let comments = commentsMatch[1].trim();
+    if (comments !== 'N/A' && comments !== '') {
+      certification.comments = cleanValue(comments);
     }
   }
   
-  // General context check for checkbox markers near test name
-  const testNameIndex = markdown.indexOf(testName);
-  if (testNameIndex === -1) return false;
-  
-  const contextStart = Math.max(0, testNameIndex - 30);
-  const contextEnd = Math.min(markdown.length, testNameIndex + testName.length + 50);
-  const context = markdown.substring(contextStart, contextEnd);
-  
-  // Look for checkbox markers in context
-  const isMarked = (
-    context.includes('[x]') || 
-    context.includes('[X]') || 
-    context.includes('✓') || 
-    context.includes('✔') || 
-    context.includes('Done') ||
-    context.includes('Completed') ||
-    context.includes('checked') || 
-    context.includes('marked')
-  );
-  
-  console.log(`Test '${testName}' is marked: ${isMarked} (context check)`);
-  return isMarked;
+  return certification;
 }
 
-// NEW helper function to extract test result values
-function extractTestResult(markdown: string, testName: string, hasTables: boolean): string | null {
-  let result = null;
+// Helper function to extract a section from markdown
+function extractSection(markdown, startMarker, endMarker) {
+  const startIndex = markdown.indexOf(startMarker);
+  if (startIndex === -1) return null;
   
-  if (hasTables) {
-    // For table format, extract result from the third column
-    const tableRowPattern = new RegExp(`<tr>[\\s\\S]*?<td>${testName}</td>[\\s\\S]*?<td>\\[(x|X)\\]</td>[\\s\\S]*?<td>(.*?)</td>`, 'i');
-    const tableMatch = markdown.match(tableRowPattern);
-    
-    if (tableMatch && tableMatch[2]) {
-      result = tableMatch[2].trim();
-      if (result === 'N/A' || result === '') return null;
-      console.log(`Extracted table result for ${testName}: ${result}`);
-      return result;
-    }
-  }
+  const endIndex = endMarker ? markdown.indexOf(endMarker, startIndex) : markdown.length;
+  if (endIndex === -1) return markdown.substring(startIndex);
   
-  // Try other common patterns for results
-  const patterns = [
-    // Test followed by result
-    new RegExp(`${testName}[\\s\\S]*?(\\d+\\.\\d+|\\d+\\/\\d+|Normal|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i'),
-    // Result in nearby text
-    new RegExp(`${testName}[\\s\\S]{1,50}result[\\s:\\s]+(\\d+\\.\\d+|\\d+\\/\\d+|Normal|Mild|Moderate|Severe|Restriction|Pass|Fail)`, 'i'),
-    // Vision test format
-    new RegExp(`${testName}[\\s\\S]{1,50}(20\\/\\d+)`, 'i')
-  ];
-  
-  for (const pattern of patterns) {
-    const match = markdown.match(pattern);
-    if (match && match[1]) {
-      result = match[1].trim();
-      console.log(`Extracted pattern result for ${testName}: ${result}`);
-      return result;
-    }
-  }
-  
-  return null;
+  return markdown.substring(startIndex, endIndex);
 }
 
-// IMPROVED helper function to extract restrictions
-function extractRestrictions(markdown: string): any {
-  const restrictions: any = {};
+// Helper function to extract restrictions from markdown
+function extractRestrictionsFromMarkdown(markdown) {
+  const restrictions = {
+    heights: false,
+    dust_exposure: false,
+    motorized_equipment: false,
+    wear_hearing_protection: false,
+    confined_spaces: false,
+    chemical_exposure: false,
+    wear_spectacles: false,
+    remain_on_treatment_for_chronic_conditions: false
+  };
   
-  const restrictionTypes = [
-    { name: 'Heights', key: 'heights' },
-    { name: 'Dust Exposure', key: 'dust_exposure' },
-    { name: 'Motorized Equipment', key: 'motorized_equipment' },
-    { name: 'Wear Hearing Protection', key: 'wear_hearing_protection' },
-    { name: 'Confined Spaces', key: 'confined_spaces' },
-    { name: 'Chemical Exposure', key: 'chemical_exposure' },
-    { name: 'Wear Spectacles', key: 'wear_spectacles' },
-    { name: 'Remain on Treatment for Chronic Conditions', key: 'remain_on_treatment_for_chronic_conditions' }
-  ];
-  
-  // Check if there's a restrictions section
-  const restrictionsSection = markdown.indexOf('Restrictions') > -1 ? 
-    markdown.substring(markdown.indexOf('Restrictions'), 
-                     markdown.indexOf('Restrictions') + 500) : 
-    '';
+  // Find the restrictions section if it exists
+  const restrictionsSection = extractSection(markdown, 'Restrictions', 'Medical Fitness Declaration');
   
   if (restrictionsSection) {
-    restrictionTypes.forEach(restriction => {
-      // Check if the restriction is specifically marked
-      restrictions[restriction.key] = restrictionsSection.includes(restriction.name) && 
-                                    (restrictionsSection.includes(`${restriction.name}.*?\\[x\\]`) || 
-                                     restrictionsSection.includes(`${restriction.name}.*?\\[X\\]`) ||
-                                     restrictionsSection.includes(`${restriction.name}.*?✓`) ||
-                                     restrictionsSection.includes(`${restriction.name}.*?✔`) ||
-                                     restrictionsSection.includes(`${restriction.name}.*?checked`) ||
-                                     restrictionsSection.includes(`${restriction.name}.*?Marked`));
-      
-      // As a fallback, check if the restriction is in the highlighted or emphasized section
-      if (!restrictions[restriction.key]) {
-        restrictions[restriction.key] = restrictionsSection.includes(restriction.name) && 
-                                      (restrictionsSection.includes(`<strong>${restriction.name}</strong>`) ||
-                                       restrictionsSection.includes(`<b>${restriction.name}</b>`) ||
-                                       restrictionsSection.includes(`<em>${restriction.name}</em>`) ||
-                                       restrictionsSection.includes(`<i>${restriction.name}</i>`) ||
-                                       restrictionsSection.includes(`**${restriction.name}**`));
-      }
-    });
+    // Check each restriction directly
+    restrictions.heights = directlyExtractCheckedBox(restrictionsSection, 'Heights');
+    restrictions.dust_exposure = directlyExtractCheckedBox(restrictionsSection, 'Dust Exposure');
+    restrictions.motorized_equipment = directlyExtractCheckedBox(restrictionsSection, 'Motorized Equipment');
+    restrictions.wear_hearing_protection = directlyExtractCheckedBox(restrictionsSection, 'Wear Hearing Protection');
+    restrictions.confined_spaces = directlyExtractCheckedBox(restrictionsSection, 'Confined Spaces');
+    restrictions.chemical_exposure = directlyExtractCheckedBox(restrictionsSection, 'Chemical Exposure');
+    restrictions.wear_spectacles = directlyExtractCheckedBox(restrictionsSection, 'Wear Spectacles');
+    restrictions.remain_on_treatment_for_chronic_conditions = directlyExtractCheckedBox(restrictionsSection, 'Remain on Treatment');
   } else {
-    // If no restrictions section found, check the entire document for each restriction
-    restrictionTypes.forEach(restriction => {
-      restrictions[restriction.key] = checkboxIsMarked(markdown, restriction.name);
-    });
+    // Fallback: check the whole document
+    restrictions.heights = directlyExtractCheckedBox(markdown, 'Heights');
+    restrictions.dust_exposure = directlyExtractCheckedBox(markdown, 'Dust Exposure');
+    restrictions.motorized_equipment = directlyExtractCheckedBox(markdown, 'Motorized Equipment');
+    restrictions.wear_hearing_protection = directlyExtractCheckedBox(markdown, 'Wear Hearing Protection');
+    restrictions.confined_spaces = directlyExtractCheckedBox(markdown, 'Confined Spaces');
+    restrictions.chemical_exposure = directlyExtractCheckedBox(markdown, 'Chemical Exposure');
+    restrictions.wear_spectacles = directlyExtractCheckedBox(markdown, 'Wear Spectacles');
+    restrictions.remain_on_treatment_for_chronic_conditions = directlyExtractCheckedBox(markdown, 'Remain on Treatment');
   }
   
   return restrictions;
