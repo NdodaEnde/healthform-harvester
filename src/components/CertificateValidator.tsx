@@ -235,7 +235,7 @@ const CertificateValidator = ({
               <TabsTrigger value="certification">Certification</TabsTrigger>
             </TabsList>
             
-            <ScrollArea className="h-[60vh] overflow-y-auto pr-4">
+            <div className="validation-scroll-area">
               <TabsContent value="patient" className="space-y-4 mt-0">
                 {renderPatientFields()}
               </TabsContent>
@@ -247,7 +247,7 @@ const CertificateValidator = ({
               <TabsContent value="certification" className="space-y-4 mt-0">
                 {renderCertificationFields()}
               </TabsContent>
-            </ScrollArea>
+            </div>
           </Tabs>
           
           <div className="flex justify-end space-x-2 pt-4">
