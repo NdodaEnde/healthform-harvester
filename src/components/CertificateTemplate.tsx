@@ -696,24 +696,25 @@ const CertificateTemplate = ({
             <div className="px-4 mb-4">
               <div className="flex justify-between items-end">
                 <div className="flex-1">
-                  <div className="border-t border-gray-400 pt-1 mt-8 max-w-40">
-                    <div className="text-xs">Doctor's Signature</div>
+                  <div className="border-t border-gray-400 pt-1 mt-8 max-w-56">
+                    <div className="text-center font-semibold text-sm">SIGNATURE</div>
                   </div>
                 </div>
                 
                 <div className="flex-1 px-2">
-                  <div className="text-[0.65rem] space-y-1">
-                    <p className="font-semibold text-center">Occupational Health Practitioner / Occupational Medical Practitioner</p>
-                    <p className="text-center">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
-                    <p className="text-center">Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
-                    <p className="text-center">SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
-                    <p className="text-center">Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
+                  <div className="text-[0.65rem] space-y-0.5 text-center">
+                    <p className="font-semibold">Occupational Health Practitioner/Occupational Medical</p>
+                    <p className="font-semibold">Practitioner</p>
+                    <p className="text-xs">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
+                    <p className="text-xs">Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
+                    <p className="text-xs">SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
+                    <p className="text-xs">Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
                   </div>
                 </div>
                 
                 <div className="flex-1 text-right">
-                  <div className="border border-gray-300 rounded-full w-24 h-24 mx-auto mb-2 flex items-center justify-center">
-                    <div className="text-xs text-gray-400">STAMP</div>
+                  <div className="border-t border-gray-400 pt-1 mt-8 max-w-56 ml-auto">
+                    <div className="text-center font-semibold text-sm">STAMP</div>
                   </div>
                 </div>
               </div>
