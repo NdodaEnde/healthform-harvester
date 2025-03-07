@@ -11,6 +11,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     // Call Landing AI API
     const result = await apiClient.callLandingAI(file);
     console.log(`Landing AI API response received for document ID: ${documentId}`);
+    console.log(`Raw API result:`, JSON.stringify(result));
     
     // Process and structure the data based on document type
     let structuredData;
@@ -52,6 +53,47 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
         updateSuccess = true;
         console.log(`Document processing completed for document ID: ${documentId}`);
         console.log('Updated document record:', updateData);
+        
+        // Immediately create a certificate record with the extracted data
+        if (documentType === 'certificate-of-fitness') {
+          try {
+            console.log('Creating certificate record from processed document...');
+            
+            // Format the data correctly for the certificates table
+            const certificateData = {
+              document_id: documentId,
+              patient_info: structuredData.patient || {},
+              fitness_declaration: structuredData.certification || {},
+              restrictions: Array.isArray(structuredData.restrictions) 
+                ? structuredData.restrictions 
+                : Object.keys(structuredData.restrictions || {}).filter(key => structuredData.restrictions[key]),
+              medical_tests: structuredData.examination_results?.test_results || {},
+              vision_tests: {
+                far_near_vision: structuredData.examination_results?.test_results?.far_near_vision_results || null,
+                side_depth: structuredData.examination_results?.test_results?.side_depth_results || null,
+                night_vision: structuredData.examination_results?.test_results?.night_vision_results || null
+              },
+              company_info: {
+                name: structuredData.patient?.company || ''
+              }
+            };
+            
+            console.log('Certificate data being saved:', JSON.stringify(certificateData));
+            
+            const { data: certData, error: certError } = await supabase
+              .from('certificates')
+              .insert(certificateData)
+              .select();
+              
+            if (certError) {
+              console.error('Error creating certificate record:', certError);
+            } else {
+              console.log('Certificate record created successfully:', certData);
+            }
+          } catch (certCreateError) {
+            console.error('Error in certificate creation process:', certCreateError);
+          }
+        }
         
         // Force another update to ensure the status is set to processed
         await supabase

@@ -63,7 +63,16 @@ export function processCertificateOfFitnessData(apiResponse: any) {
                     cleanValue(extractPath(extractedData, 'valid_until')) || 
                     cleanValue(extractPath(extractedData, 'expiry_date')) || ''
       },
-      restrictions: {},
+      restrictions: {
+        heights: false,
+        dust_exposure: false,
+        motorized_equipment: false,
+        wear_hearing_protection: false,
+        confined_spaces: false,
+        chemical_exposure: false,
+        wear_spectacles: false,
+        remain_on_treatment_for_chronic_conditions: false
+      },
       raw_content: markdown || null
     };
     
@@ -87,6 +96,9 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       structuredData.restrictions = extractRestrictionsFromMarkdown(markdown);
     }
     
+    // Log the final structured data for debugging
+    console.log('Final processed certificate data:', JSON.stringify(structuredData));
+    
     return structuredData;
     
   } catch (error) {
@@ -103,8 +115,27 @@ export function processCertificateOfFitnessData(apiResponse: any) {
         type: {},
         test_results: {}
       },
-      certification: {},
-      restrictions: {}
+      certification: {
+        fit: false,
+        fit_with_restrictions: false,
+        fit_with_condition: false,
+        temporarily_unfit: false,
+        unfit: false,
+        follow_up: '',
+        review_date: '',
+        comments: '',
+        valid_until: ''
+      },
+      restrictions: {
+        heights: false,
+        dust_exposure: false,
+        motorized_equipment: false,
+        wear_hearing_protection: false,
+        confined_spaces: false,
+        chemical_exposure: false,
+        wear_spectacles: false,
+        remain_on_treatment_for_chronic_conditions: false
+      }
     };
   }
 }

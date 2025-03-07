@@ -482,12 +482,17 @@ const DocumentViewer = () => {
     
     setSaveLoading(true);
     try {
-      console.log("Saving certificate data...", editedData);
+      console.log("Starting certificate save process...");
+      console.log("Original edited data:", editedData);
       
       // Handle different potential shapes of data
       let patientInfo = editedData.patient || editedData.patient_info || {};
       let fitnessDeclaration = editedData.certification || editedData.fitness_declaration || {};
       let restrictions = editedData.restrictions || editedData.restrictionsData || [];
+      
+      console.log("Extracted patient info:", patientInfo);
+      console.log("Extracted fitness declaration:", fitnessDeclaration);
+      console.log("Extracted restrictions:", restrictions);
       
       // Format restrictions to always be an array
       if (typeof restrictions === 'object' && !Array.isArray(restrictions)) {
@@ -511,10 +516,13 @@ const DocumentViewer = () => {
           night_vision: editedData.examination_results?.test_results?.night_vision_results || 
                       editedData.medicalTests?.nightVision?.results || null
         },
+        company_info: {
+          name: patientInfo.company || ''
+        },
         validated: true
       };
       
-      console.log("Formatted certificate data for save:", certificateData);
+      console.log("Formatted certificate data for save:", JSON.stringify(certificateData));
       
       // Log the current authentication status to help with debugging
       const { data: authData } = await supabase.auth.getSession();
@@ -565,6 +573,21 @@ const DocumentViewer = () => {
         console.error("Error fetching saved certificate:", fetchError);
       } else {
         console.log("Fetched saved certificate data:", savedCertificate);
+      }
+      
+      // Also force an update to the document record to ensure it has the correct reference
+      try {
+        await supabase
+          .from('documents')
+          .update({
+            status: 'processed',
+            extracted_data: editedData // ensure document also has latest data
+          })
+          .eq('id', id);
+          
+        console.log("Document record updated with latest extracted data");
+      } catch (docUpdateError) {
+        console.error("Error updating document record:", docUpdateError);
       }
       
       setIsEditing(false);
