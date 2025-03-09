@@ -110,7 +110,7 @@
   }
   
   .validation-scroll-area {
-    max-height: 100vh; 
+    max-height: 95vh;
     overflow-y: auto;
     padding-right: 16px;
     padding-bottom: 300px; /* Significantly increased to ensure all content is visible */

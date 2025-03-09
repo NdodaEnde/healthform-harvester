@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +11,7 @@ import { CheckCircle2, AlertCircle, HelpCircle, Check, Circle } from "lucide-rea
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CertificateValidatorProps {
   documentId: string;
@@ -166,7 +166,7 @@ const CertificateValidator = ({
     const testResults = examination.test_results || {};
 
     return (
-      <div className="space-y-8 bg-white rounded-lg p-6">
+      <div className="space-y-8 bg-white rounded-lg p-6 pb-28">
         {/* Certificate Header */}
         <div className="bg-slate-800 text-white text-center p-4 -mx-6 -mt-6 rounded-t-lg">
           <h2 className="text-2xl font-bold">CERTIFICATE OF FITNESS</h2>
@@ -711,7 +711,7 @@ const CertificateValidator = ({
     
     const patient = validatedData.structured_data.patient;
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 pb-28">
         <h3 className="text-lg font-medium">Patient Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.entries(patient).map(([key, value]: [string, any]) => {
@@ -749,7 +749,7 @@ const CertificateValidator = ({
     
     const examination = validatedData.structured_data.examination_results;
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pb-28">
         <h3 className="text-lg font-medium">Examination Results</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -872,25 +872,25 @@ const CertificateValidator = ({
                 <TabsTrigger value="examination">Examination</TabsTrigger>
               </TabsList>
               
-              <div className="flex-grow overflow-auto mb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
-                <TabsContent value="certificate" className="mt-0 p-1 pb-20">
+              <ScrollArea className="flex-grow overflow-auto pr-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
+                <TabsContent value="certificate" className="mt-0 p-1">
                   {renderCertificate()}
                 </TabsContent>
                 
-                <TabsContent value="patient" className="mt-0 p-1 pb-20">
+                <TabsContent value="patient" className="mt-0 p-1">
                   {renderPatientFields()}
                 </TabsContent>
                 
-                <TabsContent value="examination" className="mt-0 p-1 pb-20">
+                <TabsContent value="examination" className="mt-0 p-1">
                   {renderExaminationFields()}
                 </TabsContent>
-              </div>
+              </ScrollArea>
             </Tabs>
           </div>
         </CardContent>
       </Card>
       
-      <div className="flex justify-end space-x-2 py-4 bg-background sticky bottom-0 border-t mt-auto">
+      <div className="flex justify-end space-x-2 py-4 px-4 bg-background sticky bottom-0 border-t mt-auto shadow-md z-10">
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
