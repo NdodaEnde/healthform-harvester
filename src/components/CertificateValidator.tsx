@@ -847,59 +847,56 @@ const CertificateValidator = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <Card className="w-full shadow-md flex-grow overflow-hidden">
-        <CardContent className="p-0 h-full flex flex-col">
-          <div className="p-6 flex flex-col h-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Validate Certificate Data</h2>
-              <div className="flex space-x-2 items-center">
-                {getConfidenceBadge("high")}
-                {getConfidenceBadge("medium")}
-                {getConfidenceBadge("low")}
-              </div>
-            </div>
-            
-            <Tabs 
-              defaultValue="certificate" 
-              className="flex-grow flex flex-col"
-              value={activeTab}
-              onValueChange={setActiveTab}
-            >
-              <TabsList className="grid grid-cols-3 mb-2">
-                <TabsTrigger value="certificate">Certificate</TabsTrigger>
-                <TabsTrigger value="patient">Patient</TabsTrigger>
-                <TabsTrigger value="examination">Examination</TabsTrigger>
-              </TabsList>
-              
-              <ScrollArea className="flex-grow overflow-auto pr-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
-                <TabsContent value="certificate" className="mt-0 p-1">
-                  {renderCertificate()}
-                </TabsContent>
-                
-                <TabsContent value="patient" className="mt-0 p-1">
-                  {renderPatientFields()}
-                </TabsContent>
-                
-                <TabsContent value="examination" className="mt-0 p-1">
-                  {renderExaminationFields()}
-                </TabsContent>
-              </ScrollArea>
-            </Tabs>
+  <Card className="w-full shadow-md flex flex-col h-full max-h-screen">
+    <CardContent className="p-6 flex flex-col flex-grow">
+      <div className="flex flex-col flex-grow">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Validate Certificate Data</h2>
+          <div className="flex space-x-2 items-center">
+            {getConfidenceBadge("high")}
+            {getConfidenceBadge("medium")}
+            {getConfidenceBadge("low")}
           </div>
-        </CardContent>
-      </Card>
-      
-      <div className="flex justify-end space-x-2 py-4 px-4 bg-background sticky bottom-0 border-t mt-auto shadow-md z-10">
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save Validation"}
-        </Button>
+        </div>
+        
+        <Tabs 
+          defaultValue="certificate" 
+          className="w-full flex flex-col flex-grow mt-6"
+          value={activeTab}
+          onValueChange={setActiveTab}
+        >
+          <TabsList className="grid grid-cols-3 mb-4">
+            <TabsTrigger value="certificate">Certificate</TabsTrigger>
+            <TabsTrigger value="patient">Patient</TabsTrigger>
+            <TabsTrigger value="examination">Examination</TabsTrigger>
+          </TabsList>
+          
+          <div className="flex-grow overflow-auto">
+            <TabsContent value="certificate" className="space-y-4 p-4">
+              {renderCertificate()}
+            </TabsContent>
+            
+            <TabsContent value="patient" className="space-y-4 p-4">
+              {renderPatientFields()}
+            </TabsContent>
+            
+            <TabsContent value="examination" className="space-y-4 p-4">
+              {renderExaminationFields()}
+            </TabsContent>
+          </div>
+        </Tabs>
+        
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Validation"}
+          </Button>
+        </div>
       </div>
-    </div>
-  );
-};
+    </CardContent>
+  </Card>
+);
 
 export default CertificateValidator;
