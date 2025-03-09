@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -110,11 +109,11 @@
   }
   
   .validation-scroll-area {
-    max-height: 90vh; /* Increased from 85vh for even better visibility */
+    max-height: 95vh; /* Increased to 95vh for better visibility */
     overflow-y: auto;
     padding-right: 16px;
-    padding-bottom: 150px; /* Increased from 120px to ensure more space at bottom */
-    margin-bottom: 30px; /* Increased for better spacing */
+    padding-bottom: 200px; /* Significantly increased to ensure all content is visible */
+    margin-bottom: 50px; /* Increased for better spacing */
   }
 }
 
@@ -141,7 +140,7 @@
   max-height: calc(100vh - 250px);
   overflow-y: auto;
   padding-right: 16px; /* Add padding for scrollbar */
-  padding-bottom: 150px; /* Increased from 120px to provide more space at bottom */
+  padding-bottom: 200px; /* Significantly increased to provide more space at bottom */
 }
 
 /* Adding smooth page transitions */
@@ -166,4 +165,3 @@
   transform: translateY(-10px);
   transition: opacity 300ms, transform 300ms;
 }
-
