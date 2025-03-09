@@ -1,4 +1,4 @@
-<lov-code>
+
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -667,4 +667,63 @@ const CertificateTemplate = ({
                         FIT
                         {fitnessStatus.fit && <div className="text-green-600 text-lg">✓</div>}
                       </th>
-                      <th className={`border border-gray-400 p-2
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        Fit with Restriction
+                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        Fit with Condition
+                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        Temporary Unfit
+                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        UNFIT
+                        {fitnessStatus.unfit && <div className="text-red-600 text-lg">✓</div>}
+                      </th>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Comments section last */}
+            <div className="mb-4 px-4">
+              <div className="mb-2 mt-2">
+                <div className="font-semibold text-sm">Comments:</div>
+                <div className="border border-gray-400 p-2 min-h-[60px] bg-gray-50">
+                  {getValue(certification, 'comments') || "N/A"}
+                </div>
+              </div>
+              
+              <div className="mt-6 border-t border-gray-300 pt-3">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+                  <div className="text-center mb-3 md:mb-0">
+                    <div className="border-b border-gray-400 min-w-[200px] h-14"></div>
+                    <div className="text-sm mt-1">Medical Practitioner</div>
+                  </div>
+                  <div className="text-center mb-3 md:mb-0">
+                    <div className="border-b border-gray-400 min-w-[200px] h-14"></div>
+                    <div className="text-sm mt-1">Employee</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="border-b border-gray-400 min-w-[200px] h-14"></div>
+                    <div className="text-sm mt-1">Date</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-center text-[0.65rem] border-t border-gray-300 py-4 mt-2 text-gray-500">
+              <p>BlueCollar Occupational Health | Fitness Certificate | Data Extracted: {new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
