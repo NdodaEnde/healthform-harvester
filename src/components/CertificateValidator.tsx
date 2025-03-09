@@ -128,80 +128,541 @@ const CertificateValidator = ({
   };
 
   const renderPatientFields = () => {
-    if (!validatedData.structured_data || !validatedData.structured_data.patient) return null;
-    
-    const patient = validatedData.structured_data.patient;
-    return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Patient Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(patient).map(([key, value]: [string, any]) => {
-            if (typeof value === 'object' && value !== null && !Array.isArray(value)) return null;
-            
-            const confidence = getConfidenceLevel(value);
-            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            
-            return (
-              <div key={key} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor={`patient_${key}`}>{displayKey}</Label>
-                  {getConfidenceBadge(confidence)}
-                </div>
-                <Input
-                  id={`patient_${key}`}
-                  value={value?.toString() || ''}
-                  onChange={(e) => updateField('patient', key, e.target.value)}
-                  className={cn(`border`, {
-                    'border-red-300 bg-red-50': confidence === 'low',
-                    'border-yellow-300 bg-yellow-50': confidence === 'medium',
-                    'border-green-300 bg-green-50': confidence === 'high'
-                  })}
-                />
-              </div>
-            );
-          })}
+  if (!validatedData.structured_data) {
+    setValidatedData(prev => ({
+      ...prev,
+      structured_data: {
+        patient: {},
+        certification: {},
+        examination_results: {
+          test_results: {}
+        },
+        restrictions: {}
+      }
+    }));
+    return null;
+  }
+  
+  const patient = validatedData.structured_data.patient || {};
+  
+  return (
+    <div className="space-y-6">
+      <div className="bg-slate-800 text-white text-center p-4 rounded-t-lg">
+        <h2 className="text-xl font-bold">PATIENT INFORMATION</h2>
+      </div>
+      
+      {/* Core Patient Information */}
+      <div className="border rounded-lg p-4 bg-white">
+        <div className="grid grid-cols-1 gap-4">
+          {/* Name */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="patient_name" className="font-bold">Initials & Surname</Label>
+              {getConfidenceBadge(getConfidenceLevel(patient.name))}
+            </div>
+            <Input
+              id="patient_name"
+              value={patient.name || ''}
+              onChange={(e) => updateField('patient', 'name', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(patient.name) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(patient.name) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(patient.name) === 'high'
+              })}
+            />
+          </div>
+          
+          {/* ID Number */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="patient_id" className="font-bold">ID Number</Label>
+              {getConfidenceBadge(getConfidenceLevel(patient.id_number))}
+            </div>
+            <Input
+              id="patient_id"
+              value={patient.id_number || ''}
+              onChange={(e) => updateField('patient', 'id_number', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(patient.id_number) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(patient.id_number) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(patient.id_number) === 'high'
+              })}
+            />
+            <p className="text-sm text-gray-500">Format: [ID Number] (e.g., 900304 5496 084)</p>
+          </div>
+          
+          {/* Company Name */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="company_name" className="font-bold">Company Name</Label>
+              {getConfidenceBadge(getConfidenceLevel(patient.company_name))}
+            </div>
+            <Input
+              id="company_name"
+              value={patient.company_name || ''}
+              onChange={(e) => updateField('patient', 'company_name', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(patient.company_name) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(patient.company_name) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(patient.company_name) === 'high'
+              })}
+            />
+          </div>
+          
+          {/* Job Title */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="job_title" className="font-bold">Job Title</Label>
+              {getConfidenceBadge(getConfidenceLevel(patient.job_title))}
+            </div>
+            <Input
+              id="job_title"
+              value={patient.job_title || ''}
+              onChange={(e) => updateField('patient', 'job_title', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(patient.job_title) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(patient.job_title) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(patient.job_title) === 'high'
+              })}
+            />
+          </div>
         </div>
       </div>
-    );
-  };
+      
+      {/* Additional Patient Information */}
+      <div className="border rounded-lg p-4 bg-white">
+        <h3 className="font-bold text-lg mb-4">Additional Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(patient)
+            .filter(([key]) => !["name", "id_number", "company_name", "job_title"].includes(key))
+            .map(([key, value]: [string, any]) => {
+              if (typeof value === 'object' && value !== null && !Array.isArray(value)) return null;
+              
+              const confidence = getConfidenceLevel(value);
+              const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              
+              return (
+                <div key={key} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor={`patient_${key}`}>{displayKey}</Label>
+                    {getConfidenceBadge(confidence)}
+                  </div>
+                  <Input
+                    id={`patient_${key}`}
+                    value={value?.toString() || ''}
+                    onChange={(e) => updateField('patient', key, e.target.value)}
+                    className={cn(`border`, {
+                      'border-red-300 bg-red-50': confidence === 'low',
+                      'border-yellow-300 bg-yellow-50': confidence === 'medium',
+                      'border-green-300 bg-green-50': confidence === 'high'
+                    })}
+                  />
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
-  const renderExaminationFields = () => {
-    if (!validatedData.structured_data || !validatedData.structured_data.examination_results) return null;
-    
-    const examination = validatedData.structured_data.examination_results;
-    return (
-      <div className="space-y-6">
-        <h3 className="text-lg font-medium">Examination Results</h3>
+const renderExaminationFields = () => {
+  if (!validatedData.structured_data) {
+    setValidatedData(prev => ({
+      ...prev,
+      structured_data: {
+        patient: {},
+        certification: {},
+        examination_results: {
+          test_results: {}
+        },
+        restrictions: {}
+      }
+    }));
+    return null;
+  }
+  
+  const certification = validatedData.structured_data.certification || {};
+  const examination = validatedData.structured_data.examination_results || {};
+  const testResults = examination.test_results || {};
+  
+  return (
+    <div className="space-y-6">
+      <div className="bg-slate-800 text-white text-center p-4 rounded-t-lg">
+        <h2 className="text-xl font-bold">EXAMINATION DETAILS</h2>
+      </div>
+      
+      {/* Examination Dates */}
+      <div className="border rounded-lg p-4 bg-white">
+        <h3 className="font-bold text-lg mb-4">Examination Dates</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(examination).map(([key, value]: [string, any]) => {
-            if ((typeof value === 'object' && value !== null && !Array.isArray(value)) || key === 'type' || key === 'test_results') return null;
-            
-            const confidence = getConfidenceLevel(value);
-            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            
-            return (
-              <div key={key} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor={`exam_${key}`}>{displayKey}</Label>
-                  {getConfidenceBadge(confidence)}
-                </div>
-                <Input
-                  id={`exam_${key}`}
-                  value={value?.toString() || ''}
-                  onChange={(e) => updateField('examination_results', key, e.target.value)}
-                  className={cn(`border`, {
-                    'border-red-300 bg-red-50': confidence === 'low',
-                    'border-yellow-300 bg-yellow-50': confidence === 'medium',
-                    'border-green-300 bg-green-50': confidence === 'high'
-                  })}
-                />
-              </div>
-            );
-          })}
+          {/* Examination Date */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="exam_date" className="font-bold">Date of Examination</Label>
+              {getConfidenceBadge(getConfidenceLevel(certification.examination_date))}
+            </div>
+            <Input
+              id="exam_date"
+              value={certification.examination_date || ''}
+              onChange={(e) => updateField('certification', 'examination_date', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(certification.examination_date) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(certification.examination_date) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(certification.examination_date) === 'high'
+              })}
+            />
+            <p className="text-sm text-gray-500">Format: DD-MM-YYYY (e.g., 26-02-2015)</p>
+          </div>
+          
+          {/* Expiry Date */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="expiry_date" className="font-bold">Expiry Date</Label>
+              {getConfidenceBadge(getConfidenceLevel(certification.expiry_date))}
+            </div>
+            <Input
+              id="expiry_date"
+              value={certification.expiry_date || ''}
+              onChange={(e) => updateField('certification', 'expiry_date', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(certification.expiry_date) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(certification.expiry_date) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(certification.expiry_date) === 'high'
+              })}
+            />
+            <p className="text-sm text-gray-500">Format: DD-MM-YYYY (e.g., 26-02-2016)</p>
+          </div>
+          
+          {/* Review Date */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="review_date" className="font-bold">Review Date</Label>
+              {getConfidenceBadge(getConfidenceLevel(certification.review_date))}
+            </div>
+            <Input
+              id="review_date"
+              value={certification.review_date || ''}
+              onChange={(e) => updateField('certification', 'review_date', e.target.value)}
+              className={cn(`border`, {
+                'border-red-300 bg-red-50': getConfidenceLevel(certification.review_date) === 'low',
+                'border-yellow-300 bg-yellow-50': getConfidenceLevel(certification.review_date) === 'medium',
+                'border-green-300 bg-green-50': getConfidenceLevel(certification.review_date) === 'high'
+              })}
+            />
+          </div>
         </div>
       </div>
-    );
-  };
+      
+      {/* Examination Type */}
+      <div className="border rounded-lg p-4 bg-white">
+        <h3 className="font-bold text-lg mb-4">Examination Type</h3>
+        
+        <div className="grid grid-cols-3 gap-4">
+          <div className="border rounded-lg overflow-hidden">
+            <div className="bg-gray-100 p-3 font-bold text-center">PRE-EMPLOYMENT</div>
+            <div className="p-4 flex justify-center">
+              <Checkbox 
+                id="pre_employment"
+                checked={certification.pre_employment || false}
+                onCheckedChange={(checked) => updateField('certification', 'pre_employment', !!checked)}
+                className="size-6"
+              />
+            </div>
+          </div>
+          
+          <div className="border rounded-lg overflow-hidden">
+            <div className="bg-gray-100 p-3 font-bold text-center">PERIODICAL</div>
+            <div className="p-4 flex justify-center">
+              <Checkbox 
+                id="periodical"
+                checked={certification.periodical || false}
+                onCheckedChange={(checked) => updateField('certification', 'periodical', !!checked)}
+                className="size-6"
+              />
+            </div>
+          </div>
+          
+          <div className="border rounded-lg overflow-hidden">
+            <div className="bg-gray-100 p-3 font-bold text-center">EXIT</div>
+            <div className="p-4 flex justify-center">
+              <Checkbox 
+                id="exit"
+                checked={certification.exit || false}
+                onCheckedChange={(checked) => updateField('certification', 'exit', !!checked)}
+                className="size-6"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Medical Tests */}
+      <div className="border rounded-lg p-4 bg-white">
+        <h3 className="font-bold text-lg mb-4">Medical Tests</h3>
+        
+        {/* Blood & Vision Tests */}
+        <div className="mb-6">
+          <h4 className="font-medium text-md mb-3 border-b pb-1">Blood & Vision Tests</h4>
+          <div className="grid grid-cols-1 gap-4">
+            {/* BLOODS */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="blood_test_done"
+                    checked={testResults.blood_test_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'blood_test_done', !!checked)}
+                  />
+                  <Label htmlFor="blood_test_done" className="font-bold">BLOODS</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.blood_test_results))}
+              </div>
+              <Input 
+                value={testResults.blood_test_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'blood_test_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.blood_test_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.blood_test_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.blood_test_results) === 'high'
+                })}
+                placeholder="Blood test results"
+              />
+            </div>
+            
+            {/* FAR, NEAR VISION */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="vision_test_done"
+                    checked={testResults.vision_test_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'vision_test_done', !!checked)}
+                  />
+                  <Label htmlFor="vision_test_done" className="font-bold">FAR, NEAR VISION</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.vision_test_results))}
+              </div>
+              <Input 
+                value={testResults.vision_test_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'vision_test_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.vision_test_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.vision_test_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.vision_test_results) === 'high'
+                })}
+                placeholder="Vision test results (e.g., 20/30)"
+              />
+            </div>
+            
+            {/* SIDE & DEPTH */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="depth_test_done"
+                    checked={testResults.depth_test_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'depth_test_done', !!checked)}
+                  />
+                  <Label htmlFor="depth_test_done" className="font-bold">SIDE & DEPTH</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.depth_test_results))}
+              </div>
+              <Input 
+                value={testResults.depth_test_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'depth_test_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.depth_test_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.depth_test_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.depth_test_results) === 'high'
+                })}
+                placeholder="Side & depth test results (e.g., Normal)"
+              />
+            </div>
+            
+            {/* NIGHT VISION */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="night_vision_done"
+                    checked={testResults.night_vision_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'night_vision_done', !!checked)}
+                  />
+                  <Label htmlFor="night_vision_done" className="font-bold">NIGHT VISION</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.night_vision_results))}
+              </div>
+              <Input 
+                value={testResults.night_vision_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'night_vision_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.night_vision_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.night_vision_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.night_vision_results) === 'high'
+                })}
+                placeholder="Night vision test results (e.g., 20/30)"
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* Other Medical Tests */}
+        <div>
+          <h4 className="font-medium text-md mb-3 border-b pb-1">Other Medical Tests</h4>
+          <div className="grid grid-cols-1 gap-4">
+            {/* HEARING */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="hearing_test_done"
+                    checked={testResults.hearing_test_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'hearing_test_done', !!checked)}
+                  />
+                  <Label htmlFor="hearing_test_done" className="font-bold">HEARING</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.hearing_test_results))}
+              </div>
+              <Input 
+                value={testResults.hearing_test_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'hearing_test_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.hearing_test_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.hearing_test_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.hearing_test_results) === 'high'
+                })}
+                placeholder="Hearing test results (e.g., 3.4)"
+              />
+            </div>
+            
+            {/* WORKING AT HEIGHTS */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="heights_test_done"
+                    checked={testResults.heights_test_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'heights_test_done', !!checked)}
+                  />
+                  <Label htmlFor="heights_test_done" className="font-bold">WORKING AT HEIGHTS</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.heights_test_results))}
+              </div>
+              <Input 
+                value={testResults.heights_test_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'heights_test_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.heights_test_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.heights_test_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.heights_test_results) === 'high'
+                })}
+                placeholder="Heights test results (e.g., N/A)"
+              />
+            </div>
+            
+            {/* LUNG FUNCTION */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="lung_test_done"
+                    checked={testResults.lung_test_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'lung_test_done', !!checked)}
+                  />
+                  <Label htmlFor="lung_test_done" className="font-bold">LUNG FUNCTION</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.lung_test_results))}
+              </div>
+              <Input 
+                value={testResults.lung_test_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'lung_test_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.lung_test_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.lung_test_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.lung_test_results) === 'high'
+                })}
+                placeholder="Lung function test results (e.g., Mild Restriction)"
+              />
+            </div>
+            
+            {/* X-RAY */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="xray_done"
+                    checked={testResults.xray_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'xray_done', !!checked)}
+                  />
+                  <Label htmlFor="xray_done" className="font-bold">X-RAY</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.xray_results))}
+              </div>
+              <Input 
+                value={testResults.xray_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'xray_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.xray_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.xray_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.xray_results) === 'high'
+                })}
+                placeholder="X-ray results (e.g., N/A)"
+              />
+            </div>
+            
+            {/* DRUG SCREEN */}
+            <div className="border rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="drug_screen_done"
+                    checked={testResults.drug_screen_done || false}
+                    onCheckedChange={(checked) => updateNestedField('examination_results', 'test_results', 'drug_screen_done', !!checked)}
+                  />
+                  <Label htmlFor="drug_screen_done" className="font-bold">DRUG SCREEN</Label>
+                </div>
+                {getConfidenceBadge(getConfidenceLevel(testResults.drug_screen_results))}
+              </div>
+              <Input 
+                value={testResults.drug_screen_results || ''}
+                onChange={(e) => updateNestedField('examination_results', 'test_results', 'drug_screen_results', e.target.value)}
+                className={cn(`border w-full`, {
+                  'border-red-300 bg-red-50': getConfidenceLevel(testResults.drug_screen_results) === 'low',
+                  'border-yellow-300 bg-yellow-50': getConfidenceLevel(testResults.drug_screen_results) === 'medium',
+                  'border-green-300 bg-green-50': getConfidenceLevel(testResults.drug_screen_results) === 'high'
+                })}
+                placeholder="Drug screen results (e.g., N/A)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Follow-up */}
+      <div className="border rounded-lg p-4 bg-white">
+        <h3 className="font-bold text-lg mb-4">Follow-up Information</h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="follow_up" className="font-bold">Referred or follow up actions</Label>
+            {getConfidenceBadge(getConfidenceLevel(certification.follow_up))}
+          </div>
+          <Textarea
+            id="follow_up"
+            value={certification.follow_up || ''}
+            onChange={(e) => updateField('certification', 'follow_up', e.target.value)}
+            className={cn(`border w-full min-h-[100px]`, {
+              'border-red-300 bg-red-50': getConfidenceLevel(certification.follow_up) === 'low',
+              'border-yellow-300 bg-yellow-50': getConfidenceLevel(certification.follow_up) === 'medium',
+              'border-green-300 bg-green-50': getConfidenceLevel(certification.follow_up) === 'high'
+            })}
+            placeholder="Enter any follow-up actions or referrals"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const renderCertificateForm = () => {
     if (!validatedData.structured_data) {
