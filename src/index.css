@@ -110,11 +110,11 @@
   }
   
   .validation-scroll-area {
-    max-height: 80vh; /* Increased from 70vh */
+    max-height: 85vh; /* Increased from 80vh for better visibility */
     overflow-y: auto;
     padding-right: 16px;
-    padding-bottom: 80px; /* Increased from 40px */
-    margin-bottom: 16px;
+    padding-bottom: 120px; /* Increased from 80px to ensure more space at bottom */
+    margin-bottom: 20px; /* Slightly increased */
   }
 }
 
@@ -141,7 +141,7 @@
   max-height: calc(100vh - 250px);
   overflow-y: auto;
   padding-right: 16px; /* Add padding for scrollbar */
-  padding-bottom: 80px; /* Increased from 40px */
+  padding-bottom: 120px; /* Increased from 80px to provide more space at bottom */
 }
 
 /* Adding smooth page transitions */
