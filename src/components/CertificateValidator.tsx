@@ -806,70 +806,68 @@ const CertificateValidator = ({
   };
 
   return (
-    <Card className="w-full shadow-md flex flex-col h-full max-h-screen">
-      <CardContent className="p-6 flex flex-col overflow-hidden">
-        <div className="flex flex-col flex-1">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Validate Certificate Data</h2>
-            <div className="flex space-x-2 items-center">
-              {getConfidenceBadge("high")}
-              {getConfidenceBadge("medium")}
-              {getConfidenceBadge("low")}
-            </div>
-          </div>
-          
-          <Tabs 
-            defaultValue="certificate" 
-            className="w-full flex flex-col flex-1"
-            value={activeTab}
-            onValueChange={setActiveTab}
-          >
-            <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="certificate">Certificate</TabsTrigger>
-              <TabsTrigger value="original">Original Document</TabsTrigger>
-              <TabsTrigger value="extracted">Extracted Data</TabsTrigger>
-            </TabsList>
-            
-            <div className="flex-1 overflow-auto pr-2">
-              <TabsContent value="certificate" className="space-y-4 mt-0 p-1">
-                {renderCertificateForm()}
-              </TabsContent>
-              
-              <TabsContent value="original" className="mt-0 p-1">
-                <div className="flex justify-center">
-                  <div className="border rounded-lg shadow-sm p-4 bg-gray-50 text-center">
-                    <p>Original document image would be displayed here</p>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="extracted" className="mt-0 p-1">
-                <div className="p-4 border rounded-lg">
-                  <h3 className="text-lg font-medium mb-4">Extracted JSON Data</h3>
-                  <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-96">
-                    {JSON.stringify(validatedData, null, 2)}
-                  </pre>
-                </div>
-              </TabsContent>
-            </div>
-          </Tabs>
-          
-          <div className="flex justify-end space-x-3 mt-4 pt-4 border-t">
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isSaving ? "Saving..." : "Save Validation"}
-            </Button>
-          </div>
+  <Card className="w-full shadow-md flex flex-col h-screen">
+    <CardContent className="p-6 flex flex-col h-full">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Validate Certificate Data</h2>
+        <div className="flex space-x-2 items-center">
+          {getConfidenceBadge("high")}
+          {getConfidenceBadge("medium")}
+          {getConfidenceBadge("low")}
         </div>
-      </CardContent>
-    </Card>
-  );
+      </div>
+      
+      <Tabs 
+        defaultValue="certificate" 
+        className="w-full flex flex-col h-[calc(100%-80px)]"
+        value={activeTab}
+        onValueChange={setActiveTab}
+      >
+        <TabsList className="grid grid-cols-3 mb-4">
+          <TabsTrigger value="certificate">Certificate</TabsTrigger>
+          <TabsTrigger value="original">Original Document</TabsTrigger>
+          <TabsTrigger value="extracted">Extracted Data</TabsTrigger>
+        </TabsList>
+        
+        <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: "calc(100vh - 200px)" }}>
+          <TabsContent value="certificate" className="space-y-4 mt-0 p-1 pb-24">
+            {renderCertificateForm()}
+          </TabsContent>
+          
+          <TabsContent value="original" className="mt-0 p-1">
+            <div className="flex justify-center">
+              <div className="border rounded-lg shadow-sm p-4 bg-gray-50 text-center">
+                <p>Original document image would be displayed here</p>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="extracted" className="mt-0 p-1">
+            <div className="p-4 border rounded-lg">
+              <h3 className="text-lg font-medium mb-4">Extracted JSON Data</h3>
+              <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-96">
+                {JSON.stringify(validatedData, null, 2)}
+              </pre>
+            </div>
+          </TabsContent>
+        </div>
+      </Tabs>
+      
+      <div className="flex justify-end space-x-3 mt-4 pt-4 border-t">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleSave} 
+          disabled={isSaving}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          {isSaving ? "Saving..." : "Save Validation"}
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+);
 };
 
 export default CertificateValidator;
