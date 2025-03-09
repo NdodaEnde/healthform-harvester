@@ -37,14 +37,6 @@ export function cleanValue(value: string | null | undefined): string {
   // Clean up any remaining <!-- or --> fragments
   cleaned = cleaned.replace(/<!--|-->/g, '').trim();
   
-  // Clean up HTML table data cells with empty brackets
-  cleaned = cleaned.replace(/<td>\[\s*\]<\/td>/g, 'N/A').trim();
-  
-  // Handle N/A values more consistently
-  if (cleaned.match(/^N\/?A$/i) || cleaned === '[ ]' || cleaned === '[]') {
-    return 'N/A';
-  }
-  
   return cleaned;
 }
 
