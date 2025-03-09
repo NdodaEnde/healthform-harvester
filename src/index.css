@@ -110,11 +110,10 @@
   }
   
   .validation-scroll-area {
-    max-height: 95vh;
+    max-height: 65vh;
     overflow-y: auto;
     padding-right: 16px;
-    padding-bottom: 300px; /* Significantly increased to ensure all content is visible */
-    margin-bottom: 60px; /* Increased for better spacing */
+    margin-bottom: 16px;
   }
 }
 
@@ -138,10 +137,9 @@
 
 /* Making sure the certificate is scrollable */
 .certificate-container {
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 250px);
   overflow-y: auto;
   padding-right: 16px; /* Add padding for scrollbar */
-  padding-bottom: 300px; /* Significantly increased to provide more space at bottom */
 }
 
 /* Adding smooth page transitions */
