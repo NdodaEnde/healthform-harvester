@@ -716,6 +716,20 @@ const CertificateTemplate = ({
               </div>
             </div>
             
+            {/* Practitioner details section - between signatures and footer */}
+            <div className="px-4 mb-4 border-t border-gray-300 pt-3">
+              <div className="text-xs text-center">
+                <p>
+                  <span className="font-semibold">Examining Practitioner:</span> Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} 
+                  &nbsp;|&nbsp;<span className="font-semibold">Practice No:</span> {getValue(examination, 'practice_number') || '0404160'}
+                </p>
+                <p className="mt-1">
+                  <span className="font-semibold">Occupational Health Nurse:</span> Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} 
+                  &nbsp;|&nbsp;<span className="font-semibold">Practice No:</span> {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
+                </p>
+              </div>
+            </div>
+            
             <div className="text-center text-[0.65rem] border-t border-gray-300 py-4 mt-2 text-gray-500">
               <p>BlueCollar Occupational Health | Fitness Certificate | Data Extracted: {new Date().toLocaleDateString()}</p>
             </div>
