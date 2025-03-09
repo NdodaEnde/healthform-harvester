@@ -218,8 +218,10 @@ function extractTestResultsFromMarkdown(markdown: string) {
     
     testResults[`${test.key}_done`] = testData.isDone;
     
-    if (testData.result) {
+    if (testData.result !== undefined) {
       testResults[`${test.key}_results`] = testData.result;
+    } else {
+      testResults[`${test.key}_results`] = 'N/A';
     }
   }
   
@@ -255,8 +257,12 @@ function extractTestData(markdown: string, testName: string) {
         const match = tableSection.match(pattern);
         if (match) {
           const isDone = match[1] === 'x' || match[1] === 'X';
-          let result = match[2] ? match[2].trim() : '';
-          if (result === 'N/A') result = null;
+          let result = match[2] ? cleanValue(match[2].trim()) : '';
+          
+          // Normalize N/A values
+          if (result === '' || result.match(/^N\/?A$/i) || result === '[ ]' || result.includes('<td>[ ]</td>')) {
+            result = 'N/A';
+          }
           
           console.log(`Found test ${testName} in table: done=${isDone}, result=${result}`);
           return { isDone, result };
@@ -277,8 +283,12 @@ function extractTestData(markdown: string, testName: string) {
       const match = markdown.match(pattern);
       if (match) {
         const isDone = match[1] === 'x' || match[1] === 'X';
-        let result = match[2] ? match[2].trim() : '';
-        if (result === 'N/A') result = null;
+        let result = match[2] ? cleanValue(match[2].trim()) : '';
+        
+        // Normalize N/A values
+        if (result === '' || result.match(/^N\/?A$/i) || result === '[ ]' || result.includes('<td>[ ]</td>')) {
+          result = 'N/A';
+        }
         
         console.log(`Found test ${testName} in list format: done=${isDone}, result=${result}`);
         return { isDone, result };
@@ -293,8 +303,25 @@ function extractTestData(markdown: string, testName: string) {
   let testResult = null;
   const resultPattern = new RegExp(`${testName}[^\\n]*:?\\s*([^\\n,]*?)(?:\\n|,|$)`, 'i');
   const resultMatch = markdown.match(resultPattern);
-  if (resultMatch && resultMatch[1] && resultMatch[1].trim() !== 'N/A') {
-    testResult = resultMatch[1].trim();
+  if (resultMatch && resultMatch[1]) {
+    testResult = cleanValue(resultMatch[1].trim());
+    // Normalize N/A values
+    if (testResult === '' || testResult.match(/^N\/?A$/i) || testResult === '[ ]' || testResult.includes('<td>[ ]</td>')) {
+      testResult = 'N/A';
+    }
+  } else {
+    // If we couldn't extract a result but the test is done, default to N/A
+    if (isTestDone) {
+      testResult = 'N/A';
+    }
+  }
+  
+  // Check for empty table cell patterns that might contain N/A values
+  if (markdown.includes(testName) && markdown.includes('<td>[ ]</td>')) {
+    const emptyRowPattern = new RegExp(`<tr>[^<]*<td>[^<]*${testName}[^<]*</td>[^<]*<td>[^<]*</td>[^<]*<td>\\[\\s*\\]</td>`, 'i');
+    if (emptyRowPattern.test(markdown)) {
+      testResult = 'N/A';
+    }
   }
   
   return { 
