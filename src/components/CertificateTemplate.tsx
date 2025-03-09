@@ -603,41 +603,7 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            <div className="mb-4">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
-                FITNESS ASSESSMENT
-              </div>
-              
-              <div className="px-4">
-                <table className="w-full border border-gray-400">
-                  <tbody>
-                    <tr>
-                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
-                        FIT
-                        {fitnessStatus.fit && <div className="text-green-600 text-lg">✓</div>}
-                      </th>
-                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
-                        Fit with Restriction
-                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-lg">✓</div>}
-                      </th>
-                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
-                        Fit with Condition
-                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-lg">✓</div>}
-                      </th>
-                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
-                        Temporary Unfit
-                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-lg">✓</div>}
-                      </th>
-                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
-                        UNFIT
-                        {fitnessStatus.unfit && <div className="text-red-600 text-lg">✓</div>}
-                      </th>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
+            {/* Restrictions section first */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 Restrictions:
@@ -687,6 +653,43 @@ const CertificateTemplate = ({
               </div>
             </div>
             
+            {/* FITNESS ASSESSMENT section second */}
+            <div className="mb-4">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                FITNESS ASSESSMENT
+              </div>
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400">
+                  <tbody>
+                    <tr>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                        FIT
+                        {fitnessStatus.fit && <div className="text-green-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        Fit with Restriction
+                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        Fit with Condition
+                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        Temporary Unfit
+                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-lg">✓</div>}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        UNFIT
+                        {fitnessStatus.unfit && <div className="text-red-600 text-lg">✓</div>}
+                      </th>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Comments section last */}
             <div className="mb-4 px-4">
               <div className="mb-2 mt-2">
                 <div className="font-semibold text-sm">Comments:</div>
