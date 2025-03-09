@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -345,16 +346,6 @@ const CertificateValidator = ({
             })}
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="cert_comments">Comments</Label>
-          <Textarea
-            id="cert_comments"
-            value={certification.comments?.toString() || ''}
-            onChange={(e) => updateField('certification', 'comments', e.target.value)}
-            className="min-h-[100px] border border-gray-300"
-          />
-        </div>
-        
         <div className="space-y-4">
           <h4 className="text-md font-medium">Restrictions</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -375,6 +366,16 @@ const CertificateValidator = ({
               );
             })}
           </div>
+        </div>
+        
+        <div className="space-y-2 mt-4">
+          <Label htmlFor="cert_comments">Comments</Label>
+          <Textarea
+            id="cert_comments"
+            value={certification.comments?.toString() || ''}
+            onChange={(e) => updateField('certification', 'comments', e.target.value)}
+            className="min-h-[100px] border border-gray-300"
+          />
         </div>
       </div>
     );
@@ -400,7 +401,7 @@ const CertificateValidator = ({
               <TabsTrigger value="certification">Certification</TabsTrigger>
             </TabsList>
             
-            <ScrollArea className="h-[60vh]">
+            <div className="h-[calc(100vh-320px)] overflow-auto pr-2">
               <TabsContent value="patient" className="space-y-4 mt-0 p-1">
                 {renderPatientFields()}
               </TabsContent>
@@ -412,7 +413,7 @@ const CertificateValidator = ({
               <TabsContent value="certification" className="space-y-4 mt-0 p-1">
                 {renderCertificationFields()}
               </TabsContent>
-            </ScrollArea>
+            </div>
           </Tabs>
           
           <div className="flex justify-end space-x-2 pt-4">
