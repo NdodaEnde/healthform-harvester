@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -651,13 +652,7 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            <div className="px-4 mb-4">
-              <div className="font-semibold text-sm mb-1">Comments:</div>
-              <div className="border border-gray-400 p-2 min-h-16 text-sm">
-                {getValue(certification, 'comments')}
-              </div>
-            </div>
-            
+            {/* Moved Fitness Assessment to be before Comments section */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 FITNESS ASSESSMENT
@@ -690,6 +685,14 @@ const CertificateTemplate = ({
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+            
+            {/* Moved Comments section to be the last section before the signature */}
+            <div className="px-4 mb-4">
+              <div className="font-semibold text-sm mb-1">Comments:</div>
+              <div className="border border-gray-400 p-2 min-h-16 text-sm">
+                {getValue(certification, 'comments')}
               </div>
             </div>
             
