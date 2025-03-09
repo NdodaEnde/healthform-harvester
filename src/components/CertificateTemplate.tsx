@@ -373,6 +373,7 @@ const CertificateTemplate = ({
           </div>
           
           <div className="relative z-10">
+            {/* Header section with logo */}
             <div className="px-4 pt-4">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -392,10 +393,12 @@ const CertificateTemplate = ({
               </div>
             </div>
             
+            {/* Title section */}
             <div className="bg-gray-800 text-white text-center py-2 mb-2">
               <h2 className="text-lg font-bold">CERTIFICATE OF FITNESS</h2>
             </div>
             
+            {/* Doctor info */}
             <div className="text-center text-xs px-4 mb-3">
               <p>
                 Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No: {getValue(examination, 'practice_number') || '0404160'} / Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} / Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
@@ -403,6 +406,7 @@ const CertificateTemplate = ({
               <p>certify that the following employee:</p>
             </div>
             
+            {/* Patient info section */}
             <div className="px-4 space-y-4 mb-4">
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
@@ -445,6 +449,7 @@ const CertificateTemplate = ({
               </div>
             </div>
             
+            {/* Examination type section */}
             <div className="px-4 mb-4">
               <table className="w-full border border-gray-400">
                 <thead>
@@ -470,6 +475,7 @@ const CertificateTemplate = ({
               </table>
             </div>
             
+            {/* Medical tests section */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
@@ -588,6 +594,7 @@ const CertificateTemplate = ({
               </div>
             </div>
             
+            {/* Referral section */}
             <div className="px-4 mb-4">
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
@@ -689,7 +696,7 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Comments section last */}
+            {/* Comments section */}
             <div className="mb-4 px-4">
               <div className="mb-2 mt-2">
                 <div className="font-semibold text-sm">Comments:</div>
@@ -698,19 +705,20 @@ const CertificateTemplate = ({
                 </div>
               </div>
               
+              {/* Signature section with correct labels */}
               <div className="mt-6 border-t border-gray-300 pt-3">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
                   <div className="text-center mb-3 md:mb-0">
                     <div className="border-b border-gray-400 min-w-[200px] h-14"></div>
-                    <div className="text-sm mt-1">Medical Practitioner</div>
+                    <div className="text-sm mt-1">Signature</div>
                   </div>
                   <div className="text-center mb-3 md:mb-0">
                     <div className="border-b border-gray-400 min-w-[200px] h-14"></div>
-                    <div className="text-sm mt-1">Employee</div>
+                    <div className="text-sm mt-1">Practitioner details</div>
                   </div>
                   <div className="text-center">
                     <div className="border-b border-gray-400 min-w-[200px] h-14"></div>
-                    <div className="text-sm mt-1">Date</div>
+                    <div className="text-sm mt-1">Stamp</div>
                   </div>
                 </div>
               </div>
