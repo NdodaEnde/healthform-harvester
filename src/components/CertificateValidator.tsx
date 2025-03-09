@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,12 +25,14 @@ const CertificateValidator = ({
   onCancel,
 }: CertificateValidatorProps) => {
   const [validatedData, setValidatedData] = useState(() => {
+    // Create a deep copy of extractedData
     return JSON.parse(JSON.stringify(extractedData || {}));
   });
   
   const [isSaving, setIsSaving] = useState(false);
 
   const getConfidenceLevel = (value: any): "high" | "medium" | "low" => {
+    // Simple rules to determine confidence based on value content
     if (!value) return "low";
     if (typeof value === "string") {
       if (value.includes("N/A") || value.includes("n/a") || value === "[]" || value === "<td>[ ]</td>") return "medium";
@@ -72,6 +75,7 @@ const CertificateValidator = ({
     setIsSaving(true);
     
     try {
+      // Update the document in Supabase
       const { data, error } = await supabase
         .from('documents')
         .update({ 
