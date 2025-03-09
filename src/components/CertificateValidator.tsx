@@ -847,54 +847,54 @@ const CertificateValidator = ({
   };
 
   return (
-    <Card className="w-full shadow-md">
-      <CardContent className="p-6">
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Validate Certificate Data</h2>
-            <div className="flex space-x-2 items-center">
-              {getConfidenceBadge("high")}
-              {getConfidenceBadge("medium")}
-              {getConfidenceBadge("low")}
-            </div>
-          </div>
-          
-          <Tabs 
-            defaultValue="certificate" 
-            className="w-full"
-            value={activeTab}
-            onValueChange={setActiveTab}
-          >
-            <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="certificate">Certificate</TabsTrigger>
-              <TabsTrigger value="patient">Patient</TabsTrigger>
-              <TabsTrigger value="examination">Examination</TabsTrigger>
-            </TabsList>
-            
-            <div className="h-[calc(100vh-320px)] overflow-auto pr-2">
-              <TabsContent value="certificate" className="space-y-4 mt-0 p-1">
-                {renderCertificate()}
-              </TabsContent>
-              
-              <TabsContent value="patient" className="space-y-4 mt-0 p-1">
-                {renderPatientFields()}
-              </TabsContent>
-              
-              <TabsContent value="examination" className="space-y-4 mt-0 p-1">
-                {renderExaminationFields()}
-              </TabsContent>
-            </div>
-          </Tabs>
-          
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Validation"}
-            </Button>
-          </div>
-        </div>
+    <Card className="w-full shadow-md flex flex-col h-full max-h-screen">
+        <CardContent className="p-6 flex flex-col flex-grow overflow-hidden">
+        <div className="flex flex-col flex-grow">
+  <div className="flex justify-between items-center">
+    <h2 className="text-xl font-semibold">Validate Certificate Data</h2>
+    <div className="flex space-x-2 items-center">
+      {getConfidenceBadge("high")}
+      {getConfidenceBadge("medium")}
+      {getConfidenceBadge("low")}
+    </div>
+  </div>
+  
+  <Tabs 
+    defaultValue="certificate" 
+    className="w-full flex flex-col flex-grow mt-6"
+    value={activeTab}
+    onValueChange={setActiveTab}
+  >
+    <TabsList className="grid grid-cols-3 mb-4">
+      <TabsTrigger value="certificate">Certificate</TabsTrigger>
+      <TabsTrigger value="patient">Patient</TabsTrigger>
+      <TabsTrigger value="examination">Examination</TabsTrigger>
+    </TabsList>
+    
+    <div className="flex-grow overflow-auto pr-2">
+      <TabsContent value="certificate" className="space-y-4 mt-0 p-1">
+        {renderCertificate()}
+      </TabsContent>
+      
+      <TabsContent value="patient" className="space-y-4 mt-0 p-1">
+        {renderPatientFields()}
+      </TabsContent>
+      
+      <TabsContent value="examination" className="space-y-4 mt-0 p-1">
+        {renderExaminationFields()}
+      </TabsContent>
+    </div>
+  </Tabs>
+  
+  <div className="flex justify-end space-x-2 pt-4">
+    <Button variant="outline" onClick={onCancel}>
+      Cancel
+    </Button>
+    <Button onClick={handleSave} disabled={isSaving}>
+      {isSaving ? "Saving..." : "Save Validation"}
+    </Button>
+  </div>
+</div>
       </CardContent>
     </Card>
   );
