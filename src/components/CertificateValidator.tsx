@@ -1279,19 +1279,28 @@ const renderExaminationFields = () => {
       </div>
       
       <Tabs 
-        defaultValue="certificate" 
-        className="w-full flex flex-col h-[calc(100%-80px)]"
+        defaultValue="patient" 
+        className="w-full flex flex-col flex-1"
         value={activeTab}
         onValueChange={setActiveTab}
       >
-        <TabsList className="grid grid-cols-3 mb-4">
+        <TabsList className="grid grid-cols-4 mb-4">
+          <TabsTrigger value="patient">Patient</TabsTrigger>
+          <TabsTrigger value="examination">Examination</TabsTrigger>
           <TabsTrigger value="certificate">Certificate</TabsTrigger>
-          <TabsTrigger value="original">Original Document</TabsTrigger>
-          <TabsTrigger value="extracted">Extracted Data</TabsTrigger>
+          <TabsTrigger value="original">Original</TabsTrigger>
         </TabsList>
         
         <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: "calc(100vh - 200px)" }}>
-          <TabsContent value="certificate" className="space-y-4 mt-0 p-1 pb-24">
+          <TabsContent value="patient" className="mt-0 p-1 pb-24">
+            {renderPatientFields()}
+          </TabsContent>
+          
+          <TabsContent value="examination" className="mt-0 p-1 pb-24">
+            {renderExaminationFields()}
+          </TabsContent>
+          
+          <TabsContent value="certificate" className="mt-0 p-1 pb-24">
             {renderCertificateForm()}
           </TabsContent>
           
@@ -1300,15 +1309,6 @@ const renderExaminationFields = () => {
               <div className="border rounded-lg shadow-sm p-4 bg-gray-50 text-center">
                 <p>Original document image would be displayed here</p>
               </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="extracted" className="mt-0 p-1">
-            <div className="p-4 border rounded-lg">
-              <h3 className="text-lg font-medium mb-4">Extracted JSON Data</h3>
-              <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-96">
-                {JSON.stringify(validatedData, null, 2)}
-              </pre>
             </div>
           </TabsContent>
         </div>
@@ -1321,7 +1321,7 @@ const renderExaminationFields = () => {
         <Button 
           onClick={handleSave} 
           disabled={isSaving}
-          className="bg-blue-600 hover:bg-blue-700"
+          className="bg-blue-600 hover:bg-blue-700 text-white"
         >
           {isSaving ? "Saving..." : "Save Validation"}
         </Button>
