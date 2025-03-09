@@ -1,12 +1,9 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, AlertCircle, HelpCircle } from "lucide-react";
@@ -28,14 +25,12 @@ const CertificateValidator = ({
   onCancel,
 }: CertificateValidatorProps) => {
   const [validatedData, setValidatedData] = useState(() => {
-    // Create a deep copy of extractedData
     return JSON.parse(JSON.stringify(extractedData || {}));
   });
   
   const [isSaving, setIsSaving] = useState(false);
 
   const getConfidenceLevel = (value: any): "high" | "medium" | "low" => {
-    // Simple rules to determine confidence based on value content
     if (!value) return "low";
     if (typeof value === "string") {
       if (value.includes("N/A") || value.includes("n/a") || value === "[]" || value === "<td>[ ]</td>") return "medium";
@@ -114,7 +109,6 @@ const CertificateValidator = ({
     setIsSaving(true);
     
     try {
-      // Update the document in Supabase
       const { data, error } = await supabase
         .from('documents')
         .update({ 
@@ -245,7 +239,7 @@ const CertificateValidator = ({
         <div className="space-y-4">
           <h4 className="text-md font-medium">Medical Tests</h4>
           <div className="border rounded-md p-4">
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {examination.test_results && Object.keys(examination.test_results)
                 .filter(key => key.endsWith('_done'))
                 .map(key => {
@@ -256,7 +250,7 @@ const CertificateValidator = ({
                   const results = examination.test_results[resultsKey]?.toString() || '';
                   
                   return (
-                    <div key={key} className="space-y-2">
+                    <div key={key} className="space-y-2 border-b pb-2 md:border-b-0 md:pb-0">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-2">
                           <Checkbox 
