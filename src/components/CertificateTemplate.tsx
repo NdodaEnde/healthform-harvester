@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { extractPath } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
