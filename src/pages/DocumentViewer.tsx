@@ -512,6 +512,14 @@ const DocumentViewer = () => {
     
     const formattedData = mapExtractedDataToValidatorFormat(document.extractedData);
     
+    if (formattedData.structured_data.examination_results) {
+      formattedData.structured_data.examination_results.test_results = 
+        formattedData.structured_data.examination_results.test_results || {};
+      
+      formattedData.structured_data.examination_results.type = 
+        formattedData.structured_data.examination_results.type || {};
+    }
+    
     console.log("Formatted data for validator:", formattedData);
     setValidatorData(formattedData);
     return formattedData;

@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Define an interface for examination results to fix type errors
+interface ExaminationResults {
+  test_results: Record<string, any>;
+  type: Record<string, any>;
+  date?: string; // Make date optional but explicitly defined
+}
+
 // Helper function to map extracted data to a consistent format that the validator expects
 export function mapExtractedDataToValidatorFormat(extractedData: any) {
   console.log("Original data passed to mapper:", extractedData);
@@ -18,7 +25,7 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
         examination_results: { 
           test_results: {},
           type: {}
-        },
+        } as ExaminationResults,
         restrictions: {}
       }
     };
@@ -35,7 +42,7 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
         examination_results: { 
           test_results: extractedData.structured_data.examination_results?.test_results || {},
           type: extractedData.structured_data.examination_results?.type || {}
-        },
+        } as ExaminationResults,
         restrictions: extractedData.structured_data.restrictions || {}
       }
     };
@@ -60,7 +67,7 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
       examination_results: { 
         test_results: {},
         type: {}
-      },
+      } as ExaminationResults,
       restrictions: {}
     }
   };
@@ -98,8 +105,7 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
     if (typeof extractedData.examination_results === 'object' && 
         extractedData.examination_results !== null &&
         'date' in extractedData.examination_results) {
-      // Add the date property explicitly to the type
-      (structuredData.structured_data.examination_results as any).date = extractedData.examination_results.date;
+      structuredData.structured_data.examination_results.date = extractedData.examination_results.date;
     }
     
     // Map examination type, with multiple name variations to catch different data formats
