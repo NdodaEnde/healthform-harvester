@@ -23,36 +23,46 @@ export const cleanExtractedValue = (value: string | null | undefined): string =>
   return cleaned;
 };
 
-// Helper function to detect if a checkbox is marked, accommodating different marking styles
+// Improved helper function to detect if a checkbox is marked
 export const isCheckboxMarked = (markdown: string, fieldName: string): boolean => {
   if (!markdown || !fieldName) return false;
   
   // Normalize the field name for pattern matching
-  const fieldPattern = new RegExp(fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const normalizedField = fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   
   // If the field name doesn't exist in the text, return false immediately
-  if (!fieldPattern.test(markdown)) return false;
+  if (!new RegExp(normalizedField, 'i').test(markdown)) return false;
+  
+  // Create patterns that match various checkbox marks
+  const checkMarks = ['x', 'X', '✓', '✔', '√', 'v', '•', '\\*', '\\+', '[^\\s\\[\\]]'];
+  const checkboxRegexParts = checkMarks.map(mark => `\\[${mark}\\]`);
+  const checkboxPatternStr = checkboxRegexParts.join('|');
   
   // Get the context around the field name
-  const index = markdown.search(fieldPattern);
+  const index = markdown.search(new RegExp(normalizedField, 'i'));
   if (index === -1) return false;
   
   const startContext = Math.max(0, index - 100);
   const endContext = Math.min(markdown.length, index + fieldName.length + 150);
   const context = markdown.substring(startContext, endContext);
   
-  // Look for various checkbox marking patterns in the context
+  // Look for various checkbox patterns in the context
   const patterns = [
-    // Standard markdown checkbox with 'x' (case insensitive)
-    /\[(x|X)\]/i,
+    // Standard markdown checkbox with mark (case insensitive)
+    new RegExp(`${normalizedField}[^\\n]*?(${checkboxPatternStr})`, 'i'),
+    new RegExp(`(${checkboxPatternStr})[^\\n]*?${normalizedField}`, 'i'),
+    
     // HTML table cell with checkbox
-    /<td>\[(x|X)\]<\/td>/i,
+    new RegExp(`<td>[^<]*${normalizedField}[^<]*</td>[^<]*<td>(${checkboxPatternStr})</td>`, 'i'),
+    
     // Table with checkmark/tick symbol
-    /[✓✔]/,
+    new RegExp(`${normalizedField}[^\\n]*?[✓✔]`, 'i'),
+    
     // HTML entities for checkmarks
-    /(&check;|&#10003;|&#10004;)/i,
+    new RegExp(`${normalizedField}[^\\n]*?(&check;|&#10003;|&#10004;)`, 'i'),
+    
     // Text indicating checked status
-    /(checked|marked|selected|ticked)/i
+    new RegExp(`${normalizedField}[^\\n]*?(checked|marked|selected|ticked)`, 'i')
   ];
   
   // Return true if any pattern matches in the context

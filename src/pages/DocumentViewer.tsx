@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
+import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -300,18 +301,9 @@ const DocumentViewer = () => {
           typeof extractedData === 'object' && 
           extractedData !== null && 
           !Array.isArray(extractedData) && 
-          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
-          extractedData.raw_response
+          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object')
         ) {
-          extractedData = {
-            ...extractedData,
-            structured_data: {
-              patient: {
-                name: patientName,
-                id_number: patientId
-              }
-            }
-          };
+          extractedData = mapExtractedDataToValidatorFormat(extractedData);
         }
       }
       
@@ -513,10 +505,14 @@ const DocumentViewer = () => {
 
   const renderExtractedData = () => {
     if (isValidating && document) {
+      const formattedData = document.type === 'Certificate of Fitness' 
+        ? (document.extractedData.structured_data ? document.extractedData : mapExtractedDataToValidatorFormat(document.extractedData))
+        : document.extractedData;
+      
       return (
         <CertificateValidator 
           documentId={document.id}
-          extractedData={document.extractedData}
+          extractedData={formattedData}
           onSave={handleValidationSave}
           onCancel={() => setIsValidating(false)}
         />
