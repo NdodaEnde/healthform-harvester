@@ -12,6 +12,9 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     const result = await apiClient.callLandingAI(file);
     console.log(`Landing AI API response received for document ID: ${documentId}`);
     
+    // Log the full API response for debugging
+    console.log('Raw API Response:', JSON.stringify(result, null, 2));
+    
     // Process and structure the data based on document type
     let structuredData;
     if (documentType === 'medical-questionnaire') {
