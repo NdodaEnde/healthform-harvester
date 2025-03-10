@@ -1,4 +1,3 @@
-
 import { extractPath, cleanValue, isChecked } from "../utils.ts";
 
 // Process certificate of fitness data from Landing AI response
@@ -173,25 +172,44 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
 
 // Helper function to extract examination type from markdown
 function extractExaminationTypeFromMarkdown(markdown: string) {
-  const preEmploymentChecked = isChecked(markdown, "Pre-Employment") || 
-                              isChecked(markdown, "PRE-EMPLOYMENT");
+  // Updated to correctly check for [x] vs [ ] in the markdown
+  const preEmploymentChecked = markdown.includes("Pre-Employment") && 
+                              (markdown.includes("Pre-Employment") && markdown.includes("[x]") || 
+                               markdown.includes("PRE-EMPLOYMENT") && markdown.includes("[x]"));
   
-  const periodicalChecked = isChecked(markdown, "Periodical") || 
-                           isChecked(markdown, "PERIODICAL");
+  const periodicalChecked = markdown.includes("Periodical") && 
+                           (markdown.includes("Periodical") && markdown.includes("[x]") || 
+                            markdown.includes("PERIODICAL") && markdown.includes("[x]"));
   
-  const exitChecked = isChecked(markdown, "Exit") || 
-                     isChecked(markdown, "EXIT");
+  const exitChecked = markdown.includes("Exit") && 
+                     (markdown.includes("Exit") && markdown.includes("[x]") || 
+                      markdown.includes("EXIT") && markdown.includes("[x]"));
+  
+  // More specific check using the patterns in the actual document
+  const preEmploymentPattern = /- \*\*Pre-Employment\*\*: \[x\]/i;
+  const periodicalPattern = /- \*\*Periodical\*\*: \[ \]/i;
+  const exitPattern = /- \*\*Exit\*\*: \[ \]/i;
+  
+  // Check using the more specific patterns as well
+  const preEmploymentExact = preEmploymentPattern.test(markdown);
+  const periodicalExact = !periodicalPattern.test(markdown) && markdown.includes("Periodical") && markdown.includes("[x]");
+  const exitExact = !exitPattern.test(markdown) && markdown.includes("Exit") && markdown.includes("[x]");
+  
+  // Log actual found patterns
+  if (preEmploymentExact) console.log("Found checked pattern for Pre-Employment");
+  if (periodicalExact) console.log("Found checked pattern for Periodical");
+  if (exitExact) console.log("Found checked pattern for Exit");
   
   console.log('Examination types found:', {
-    preEmploymentChecked,
-    periodicalChecked,
-    exitChecked
+    preEmploymentChecked: preEmploymentExact,
+    periodicalChecked: periodicalExact,
+    exitChecked: exitExact
   });
   
   return {
-    pre_employment: preEmploymentChecked,
-    periodical: periodicalChecked,
-    exit: exitChecked
+    pre_employment: preEmploymentExact,
+    periodical: periodicalExact,
+    exit: exitExact
   };
 }
 
@@ -212,16 +230,60 @@ function extractTestResultsFromMarkdown(markdown: string) {
     { name: 'Drug Screen', key: 'drug_screen' }
   ];
   
-  // Process each test individually with improved extraction
-  for (const test of tests) {
-    const testData = extractTestData(markdown, test.name);
+  // Extract table structure for test results
+  const tableMatch = markdown.match(/\|\s*Test\s*\|\s*Done\s*\|\s*Results\s*\|[\s\S]*?\n([\s\S]*?)(?=\n\n|\n###|\n##|\n#|$)/i);
+  
+  if (tableMatch && tableMatch[1]) {
+    const tableRows = tableMatch[1].split('\n').filter(row => row.trim() !== '');
     
-    testResults[`${test.key}_done`] = testData.isDone;
-    
-    if (testData.result !== undefined) {
-      testResults[`${test.key}_results`] = testData.result;
-    } else {
+    // Process each test individually
+    for (const test of tests) {
+      // Default values
+      testResults[`${test.key}_done`] = false;
       testResults[`${test.key}_results`] = 'N/A';
+      
+      // Look for the test in table rows
+      for (const row of tableRows) {
+        if (row.toLowerCase().includes(test.name.toLowerCase())) {
+          // Check if done
+          testResults[`${test.key}_done`] = row.includes('[x]');
+          
+          // Extract results
+          const resultsMatch = row.match(/\|\s*\[\s*[xX]?\s*\]\s*\|\s*(.*?)\s*\|/);
+          if (resultsMatch && resultsMatch[1]) {
+            testResults[`${test.key}_results`] = cleanValue(resultsMatch[1].trim());
+          }
+          
+          break;
+        }
+      }
+    }
+  } else {
+    // Alternative HTML table extraction
+    const htmlTableMatch = markdown.match(/<table>[\s\S]*?<\/table>/);
+    if (htmlTableMatch) {
+      const tableHTML = htmlTableMatch[0];
+      
+      // Process each test individually with HTML parsing
+      for (const test of tests) {
+        // Default values
+        testResults[`${test.key}_done`] = false;
+        testResults[`${test.key}_results`] = 'N/A';
+        
+        // Check for test in HTML table
+        const testRowRegex = new RegExp(`<tr>[\\s\\S]*?<td>[\\s\\S]*?${test.name}[\\s\\S]*?</td>[\\s\\S]*?<td>\\[(x|X| )\\]</td>[\\s\\S]*?<td>([\\s\\S]*?)</td>[\\s\\S]*?</tr>`, 'i');
+        const testRowMatch = tableHTML.match(testRowRegex);
+        
+        if (testRowMatch) {
+          // Check if checkbox is marked
+          testResults[`${test.key}_done`] = testRowMatch[1] === 'x' || testRowMatch[1] === 'X';
+          
+          // Extract results
+          if (testRowMatch[2]) {
+            testResults[`${test.key}_results`] = cleanValue(testRowMatch[2].trim());
+          }
+        }
+      }
     }
   }
   
@@ -229,146 +291,53 @@ function extractTestResultsFromMarkdown(markdown: string) {
   return testResults;
 }
 
-// Helper function to extract data for a specific test
-function extractTestData(markdown: string, testName: string) {
-  // Normalize test name for case-insensitive matching
-  const normalizedTestName = testName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
-  const testVariants = [
-    testName,
-    testName.toUpperCase(),
-    testName.toLowerCase(),
-    normalizedTestName
-  ];
-  
-  // First, try to find test data in tables
-  const tableSections = markdown.match(/<table>[\s\S]*?<\/table>/g) || [];
-  
-  for (const tableSection of tableSections) {
-    for (const variant of testVariants) {
-      // Try to match rows containing test name, checkbox, and result
-      const rowPatterns = [
-        new RegExp(`<tr>\\s*<td>${variant}\\s*</td>\\s*<td>\\[(x|X|)\\]</td>\\s*<td>([^<]*)</td>`, 'i'),
-        new RegExp(`<tr>\\s*<td>([^<]*${variant}[^<]*)</td>\\s*<td>\\[(x|X|)\\]</td>\\s*<td>([^<]*)</td>`, 'i'),
-        new RegExp(`<tr>[^<]*<td>[^<]*${variant}[^<]*</td>[^<]*<td>\\[(x|X|)\\]</td>[^<]*<td>([^<]*)</td>`, 'i')
-      ];
-      
-      for (const pattern of rowPatterns) {
-        const match = tableSection.match(pattern);
-        if (match) {
-          const isDone = match[1] === 'x' || match[1] === 'X';
-          let result = match[2] ? cleanValue(match[2].trim()) : '';
-          
-          // Normalize N/A values
-          if (result === '' || result.match(/^N\/?A$/i) || result === '[ ]' || result.includes('<td>[ ]</td>')) {
-            result = 'N/A';
-          }
-          
-          console.log(`Found test ${testName} in table: done=${isDone}, result=${result}`);
-          return { isDone, result };
-        }
-      }
-    }
-  }
-  
-  // Try to extract from markdown list format
-  for (const variant of testVariants) {
-    const listPatterns = [
-      new RegExp(`\\|\\s*${variant}\\s*\\|\\s*\\[(x|X|)\\]\\s*\\|\\s*([^\\|]*)\\|`, 'i'),
-      new RegExp(`\\- \\*\\*${variant}\\*\\*:\\s*\\[(x|X|)\\]\\s*([^\\n]*)`, 'i'),
-      new RegExp(`${variant}[^\\n]*:\\s*\\[(x|X|)\\]\\s*([^\\n]*)`, 'i')
-    ];
-    
-    for (const pattern of listPatterns) {
-      const match = markdown.match(pattern);
-      if (match) {
-        const isDone = match[1] === 'x' || match[1] === 'X';
-        let result = match[2] ? cleanValue(match[2].trim()) : '';
-        
-        // Normalize N/A values
-        if (result === '' || result.match(/^N\/?A$/i) || result === '[ ]' || result.includes('<td>[ ]</td>')) {
-          result = 'N/A';
-        }
-        
-        console.log(`Found test ${testName} in list format: done=${isDone}, result=${result}`);
-        return { isDone, result };
-      }
-    }
-  }
-  
-  // Check for general checkbox patterns
-  const isTestDone = isChecked(markdown, testName);
-  
-  // Try to extract results if the test is mentioned
-  let testResult = null;
-  const resultPattern = new RegExp(`${testName}[^\\n]*:?\\s*([^\\n,]*?)(?:\\n|,|$)`, 'i');
-  const resultMatch = markdown.match(resultPattern);
-  if (resultMatch && resultMatch[1]) {
-    testResult = cleanValue(resultMatch[1].trim());
-    // Normalize N/A values
-    if (testResult === '' || testResult.match(/^N\/?A$/i) || testResult === '[ ]' || testResult.includes('<td>[ ]</td>')) {
-      testResult = 'N/A';
-    }
-  } else {
-    // If we couldn't extract a result but the test is done, default to N/A
-    if (isTestDone) {
-      testResult = 'N/A';
-    }
-  }
-  
-  // Check for empty table cell patterns that might contain N/A values
-  if (markdown.includes(testName) && markdown.includes('<td>[ ]</td>')) {
-    const emptyRowPattern = new RegExp(`<tr>[^<]*<td>[^<]*${testName}[^<]*</td>[^<]*<td>[^<]*</td>[^<]*<td>\\[\\s*\\]</td>`, 'i');
-    if (emptyRowPattern.test(markdown)) {
-      testResult = 'N/A';
-    }
-  }
-  
-  return { 
-    isDone: isTestDone, 
-    result: testResult 
-  };
-}
-
 // Helper function to extract fitness status from markdown
 function extractFitnessStatusFromMarkdown(markdown: string, certification: any) {
-  // Directly check for checked fitness statuses
-  certification.fit = isChecked(markdown, "FIT");
-  certification.fit_with_restrictions = isChecked(markdown, "Fit with Restriction");
-  certification.fit_with_condition = isChecked(markdown, "Fit with Condition");
-  certification.temporarily_unfit = isChecked(markdown, "Temporary Unfit") || 
-                                   isChecked(markdown, "Temporarily Unfit");
-  certification.unfit = isChecked(markdown, "UNFIT");
+  // Look for the Medical Fitness Declaration section
+  const fitnessSectionMatch = markdown.match(/### Medical Fitness(?:\s*Declaration|Evaluation)\s*([\s\S]*?)(?=\n\n|\n###|\n##|\n#|$)/i);
   
-  // Special case: Check if FIT is crossed out
-  const fitCrossedOut = markdown.includes('crossing it out') || 
-                       markdown.includes('crossed out') || 
-                       markdown.includes('large "X"') ||
-                       markdown.includes('crossing out of the word "FIT"');
-                       
-  if (fitCrossedOut) {
-    certification.fit = false;
-    certification.unfit = true;
-  }
-  
-  // Extract follow-up actions if available
-  const followUpMatch = markdown.match(/Referred or follow up actions:?\s*(.*?)(?=\n\n|\r\n\r\n|$|Review Date)/is);
-  if (followUpMatch && followUpMatch[1] && followUpMatch[1].trim() !== '') {
-    certification.follow_up = cleanValue(followUpMatch[1].trim());
-  }
-  
-  // Extract review date if available
-  const reviewDateMatch = markdown.match(/Review Date:?\s*(.*?)(?=\n|\r|$|<)/i);
-  if (reviewDateMatch && reviewDateMatch[1] && reviewDateMatch[1].trim() !== '') {
-    certification.review_date = cleanValue(reviewDateMatch[1].trim());
-  }
-  
-  // Extract comments if available
-  const commentsMatch = markdown.match(/Comments:?\s*(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
-  if (commentsMatch && commentsMatch[1]) {
-    let comments = commentsMatch[1].trim();
-    if (comments !== 'N/A' && comments !== '') {
-      certification.comments = cleanValue(comments);
+  if (fitnessSectionMatch && fitnessSectionMatch[1]) {
+    const fitnessSection = fitnessSectionMatch[1];
+    
+    // Check for fit status in the markdown using better pattern matching
+    certification.fit = fitnessSection.includes('FIT') && 
+                     (fitnessSection.includes('FIT') && fitnessSection.includes('[x]') && 
+                      !fitnessSection.includes('with Restriction') && !fitnessSection.includes('with Condition') && 
+                      !fitnessSection.includes('Temporary Unfit') && !fitnessSection.includes('UNFIT'));
+    
+    certification.fit_with_restrictions = fitnessSection.includes('Fit with Restriction') && 
+                                      fitnessSection.includes('Fit with Restriction') && fitnessSection.includes('[x]');
+    
+    certification.fit_with_condition = fitnessSection.includes('Fit with Condition') && 
+                                    fitnessSection.includes('Fit with Condition') && fitnessSection.includes('[x]');
+    
+    certification.temporarily_unfit = (fitnessSection.includes('Temporary Unfit') || fitnessSection.includes('Temporarily Unfit')) && 
+                                   ((fitnessSection.includes('Temporary Unfit') || fitnessSection.includes('Temporarily Unfit')) && 
+                                    fitnessSection.includes('[x]'));
+    
+    certification.unfit = fitnessSection.includes('UNFIT') && fitnessSection.includes('UNFIT') && fitnessSection.includes('[x]');
+    
+    // Check HTML table format if available
+    if (markdown.includes('<table>') && markdown.includes('FIT')) {
+      const fitTableMatch = markdown.match(/<table>[\s\S]*?<tr>[\s\S]*?<th>FIT<\/th>[\s\S]*?<\/tr>[\s\S]*?<tr>([\s\S]*?)<\/tr>/i);
+      
+      if (fitTableMatch && fitTableMatch[1]) {
+        const cells = fitTableMatch[1].match(/<td>\[(x|X| )\]<\/td>/g) || [];
+        
+        if (cells.length >= 5) {
+          certification.fit = cells[0].includes('[x]') || cells[0].includes('[X]');
+          certification.fit_with_restrictions = cells[1].includes('[x]') || cells[1].includes('[X]');
+          certification.fit_with_condition = cells[2].includes('[x]') || cells[2].includes('[X]');
+          certification.temporarily_unfit = cells[3].includes('[x]') || cells[3].includes('[X]');
+          certification.unfit = cells[4].includes('[x]') || cells[4].includes('[X]');
+        }
+      }
+    }
+    
+    // Extract comments if available
+    const commentsMatch = markdown.match(/\*\*Comments\*\*:\s*(.*?)(?=\n\n|\n###|\n##|\n#|$|---)/i);
+    if (commentsMatch && commentsMatch[1] && commentsMatch[1].trim() !== '') {
+      certification.comments = cleanValue(commentsMatch[1].trim());
     }
   }
   
@@ -389,16 +358,24 @@ function extractRestrictionsFromMarkdown(markdown: string) {
     remain_on_treatment_for_chronic_conditions: false
   };
   
-  // Check for checked restrictions directly
-  restrictions.heights = isChecked(markdown, "Heights");
-  restrictions.dust_exposure = isChecked(markdown, "Dust Exposure");
-  restrictions.motorized_equipment = isChecked(markdown, "Motorized Equipment");
-  restrictions.wear_hearing_protection = isChecked(markdown, "Wear Hearing Protection");
-  restrictions.confined_spaces = isChecked(markdown, "Confined Spaces");
-  restrictions.chemical_exposure = isChecked(markdown, "Chemical Exposure");
-  restrictions.wear_spectacles = isChecked(markdown, "Wear Spectacles");
-  restrictions.remain_on_treatment_for_chronic_conditions = isChecked(markdown, "Remain on Treatment") || 
-                                                          isChecked(markdown, "Remain on Treatment for Chronic Conditions");
+  // Look for the Restrictions section
+  const restrictionsSectionMatch = markdown.match(/### Restrictions\s*([\s\S]*?)(?=\n\n|\n###|\n##|\n#|$)/i);
+  
+  if (restrictionsSectionMatch && restrictionsSectionMatch[1]) {
+    const restrictionsSection = restrictionsSectionMatch[1];
+    
+    // Check for each restriction
+    restrictions.heights = restrictionsSection.includes('Heights') && restrictionsSection.includes('[x]');
+    restrictions.dust_exposure = restrictionsSection.includes('Dust Exposure') && restrictionsSection.includes('[x]');
+    restrictions.motorized_equipment = restrictionsSection.includes('Motorized Equipment') && restrictionsSection.includes('[x]');
+    restrictions.wear_hearing_protection = restrictionsSection.includes('Wear Hearing Protection') && restrictionsSection.includes('[x]');
+    restrictions.confined_spaces = restrictionsSection.includes('Confined Spaces') && restrictionsSection.includes('[x]');
+    restrictions.chemical_exposure = restrictionsSection.includes('Chemical Exposure') && restrictionsSection.includes('[x]');
+    restrictions.wear_spectacles = restrictionsSection.includes('Wear Spectacles') && restrictionsSection.includes('[x]');
+    restrictions.remain_on_treatment_for_chronic_conditions = 
+      (restrictionsSection.includes('Remain on Treatment') || restrictionsSection.includes('Remain on Treatment for Chronic Conditions')) && 
+      restrictionsSection.includes('[x]');
+  }
   
   console.log('Extracted restrictions:', restrictions);
   return restrictions;

@@ -60,76 +60,24 @@ export function checkCondition(data: any, path: string, condition: string): bool
 
 // Helper function to check if a specific item is checked in the markdown
 export function isChecked(markdown: string, label: string): boolean {
-  // Look for the pattern where label is followed by [x] or preceded by [x]
+  // Look for patterns specific to the label rather than global checks
+  // This focuses on finding '[x]' immediately adjacent to the specific label
+  
+  // Create a regex pattern for detecting label with [x] check
   const patterns = [
-    new RegExp(`${label}\\s*:\\s*\\[x\\]`, 'i'),
-    new RegExp(`${label}\\s*:\\s*\\[X\\]`, 'i'),
-    new RegExp(`\\[x\\]\\s*${label}`, 'i'),
-    new RegExp(`\\[X\\]\\s*${label}`, 'i'),
+    // Direct label with checkbox format
     new RegExp(`\\- \\*\\*${label}\\*\\*:\\s*\\[x\\]`, 'i'),
     new RegExp(`\\- \\*\\*${label}\\*\\*:\\s*\\[X\\]`, 'i'),
-    // For table formats
-    new RegExp(`<td>${label}<\\/td>\\s*<td>\\[x\\]<\\/td>`, 'i'),
-    new RegExp(`<td>${label}<\\/td>\\s*<td>\\[X\\]<\\/td>`, 'i'),
-    // For typical form formats
-    new RegExp(`<tr>\\s*<th>${label}<\\/th>[\\s\\S]*?<td>\\[x\\]<\\/td>`, 'i'),
-    new RegExp(`<tr>\\s*<th>${label}<\\/th>[\\s\\S]*?<td>\\[X\\]<\\/td>`, 'i'),
-    // For other formats
-    new RegExp(`${label}[\\s\\S]*?\\[x\\]`, 'i'),
-    new RegExp(`${label}[\\s\\S]*?\\[X\\]`, 'i'),
-    // Look for cases where a row has the label and includes [x] in the same tr element
-    new RegExp(`<tr>[\\s\\S]*?${label}[\\s\\S]*?\\[x\\][\\s\\S]*?<\\/tr>`, 'i'),
-    new RegExp(`<tr>[\\s\\S]*?${label}[\\s\\S]*?\\[X\\][\\s\\S]*?<\\/tr>`, 'i')
+    // Table format with label and checkbox in adjacent cells
+    new RegExp(`<tr>[^<]*<td>[^<]*${label}[^<]*</td>[^<]*<td>\\[x\\]</td>`, 'i'),
+    new RegExp(`<tr>[^<]*<td>[^<]*${label}[^<]*</td>[^<]*<td>\\[X\\]</td>`, 'i')
   ];
   
-  // Check all patterns
+  // Check if any of the patterns match the markdown
   for (const pattern of patterns) {
     if (pattern.test(markdown)) {
       console.log(`Found checked pattern for ${label}`);
       return true;
-    }
-  }
-  
-  // For more complex tables, check table sections
-  if (markdown.includes(`<table>`) && markdown.includes(label)) {
-    // Extract all table sections
-    const tableSections = markdown.match(/<table>[\s\S]*?<\/table>/g) || [];
-    
-    for (const tableSection of tableSections) {
-      if (tableSection.includes(label)) {
-        // Look for [x] in the rows that follow
-        if (tableSection.includes('[x]') || tableSection.includes('[X]')) {
-          // Try to determine if the [x] corresponds to this label
-          const rows = tableSection.match(/<tr>[\s\S]*?<\/tr>/g) || [];
-          
-          // Locate header row with the label
-          let labelColumnIndex = -1;
-          for (let i = 0; i < rows.length; i++) {
-            const headerCells = rows[i].match(/<th>(.*?)<\/th>/g) || [];
-            for (let j = 0; j < headerCells.length; j++) {
-              if (headerCells[j].includes(label)) {
-                labelColumnIndex = j;
-                break;
-              }
-            }
-            if (labelColumnIndex >= 0) break;
-          }
-          
-          // If we found the column, check the data rows for [x]
-          if (labelColumnIndex >= 0) {
-            // Look at data rows (usually after header row)
-            for (let i = 1; i < rows.length; i++) {
-              const cells = rows[i].match(/<td>(.*?)<\/td>/g) || [];
-              if (cells.length > labelColumnIndex) {
-                if (cells[labelColumnIndex].includes('[x]') || cells[labelColumnIndex].includes('[X]')) {
-                  console.log(`Found checked pattern for ${label} in table at column ${labelColumnIndex}`);
-                  return true;
-                }
-              }
-            }
-          }
-        }
-      }
     }
   }
   
