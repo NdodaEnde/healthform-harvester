@@ -417,6 +417,49 @@ const DocumentViewer = () => {
     });
   };
 
+  const renderStructuredSection = (title: string, data: any, path: string[]) => {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return null;
+    }
+    
+    return (
+      <div className="px-6">
+        <h3 className="text-lg font-medium mb-4">{title}</h3>
+        <div className="space-y-3">
+          {Object.entries(data).map(([key, value]) => {
+            if (typeof value === 'object' && value !== null) {
+              return null;
+            }
+            
+            const displayKey = key
+              .replace(/_/g, ' ')
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+              
+            return (
+              <div key={key} className="flex items-center">
+                <span className="font-semibold mr-1 min-w-32">{displayKey}:</span>
+                {isEditing ? (
+                  <Input 
+                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                    value={value as string || ''}
+                    onChange={(e) => {
+                      const newPath = [...path, key];
+                      updateEditableData(newPath, e.target.value);
+                    }}
+                  />
+                ) : (
+                  <span className="text-gray-700">{value as string || 'N/A'}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const renderCertificateSection = (data: any) => {
     if (!data || !data.structured_data) return null;
     
