@@ -293,10 +293,10 @@ const DocumentViewer = () => {
         .createSignedUrl(documentData.file_path, 3600);
       
       let extractedData = documentData.extracted_data || {};
-      let patientName = extractPatientName(extractedData);
-      let patientId = extractPatientId(extractedData);
       
       if (documentData.document_type === 'certificate-of-fitness') {
+        console.log('Before mapping:', extractedData);
+        
         if (
           typeof extractedData === 'object' && 
           extractedData !== null && 
@@ -304,8 +304,12 @@ const DocumentViewer = () => {
           (!extractedData.structured_data || typeof extractedData.structured_data !== 'object')
         ) {
           extractedData = mapExtractedDataToValidatorFormat(extractedData);
+          console.log('After mapping:', extractedData);
         }
       }
+      
+      let patientName = extractPatientName(extractedData);
+      let patientId = extractPatientId(extractedData);
       
       console.log('Processed extracted data:', extractedData);
       
@@ -450,6 +454,8 @@ const DocumentViewer = () => {
   }, [id, document?.status, processingTimeout, refreshKey]);
 
   const handleValidationSave = async (validatedData: any) => {
+    console.log('Saving validated data:', validatedData);
+    
     setDocument(prev => {
       if (!prev) return null;
       
@@ -505,6 +511,8 @@ const DocumentViewer = () => {
 
   const renderExtractedData = () => {
     if (isValidating && document) {
+      console.log('Data passed to validator:', document.extractedData);
+      
       const formattedData = document.type === 'Certificate of Fitness' 
         ? (document.extractedData.structured_data ? document.extractedData : mapExtractedDataToValidatorFormat(document.extractedData))
         : document.extractedData;
@@ -990,7 +998,10 @@ const DocumentViewer = () => {
                 </Button>
                 {document.status === 'processed' && !isValidating && (
                   <Button
-                    onClick={() => setIsValidating(true)}
+                    onClick={() => {
+                      console.log('Starting validation with data:', document.extractedData);
+                      setIsValidating(true);
+                    }}
                   >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                     {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
