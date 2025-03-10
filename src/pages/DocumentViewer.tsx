@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -17,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
-import { normalizeExtractedData } from "../../supabase/functions/process-document/utils";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -293,12 +291,31 @@ const DocumentViewer = () => {
         .from('medical-documents')
         .createSignedUrl(documentData.file_path, 3600);
       
-      // Apply the normalizeExtractedData function to properly structure the data
-      let extractedData = normalizeExtractedData(documentData.extracted_data || {});
+      let extractedData = documentData.extracted_data || {};
       let patientName = extractPatientName(extractedData);
       let patientId = extractPatientId(extractedData);
       
-      console.log('Normalized extracted data:', extractedData);
+      if (documentData.document_type === 'certificate-of-fitness') {
+        if (
+          typeof extractedData === 'object' && 
+          extractedData !== null && 
+          !Array.isArray(extractedData) && 
+          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
+          extractedData.raw_response
+        ) {
+          extractedData = {
+            ...extractedData,
+            structured_data: {
+              patient: {
+                name: patientName,
+                id_number: patientId
+              }
+            }
+          };
+        }
+      }
+      
+      console.log('Processed extracted data:', extractedData);
       
       return {
         id: documentData.id,
@@ -417,15 +434,13 @@ const DocumentViewer = () => {
             }
           } else if (document.status !== data.status) {
             console.log('Document status changed:', data.status);
-            // Apply normalizeExtractedData to ensure proper structure
-            const normalizedData = normalizeExtractedData(data.extracted_data || {});
             setDocument(prev => ({
               ...prev,
               status: data.status,
-              extractedData: normalizedData,
-              patientName: extractPatientName(normalizedData) || prev.patientName,
-              patientId: extractPatientId(normalizedData) || prev.patientId,
-              jsonData: JSON.stringify(normalizedData, null, 2)
+              extractedData: data.extracted_data || prev.extractedData,
+              patientName: extractPatientName(data.extracted_data) || prev.patientName,
+              patientId: extractPatientId(data.extracted_data) || prev.patientId,
+              jsonData: JSON.stringify(data.extracted_data || prev.extractedData, null, 2)
             }));
           }
         }
@@ -443,16 +458,13 @@ const DocumentViewer = () => {
   }, [id, document?.status, processingTimeout, refreshKey]);
 
   const handleValidationSave = async (validatedData: any) => {
-    // Ensure proper normalization of data before saving
-    const normalizedData = normalizeExtractedData(validatedData);
-    
     setDocument(prev => {
       if (!prev) return null;
       
       const updatedDoc = {
         ...prev,
-        extractedData: normalizedData,
-        jsonData: JSON.stringify(normalizedData, null, 2),
+        extractedData: validatedData,
+        jsonData: JSON.stringify(validatedData, null, 2),
         validationStatus: 'validated'
       };
       
@@ -472,7 +484,7 @@ const DocumentViewer = () => {
         const { error } = await supabase
           .from('documents')
           .update({
-            extracted_data: normalizedData,
+            extracted_data: validatedData,
             is_validated: true,
             updated_at: new Date().toISOString()
           })
@@ -499,27 +511,8 @@ const DocumentViewer = () => {
     });
   };
 
-  // Function to prepare data for validation
-  const startValidation = () => {
-    if (document) {
-      // Make sure the data is properly normalized before passing to validator
-      const normalizedData = normalizeExtractedData(document.extractedData);
-      
-      console.log("Starting validation with normalized data:", normalizedData);
-      
-      // Update the document with normalized data
-      setDocument(prev => ({
-        ...prev,
-        extractedData: normalizedData
-      }));
-      
-      setIsValidating(true);
-    }
-  };
-
   const renderExtractedData = () => {
     if (isValidating && document) {
-      console.log("Rendering validator with data:", document.extractedData);
       return (
         <CertificateValidator 
           documentId={document.id}
@@ -1001,7 +994,7 @@ const DocumentViewer = () => {
                 </Button>
                 {document.status === 'processed' && !isValidating && (
                   <Button
-                    onClick={startValidation}
+                    onClick={() => setIsValidating(true)}
                   >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                     {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}

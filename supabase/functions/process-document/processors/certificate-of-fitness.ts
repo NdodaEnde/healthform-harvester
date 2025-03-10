@@ -1,5 +1,5 @@
 
-import { extractPath, cleanValue, isChecked, hasValue, deepMergeObjects } from "../utils.ts";
+import { extractPath, cleanValue, isChecked } from "../utils.ts";
 
 // Process certificate of fitness data from Landing AI response
 export function processCertificateOfFitnessData(apiResponse: any) {
@@ -9,15 +9,6 @@ export function processCertificateOfFitnessData(apiResponse: any) {
     const markdown = apiResponse.data?.markdown || '';
 
     console.log('Processing certificate of fitness data from API response');
-    console.log('API response result structure:', JSON.stringify(extractedData, null, 2));
-    
-    // Log markdown length and preview
-    if (markdown) {
-      console.log(`Markdown content length: ${markdown.length} characters`);
-      console.log(`Markdown preview (first 200 chars): ${markdown.substring(0, 200)}...`);
-    } else {
-      console.log('No markdown content found in API response');
-    }
     
     // Build structured data object from API response and markdown
     let structuredData = {
@@ -72,16 +63,7 @@ export function processCertificateOfFitnessData(apiResponse: any) {
                     cleanValue(extractPath(extractedData, 'valid_until')) || 
                     cleanValue(extractPath(extractedData, 'expiry_date')) || ''
       },
-      restrictions: {
-        heights: false,
-        dust_exposure: false,
-        motorized_equipment: false,
-        wear_hearing_protection: false,
-        confined_spaces: false,
-        chemical_exposure: false,
-        wear_spectacles: false,
-        remain_on_treatment_for_chronic_conditions: false
-      },
+      restrictions: {},
       raw_content: markdown || null
     };
     
@@ -105,17 +87,7 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       structuredData.restrictions = extractRestrictionsFromMarkdown(markdown);
     }
     
-    // Create a normalized version that matches the form structure better
-    const normalizedStructuredData = normalizeDataStructure(structuredData);
-    
-    // Log the important structures to track data flow
-    console.log('Original structured data:', JSON.stringify(structuredData.patient, null, 2));
-    console.log('Normalized data:', JSON.stringify(normalizedStructuredData.structured_data?.patient, null, 2));
-    
-    // Return the normalized data structure with the original as a reference
-    const result = deepMergeObjects(structuredData, normalizedStructuredData);
-    console.log('Final merged data structure:', JSON.stringify(result.patient, null, 2));
-    return result;
+    return structuredData;
     
   } catch (error) {
     console.error('Error processing certificate of fitness data:', error);
@@ -135,134 +107,6 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       restrictions: {}
     };
   }
-}
-
-// Helper function to normalize the data structure to match the form fields better
-function normalizeDataStructure(data: any) {
-  try {
-    // Create an improved structured data format that aligns with validator expectations
-    const normalizedData: any = {
-      structured_data: {
-        patient: {},
-        examination_results: {
-          test_results: {}
-        },
-        certification: {},
-        restrictions: {}
-      }
-    };
-    
-    // Copy and normalize patient information
-    if (data.patient) {
-      normalizedData.structured_data.patient = {
-        ...data.patient,
-        id_number: data.patient.employee_id || data.patient.id_number || data.patient.id || '',
-        company_name: data.patient.company || ''
-      };
-    }
-    
-    // Copy and normalize examination results with improved structure
-    if (data.examination_results) {
-      normalizedData.structured_data.examination_results = {
-        ...data.examination_results,
-        exam_date: data.examination_results.date || '',
-        expiry_date: data.certification?.valid_until || data.examination_results.next_examination_date || ''
-      };
-      
-      // Ensure examination type is properly mapped
-      if (data.examination_results.type) {
-        normalizedData.structured_data.examination_results.pre_employment = 
-          data.examination_results.type.pre_employment === true || data.examination_results.type.pre_employment === 'true';
-        normalizedData.structured_data.examination_results.periodical = 
-          data.examination_results.type.periodical === true || data.examination_results.type.periodical === 'true';
-        normalizedData.structured_data.examination_results.exit = 
-          data.examination_results.type.exit === true || data.examination_results.type.exit === 'true';
-      }
-      
-      // Ensure test results are normalized and available in both locations
-      if (data.examination_results.test_results) {
-        const testResults = data.examination_results.test_results;
-        normalizedData.structured_data.examination_results.test_results = {
-          ...testResults,
-          bloods_done: testResults.bloods_done === true || testResults.bloods_done === 'true' || false,
-          bloods_results: testResults.bloods_results || 'N/A',
-          far_near_vision_done: testResults.far_near_vision_done === true || testResults.far_near_vision_done === 'true' || false,
-          far_near_vision_results: testResults.far_near_vision_results || 'N/A',
-          side_depth_done: testResults.side_depth_done === true || testResults.side_depth_done === 'true' || false,
-          side_depth_results: testResults.side_depth_results || 'N/A',
-          night_vision_done: testResults.night_vision_done === true || testResults.night_vision_done === 'true' || false,
-          night_vision_results: testResults.night_vision_results || 'N/A',
-          hearing_done: testResults.hearing_done === true || testResults.hearing_done === 'true' || false,
-          hearing_results: testResults.hearing_results || 'N/A',
-          heights_done: testResults.heights_done === true || testResults.heights_done === 'true' || false,
-          heights_results: testResults.heights_results || 'N/A',
-          lung_function_done: testResults.lung_function_done === true || testResults.lung_function_done === 'true' || false,
-          lung_function_results: testResults.lung_function_results || 'N/A',
-          x_ray_done: testResults.x_ray_done === true || testResults.x_ray_done === 'true' || false,
-          x_ray_results: testResults.x_ray_results || 'N/A',
-          drug_screen_done: testResults.drug_screen_done === true || testResults.drug_screen_done === 'true' || false,
-          drug_screen_results: testResults.drug_screen_results || 'N/A'
-        };
-      }
-      
-      // Directly add test results to examination_results for alternative access pattern
-      normalizedData.structured_data.examination_results.bloods_done = 
-        data.examination_results.test_results?.bloods_done === true || 
-        data.examination_results.test_results?.bloods_done === 'true' || 
-        false;
-        
-      normalizedData.structured_data.examination_results.far_near_vision_done = 
-        data.examination_results.test_results?.far_near_vision_done === true || 
-        data.examination_results.test_results?.far_near_vision_done === 'true' || 
-        false;
-        
-      // Add more direct mappings for other test results
-    }
-    
-    // Copy and normalize certification with improved structure
-    if (data.certification) {
-      normalizedData.structured_data.certification = {
-        ...data.certification,
-        valid_until: data.certification.valid_until || data.examination_results?.next_examination_date || '',
-        fit_for_duty: data.certification.fit === true || data.certification.fit === 'true' || false,
-        fitness_declaration: determineOverallFitnessStatus(data.certification)
-      };
-    }
-    
-    // Copy and normalize restrictions
-    if (data.restrictions) {
-      normalizedData.structured_data.restrictions = { 
-        ...data.restrictions,
-        // Add alternative field names to maximize compatibility
-        heights_restriction: data.restrictions.heights === true || data.restrictions.heights === 'true' || false,
-        hearing_protection: data.restrictions.wear_hearing_protection === true || 
-                          data.restrictions.wear_hearing_protection === 'true' || false,
-        chronic_conditions: data.restrictions.remain_on_treatment_for_chronic_conditions === true || 
-                          data.restrictions.remain_on_treatment_for_chronic_conditions === 'true' || false
-      };
-    }
-    
-    return normalizedData;
-  } catch (error) {
-    console.error('Error normalizing data structure:', error);
-    return {};
-  }
-}
-
-// Helper function to determine overall fitness status
-function determineOverallFitnessStatus(certification: any): string {
-  if (certification.fit === true || certification.fit === 'true') {
-    return 'Fit';
-  } else if (certification.fit_with_restrictions === true || certification.fit_with_restrictions === 'true') {
-    return 'Fit with Restrictions';
-  } else if (certification.fit_with_condition === true || certification.fit_with_condition === 'true') {
-    return 'Fit with Condition';
-  } else if (certification.temporarily_unfit === true || certification.temporarily_unfit === 'true') {
-    return 'Temporarily Unfit';
-  } else if (certification.unfit === true || certification.unfit === 'true') {
-    return 'Unfit';
-  }
-  return 'Unknown';
 }
 
 // Helper function to extract patient information from markdown
