@@ -899,8 +899,253 @@ const DocumentViewer = () => {
     );
   };
 
-  // Add this new function to render an editable form for all data types
   const renderEditableDataForm = (data: any) => {
-    const renderNestedForm = (data: any, parentPath: string[] = []) => {
-      if (!data || typeof data !== 'object') {
+    const renderNestedForm = (dataObj: any, parentPath: string[] = []) => {
+      if (!dataObj || typeof dataObj !== 'object') {
         return null;
+      }
+      
+      if (Array.isArray(dataObj)) {
+        return (
+          <div className="space-y-4">
+            {dataObj.map((item, index) => {
+              const newPath = [...parentPath, index.toString()];
+              return (
+                <div key={index} className="border rounded p-3">
+                  <p className="text-sm font-medium mb-2">Item {index + 1}</p>
+                  {renderNestedForm(item, newPath)}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      
+      return (
+        <div className="grid grid-cols-1 gap-4">
+          {Object.entries(dataObj).map(([key, value]) => {
+            const newPath = [...parentPath, key];
+            const formattedKey = key.replace(/([A-Z])/g, ' $1')
+              .replace(/^./, str => str.toUpperCase())
+              .replace(/_/g, ' ');
+              
+            if (typeof value === 'object' && value !== null) {
+              return (
+                <div key={key} className="space-y-2 border rounded p-3">
+                  <h4 className="text-sm font-medium">{formattedKey}</h4>
+                  {renderNestedForm(value, newPath)}
+                </div>
+              );
+            }
+            
+            return renderEditableField(formattedKey, newPath, value);
+          })}
+        </div>
+      );
+    };
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">Edit Document Data</h3>
+          <Button 
+            variant="success" 
+            size="sm" 
+            onClick={handleSaveEditedData}
+            className="flex items-center gap-2"
+          >
+            <Save size={16} /> Save Changes
+          </Button>
+        </div>
+        <div className="border rounded-md p-4">
+          {renderNestedForm(data)}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="container max-w-screen-xl mx-auto px-4 py-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Document Viewer</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+          >
+            <ChevronLeft size={16} />
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading document...</p>
+          </div>
+        </div>
+      ) : !document ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-2">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <p className="text-muted-foreground">Document not found</p>
+            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="mt-2">
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold">Document Data</h2>
+                    <div className="flex gap-2">
+                      {document.status === 'processed' && !isValidating && document.type === 'Certificate of Fitness' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={startValidation}
+                          disabled={isValidating}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Validate Data
+                        </Button>
+                      )}
+                      {document.status === 'processed' && !isValidating && (
+                        <Button
+                          variant={isEditing ? "success" : "outline"}
+                          size="sm"
+                          onClick={toggleEditMode}
+                        >
+                          {isEditing ? (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Edits
+                            </>
+                          ) : (
+                            <>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Data
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    {document.status === 'processing' ? (
+                      <div className="text-center py-8">
+                        <div className="flex justify-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                        </div>
+                        <h3 className="text-lg font-medium mb-2">Processing document...</h3>
+                        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                          We're extracting data from your document. This may take a minute or two.
+                        </p>
+                      </div>
+                    ) : (
+                      renderExtractedData()
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {document.status === 'processed' && !isValidating && (
+                <Card>
+                  <CardContent className="p-6">
+                    <h2 className="text-xl font-semibold mb-4">JSON Data</h2>
+                    <ScrollArea className="h-96 w-full rounded-md border">
+                      <pre className="p-4 text-xs">
+                        {document.jsonData}
+                      </pre>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+            
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold">Document Preview</h2>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowOriginal(!showOriginal)}
+                        title={showOriginal ? "Show extracted data" : "Show original document"}
+                      >
+                        {showOriginal ? <Eye className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                      </Button>
+                      {imageUrl && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => window.open(imageUrl, '_blank')}
+                          title="Open in new tab"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 border rounded-md overflow-hidden">
+                    {imageUrl && showOriginal ? (
+                      <div className="w-full h-[600px] relative">
+                        <img 
+                          src={imageUrl} 
+                          alt={document.name} 
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '/placeholder.svg';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-[600px] bg-muted flex items-center justify-center p-4">
+                        {document.status === 'processing' ? (
+                          <div className="text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">Processing document...</p>
+                          </div>
+                        ) : !showOriginal && document.type === 'Certificate of Fitness' ? (
+                          <ScrollArea className="h-full w-full">
+                            <div className="p-4">
+                              <CertificateTemplate extractedData={document.extractedData} />
+                            </div>
+                          </ScrollArea>
+                        ) : (
+                          <div className="text-center">
+                            <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">
+                              {showOriginal 
+                                ? "Original document preview not available" 
+                                : "Extracted data preview not available"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default DocumentViewer;
