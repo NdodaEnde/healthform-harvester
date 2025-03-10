@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check, Edit, Save
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,9 +13,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input"; 
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
@@ -163,8 +160,6 @@ const DocumentViewer = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [validatorData, setValidatorData] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState<any>(null);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -537,191 +532,6 @@ const DocumentViewer = () => {
     setIsValidating(true);
   };
 
-  const toggleEditMode = () => {
-    if (isEditing) {
-      handleSaveEditedData();
-    } else {
-      setIsEditing(true);
-      setEditedData(document?.extractedData ? JSON.parse(JSON.stringify(document.extractedData)) : {});
-    }
-  };
-
-  const handleSaveEditedData = async () => {
-    if (!editedData) return;
-    
-    try {
-      console.log('Saving edited data:', editedData);
-      
-      if (id) {
-        const { error } = await supabase
-          .from('documents')
-          .update({
-            extracted_data: editedData,
-            is_validated: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', id);
-          
-        if (error) {
-          console.error('Error saving edited data to Supabase:', error);
-          toast.error("Failed to save changes", {
-            description: "There was an error saving your changes to the database."
-          });
-          return;
-        }
-      }
-      
-      setDocument(prev => {
-        if (!prev) return null;
-        
-        return {
-          ...prev,
-          extractedData: editedData,
-          jsonData: JSON.stringify(editedData, null, 2),
-          validationStatus: 'validated'
-        };
-      });
-      
-      setIsEditing(false);
-      setRefreshKey(prevKey => prevKey + 1);
-      
-      toast.success("Changes saved successfully", {
-        description: "Your edits have been saved to the database."
-      });
-    } catch (error) {
-      console.error('Exception saving edited data:', error);
-      toast.error("Failed to save changes", {
-        description: "There was an error processing your request."
-      });
-    }
-  };
-
-  const handleInputChange = (path: string[], value: any) => {
-    setEditedData(prevData => {
-      if (!prevData) return prevData;
-      
-      const newData = JSON.parse(JSON.stringify(prevData));
-      let current = newData;
-      
-      for (let i = 0; i < path.length - 1; i++) {
-        if (!current[path[i]]) {
-          current[path[i]] = {};
-        }
-        current = current[path[i]];
-      }
-      
-      current[path[path.length - 1]] = value;
-      return newData;
-    });
-  };
-
-  const renderEditableField = (label: string, path: string[], value: any) => {
-    const fieldId = path.join('-');
-    const formattedLabel = label.replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .replace(/_/g, ' ');
-    
-    if (typeof value === 'string' && value.length > 50) {
-      return (
-        <div key={fieldId} className="space-y-1 mb-4">
-          <Label htmlFor={fieldId}>{formattedLabel}</Label>
-          <Textarea
-            id={fieldId}
-            value={value || ''}
-            onChange={(e) => handleInputChange(path, e.target.value)}
-            className="resize-y"
-          />
-        </div>
-      );
-    }
-    
-    return (
-      <div key={fieldId} className="space-y-1 mb-4">
-        <Label htmlFor={fieldId}>{formattedLabel}</Label>
-        <Input
-          id={fieldId}
-          type="text"
-          value={value !== null && value !== undefined ? value.toString() : ''}
-          onChange={(e) => handleInputChange(path, e.target.value)}
-        />
-      </div>
-    );
-  };
-
-  const renderEditableDataForm = (data: any) => {
-    if (!data || typeof data !== 'object') {
-      return <div>No editable data available</div>;
-    }
-    
-    const renderNestedForm = (obj: any, parentPath: string[] = []) => {
-      if (!obj || typeof obj !== 'object') {
-        return null;
-      }
-      
-      if (Array.isArray(obj)) {
-        return (
-          <div className="space-y-4">
-            {obj.map((item, index) => {
-              const newPath = [...parentPath, index.toString()];
-              
-              if (typeof item === 'object' && item !== null) {
-                return (
-                  <div key={index} className="border rounded p-3">
-                    <p className="text-sm font-medium mb-2">Item {index + 1}</p>
-                    {renderNestedForm(item, newPath)}
-                  </div>
-                );
-              } else {
-                return renderEditableField(`Item ${index + 1}`, newPath, item);
-              }
-            })}
-          </div>
-        );
-      }
-      
-      return (
-        <div className="grid grid-cols-1 gap-4">
-          {Object.entries(obj).map(([key, value]) => {
-            const newPath = [...parentPath, key];
-            const formattedKey = key.replace(/([A-Z])/g, ' $1')
-              .replace(/^./, str => str.toUpperCase())
-              .replace(/_/g, ' ');
-              
-            if (typeof value === 'object' && value !== null) {
-              return (
-                <div key={key} className="space-y-2 border rounded p-3">
-                  <h4 className="text-sm font-medium">{formattedKey}</h4>
-                  {renderNestedForm(value, newPath)}
-                </div>
-              );
-            }
-            
-            return renderEditableField(formattedKey, newPath, value);
-          })}
-        </div>
-      );
-    };
-    
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Edit Document Data</h3>
-          <Button 
-            variant="success" 
-            size="sm" 
-            onClick={handleSaveEditedData}
-            className="flex items-center gap-2"
-          >
-            <Save size={16} /> Save Changes
-          </Button>
-        </div>
-        <div className="border rounded-md p-4">
-          {renderNestedForm(data)}
-        </div>
-      </div>
-    );
-  };
-
   const renderExtractedData = () => {
     if (isValidating && document) {
       console.log('Data passed to validator:', validatorData || document.extractedData);
@@ -749,13 +559,10 @@ const DocumentViewer = () => {
       );
     }
     
-    if (isEditing) {
-      return renderEditableDataForm(editedData);
-    }
-    
     const extractedData = document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
+      console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
           <CertificateTemplate extractedData={extractedData} />
@@ -779,7 +586,6 @@ const DocumentViewer = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(structuredData.patient).map(([key, value]: [string, any]) => {
                   if (typeof value === 'object' && value !== null) return null;
-                  
                   return (
                     <div key={key} className="space-y-1">
                       <p className="text-sm text-muted-foreground">
@@ -801,11 +607,11 @@ const DocumentViewer = () => {
                 <h3 className="text-lg font-medium mb-3">Medical Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(structuredData.medical_details).map(([key, value]: [string, any]) => {
-                    if (typeof value === 'object' && value !== null) return null;
-                    
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
+                    } else if (typeof value === 'object' && value !== null) {
+                      return null;
                     }
                     
                     return (
@@ -830,11 +636,11 @@ const DocumentViewer = () => {
                 <h3 className="text-lg font-medium mb-3">Examination Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(structuredData.examination_results).map(([key, value]: [string, any]) => {
-                    if (typeof value === 'object' && value !== null) return null;
-                    
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
+                    } else if (typeof value === 'object' && value !== null) {
+                      return null;
                     }
                     
                     return (
@@ -859,11 +665,11 @@ const DocumentViewer = () => {
                 <h3 className="text-lg font-medium mb-3">Certification</h3>
                 <div className="grid grid-cols-1 gap-4">
                   {Object.entries(structuredData.certification).map(([key, value]: [string, any]) => {
-                    if (typeof value === 'object' && value !== null) return null;
-                    
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
+                    } else if (typeof value === 'object' && value !== null) {
+                      return null;
                     }
                     
                     return (
@@ -973,186 +779,260 @@ const DocumentViewer = () => {
     );
   };
 
-  return (
-    <div className="container max-w-screen-xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Document Viewer</h1>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/dashboard')}
-          >
-            <ChevronLeft size={16} />
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+          <p className="text-muted-foreground">Loading document data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!document) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
+          <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
+          <Button onClick={() => navigate("/dashboard")}>
+            <ChevronLeft className="h-4 w-4" />
             Back to Dashboard
           </Button>
         </div>
       </div>
-      
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading document...</p>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center space-x-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate("/dashboard")}
+          >
+            <ChevronLeft className="h-5 w-5" />
+            <span className="sr-only">Back</span>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-medium truncate">{document.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {document.type} | {document.patientName || "Unknown Patient"}
+            </p>
           </div>
-        </div>
-      ) : !document ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <p className="text-muted-foreground">Document not found</p>
-            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="mt-2">
-              Return to Dashboard
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              {showOriginal ? (
+                <>
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  Hide Original
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Show Original
+                </>
+              )}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (document.imageUrl) {
+                  window.open(document.imageUrl, '_blank');
+                } else {
+                  toast.error("Document preview not available");
+                }
+              }}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(document.jsonData);
+                toast.success("JSON data copied to clipboard");
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy JSON
+            </Button>
+            {!isValidating && (
+              <Button 
+                variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
+                size="sm"
+                onClick={startValidation}
+              >
+                {document.validationStatus === 'validated' ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Edit Validation
+                  </>
+                ) : (
+                  <>
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Validate
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">Document Data</h2>
-                    <div className="flex gap-2">
-                      {document.status === 'processed' && !isValidating && document.type === 'Certificate of Fitness' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={startValidation}
-                          disabled={isValidating}
-                        >
-                          <CheckCircle2 className="w-4 h-4 mr-2" />
-                          Validate Data
-                        </Button>
-                      )}
-                      {document.status === 'processed' && !isValidating && (
-                        <Button
-                          variant={isEditing ? "success" : "outline"}
-                          size="sm"
-                          onClick={toggleEditMode}
-                        >
-                          {isEditing ? (
-                            <>
-                              <Save className="w-4 h-4 mr-2" />
-                              Save Edits
-                            </>
-                          ) : (
-                            <>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Data
-                            </>
-                          )}
-                        </Button>
-                      )}
+      </header>
+      
+      <main className="flex-1 container py-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+        >
+          {showOriginal && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Original Document</h2>
+                <Badge variant="outline" className="text-xs">
+                  {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
+                </Badge>
+              </div>
+              <Card className="overflow-hidden h-[calc(100vh-220px)]">
+                <div className="relative w-full h-full">
+                  {imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt="Document preview" 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
                     </div>
-                  </div>
-                  
-                  <div className="mt-4">
-                    {document.status === 'processing' ? (
-                      <div className="text-center py-8">
-                        <div className="flex justify-center">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                        </div>
-                        <h3 className="text-lg font-medium mb-2">Processing document...</h3>
-                        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                          We're extracting data from your document. This may take a minute or two.
-                        </p>
-                      </div>
-                    ) : (
-                      renderExtractedData()
-                    )}
-                  </div>
-                </CardContent>
+                  )}
+                </div>
               </Card>
-              
-              {document.status === 'processed' && !isValidating && (
-                <Card>
-                  <CardContent className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">JSON Data</h2>
-                    <ScrollArea className="h-96 w-full rounded-md border">
-                      <pre className="p-4 text-xs">
-                        {document.jsonData}
-                      </pre>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
+            </motion.div>
+          )}
+          
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
+            key={`document-content-${refreshKey}`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">
+                {isValidating ? "Validate Document Data" : "Extracted Data"}
+              </h2>
+              {!isValidating && (
+                <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
+                  {document.status === 'processed' ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Processed
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3 w-3 mr-1 animate-pulse" />
+                      Processing
+                    </>
+                  )}
+                </Badge>
+              )}
+              {!isValidating && document.validationStatus === 'validated' && (
+                <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+                  <Check className="h-3 w-3 mr-1" />
+                  Validated
+                </Badge>
               )}
             </div>
             
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">Document Preview</h2>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setShowOriginal(!showOriginal)}
-                        title={showOriginal ? "Show extracted data" : "Show original document"}
-                      >
-                        {showOriginal ? <Eye className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-                      </Button>
-                      {imageUrl && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => window.open(imageUrl, '_blank')}
-                          title="Open in new tab"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 border rounded-md overflow-hidden">
-                    {imageUrl && showOriginal ? (
-                      <div className="w-full h-[600px] relative">
-                        <img 
-                          src={imageUrl} 
-                          alt={document.name} 
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.src = '/placeholder.svg';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-[600px] bg-muted flex items-center justify-center p-4">
-                        {document.status === 'processing' ? (
-                          <div className="text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-                            <p className="text-sm text-muted-foreground">Processing document...</p>
-                          </div>
-                        ) : !showOriginal && document.type === 'Certificate of Fitness' ? (
-                          <ScrollArea className="h-full w-full">
-                            <div className="p-4">
-                              <CertificateTemplate extractedData={document.extractedData} />
-                            </div>
-                          </ScrollArea>
-                        ) : (
-                          <div className="text-center">
-                            <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                            <p className="text-sm text-muted-foreground">
-                              {showOriginal 
-                                ? "Original document preview not available" 
-                                : "Extracted data preview not available"}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+            <Card className="flex-1 overflow-hidden">
+              {isValidating ? (
+                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
+                  {renderExtractedData()}
                 </CardContent>
-              </Card>
-            </div>
-          </div>
-        </>
-      )}
+              ) : (
+                <>
+                  <Tabs defaultValue="structured">
+                    <CardContent className="pb-0 pt-4">
+                      <TabsList className="grid grid-cols-2">
+                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                        <TabsTrigger value="json">JSON</TabsTrigger>
+                      </TabsList>
+                    </CardContent>
+                    
+                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
+                      <TabsContent value="structured" className="m-0 h-full">
+                        <ScrollArea className="h-full pr-4">
+                          {renderExtractedData()}
+                        </ScrollArea>
+                      </TabsContent>
+                      
+                      <TabsContent value="json" className="m-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="relative">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="absolute top-1 right-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(document.jsonData);
+                                toast.success("JSON data copied to clipboard");
+                              }}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </Button>
+                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
+                              {document.jsonData}
+                            </pre>
+                          </div>
+                        </ScrollArea>
+                      </TabsContent>
+                    </CardContent>
+                  </Tabs>
+                </>
+              )}
+            </Card>
+            
+            {!isValidating && (
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/dashboard")}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Back to Dashboard
+                </Button>
+                {document.status === 'processed' && !isValidating && (
+                  <Button
+                    onClick={startValidation}
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
+                  </Button>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      </main>
     </div>
   );
 };
