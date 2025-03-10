@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -1106,6 +1107,45 @@ const DocumentViewer = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between bg-muted/50 p-4">
+                <div className="flex items-center space-x-4">
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Document Preview</h3>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="p-4">
+                <div className="rounded border overflow-hidden h-[calc(100vh-400px)]">
+                  {document.status === 'processing' ? (
+                    <div className="flex flex-col items-center justify-center h-full space-y-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      <p className="text-muted-foreground text-sm">Processing document...</p>
+                    </div>
+                  ) : !imageUrl ? (
+                    <div className="flex flex-col items-center justify-center h-full space-y-4">
+                      <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-muted-foreground text-sm">Preview not available</p>
+                    </div>
+                  ) : (
+                    <img 
+                      src={imageUrl} 
+                      alt={document.name}
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
