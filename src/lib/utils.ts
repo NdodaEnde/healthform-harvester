@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -59,8 +60,10 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
 
   // Map examination results and test results
   if (extractedData.examination_results) {
-    // Set the date if available
-    if (extractedData.examination_results.date) {
+    // Check if the date property exists before trying to set it
+    if (typeof extractedData.examination_results === 'object' && 
+        extractedData.examination_results !== null &&
+        'date' in extractedData.examination_results) {
       structuredData.structured_data.examination_results.date = extractedData.examination_results.date;
     }
     
@@ -194,4 +197,5 @@ export const isCheckboxMarked = (markdown: string, fieldName: string): boolean =
   return patterns.some(pattern => pattern.test(context));
 };
 
-export { useHookToast as useToast, hookToast as toast } from "@/hooks/use-toast";
+// Corrected import statement to use the actual names exported from use-toast.ts
+export { useToast, toast } from "@/hooks/use-toast";
