@@ -79,7 +79,10 @@ export function isChecked(markdown: string, label: string): boolean {
     new RegExp(`${label}[\\s\\S]*?\\[X\\]`, 'i'),
     // Look for cases where a row has the label and includes [x] in the same tr element
     new RegExp(`<tr>[\\s\\S]*?${label}[\\s\\S]*?\\[x\\][\\s\\S]*?<\\/tr>`, 'i'),
-    new RegExp(`<tr>[\\s\\S]*?${label}[\\s\\S]*?\\[X\\][\\s\\S]*?<\\/tr>`, 'i')
+    new RegExp(`<tr>[\\s\\S]*?${label}[\\s\\S]*?\\[X\\][\\s\\S]*?<\\/tr>`, 'i'),
+    // Look for checkmark symbols
+    new RegExp(`${label}[\\s\\S]*?✓`, 'i'),
+    new RegExp(`✓[\\s\\S]*?${label}`, 'i')
   ];
   
   // Check all patterns
@@ -98,7 +101,7 @@ export function isChecked(markdown: string, label: string): boolean {
     for (const tableSection of tableSections) {
       if (tableSection.includes(label)) {
         // Look for [x] in the rows that follow
-        if (tableSection.includes('[x]') || tableSection.includes('[X]')) {
+        if (tableSection.includes('[x]') || tableSection.includes('[X]') || tableSection.includes('✓')) {
           // Try to determine if the [x] corresponds to this label
           const rows = tableSection.match(/<tr>[\s\S]*?<\/tr>/g) || [];
           
@@ -121,7 +124,7 @@ export function isChecked(markdown: string, label: string): boolean {
             for (let i = 1; i < rows.length; i++) {
               const cells = rows[i].match(/<td>(.*?)<\/td>/g) || [];
               if (cells.length > labelColumnIndex) {
-                if (cells[labelColumnIndex].includes('[x]') || cells[labelColumnIndex].includes('[X]')) {
+                if (cells[labelColumnIndex].includes('[x]') || cells[labelColumnIndex].includes('[X]') || cells[labelColumnIndex].includes('✓')) {
                   console.log(`Found checked pattern for ${label} in table at column ${labelColumnIndex}`);
                   return true;
                 }
@@ -134,4 +137,38 @@ export function isChecked(markdown: string, label: string): boolean {
   }
   
   return false;
+}
+
+// Check if a specific field exists and has a non-empty value
+export function hasValue(data: any, fieldPath: string): boolean {
+  const value = extractPath(data, fieldPath);
+  return value !== undefined && value !== null && value !== '';
+}
+
+// Deep merge two objects
+export function deepMergeObjects(target: any, source: any): any {
+  // If either is not an object, return source
+  if (typeof target !== 'object' || target === null || 
+      typeof source !== 'object' || source === null) {
+    return source;
+  }
+  
+  const output = { ...target };
+  
+  Object.keys(source).forEach(key => {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      if (!(key in target)) {
+        output[key] = source[key];
+      } else {
+        output[key] = deepMergeObjects(target[key], source[key]);
+      }
+    } else {
+      // For arrays or primitive values, overwrite completely
+      if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+        output[key] = source[key];
+      }
+    }
+  });
+  
+  return output;
 }

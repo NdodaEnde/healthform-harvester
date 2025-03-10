@@ -1,5 +1,5 @@
 
-import { extractPath, cleanValue, isChecked } from "../utils.ts";
+import { extractPath, cleanValue, isChecked, hasValue, deepMergeObjects } from "../utils.ts";
 
 // Process certificate of fitness data from Landing AI response
 export function processCertificateOfFitnessData(apiResponse: any) {
@@ -87,7 +87,11 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       structuredData.restrictions = extractRestrictionsFromMarkdown(markdown);
     }
     
-    return structuredData;
+    // Create a normalized version that matches the form structure better
+    const normalizedStructuredData = normalizeDataStructure(structuredData);
+    
+    // Return the normalized data structure with the original as a reference
+    return deepMergeObjects(structuredData, normalizedStructuredData);
     
   } catch (error) {
     console.error('Error processing certificate of fitness data:', error);
@@ -106,6 +110,68 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       certification: {},
       restrictions: {}
     };
+  }
+}
+
+// Helper function to normalize the data structure to match the form fields better
+function normalizeDataStructure(data: any) {
+  try {
+    const normalizedData: any = {
+      structured_data: {}
+    };
+    
+    // Copy patient information
+    if (data.patient) {
+      normalizedData.structured_data.patient = {
+        ...data.patient,
+        id_number: data.patient.employee_id || data.patient.id_number || data.patient.id || '',
+        company_name: data.patient.company || ''
+      };
+    }
+    
+    // Copy examination results with normalized structure
+    if (data.examination_results) {
+      normalizedData.structured_data.examination_results = {
+        ...data.examination_results,
+        exam_date: data.examination_results.date || '',
+        expiry_date: data.certification?.valid_until || data.examination_results.next_examination_date || ''
+      };
+      
+      // Ensure test results are normalized
+      if (data.examination_results.test_results) {
+        const testResults = data.examination_results.test_results;
+        normalizedData.structured_data.examination_results.test_results = {
+          ...testResults,
+          bloods_done: testResults.bloods_done === true || testResults.bloods_done === 'true' || false,
+          far_near_vision_done: testResults.far_near_vision_done === true || testResults.far_near_vision_done === 'true' || false,
+          side_depth_done: testResults.side_depth_done === true || testResults.side_depth_done === 'true' || false,
+          night_vision_done: testResults.night_vision_done === true || testResults.night_vision_done === 'true' || false,
+          hearing_done: testResults.hearing_done === true || testResults.hearing_done === 'true' || false,
+          heights_done: testResults.heights_done === true || testResults.heights_done === 'true' || false,
+          lung_function_done: testResults.lung_function_done === true || testResults.lung_function_done === 'true' || false,
+          x_ray_done: testResults.x_ray_done === true || testResults.x_ray_done === 'true' || false,
+          drug_screen_done: testResults.drug_screen_done === true || testResults.drug_screen_done === 'true' || false
+        };
+      }
+    }
+    
+    // Copy certification with normalized structure
+    if (data.certification) {
+      normalizedData.structured_data.certification = {
+        ...data.certification,
+        valid_until: data.certification.valid_until || data.examination_results?.next_examination_date || ''
+      };
+    }
+    
+    // Copy restrictions
+    if (data.restrictions) {
+      normalizedData.structured_data.restrictions = { ...data.restrictions };
+    }
+    
+    return normalizedData;
+  } catch (error) {
+    console.error('Error normalizing data structure:', error);
+    return {};
   }
 }
 

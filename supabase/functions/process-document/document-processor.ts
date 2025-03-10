@@ -2,6 +2,7 @@
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
+import { deepMergeObjects } from "./utils.ts";
 
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
@@ -25,6 +26,12 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     // Clean any problematic data in the structuredData
     cleanStructuredData(structuredData);
     
+    // Ensure the raw_response data is preserved for validation
+    const extractedData = {
+      structured_data: structuredData,
+      raw_response: result
+    };
+    
     // Try to update the document record multiple times if needed
     let updateSuccess = false;
     let attempts = 0;
@@ -36,10 +43,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       const { data: updateData, error: updateError } = await supabase
         .from('documents')
         .update({
-          extracted_data: {
-            structured_data: structuredData,
-            raw_response: result
-          },
+          extracted_data: extractedData,
           status: 'processed',
           processed_at: new Date().toISOString()
         })
