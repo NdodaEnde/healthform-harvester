@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check
+  Check, Pencil, Save, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,10 @@ import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
 import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -160,6 +164,8 @@ const DocumentViewer = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [validatorData, setValidatorData] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableData, setEditableData] = useState<any>(null);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -532,6 +538,131 @@ const DocumentViewer = () => {
     setIsValidating(true);
   };
 
+  const renderEditableField = (
+    section: string, 
+    key: string, 
+    value: any, 
+    path: string[]
+  ) => {
+    const updateNestedValue = (newValue: any) => {
+      setEditableData((prev: any) => {
+        const newData = { ...prev };
+        let current = newData;
+        
+        for (let i = 0; i < path.length - 1; i++) {
+          if (!current[path[i]]) {
+            current[path[i]] = {};
+          }
+          current = current[path[i]];
+        }
+        
+        current[path[path.length - 1]] = newValue;
+        return newData;
+      });
+    };
+
+    const fieldId = `${section}-${key}-${path.join('-')}`;
+    const displayName = key.replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace(/_/g, ' ');
+
+    if (typeof value === 'boolean') {
+      return (
+        <div key={fieldId} className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={fieldId}
+              checked={value || false}
+              onCheckedChange={(checked) => updateNestedValue(!!checked)}
+            />
+            <Label htmlFor={fieldId} className="text-sm">
+              {displayName}
+            </Label>
+          </div>
+        </div>
+      );
+    }
+    
+    if (typeof value === 'string' && value.length > 100) {
+      return (
+        <div key={fieldId} className="space-y-1">
+          <Label htmlFor={fieldId} className="text-sm text-muted-foreground">
+            {displayName}
+          </Label>
+          <Textarea 
+            id={fieldId}
+            value={value || ''}
+            onChange={(e) => updateNestedValue(e.target.value)}
+            className="min-h-[100px]"
+          />
+        </div>
+      );
+    }
+    
+    return (
+      <div key={fieldId} className="space-y-1">
+        <Label htmlFor={fieldId} className="text-sm text-muted-foreground">
+          {displayName}
+        </Label>
+        <Input 
+          id={fieldId}
+          value={value !== null && value !== undefined ? value.toString() : ''}
+          onChange={(e) => updateNestedValue(e.target.value)}
+        />
+      </div>
+    );
+  };
+
+  const renderStructuredSection = (
+    title: string,
+    data: Record<string, any>,
+    path: string[] = []
+  ) => {
+    return (
+      <div>
+        <h3 className="text-lg font-medium mb-3">{title}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(data).map(([key, value]) => {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+              return null;
+            }
+            
+            if (Array.isArray(value)) {
+              if (isEditing) {
+                return renderEditableField(title.toLowerCase(), key, value.join(', '), [...path, key]);
+              }
+              return (
+                <div key={`${title}-${key}`} className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    {key.replace(/([A-Z])/g, ' $1')
+                      .replace(/^./, str => str.toUpperCase())
+                      .replace(/_/g, ' ')}
+                  </p>
+                  <p className="font-medium">{value.join(', ') || 'N/A'}</p>
+                </div>
+              );
+            }
+            
+            if (isEditing) {
+              return renderEditableField(title.toLowerCase(), key, value, [...path, key]);
+            }
+            
+            return (
+              <div key={`${title}-${key}`} className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  {key.replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase())
+                    .replace(/_/g, ' ')}
+                </p>
+                <p className="font-medium">{value !== null && value !== undefined ? value.toString() : 'N/A'}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const renderExtractedData = () => {
     if (isValidating && document) {
       console.log('Data passed to validator:', validatorData || document.extractedData);
@@ -559,9 +690,63 @@ const DocumentViewer = () => {
       );
     }
     
-    const extractedData = document.extractedData;
+    const extractedData = isEditing ? editableData : document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
+      if (isEditing) {
+        return (
+          <div className="space-y-6">
+            {extractedData.structured_data && (
+              <>
+                {extractedData.structured_data.patient && (
+                  <>
+                    {renderStructuredSection("Patient Information", extractedData.structured_data.patient, ['structured_data', 'patient'])}
+                    <Separator />
+                  </>
+                )}
+                
+                {extractedData.structured_data.medical_details && (
+                  <>
+                    {renderStructuredSection("Medical Information", extractedData.structured_data.medical_details, ['structured_data', 'medical_details'])}
+                    <Separator />
+                  </>
+                )}
+                
+                {extractedData.structured_data.examination_results && (
+                  <>
+                    {renderStructuredSection("Examination Results", extractedData.structured_data.examination_results, ['structured_data', 'examination_results'])}
+                    <Separator />
+                  </>
+                )}
+                
+                {extractedData.structured_data.certification && (
+                  <>
+                    {renderStructuredSection("Certification", extractedData.structured_data.certification, ['structured_data', 'certification'])}
+                  </>
+                )}
+                
+                <div className="mt-6 flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditableData(null);
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveEdits}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
+      
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
@@ -581,109 +766,49 @@ const DocumentViewer = () => {
       return (
         <div className="space-y-6">
           {structuredData.patient && (
-            <div>
-              <h3 className="text-lg font-medium mb-3">Patient Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(structuredData.patient).map(([key, value]: [string, any]) => {
-                  if (typeof value === 'object' && value !== null) return null;
-                  return (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">
-                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                      </p>
-                      <p className="font-medium">{value !== null ? value.toString() : 'N/A'}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <>
+              {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
+              <Separator />
+            </>
           )}
-          
-          <Separator />
           
           {structuredData.medical_details && (
             <>
-              <div>
-                <h3 className="text-lg font-medium mb-3">Medical Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(structuredData.medical_details).map(([key, value]: [string, any]) => {
-                    let displayValue = value;
-                    if (Array.isArray(value)) {
-                      displayValue = value.join(', ');
-                    } else if (typeof value === 'object' && value !== null) {
-                      return null;
-                    }
-                    
-                    return (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              
+              {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
               <Separator />
             </>
           )}
           
           {structuredData.examination_results && (
             <>
-              <div>
-                <h3 className="text-lg font-medium mb-3">Examination Results</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(structuredData.examination_results).map(([key, value]: [string, any]) => {
-                    let displayValue = value;
-                    if (Array.isArray(value)) {
-                      displayValue = value.join(', ');
-                    } else if (typeof value === 'object' && value !== null) {
-                      return null;
-                    }
-                    
-                    return (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              
+              {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
               <Separator />
             </>
           )}
           
           {structuredData.certification && (
             <>
-              <div>
-                <h3 className="text-lg font-medium mb-3">Certification</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {Object.entries(structuredData.certification).map(([key, value]: [string, any]) => {
-                    let displayValue = value;
-                    if (Array.isArray(value)) {
-                      displayValue = value.join(', ');
-                    } else if (typeof value === 'object' && value !== null) {
-                      return null;
-                    }
-                    
-                    return (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
             </>
+          )}
+          
+          {isEditing && (
+            <div className="mt-6 flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditableData(null);
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
           )}
           
           {!structuredData.patient && !structuredData.medical_details && 
@@ -695,70 +820,6 @@ const DocumentViewer = () => {
               </pre>
             </div>
           )}
-        </div>
-      );
-    }
-    
-    if (
-      typeof extractedData === 'object' && 
-      extractedData !== null && 
-      !Array.isArray(extractedData) && 
-      (extractedData.documents || extractedData.text || extractedData.tables)
-    ) {
-      return (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-3">Extracted API Data</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              This displays the raw data extracted from your document using the Agentic Document Extraction API.
-            </p>
-            
-            {extractedData.documents && (
-              <div className="space-y-4">
-                {extractedData.documents.map((doc: any, index: number) => (
-                  <div key={index} className="border rounded-md p-4">
-                    <h4 className="text-md font-medium mb-2">Document Segment {index + 1}</h4>
-                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                      {JSON.stringify(doc, null, 2)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {extractedData.text && (
-              <div className="border rounded-md p-4 mt-4">
-                <h4 className="text-md font-medium mb-2">Extracted Text</h4>
-                <div className="bg-muted p-3 rounded">
-                  <p className="whitespace-pre-wrap text-sm">{extractedData.text}</p>
-                </div>
-              </div>
-            )}
-            
-            {extractedData.tables && extractedData.tables.length > 0 && (
-              <div className="space-y-4 mt-4">
-                <h4 className="text-md font-medium">Extracted Tables</h4>
-                {extractedData.tables.map((table: any, index: number) => (
-                  <div key={index} className="border rounded-md p-4 overflow-x-auto">
-                    <h5 className="text-sm font-medium mb-2">Table {index + 1}</h5>
-                    <table className="min-w-full divide-y divide-border">
-                      <tbody className="divide-y divide-border">
-                        {table.data.map((row: any, rowIndex: number) => (
-                          <tr key={rowIndex}>
-                            {row.map((cell: any, cellIndex: number) => (
-                              <td key={cellIndex} className="px-3 py-2 text-sm">
-                                {cell}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       );
     }
@@ -867,7 +928,27 @@ const DocumentViewer = () => {
               <Copy className="h-4 w-4 mr-2" />
               Copy JSON
             </Button>
-            {!isValidating && (
+            {!isValidating && !isEditing && document.status === 'processed' && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={toggleEditMode}
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Data
+              </Button>
+            )}
+            {isEditing && (
+              <Button 
+                variant="warning" 
+                size="sm"
+                onClick={toggleEditMode}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel Edit
+              </Button>
+            )}
+            {!isValidating && !isEditing && (
               <Button 
                 variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
                 size="sm"
@@ -933,13 +1014,13 @@ const DocumentViewer = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
-            key={`document-content-${refreshKey}`}
+            key={`document-content-${refreshKey}-${isEditing ? 'edit' : 'view'}`}
           >
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">
-                {isValidating ? "Validate Document Data" : "Extracted Data"}
+                {isValidating ? "Validate Document Data" : (isEditing ? "Edit Document Data" : "Extracted Data")}
               </h2>
-              {!isValidating && (
+              {!isValidating && !isEditing && (
                 <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
                   {document.status === 'processed' ? (
                     <>
@@ -954,7 +1035,13 @@ const DocumentViewer = () => {
                   )}
                 </Badge>
               )}
-              {!isValidating && document.validationStatus === 'validated' && (
+              {isEditing && (
+                <Badge variant="secondary" className="text-xs">
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Editing
+                </Badge>
+              )}
+              {!isValidating && !isEditing && document.validationStatus === 'validated' && (
                 <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
                   <Check className="h-3 w-3 mr-1" />
                   Validated
@@ -965,6 +1052,10 @@ const DocumentViewer = () => {
             <Card className="flex-1 overflow-hidden">
               {isValidating ? (
                 <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
+                  {renderExtractedData()}
+                </CardContent>
+              ) : isEditing ? (
+                <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
               ) : (
@@ -1011,7 +1102,7 @@ const DocumentViewer = () => {
               )}
             </Card>
             
-            {!isValidating && (
+            {!isValidating && !isEditing && (
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
@@ -1020,7 +1111,15 @@ const DocumentViewer = () => {
                   <ChevronLeft className="h-4 w-4 mr-2" />
                   Back to Dashboard
                 </Button>
-                {document.status === 'processed' && !isValidating && (
+                {document.status === 'processed' && !isEditing && (
+                  <Button
+                    onClick={toggleEditMode}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Data
+                  </Button>
+                )}
+                {document.status === 'processed' && !isValidating && !isEditing && (
                   <Button
                     onClick={startValidation}
                   >
@@ -1028,6 +1127,27 @@ const DocumentViewer = () => {
                     {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
                   </Button>
                 )}
+              </div>
+            )}
+            
+            {isEditing && (
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditableData(null);
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveEdits}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
               </div>
             )}
           </motion.div>
