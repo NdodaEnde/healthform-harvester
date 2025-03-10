@@ -542,11 +542,13 @@ const DocumentViewer = () => {
       handleSaveEditedData();
     } else {
       setIsEditing(true);
-      setEditedData(JSON.parse(JSON.stringify(document.extractedData)));
+      setEditedData(document?.extractedData ? JSON.parse(JSON.stringify(document.extractedData)) : {});
     }
   };
 
   const handleSaveEditedData = async () => {
+    if (!editedData) return;
+    
     try {
       console.log('Saving edited data:', editedData);
       
@@ -596,6 +598,8 @@ const DocumentViewer = () => {
 
   const handleInputChange = (path: string[], value: any) => {
     setEditedData(prevData => {
+      if (!prevData) return prevData;
+      
       const newData = JSON.parse(JSON.stringify(prevData));
       let current = newData;
       
@@ -615,7 +619,7 @@ const DocumentViewer = () => {
     const fieldId = path.join('-');
     const formattedLabel = label.replace(/([A-Z])/g, ' $1')
       .replace(/^./, str => str.toUpperCase())
-      .replace('_', ' ');
+      .replace(/_/g, ' ');
     
     if (typeof value === 'string' && value.length > 50) {
       return (
@@ -640,6 +644,80 @@ const DocumentViewer = () => {
           value={value !== null && value !== undefined ? value.toString() : ''}
           onChange={(e) => handleInputChange(path, e.target.value)}
         />
+      </div>
+    );
+  };
+
+  const renderEditableDataForm = (data: any) => {
+    if (!data || typeof data !== 'object') {
+      return <div>No editable data available</div>;
+    }
+    
+    const renderNestedForm = (obj: any, parentPath: string[] = []) => {
+      if (!obj || typeof obj !== 'object') {
+        return null;
+      }
+      
+      if (Array.isArray(obj)) {
+        return (
+          <div className="space-y-4">
+            {obj.map((item, index) => {
+              const newPath = [...parentPath, index.toString()];
+              
+              if (typeof item === 'object' && item !== null) {
+                return (
+                  <div key={index} className="border rounded p-3">
+                    <p className="text-sm font-medium mb-2">Item {index + 1}</p>
+                    {renderNestedForm(item, newPath)}
+                  </div>
+                );
+              } else {
+                return renderEditableField(`Item ${index + 1}`, newPath, item);
+              }
+            })}
+          </div>
+        );
+      }
+      
+      return (
+        <div className="grid grid-cols-1 gap-4">
+          {Object.entries(obj).map(([key, value]) => {
+            const newPath = [...parentPath, key];
+            const formattedKey = key.replace(/([A-Z])/g, ' $1')
+              .replace(/^./, str => str.toUpperCase())
+              .replace(/_/g, ' ');
+              
+            if (typeof value === 'object' && value !== null) {
+              return (
+                <div key={key} className="space-y-2 border rounded p-3">
+                  <h4 className="text-sm font-medium">{formattedKey}</h4>
+                  {renderNestedForm(value, newPath)}
+                </div>
+              );
+            }
+            
+            return renderEditableField(formattedKey, newPath, value);
+          })}
+        </div>
+      );
+    };
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">Edit Document Data</h3>
+          <Button 
+            variant="success" 
+            size="sm" 
+            onClick={handleSaveEditedData}
+            className="flex items-center gap-2"
+          >
+            <Save size={16} /> Save Changes
+          </Button>
+        </div>
+        <div className="border rounded-md p-4">
+          {renderNestedForm(data)}
+        </div>
       </div>
     );
   };
@@ -671,22 +749,18 @@ const DocumentViewer = () => {
       );
     }
     
-    const extractedData = isEditing ? editedData : document.extractedData;
+    if (isEditing) {
+      return renderEditableDataForm(editedData);
+    }
+    
+    const extractedData = document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
-      if (isEditing) {
-        return renderEditableDataForm(extractedData);
-      }
-      console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
           <CertificateTemplate extractedData={extractedData} />
         </div>
       );
-    }
-    
-    if (isEditing) {
-      return renderEditableDataForm(extractedData);
     }
     
     if (
@@ -894,71 +968,6 @@ const DocumentViewer = () => {
           <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
             {JSON.stringify(extractedData, null, 2)}
           </pre>
-        </div>
-      </div>
-    );
-  };
-
-  const renderEditableDataForm = (data: any) => {
-    const renderNestedForm = (dataObj: any, parentPath: string[] = []) => {
-      if (!dataObj || typeof dataObj !== 'object') {
-        return null;
-      }
-      
-      if (Array.isArray(dataObj)) {
-        return (
-          <div className="space-y-4">
-            {dataObj.map((item, index) => {
-              const newPath = [...parentPath, index.toString()];
-              return (
-                <div key={index} className="border rounded p-3">
-                  <p className="text-sm font-medium mb-2">Item {index + 1}</p>
-                  {renderNestedForm(item, newPath)}
-                </div>
-              );
-            })}
-          </div>
-        );
-      }
-      
-      return (
-        <div className="grid grid-cols-1 gap-4">
-          {Object.entries(dataObj).map(([key, value]) => {
-            const newPath = [...parentPath, key];
-            const formattedKey = key.replace(/([A-Z])/g, ' $1')
-              .replace(/^./, str => str.toUpperCase())
-              .replace(/_/g, ' ');
-              
-            if (typeof value === 'object' && value !== null) {
-              return (
-                <div key={key} className="space-y-2 border rounded p-3">
-                  <h4 className="text-sm font-medium">{formattedKey}</h4>
-                  {renderNestedForm(value, newPath)}
-                </div>
-              );
-            }
-            
-            return renderEditableField(formattedKey, newPath, value);
-          })}
-        </div>
-      );
-    };
-    
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Edit Document Data</h3>
-          <Button 
-            variant="success" 
-            size="sm" 
-            onClick={handleSaveEditedData}
-            className="flex items-center gap-2"
-          >
-            <Save size={16} /> Save Changes
-          </Button>
-        </div>
-        <div className="border rounded-md p-4">
-          {renderNestedForm(data)}
         </div>
       </div>
     );
