@@ -26,11 +26,16 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     // Clean any problematic data in the structuredData
     cleanStructuredData(structuredData);
     
+    // Ensure data is present in all expected locations to maximize compatibility
+    ensureDataAvailability(structuredData);
+    
     // Ensure the raw_response data is preserved for validation
     const extractedData = {
       structured_data: structuredData,
       raw_response: result
     };
+    
+    console.log('Final extracted_data structure:', JSON.stringify(extractedData.structured_data.patient, null, 2));
     
     // Try to update the document record multiple times if needed
     let updateSuccess = false;
@@ -127,6 +132,70 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
   }
 }
 
+// Helper function to ensure data is available in all expected locations
+function ensureDataAvailability(data: any) {
+  if (!data) return;
+  
+  // Ensure structured_data exists 
+  data.structured_data = data.structured_data || {};
+  
+  // Make sure patient data is in both places
+  if (data.patient && !data.structured_data.patient) {
+    data.structured_data.patient = {...data.patient};
+  } else if (!data.patient && data.structured_data.patient) {
+    data.patient = {...data.structured_data.patient};
+  } else if (!data.patient && !data.structured_data.patient) {
+    data.patient = {};
+    data.structured_data.patient = {};
+  }
+  
+  // Same for examination results
+  if (data.examination_results && !data.structured_data.examination_results) {
+    data.structured_data.examination_results = {...data.examination_results};
+  } else if (!data.examination_results && data.structured_data.examination_results) {
+    data.examination_results = {...data.structured_data.examination_results};
+  } else if (!data.examination_results && !data.structured_data.examination_results) {
+    data.examination_results = { test_results: {} };
+    data.structured_data.examination_results = { test_results: {} };
+  }
+  
+  // Ensure test results are accessible both ways
+  if (data.examination_results && data.examination_results.test_results) {
+    if (!data.structured_data.examination_results) {
+      data.structured_data.examination_results = {};
+    }
+    if (!data.structured_data.examination_results.test_results) {
+      data.structured_data.examination_results.test_results = {};
+    }
+    
+    // Copy test results to structured_data
+    Object.keys(data.examination_results.test_results).forEach(key => {
+      data.structured_data.examination_results.test_results[key] = 
+        data.examination_results.test_results[key];
+    });
+  }
+  
+  // Ensure certification data is available in both places
+  if (data.certification && !data.structured_data.certification) {
+    data.structured_data.certification = {...data.certification};
+  } else if (!data.certification && data.structured_data.certification) {
+    data.certification = {...data.structured_data.certification};
+  } else if (!data.certification && !data.structured_data.certification) {
+    data.certification = {};
+    data.structured_data.certification = {};
+  }
+  
+  // Ensure restrictions data is available in both places
+  if (data.restrictions && !data.structured_data.restrictions) {
+    data.structured_data.restrictions = {...data.restrictions};
+  } else if (!data.restrictions && data.structured_data.restrictions) {
+    data.restrictions = {...data.structured_data.restrictions};
+  } else if (!data.restrictions && !data.structured_data.restrictions) {
+    data.restrictions = {};
+    data.structured_data.restrictions = {};
+  }
+}
+
 // Helper function to clean any problematic data in the structured data
 function cleanStructuredData(data: any) {
   if (!data || typeof data !== 'object') return;
@@ -156,6 +225,10 @@ function cleanStructuredData(data: any) {
         data[key] = 'N/A';
       }
     }
+    // Convert boolean-like strings to actual booleans
+    else if (typeof data[key] === 'string' && (data[key].toLowerCase() === 'true' || data[key].toLowerCase() === 'false')) {
+      data[key] = data[key].toLowerCase() === 'true';
+    }
   });
   
   // Process examination_results.test_results specifically for certificate of fitness
@@ -171,6 +244,37 @@ function cleanStructuredData(data: any) {
             testResults[key] === '[]') {
           testResults[key] = 'N/A';
         }
+      }
+      // Convert test_done fields to boolean
+      else if (key.endsWith('_done')) {
+        if (typeof testResults[key] === 'string') {
+          testResults[key] = testResults[key].toLowerCase() === 'true';
+        } else if (testResults[key] === undefined || testResults[key] === null) {
+          testResults[key] = false;
+        }
+      }
+    });
+  }
+  
+  // Process restrictions to ensure they're all boolean values
+  if (data.restrictions) {
+    Object.keys(data.restrictions).forEach(key => {
+      if (typeof data.restrictions[key] === 'string') {
+        data.restrictions[key] = data.restrictions[key].toLowerCase() === 'true';
+      } else if (data.restrictions[key] === undefined || data.restrictions[key] === null) {
+        data.restrictions[key] = false;
+      }
+    });
+  }
+  
+  // Process certification to ensure fitness status fields are boolean values
+  if (data.certification) {
+    const certificationFields = ['fit', 'fit_with_restrictions', 'fit_with_condition', 'temporarily_unfit', 'unfit'];
+    certificationFields.forEach(field => {
+      if (typeof data.certification[field] === 'string') {
+        data.certification[field] = data.certification[field].toLowerCase() === 'true';
+      } else if (data.certification[field] === undefined || data.certification[field] === null) {
+        data.certification[field] = false;
       }
     });
   }

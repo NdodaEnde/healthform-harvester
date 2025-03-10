@@ -145,7 +145,7 @@ export function hasValue(data: any, fieldPath: string): boolean {
   return value !== undefined && value !== null && value !== '';
 }
 
-// Deep merge two objects
+// Deep merge two objects with improved handling of arrays and non-object values
 export function deepMergeObjects(target: any, source: any): any {
   // If either is not an object, return source
   if (typeof target !== 'object' || target === null || 
@@ -153,18 +153,35 @@ export function deepMergeObjects(target: any, source: any): any {
     return source;
   }
   
+  // Create a copy of target to avoid mutation
   const output = { ...target };
   
+  // Process all keys in source
   Object.keys(source).forEach(key => {
-    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-      if (!(key in target)) {
-        output[key] = source[key];
-      } else {
-        output[key] = deepMergeObjects(target[key], source[key]);
+    // If key is an object in both target and source, merge recursively
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) &&
+        output[key] && typeof output[key] === 'object' && !Array.isArray(output[key])) {
+      
+      output[key] = deepMergeObjects(output[key], source[key]);
+    } 
+    // Special handling for structured_data to ensure we don't lose any fields
+    else if (key === 'structured_data' && source[key] && typeof source[key] === 'object') {
+      if (!output[key] || typeof output[key] !== 'object') {
+        output[key] = {};
       }
-    } else {
-      // For arrays or primitive values, overwrite completely
-      if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+      output[key] = deepMergeObjects(output[key], source[key]);
+    }
+    // For arrays or when the key exists only in source, copy from source
+    else if (source[key] !== undefined && (
+             Array.isArray(source[key]) || 
+             source[key] !== null && 
+             source[key] !== '')) {
+      
+      // Special handling for boolean-like strings
+      if (typeof source[key] === 'string' && 
+          (source[key].toLowerCase() === 'true' || source[key].toLowerCase() === 'false')) {
+        output[key] = source[key].toLowerCase() === 'true';
+      } else {
         output[key] = source[key];
       }
     }
