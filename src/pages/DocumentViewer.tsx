@@ -167,6 +167,69 @@ const DocumentViewer = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
 
+  const toggleEditMode = () => {
+    if (!isEditing) {
+      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
+    } else {
+      setEditableData(null);
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleSaveEdits = async () => {
+    if (!editableData) return;
+    
+    try {
+      console.log('Saving edited data:', editableData);
+      
+      setDocument(prev => {
+        if (!prev) return null;
+        
+        const updatedDoc = {
+          ...prev,
+          extractedData: editableData,
+          jsonData: JSON.stringify(editableData, null, 2)
+        };
+        
+        if (id) {
+          sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+        }
+        
+        return updatedDoc;
+      });
+      
+      setIsEditing(false);
+      setEditableData(null);
+      
+      if (id) {
+        const { error } = await supabase
+          .from('documents')
+          .update({
+            extracted_data: editableData as Json,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error saving edited data to Supabase:', error);
+          toast.error("Failed to save changes", {
+            description: "There was an error saving your changes to the database."
+          });
+          return;
+        }
+      }
+      
+      toast.success("Changes saved", {
+        description: "Your edits have been saved successfully."
+      });
+    } catch (error) {
+      console.error('Exception saving edited data:', error);
+      toast.error("Failed to save changes", {
+        description: "There was an error saving your changes. Please try again."
+      });
+    }
+  };
+
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
     
@@ -948,24 +1011,11 @@ const DocumentViewer = () => {
                 Cancel Edit
               </Button>
             )}
-            {!isValidating && !isEditing && (
-              <Button 
-                variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
-                size="sm"
-                onClick={startValidation}
-              >
-                {document.validationStatus === 'validated' ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Edit Validation
-                  </>
-                ) : (
-                  <>
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Validate
-                  </>
-                )}
-              </Button>
+            {!isValidating && !isEditing && document.validationStatus === 'validated' && (
+              <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+                <Check className="h-3 w-3 mr-1" />
+                Validated
+              </Badge>
             )}
           </div>
         </div>
@@ -1158,3 +1208,4 @@ const DocumentViewer = () => {
 };
 
 export default DocumentViewer;
+
