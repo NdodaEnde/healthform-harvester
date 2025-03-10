@@ -1,20 +1,22 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { Json } from "@/integrations/supabase/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 // Define an interface for examination results to fix type errors
-interface ExaminationResults {
+// Make it extend Record<string, any> to include an index signature
+interface ExaminationResults extends Record<string, any> {
   test_results: Record<string, any>;
   type: Record<string, any>;
   date?: string; // Make date optional but explicitly defined
 }
 
 // Helper function to map extracted data to a consistent format that the validator expects
-export function mapExtractedDataToValidatorFormat(extractedData: any) {
+export function mapExtractedDataToValidatorFormat(extractedData: any): { structured_data: Record<string, any> } {
   console.log("Original data passed to mapper:", extractedData);
   
   if (!extractedData || typeof extractedData !== 'object') {

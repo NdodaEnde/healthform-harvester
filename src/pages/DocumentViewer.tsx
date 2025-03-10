@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
 import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
+import { Json } from "@/integrations/supabase/types";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -450,7 +451,7 @@ const DocumentViewer = () => {
   const handleValidationSave = async (validatedData: any) => {
     console.log('Saving validated data:', validatedData);
     
-    const processedData = mapExtractedDataToValidatorFormat(validatedData);
+    const processedData = mapExtractedDataToValidatorFormat(validatedData) as unknown as Json;
     
     setDocument(prev => {
       if (!prev) return null;
@@ -510,7 +511,7 @@ const DocumentViewer = () => {
     
     console.log("Preparing data for validator:", document.extractedData);
     
-    const formattedData = mapExtractedDataToValidatorFormat(document.extractedData);
+    const formattedData = mapExtractedDataToValidatorFormat(document.extractedData) as unknown as Record<string, any>;
     
     if (formattedData.structured_data.examination_results) {
       formattedData.structured_data.examination_results.test_results = 
@@ -797,7 +798,7 @@ const DocumentViewer = () => {
           <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
           <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
           <Button onClick={() => navigate("/dashboard")}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
+            <ChevronLeft className="h-4 w-4" />
             Back to Dashboard
           </Button>
         </div>
