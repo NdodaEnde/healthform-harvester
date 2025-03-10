@@ -158,6 +158,7 @@ const DocumentViewer = () => {
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [validatorData, setValidatorData] = useState<any>(null);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -297,15 +298,8 @@ const DocumentViewer = () => {
       if (documentData.document_type === 'certificate-of-fitness') {
         console.log('Before mapping:', extractedData);
         
-        if (
-          typeof extractedData === 'object' && 
-          extractedData !== null && 
-          !Array.isArray(extractedData) && 
-          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object')
-        ) {
-          extractedData = mapExtractedDataToValidatorFormat(extractedData);
-          console.log('After mapping:', extractedData);
-        }
+        extractedData = mapExtractedDataToValidatorFormat(extractedData);
+        console.log('After mapping:', extractedData);
       }
       
       let patientName = extractPatientName(extractedData);
@@ -456,13 +450,15 @@ const DocumentViewer = () => {
   const handleValidationSave = async (validatedData: any) => {
     console.log('Saving validated data:', validatedData);
     
+    const processedData = mapExtractedDataToValidatorFormat(validatedData);
+    
     setDocument(prev => {
       if (!prev) return null;
       
       const updatedDoc = {
         ...prev,
-        extractedData: validatedData,
-        jsonData: JSON.stringify(validatedData, null, 2),
+        extractedData: processedData,
+        jsonData: JSON.stringify(processedData, null, 2),
         validationStatus: 'validated'
       };
       
@@ -474,7 +470,7 @@ const DocumentViewer = () => {
     });
     
     setRefreshKey(prevKey => prevKey + 1);
-    
+    setValidatorData(null);
     setIsValidating(false);
     
     if (id) {
@@ -482,7 +478,7 @@ const DocumentViewer = () => {
         const { error } = await supabase
           .from('documents')
           .update({
-            extracted_data: validatedData,
+            extracted_data: processedData,
             is_validated: true,
             updated_at: new Date().toISOString()
           })
@@ -509,20 +505,39 @@ const DocumentViewer = () => {
     });
   };
 
+  const prepareValidatorData = () => {
+    if (!document) return null;
+    
+    console.log("Preparing data for validator:", document.extractedData);
+    
+    const formattedData = mapExtractedDataToValidatorFormat(document.extractedData);
+    
+    console.log("Formatted data for validator:", formattedData);
+    setValidatorData(formattedData);
+    return formattedData;
+  };
+
+  const startValidation = () => {
+    const data = prepareValidatorData();
+    console.log("Starting validation with data:", data);
+    setIsValidating(true);
+  };
+
   const renderExtractedData = () => {
     if (isValidating && document) {
-      console.log('Data passed to validator:', document.extractedData);
+      console.log('Data passed to validator:', validatorData || document.extractedData);
       
-      const formattedData = document.type === 'Certificate of Fitness' 
-        ? (document.extractedData.structured_data ? document.extractedData : mapExtractedDataToValidatorFormat(document.extractedData))
-        : document.extractedData;
+      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
       
       return (
         <CertificateValidator 
           documentId={document.id}
-          extractedData={formattedData}
+          extractedData={dataForValidator}
           onSave={handleValidationSave}
-          onCancel={() => setIsValidating(false)}
+          onCancel={() => {
+            setIsValidating(false);
+            setValidatorData(null);
+          }}
         />
       );
     }
@@ -847,7 +862,7 @@ const DocumentViewer = () => {
               <Button 
                 variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
                 size="sm"
-                onClick={() => setIsValidating(true)}
+                onClick={startValidation}
               >
                 {document.validationStatus === 'validated' ? (
                   <>
@@ -998,10 +1013,7 @@ const DocumentViewer = () => {
                 </Button>
                 {document.status === 'processed' && !isValidating && (
                   <Button
-                    onClick={() => {
-                      console.log('Starting validation with data:', document.extractedData);
-                      setIsValidating(true);
-                    }}
+                    onClick={startValidation}
                   >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                     {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}

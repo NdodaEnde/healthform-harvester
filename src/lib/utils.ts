@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -8,15 +7,46 @@ export function cn(...inputs: ClassValue[]) {
 
 // Helper function to map extracted data to a consistent format that the validator expects
 export function mapExtractedDataToValidatorFormat(extractedData: any) {
+  console.log("Original data passed to mapper:", extractedData);
+  
   if (!extractedData || typeof extractedData !== 'object') {
     return {
       structured_data: {
         patient: {},
         certification: {},
-        examination_results: { test_results: {} },
+        examination_results: { 
+          test_results: {},
+          type: {}
+        },
         restrictions: {}
       }
     };
+  }
+
+  // If it's already in the expected format with structured_data, just ensure all required fields exist
+  if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
+    console.log("Data already has structured_data format, ensuring all fields exist");
+    
+    const structuredData = {
+      structured_data: {
+        patient: { ...extractedData.structured_data.patient } || {},
+        certification: { ...extractedData.structured_data.certification } || {},
+        examination_results: { 
+          test_results: { ...extractedData.structured_data.examination_results?.test_results } || {},
+          type: { ...extractedData.structured_data.examination_results?.type } || {}
+        },
+        restrictions: { ...extractedData.structured_data.restrictions } || {}
+      }
+    };
+    
+    // Ensure examination date is set in examination_results
+    if (extractedData.structured_data.examination_results?.date) {
+      structuredData.structured_data.examination_results.date = 
+        extractedData.structured_data.examination_results.date;
+    }
+    
+    console.log("Returning already structured data with ensured fields:", structuredData);
+    return structuredData;
   }
 
   // Create a properly structured object
@@ -35,20 +65,21 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
   // Map patient details
   if (extractedData.patient) {
     structuredData.structured_data.patient = {
-      name: extractedData.patient.name || '',
-      id_number: extractedData.patient.employee_id || extractedData.patient.id_number || '',
-      company: extractedData.patient.company || '',
-      occupation: extractedData.patient.occupation || ''
+      name: extractedData.patient.name || extractedData.patient.full_name || '',
+      id_number: extractedData.patient.employee_id || extractedData.patient.id_number || extractedData.patient.id || '',
+      company: extractedData.patient.company || extractedData.patient.company_name || extractedData.patient.employer || '',
+      occupation: extractedData.patient.occupation || extractedData.patient.job_title || extractedData.patient.job || ''
     };
   }
 
   // Map certification details
   if (extractedData.certification) {
     structuredData.structured_data.certification = {
-      valid_until: extractedData.certification.valid_until || '',
+      examination_date: extractedData.certification.examination_date || extractedData.certification.date || '',
+      valid_until: extractedData.certification.valid_until || extractedData.certification.expiry_date || '',
       review_date: extractedData.certification.review_date || '',
       follow_up: extractedData.certification.follow_up || '',
-      comments: extractedData.certification.comments || '',
+      comments: extractedData.certification.comments || extractedData.certification.notes || '',
       // Fitness assessment
       fit: extractedData.certification.fit || false,
       fit_with_restrictions: extractedData.certification.fit_with_restrictions || false,
@@ -67,44 +98,50 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
       structuredData.structured_data.examination_results.date = extractedData.examination_results.date;
     }
     
-    // Map examination type
+    // Map examination type, with multiple name variations to catch different data formats
     structuredData.structured_data.examination_results.type = {
-      pre_employment: extractedData.examination_results.type?.pre_employment || false,
-      periodical: extractedData.examination_results.type?.periodical || false,
-      exit: extractedData.examination_results.type?.exit || false
+      pre_employment: extractedData.examination_results.type?.pre_employment || 
+                      extractedData.examination_results.pre_employment || 
+                      extractedData.examination_type?.pre_employment || false,
+      periodical: extractedData.examination_results.type?.periodical || 
+                 extractedData.examination_results.periodical || 
+                 extractedData.examination_type?.periodical || false,
+      exit: extractedData.examination_results.type?.exit || 
+            extractedData.examination_results.exit || 
+            extractedData.examination_type?.exit || false
     };
 
-    // Map test results
+    // Map test results with multiple name variations to catch different data formats
     if (extractedData.examination_results.test_results) {
       const testResults = extractedData.examination_results.test_results;
       
       structuredData.structured_data.examination_results.test_results = {
-        // Blood tests
-        bloods_done: testResults.bloods_done || false,
-        bloods_results: testResults.bloods_results || '',
+        // Blood tests - map multiple possible field names
+        bloods_done: testResults.bloods_done || testResults.blood_test_done || testResults.blood_done || false,
+        bloods_results: testResults.bloods_results || testResults.blood_test_results || testResults.blood_results || '',
         
-        // Vision tests
-        far_near_vision_done: testResults.far_near_vision_done || false,
-        far_near_vision_results: testResults.far_near_vision_results || '',
+        // Vision tests - map multiple possible field names
+        far_near_vision_done: testResults.far_near_vision_done || testResults.vision_test_done || testResults.vision_done || false,
+        far_near_vision_results: testResults.far_near_vision_results || testResults.vision_test_results || testResults.vision_results || '',
         
-        side_depth_done: testResults.side_depth_done || false,
-        side_depth_results: testResults.side_depth_results || '',
+        side_depth_done: testResults.side_depth_done || testResults.depth_test_done || testResults.depth_perception_done || false,
+        side_depth_results: testResults.side_depth_results || testResults.depth_test_results || testResults.depth_perception_results || '',
         
         night_vision_done: testResults.night_vision_done || false,
         night_vision_results: testResults.night_vision_results || '',
         
-        // Other tests
-        hearing_done: testResults.hearing_done || false,
-        hearing_results: testResults.hearing_results || '',
+        // Other tests - map multiple possible field names
+        hearing_done: testResults.hearing_done || testResults.hearing_test_done || false,
+        hearing_results: testResults.hearing_results || testResults.hearing_test_results || '',
         
-        heights_done: testResults.heights_done || false,
-        heights_results: testResults.heights_results || '',
+        heights_done: testResults.heights_done || testResults.heights_test_done || false,
+        heights_results: testResults.heights_results || testResults.heights_test_results || '',
         
-        lung_function_done: testResults.lung_function_done || false,
-        lung_function_results: testResults.lung_function_results || '',
+        lung_function_done: testResults.lung_function_done || testResults.lung_test_done || false,
+        lung_function_results: testResults.lung_function_results || testResults.lung_test_results || '',
         
-        x_ray_done: testResults.x_ray_done || false,
-        x_ray_results: testResults.x_ray_results || '',
+        x_ray_done: testResults.x_ray_done || testResults.xray_done || false,
+        x_ray_results: testResults.x_ray_results || testResults.xray_results || '',
         
         drug_screen_done: testResults.drug_screen_done || false,
         drug_screen_results: testResults.drug_screen_results || ''
@@ -112,20 +149,24 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
     }
   }
 
-  // Map restrictions
+  // Map restrictions with multiple field name variations
   if (extractedData.restrictions) {
     structuredData.structured_data.restrictions = {
       heights: extractedData.restrictions.heights || false,
-      dust_exposure: extractedData.restrictions.dust_exposure || false,
-      motorized_equipment: extractedData.restrictions.motorized_equipment || false,
-      wear_hearing_protection: extractedData.restrictions.wear_hearing_protection || false,
+      dust_exposure: extractedData.restrictions.dust_exposure || extractedData.restrictions.dust || false,
+      motorized_equipment: extractedData.restrictions.motorized_equipment || extractedData.restrictions.equipment || false,
+      wear_hearing_protection: extractedData.restrictions.wear_hearing_protection || 
+                             extractedData.restrictions.hearing_protection || false,
       confined_spaces: extractedData.restrictions.confined_spaces || false,
-      chemical_exposure: extractedData.restrictions.chemical_exposure || false,
-      wear_spectacles: extractedData.restrictions.wear_spectacles || false,
-      remain_on_treatment_for_chronic_conditions: extractedData.restrictions.remain_on_treatment_for_chronic_conditions || false
+      chemical_exposure: extractedData.restrictions.chemical_exposure || extractedData.restrictions.chemicals || false,
+      wear_spectacles: extractedData.restrictions.wear_spectacles || 
+                      extractedData.restrictions.spectacles || false,
+      remain_on_treatment_for_chronic_conditions: extractedData.restrictions.remain_on_treatment_for_chronic_conditions || 
+                                                extractedData.restrictions.chronic_treatment || false
     };
   }
 
+  console.log("Mapped data result:", structuredData);
   return structuredData;
 }
 
