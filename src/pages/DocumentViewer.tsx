@@ -267,6 +267,28 @@ const DocumentViewer = () => {
     return "No ID";
   };
 
+  const normalizeExtractedData = (data: any): any => {
+    if (!data) return {};
+    
+    if (typeof data === 'object' && data !== null) {
+      const normalizedData: any = {};
+      
+      for (const key in data) {
+        if (Array.isArray(data[key])) {
+          normalizedData[key] = data[key].map(normalizeExtractedData);
+        } else if (typeof data[key] === 'object' && data[key] !== null) {
+          normalizedData[key] = normalizeExtractedData(data[key]);
+        } else {
+          normalizedData[key] = data[key];
+        }
+      }
+      
+      return normalizedData;
+    }
+    
+    return data;
+  };
+
   const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
       const { data: documentData, error } = await supabase
@@ -291,31 +313,11 @@ const DocumentViewer = () => {
         .from('medical-documents')
         .createSignedUrl(documentData.file_path, 3600);
       
-      let extractedData = documentData.extracted_data || {};
+      let extractedData = normalizeExtractedData(documentData.extracted_data || {});
       let patientName = extractPatientName(extractedData);
       let patientId = extractPatientId(extractedData);
       
-      if (documentData.document_type === 'certificate-of-fitness') {
-        if (
-          typeof extractedData === 'object' && 
-          extractedData !== null && 
-          !Array.isArray(extractedData) && 
-          (!extractedData.structured_data || typeof extractedData.structured_data !== 'object') && 
-          extractedData.raw_response
-        ) {
-          extractedData = {
-            ...extractedData,
-            structured_data: {
-              patient: {
-                name: patientName,
-                id_number: patientId
-              }
-            }
-          };
-        }
-      }
-      
-      console.log('Processed extracted data:', extractedData);
+      console.log('Normalized extracted data:', extractedData);
       
       return {
         id: documentData.id,
@@ -434,13 +436,14 @@ const DocumentViewer = () => {
             }
           } else if (document.status !== data.status) {
             console.log('Document status changed:', data.status);
+            const normalizedData = normalizeExtractedData(data.extracted_data || {});
             setDocument(prev => ({
               ...prev,
               status: data.status,
-              extractedData: data.extracted_data || prev.extractedData,
-              patientName: extractPatientName(data.extracted_data) || prev.patientName,
-              patientId: extractPatientId(data.extracted_data) || prev.patientId,
-              jsonData: JSON.stringify(data.extracted_data || prev.extractedData, null, 2)
+              extractedData: normalizedData,
+              patientName: extractPatientName(normalizedData) || prev.patientName,
+              patientId: extractPatientId(normalizedData) || prev.patientId,
+              jsonData: JSON.stringify(normalizedData, null, 2)
             }));
           }
         }
@@ -458,13 +461,15 @@ const DocumentViewer = () => {
   }, [id, document?.status, processingTimeout, refreshKey]);
 
   const handleValidationSave = async (validatedData: any) => {
+    const normalizedData = normalizeExtractedData(validatedData);
+    
     setDocument(prev => {
       if (!prev) return null;
       
       const updatedDoc = {
         ...prev,
-        extractedData: validatedData,
-        jsonData: JSON.stringify(validatedData, null, 2),
+        extractedData: normalizedData,
+        jsonData: JSON.stringify(normalizedData, null, 2),
         validationStatus: 'validated'
       };
       
@@ -484,7 +489,7 @@ const DocumentViewer = () => {
         const { error } = await supabase
           .from('documents')
           .update({
-            extracted_data: validatedData,
+            extracted_data: normalizedData,
             is_validated: true,
             updated_at: new Date().toISOString()
           })

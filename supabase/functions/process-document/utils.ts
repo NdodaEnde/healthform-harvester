@@ -189,3 +189,91 @@ export function deepMergeObjects(target: any, source: any): any {
   
   return output;
 }
+
+// Normalize extracted data to ensure it has the expected structure for validation
+export function normalizeExtractedData(extractedData: any): any {
+  if (!extractedData) return { structured_data: {} };
+  
+  // Create a deep copy to avoid modifying the original
+  const normalizedData = JSON.parse(JSON.stringify(extractedData));
+  
+  // Ensure we have a structured_data object
+  if (!normalizedData.structured_data) {
+    normalizedData.structured_data = {};
+  }
+  
+  // Ensure all required sections exist
+  const requiredSections = ['patient', 'certification', 'examination_results', 'restrictions'];
+  for (const section of requiredSections) {
+    if (!normalizedData.structured_data[section]) {
+      normalizedData.structured_data[section] = {};
+    }
+  }
+  
+  // Ensure examination_results has test_results
+  if (!normalizedData.structured_data.examination_results.test_results) {
+    normalizedData.structured_data.examination_results.test_results = {};
+  }
+  
+  // Special handling for raw_response data
+  if (normalizedData.raw_response && normalizedData.raw_response.data) {
+    const markdown = normalizedData.raw_response.data.markdown;
+    
+    // Extract certificate information from markdown if present and not already in structured data
+    if (markdown) {
+      // Try to extract certificate data if not already present
+      if (Object.keys(normalizedData.structured_data.certification).length === 0) {
+        // Example: Extract certificate status
+        const fitnessMatch = markdown.match(/\*\*Fitness for Duty\*\*:\s*(.*?)(?=\n|\r|$)/i);
+        if (fitnessMatch && fitnessMatch[1]) {
+          normalizedData.structured_data.certification.fitness_status = fitnessMatch[1].trim();
+        }
+        
+        // Example: Extract certification date
+        const dateMatch = markdown.match(/\*\*Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
+        if (dateMatch && dateMatch[1]) {
+          normalizedData.structured_data.certification.date = dateMatch[1].trim();
+        }
+        
+        // Example: Extract certifying doctor
+        const doctorMatch = markdown.match(/\*\*Doctor.*?\*\*:\s*(.*?)(?=\n|\r|$)/i);
+        if (doctorMatch && doctorMatch[1]) {
+          normalizedData.structured_data.certification.doctor = doctorMatch[1].trim();
+        }
+      }
+      
+      // Extract restrictions if not already present
+      if (!normalizedData.structured_data.restrictions.items || 
+          normalizedData.structured_data.restrictions.items.length === 0) {
+        const restrictionsRegex = /\*\*Restrictions\*\*:[\s\S]*?(?=\n\n|\r\n\r\n|$)/i;
+        const restrictionsMatch = markdown.match(restrictionsRegex);
+        
+        if (restrictionsMatch && restrictionsMatch[0]) {
+          const restrictions = restrictionsMatch[0].replace(/\*\*Restrictions\*\*:\s*/i, '').trim();
+          if (restrictions && restrictions !== 'None' && restrictions !== 'N/A') {
+            normalizedData.structured_data.restrictions.items = [restrictions];
+          }
+        }
+      }
+      
+      // Extract test results if not already present
+      if (Object.keys(normalizedData.structured_data.examination_results.test_results).length === 0) {
+        // Look for common test patterns in the markdown
+        const testPatterns = [
+          { name: 'hearing_test', regex: /\*\*Hearing Test\*\*:\s*(.*?)(?=\n|\r|$)/i },
+          { name: 'vision_test', regex: /\*\*Vision Test\*\*:\s*(.*?)(?=\n|\r|$)/i },
+          { name: 'blood_pressure', regex: /\*\*Blood Pressure\*\*:\s*(.*?)(?=\n|\r|$)/i }
+        ];
+        
+        testPatterns.forEach(pattern => {
+          const match = markdown.match(pattern.regex);
+          if (match && match[1]) {
+            normalizedData.structured_data.examination_results.test_results[pattern.name] = match[1].trim();
+          }
+        });
+      }
+    }
+  }
+  
+  return normalizedData;
+}
