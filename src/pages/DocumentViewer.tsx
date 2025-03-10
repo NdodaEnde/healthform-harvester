@@ -309,8 +309,17 @@ const DocumentViewer = () => {
     if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
       const markdown = extractedData.raw_response.data.markdown;
       if (markdown) {
-        const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
-        if (idMatch && idMatch[1]) return idMatch[1].trim();
+        const idPatterns = [
+          /\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i,
+          /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i,
+          /ID No[.:]\s*(.*?)(?=\n|\r|$)/i,
+          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i
+        ];
+        
+        for (const pattern of idPatterns) {
+          const idMatch = markdown.match(pattern);
+          if (idMatch && idMatch[1]) return idMatch[1].trim();
+        }
       }
     }
     
@@ -319,8 +328,11 @@ const DocumentViewer = () => {
         if (!obj || typeof obj !== 'object') return null;
         
         if (obj.patient && obj.patient.id_number) return obj.patient.id_number;
+        if (obj.patient && obj.patient.employee_id) return obj.patient.employee_id;
         if (obj.patient && obj.patient.id) return obj.patient.id;
         if (obj.id_number && typeof obj.id_number === 'string') return obj.id_number;
+        if (obj.patient_id && typeof obj.patient_id === 'string') return obj.patient_id;
+        if (obj.employee_id && typeof obj.employee_id === 'string') return obj.employee_id;
         
         for (const key in obj) {
           if (typeof obj[key] === 'object' && obj[key] !== null) {
@@ -487,8 +499,16 @@ const DocumentViewer = () => {
                 <span className="font-semibold mr-1">ID NO:</span>
                 <Input 
                   className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                  value={patient.id_number || ''}
-                  onChange={(e) => updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value)}
+                  value={patient.id_number || patient.employee_id || patient.id || ''}
+                  onChange={(e) => {
+                    if ('id_number' in patient) {
+                      updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value);
+                    } else if ('employee_id' in patient) {
+                      updateEditableData(['structured_data', 'patient', 'employee_id'], e.target.value);
+                    } else {
+                      updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value);
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -1464,3 +1484,4 @@ const DocumentViewer = () => {
 };
 
 export default DocumentViewer;
+
