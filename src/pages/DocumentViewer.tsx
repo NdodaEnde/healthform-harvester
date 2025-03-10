@@ -1,4 +1,4 @@
-<lov-code>
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -865,3 +865,331 @@ const DocumentViewer = () => {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="test-vision-results">Results</Label>
+                  <Input 
+                    id="test-vision-results" 
+                    value={data.examination_results?.test_results?.far_near_vision_results || ''}
+                    onChange={(e) => updateEditableData('structured_data.examination_results.test_results.far_near_vision_results', e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="border p-3 rounded-md space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="test-audio" 
+                    checked={data.examination_results?.test_results?.audiogram_done || false}
+                    onCheckedChange={(checked) => 
+                      updateEditableData('structured_data.examination_results.test_results.audiogram_done', checked === true)
+                    }
+                  />
+                  <Label htmlFor="test-audio" className="cursor-pointer">Audiogram Done</Label>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="test-audio-results">Results</Label>
+                  <Input 
+                    id="test-audio-results" 
+                    value={data.examination_results?.test_results?.audiogram_results || ''}
+                    onChange={(e) => updateEditableData('structured_data.examination_results.test_results.audiogram_results', e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="border p-3 rounded-md space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="test-drugs" 
+                    checked={data.examination_results?.test_results?.drug_screen_done || false}
+                    onCheckedChange={(checked) => 
+                      updateEditableData('structured_data.examination_results.test_results.drug_screen_done', checked === true)
+                    }
+                  />
+                  <Label htmlFor="test-drugs" className="cursor-pointer">Drug Screen Done</Label>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="test-drugs-results">Results</Label>
+                  <Input 
+                    id="test-drugs-results" 
+                    value={data.examination_results?.test_results?.drug_screen_results || ''}
+                    onChange={(e) => updateEditableData('structured_data.examination_results.test_results.drug_screen_results', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <Separator />
+        
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Restrictions</h3>
+          <div className="space-y-2">
+            <Label htmlFor="restrictions">Restrictions</Label>
+            <Input 
+              id="restrictions" 
+              value={data.restrictions?.details || ''}
+              onChange={(e) => updateEditableData('structured_data.restrictions.details', e.target.value)}
+            />
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-2 pt-6">
+          <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button type="submit">
+            <Save className="h-4 w-4 mr-2" />
+            Save Changes
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
+  const renderExtractedData = () => {
+    if (!document || !document.extractedData) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No extracted data available</p>
+        </div>
+      );
+    }
+    
+    let dataToRender;
+    try {
+      dataToRender = typeof document.jsonData === 'string' 
+        ? JSON.parse(document.jsonData) 
+        : document.jsonData;
+    } catch (error) {
+      console.error('Error parsing JSON data:', error);
+      dataToRender = document.extractedData;
+    }
+    
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium">Extracted Data</h3>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setIsEditing(true)}
+            className="ml-auto"
+          >
+            <Edit className="h-4 w-4 mr-2" /> Edit Data
+          </Button>
+        </div>
+        <pre className="bg-slate-50 p-4 rounded-md text-xs overflow-x-auto">
+          {JSON.stringify(dataToRender, null, 2)}
+        </pre>
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container max-w-screen-lg mx-auto p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-center h-[80vh]">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading document data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!document) {
+    return (
+      <div className="container max-w-screen-lg mx-auto p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-center h-[80vh]">
+          <div className="flex flex-col items-center space-y-4">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <p className="text-muted-foreground">Document not found</p>
+            <Button onClick={() => navigate("/dashboard")}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container max-w-screen-lg mx-auto p-4 md:p-6 space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => navigate("/dashboard")}
+                className="p-0"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <h1 className="text-2xl font-bold truncate">{document.name}</h1>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant={document.status === 'processed' ? 'success' : 'secondary'}>
+                {document.status === 'processed' ? (
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                ) : (
+                  <Clock className="h-3 w-3 mr-1 animate-pulse" />
+                )}
+                {document.status === 'processed' ? 'Processed' : 'Processing...'}
+              </Badge>
+              <Badge variant="outline">{document.type}</Badge>
+              <Badge variant="outline" className="font-mono">ID: {document.patientId}</Badge>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+            <Button variant="outline" size="sm">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Link
+            </Button>
+            <Button variant="outline" size="sm">
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="space-y-4"
+        >
+          <Card>
+            <CardHeader className="p-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl flex items-center">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Document View
+                </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowOriginal(!showOriginal)}
+                >
+                  {showOriginal ? (
+                    <>
+                      <EyeOff className="h-4 w-4 mr-2" />
+                      Hide Original
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4 mr-2" />
+                      Show Original
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {showOriginal && (
+                <div className="h-[600px] overflow-hidden rounded-b-lg">
+                  {imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt={document.name}
+                      className="w-full h-full object-contain bg-slate-100"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                      <p className="text-muted-foreground">Image not available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {!showOriginal && document.type === 'Certificate of Fitness' && (
+                <div className="h-[600px] overflow-hidden rounded-b-lg bg-white border-t">
+                  <CertificateTemplate 
+                    data={mapExtractedDataToValidatorFormat(document.extractedData)}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="space-y-4"
+        >
+          <Card>
+            <CardHeader className="p-4">
+              <CardTitle className="text-xl">
+                {isEditing ? "Edit Data" : "Extracted Data"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <Tabs defaultValue="extracted" className="w-full">
+                <TabsList className="mb-4 grid grid-cols-3">
+                  <TabsTrigger value="extracted">Overview</TabsTrigger>
+                  <TabsTrigger value="certificate" disabled={document.type !== 'Certificate of Fitness'}>
+                    Certificate
+                  </TabsTrigger>
+                  <TabsTrigger value="questionnaire" disabled={document.type !== 'Medical Examination Questionnaire'}>
+                    Questionnaire
+                  </TabsTrigger>
+                </TabsList>
+                
+                <ScrollArea className="h-[640px] pr-4">
+                  <TabsContent value="extracted" className="mt-0 space-y-4">
+                    {isEditing ? renderEditForm() : renderExtractedData()}
+                  </TabsContent>
+                  
+                  <TabsContent value="certificate" className="mt-0">
+                    {isValidating ? (
+                      <CertificateValidator
+                        documentId={id || ''}
+                        extractedData={validatorData}
+                        onSave={handleValidationSave}
+                        onCancel={() => setIsValidating(false)}
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        <p className="text-muted-foreground">
+                          Review and validate the extracted certificate data.
+                        </p>
+                        <Button onClick={startValidation}>
+                          <ClipboardCheck className="h-4 w-4 mr-2" />
+                          Start Validation
+                        </Button>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="questionnaire" className="mt-0">
+                    <p className="text-muted-foreground">
+                      Questionnaire data validation is not implemented yet.
+                    </p>
+                  </TabsContent>
+                </ScrollArea>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default DocumentViewer;
