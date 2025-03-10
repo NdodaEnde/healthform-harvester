@@ -217,16 +217,27 @@ function cleanStructuredData(data: any) {
     } 
     // If it's an array, clean each item in the array
     else if (Array.isArray(data[key])) {
+      // Create a new array to store cleaned items
+      const cleanedArray: any[] = [];
+      
       data[key].forEach((item: any, index: number) => {
         if (typeof item === 'object') {
           cleanStructuredData(item);
+          cleanedArray.push(item);
         } else if (typeof item === 'string') {
           // Clean HTML table cells from array items
           if (item.includes('<td>[ ]</td>') || item === '[ ]' || item === '[]') {
-            data[key][index] = 'N/A';
+            cleanedArray.push('N/A');
+          } else {
+            cleanedArray.push(item);
           }
+        } else {
+          cleanedArray.push(item);
         }
       });
+      
+      // Replace the original array with the cleaned one
+      data[key] = cleanedArray;
     }
     // If it's a string, clean HTML table cells
     else if (typeof data[key] === 'string') {
