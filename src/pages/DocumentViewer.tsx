@@ -674,12 +674,19 @@ const DocumentViewer = () => {
     const extractedData = isEditing ? editedData : document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
+      if (isEditing) {
+        return renderEditableDataForm(extractedData);
+      }
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
           <CertificateTemplate extractedData={extractedData} />
         </div>
       );
+    }
+    
+    if (isEditing) {
+      return renderEditableDataForm(extractedData);
     }
     
     if (
@@ -699,16 +706,14 @@ const DocumentViewer = () => {
                 {Object.entries(structuredData.patient).map(([key, value]: [string, any]) => {
                   if (typeof value === 'object' && value !== null) return null;
                   
-                  return isEditing ? 
-                    renderEditableField(key, ['structured_data', 'patient', key], value) :
-                    (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{value !== null ? value.toString() : 'N/A'}</p>
-                      </div>
-                    );
+                  return (
+                    <div key={key} className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                      </p>
+                      <p className="font-medium">{value !== null ? value.toString() : 'N/A'}</p>
+                    </div>
+                  );
                 })}
               </div>
             </div>
@@ -729,16 +734,14 @@ const DocumentViewer = () => {
                       displayValue = value.join(', ');
                     }
                     
-                    return isEditing ? 
-                      renderEditableField(key, ['structured_data', 'medical_details', key], displayValue) :
-                      (
-                        <div key={key} className="space-y-1">
-                          <p className="text-sm text-muted-foreground">
-                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                          </p>
-                          <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                        </div>
-                      );
+                    return (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -760,16 +763,14 @@ const DocumentViewer = () => {
                       displayValue = value.join(', ');
                     }
                     
-                    return isEditing ? 
-                      renderEditableField(key, ['structured_data', 'examination_results', key], displayValue) :
-                      (
-                        <div key={key} className="space-y-1">
-                          <p className="text-sm text-muted-foreground">
-                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                          </p>
-                          <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                        </div>
-                      );
+                    return (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -791,16 +792,14 @@ const DocumentViewer = () => {
                       displayValue = value.join(', ');
                     }
                     
-                    return isEditing ? 
-                      renderEditableField(key, ['structured_data', 'certification', key], displayValue) :
-                      (
-                        <div key={key} className="space-y-1">
-                          <p className="text-sm text-muted-foreground">
-                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                          </p>
-                          <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                        </div>
-                      );
+                    return (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -900,290 +899,8 @@ const DocumentViewer = () => {
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-          <p className="text-muted-foreground">Loading document data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!document) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
-          <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => navigate("/dashboard")}>
-            <ChevronLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center space-x-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate("/dashboard")}
-          >
-            <ChevronLeft className="h-5 w-5" />
-            <span className="sr-only">Back</span>
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-medium truncate">{document.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {document.type} | {document.patientName || "Unknown Patient"}
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOriginal(!showOriginal)}
-            >
-              {showOriginal ? (
-                <>
-                  <EyeOff className="h-4 w-4 mr-2" />
-                  Hide Original
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Show Original
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (document.imageUrl) {
-                  window.open(document.imageUrl, '_blank');
-                } else {
-                  toast.error("Document preview not available");
-                }
-              }}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                navigator.clipboard.writeText(document.jsonData);
-                toast.success("JSON data copied to clipboard");
-              }}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copy JSON
-            </Button>
-            {!isValidating && (
-              <Button 
-                variant={isEditing ? "warning" : "default"}
-                size="sm"
-                onClick={toggleEditMode}
-              >
-                {isEditing ? (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                ) : (
-                  <>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Data
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-      
-      <main className="flex-1 container py-8">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-8"
-        >
-          {showOriginal && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Original Document</h2>
-                <Badge variant="outline" className="text-xs">
-                  {document?.name?.split('.').pop()?.toUpperCase() || 'PDF'}
-                </Badge>
-              </div>
-              <Card className="overflow-hidden h-[calc(100vh-220px)]">
-                <div className="relative w-full h-full">
-                  {imageUrl ? (
-                    <img 
-                      src={imageUrl} 
-                      alt="Document preview" 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </motion.div>
-          )}
-          
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
-            key={`document-content-${refreshKey}`}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {isEditing ? "Edit Document Data" : "Extracted Data"}
-              </h2>
-              {!isEditing && !isValidating && (
-                <Badge variant={document?.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
-                  {document?.status === 'processed' ? (
-                    <>
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Processed
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="h-3 w-3 mr-1 animate-pulse" />
-                      Processing
-                    </>
-                  )}
-                </Badge>
-              )}
-              {isEditing && (
-                <Badge variant="warning" className="text-xs">
-                  <Edit className="h-3 w-3 mr-1" />
-                  Editing
-                </Badge>
-              )}
-              {!isEditing && !isValidating && document?.validationStatus === 'validated' && (
-                <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
-                  <Check className="h-3 w-3 mr-1" />
-                  Validated
-                </Badge>
-              )}
-            </div>
-            
-            <Card className="flex-1 overflow-hidden">
-              {isValidating ? (
-                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
-                  {renderExtractedData()}
-                </CardContent>
-              ) : (
-                <>
-                  <Tabs defaultValue="structured">
-                    <CardContent className="pb-0 pt-4">
-                      <TabsList className="grid grid-cols-2">
-                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                        <TabsTrigger value="json">JSON</TabsTrigger>
-                      </TabsList>
-                    </CardContent>
-                    
-                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
-                      <TabsContent value="structured" className="m-0 h-full">
-                        <ScrollArea className="h-full pr-4">
-                          {renderExtractedData()}
-                        </ScrollArea>
-                      </TabsContent>
-                      
-                      <TabsContent value="json" className="m-0 h-full">
-                        <ScrollArea className="h-full">
-                          <div className="relative">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="absolute top-1 right-1"
-                              onClick={() => {
-                                navigator.clipboard.writeText(document?.jsonData || '');
-                                toast.success("JSON data copied to clipboard");
-                              }}
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </Button>
-                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                              {document?.jsonData}
-                            </pre>
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-                    </CardContent>
-                  </Tabs>
-                </>
-              )}
-            </Card>
-            
-            {!isValidating && (
-              <div className="flex justify-end space-x-2">
-                {isEditing && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditedData(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                )}
-                {!isEditing && (
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate("/dashboard")}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Back to Dashboard
-                  </Button>
-                )}
-                {document?.status === 'processed' && !isValidating && !isEditing && (
-                  <Button
-                    onClick={toggleEditMode}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Data
-                  </Button>
-                )}
-                {isEditing && (
-                  <Button
-                    variant="success"
-                    onClick={handleSaveEditedData}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </Button>
-                )}
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
-      </main>
-    </div>
-  );
-};
-
-export default DocumentViewer;
+  // Add this new function to render an editable form for all data types
+  const renderEditableDataForm = (data: any) => {
+    const renderNestedForm = (data: any, parentPath: string[] = []) => {
+      if (!data || typeof data !== 'object') {
+        return null;
