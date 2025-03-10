@@ -1,3 +1,4 @@
+
 import { extractPath, cleanValue, isChecked, hasValue, deepMergeObjects } from "../utils.ts";
 
 // Process certificate of fitness data from Landing AI response
@@ -8,6 +9,15 @@ export function processCertificateOfFitnessData(apiResponse: any) {
     const markdown = apiResponse.data?.markdown || '';
 
     console.log('Processing certificate of fitness data from API response');
+    console.log('API response result structure:', JSON.stringify(extractedData, null, 2));
+    
+    // Log markdown length and preview
+    if (markdown) {
+      console.log(`Markdown content length: ${markdown.length} characters`);
+      console.log(`Markdown preview (first 200 chars): ${markdown.substring(0, 200)}...`);
+    } else {
+      console.log('No markdown content found in API response');
+    }
     
     // Build structured data object from API response and markdown
     let structuredData = {

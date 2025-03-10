@@ -13,6 +13,15 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     const result = await apiClient.callLandingAI(file);
     console.log(`Landing AI API response received for document ID: ${documentId}`);
     
+    // Log the full API response for debugging
+    console.log(`API Response for document ID ${documentId}:`, JSON.stringify(result, null, 2));
+    
+    // If there's markdown data, log it separately for better debugging
+    if (result.data && result.data.markdown) {
+      console.log(`Markdown content from API for document ID ${documentId}:`);
+      console.log(result.data.markdown);
+    }
+    
     // Process and structure the data based on document type
     let structuredData;
     if (documentType === 'medical-questionnaire') {
