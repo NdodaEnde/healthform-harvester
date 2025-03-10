@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check
+  Check, Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
@@ -160,6 +163,8 @@ const DocumentViewer = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [validatorData, setValidatorData] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<any>(null);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -527,12 +532,211 @@ const DocumentViewer = () => {
   };
 
   const startValidation = () => {
-    const data = prepareValidatorData();
-    console.log("Starting validation with data:", data);
-    setIsValidating(true);
+    if (isEditing) {
+      handleSaveEdits();
+      return;
+    }
+    
+    setIsEditing(true);
+    setEditedData(structureEditableData(document?.extractedData));
+  };
+
+  // Function to convert the extracted data into an editable format
+  const structureEditableData = (data: any) => {
+    if (!data) return {};
+    
+    // If data already has a structured format we can use
+    if (data.structured_data) {
+      return JSON.parse(JSON.stringify(data));
+    }
+    
+    // If the data is in a different format, create a standard structure
+    return {
+      structured_data: {
+        patient: data.patient || {},
+        certification: data.certification || {},
+        examination_results: data.examination_results || {},
+        restrictions: data.restrictions || []
+      }
+    };
+  };
+
+  // Handle updating the edited data
+  const handleDataChange = (section: string, key: string, value: any) => {
+    setEditedData((prev: any) => {
+      if (!prev || !prev.structured_data) return prev;
+      
+      const updated = { ...prev };
+      
+      if (!updated.structured_data[section]) {
+        updated.structured_data[section] = {};
+      }
+      
+      updated.structured_data[section][key] = value;
+      return updated;
+    });
+  };
+
+  // Handle saving the edited data
+  const handleSaveEdits = async () => {
+    if (!editedData || !document || !id) {
+      toast.error("Error saving changes", {
+        description: "No edited data available to save."
+      });
+      return;
+    }
+    
+    try {
+      const processedData = editedData as unknown as Json;
+      
+      setDocument(prev => {
+        if (!prev) return null;
+        
+        const updatedDoc = {
+          ...prev,
+          extractedData: processedData,
+          jsonData: JSON.stringify(processedData, null, 2),
+          validationStatus: 'validated'
+        };
+        
+        if (id) {
+          sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+        }
+        
+        return updatedDoc;
+      });
+      
+      setRefreshKey(prevKey => prevKey + 1);
+      setIsEditing(false);
+      
+      if (id) {
+        const { error } = await supabase
+          .from('documents')
+          .update({
+            extracted_data: processedData,
+            is_validated: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error saving edited data to Supabase:', error);
+          toast.error("Failed to save changes", {
+            description: "There was an error saving your changes to the database."
+          });
+          return;
+        }
+      }
+      
+      toast.success("Changes saved", {
+        description: "The document data has been updated."
+      });
+    } catch (error) {
+      console.error('Exception saving edited data:', error);
+      toast.error("Failed to save changes", {
+        description: "There was an error saving your changes."
+      });
+    }
+  };
+
+  // Function to render input fields for editing
+  const renderEditableField = (section: string, key: string, value: any, label?: string) => {
+    const displayLabel = label || key.replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace('_', ' ');
+    
+    if (typeof value === 'string' && value.length > 50) {
+      return (
+        <div className="space-y-1 mb-3">
+          <Label htmlFor={`${section}-${key}`}>{displayLabel}</Label>
+          <Textarea
+            id={`${section}-${key}`}
+            value={value}
+            onChange={(e) => handleDataChange(section, key, e.target.value)}
+            className="min-h-[80px]"
+          />
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-1 mb-3">
+        <Label htmlFor={`${section}-${key}`}>{displayLabel}</Label>
+        <Input
+          id={`${section}-${key}`}
+          value={value !== null ? value.toString() : ''}
+          onChange={(e) => handleDataChange(section, key, e.target.value)}
+        />
+      </div>
+    );
+  };
+
+  // Render editable sections for structured data
+  const renderEditableSection = (sectionName: string, sectionData: Record<string, any>) => {
+    return (
+      <div className="space-y-3 mb-5">
+        <h3 className="text-lg font-medium">{sectionName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(sectionData).map(([key, value]) => {
+            if (typeof value === 'object' && value !== null) return null;
+            return (
+              <div key={key}>
+                {renderEditableField(sectionName, key, value)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const renderExtractedData = () => {
+    if (isEditing && document) {
+      // Render edit form
+      return (
+        <div className="space-y-5 px-1 py-2">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Edit Extracted Data</h2>
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits}>
+                <Check className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          </div>
+          
+          {editedData && editedData.structured_data && (
+            <div className="space-y-5">
+              {editedData.structured_data.patient && (
+                renderEditableSection('patient', editedData.structured_data.patient)
+              )}
+              
+              <Separator />
+              
+              {editedData.structured_data.certification && (
+                renderEditableSection('certification', editedData.structured_data.certification)
+              )}
+              
+              <Separator />
+              
+              {editedData.structured_data.examination_results && (
+                renderEditableSection('examination_results', editedData.structured_data.examination_results)
+              )}
+              
+              <Separator />
+              
+              {editedData.structured_data.medical_details && (
+                renderEditableSection('medical_details', editedData.structured_data.medical_details)
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
     if (isValidating && document) {
       console.log('Data passed to validator:', validatorData || document.extractedData);
       
@@ -712,329 +916,3 @@ const DocumentViewer = () => {
             <p className="text-sm text-muted-foreground mb-4">
               This displays the raw data extracted from your document using the Agentic Document Extraction API.
             </p>
-            
-            {extractedData.documents && (
-              <div className="space-y-4">
-                {extractedData.documents.map((doc: any, index: number) => (
-                  <div key={index} className="border rounded-md p-4">
-                    <h4 className="text-md font-medium mb-2">Document Segment {index + 1}</h4>
-                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                      {JSON.stringify(doc, null, 2)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {extractedData.text && (
-              <div className="border rounded-md p-4 mt-4">
-                <h4 className="text-md font-medium mb-2">Extracted Text</h4>
-                <div className="bg-muted p-3 rounded">
-                  <p className="whitespace-pre-wrap text-sm">{extractedData.text}</p>
-                </div>
-              </div>
-            )}
-            
-            {extractedData.tables && extractedData.tables.length > 0 && (
-              <div className="space-y-4 mt-4">
-                <h4 className="text-md font-medium">Extracted Tables</h4>
-                {extractedData.tables.map((table: any, index: number) => (
-                  <div key={index} className="border rounded-md p-4 overflow-x-auto">
-                    <h5 className="text-sm font-medium mb-2">Table {index + 1}</h5>
-                    <table className="min-w-full divide-y divide-border">
-                      <tbody className="divide-y divide-border">
-                        {table.data.map((row: any, rowIndex: number) => (
-                          <tr key={rowIndex}>
-                            {row.map((cell: any, cellIndex: number) => (
-                              <td key={cellIndex} className="px-3 py-2 text-sm">
-                                {cell}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            The data structure from this extraction doesn't match the expected format. 
-            Here's the raw data that was extracted:
-          </p>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-            {JSON.stringify(extractedData, null, 2)}
-          </pre>
-        </div>
-      </div>
-    );
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-          <p className="text-muted-foreground">Loading document data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!document) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
-          <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => navigate("/dashboard")}>
-            <ChevronLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center space-x-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate("/dashboard")}
-          >
-            <ChevronLeft className="h-5 w-5" />
-            <span className="sr-only">Back</span>
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-medium truncate">{document.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {document.type} | {document.patientName || "Unknown Patient"}
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOriginal(!showOriginal)}
-            >
-              {showOriginal ? (
-                <>
-                  <EyeOff className="h-4 w-4 mr-2" />
-                  Hide Original
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Show Original
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (document.imageUrl) {
-                  window.open(document.imageUrl, '_blank');
-                } else {
-                  toast.error("Document preview not available");
-                }
-              }}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                navigator.clipboard.writeText(document.jsonData);
-                toast.success("JSON data copied to clipboard");
-              }}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copy JSON
-            </Button>
-            {!isValidating && (
-              <Button 
-                variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
-                size="sm"
-                onClick={startValidation}
-              >
-                {document.validationStatus === 'validated' ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Edit Validation
-                  </>
-                ) : (
-                  <>
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Validate
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-      
-      <main className="flex-1 container py-8">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-8"
-        >
-          {showOriginal && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Original Document</h2>
-                <Badge variant="outline" className="text-xs">
-                  {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
-                </Badge>
-              </div>
-              <Card className="overflow-hidden h-[calc(100vh-220px)]">
-                <div className="relative w-full h-full">
-                  {imageUrl ? (
-                    <img 
-                      src={imageUrl} 
-                      alt="Document preview" 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </motion.div>
-          )}
-          
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
-            key={`document-content-${refreshKey}`}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {isValidating ? "Validate Document Data" : "Extracted Data"}
-              </h2>
-              {!isValidating && (
-                <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
-                  {document.status === 'processed' ? (
-                    <>
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Processed
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="h-3 w-3 mr-1 animate-pulse" />
-                      Processing
-                    </>
-                  )}
-                </Badge>
-              )}
-              {!isValidating && document.validationStatus === 'validated' && (
-                <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
-                  <Check className="h-3 w-3 mr-1" />
-                  Validated
-                </Badge>
-              )}
-            </div>
-            
-            <Card className="flex-1 overflow-hidden">
-              {isValidating ? (
-                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
-                  {renderExtractedData()}
-                </CardContent>
-              ) : (
-                <>
-                  <Tabs defaultValue="structured">
-                    <CardContent className="pb-0 pt-4">
-                      <TabsList className="grid grid-cols-2">
-                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                        <TabsTrigger value="json">JSON</TabsTrigger>
-                      </TabsList>
-                    </CardContent>
-                    
-                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
-                      <TabsContent value="structured" className="m-0 h-full">
-                        <ScrollArea className="h-full pr-4">
-                          {renderExtractedData()}
-                        </ScrollArea>
-                      </TabsContent>
-                      
-                      <TabsContent value="json" className="m-0 h-full">
-                        <ScrollArea className="h-full">
-                          <div className="relative">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="absolute top-1 right-1"
-                              onClick={() => {
-                                navigator.clipboard.writeText(document.jsonData);
-                                toast.success("JSON data copied to clipboard");
-                              }}
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </Button>
-                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                              {document.jsonData}
-                            </pre>
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-                    </CardContent>
-                  </Tabs>
-                </>
-              )}
-            </Card>
-            
-            {!isValidating && (
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/dashboard")}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-                {document.status === 'processed' && !isValidating && (
-                  <Button
-                    onClick={startValidation}
-                  >
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
-                  </Button>
-                )}
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
-      </main>
-    </div>
-  );
-};
-
-export default DocumentViewer;
