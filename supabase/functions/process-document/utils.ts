@@ -197,6 +197,8 @@ export function normalizeExtractedData(extractedData: any): any {
   // Create a deep copy to avoid modifying the original
   const normalizedData = JSON.parse(JSON.stringify(extractedData));
   
+  console.log("Normalizing extracted data:", normalizedData);
+  
   // Ensure we have a structured_data object
   if (!normalizedData.structured_data) {
     normalizedData.structured_data = {};
@@ -215,30 +217,81 @@ export function normalizeExtractedData(extractedData: any): any {
     normalizedData.structured_data.examination_results.test_results = {};
   }
   
+  // If certification data exists at the top level but not in structured_data, move it
+  if (normalizedData.certification && 
+      Object.keys(normalizedData.structured_data.certification).length === 0) {
+    normalizedData.structured_data.certification = {...normalizedData.certification};
+  }
+  
+  // If restrictions data exists at the top level but not in structured_data, move it
+  if (normalizedData.restrictions && 
+      Object.keys(normalizedData.structured_data.restrictions).length === 0) {
+    normalizedData.structured_data.restrictions = {...normalizedData.restrictions};
+  }
+  
+  // If examination_results data exists at the top level but not in structured_data, move it
+  if (normalizedData.examination_results && 
+      Object.keys(normalizedData.structured_data.examination_results).length === 0) {
+    normalizedData.structured_data.examination_results = {...normalizedData.examination_results};
+  }
+  
+  // Move test_results if they exist at the wrong level
+  if (normalizedData.examination_results && normalizedData.examination_results.test_results &&
+      !normalizedData.structured_data.examination_results.test_results) {
+    normalizedData.structured_data.examination_results.test_results = {...normalizedData.examination_results.test_results};
+  }
+  
   // Special handling for raw_response data
   if (normalizedData.raw_response && normalizedData.raw_response.data) {
     const markdown = normalizedData.raw_response.data.markdown;
     
     // Extract certificate information from markdown if present and not already in structured data
     if (markdown) {
+      console.log("Processing markdown data for certification fields");
+      
       // Try to extract certificate data if not already present
       if (Object.keys(normalizedData.structured_data.certification).length === 0) {
-        // Example: Extract certificate status
+        // Extract certificate fitness status
         const fitnessMatch = markdown.match(/\*\*Fitness for Duty\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (fitnessMatch && fitnessMatch[1]) {
           normalizedData.structured_data.certification.fitness_status = fitnessMatch[1].trim();
         }
         
-        // Example: Extract certification date
+        // Extract certification date
         const dateMatch = markdown.match(/\*\*Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (dateMatch && dateMatch[1]) {
           normalizedData.structured_data.certification.date = dateMatch[1].trim();
         }
         
-        // Example: Extract certifying doctor
+        // Extract certifying doctor
         const doctorMatch = markdown.match(/\*\*Doctor.*?\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (doctorMatch && doctorMatch[1]) {
           normalizedData.structured_data.certification.doctor = doctorMatch[1].trim();
+        }
+        
+        // Extract specific fitness status
+        const fitPattern = /\*\*(Fit|SUITABLE FOR WORK)\*\*/i;
+        const fitWithRestrictionsPattern = /\*\*(Fit with restrictions|Fit with Limitation|Work with Restriction)\*\*/i;
+        const temporarilyUnfitPattern = /\*\*(Temporarily unfit|Temporarily Unsuitable|Unfit Temporarily)\*\*/i;
+        const unfitPattern = /\*\*(Unfit|Unsuitable for Work|Not Fit)\*\*/i;
+        
+        normalizedData.structured_data.certification.fit = fitPattern.test(markdown);
+        normalizedData.structured_data.certification.fit_with_restrictions = fitWithRestrictionsPattern.test(markdown);
+        normalizedData.structured_data.certification.temporarily_unfit = temporarilyUnfitPattern.test(markdown);
+        normalizedData.structured_data.certification.unfit = unfitPattern.test(markdown);
+        
+        // Look for checkboxes
+        if (markdown.match(/\[x\]\s*Fit\b/i) || markdown.match(/\[X\]\s*Fit\b/i)) {
+          normalizedData.structured_data.certification.fit = true;
+        }
+        if (markdown.match(/\[x\]\s*Fit with restriction/i) || markdown.match(/\[X\]\s*Fit with restriction/i)) {
+          normalizedData.structured_data.certification.fit_with_restrictions = true;
+        }
+        if (markdown.match(/\[x\]\s*Temporarily unfit/i) || markdown.match(/\[X\]\s*Temporarily unfit/i)) {
+          normalizedData.structured_data.certification.temporarily_unfit = true;
+        }
+        if (markdown.match(/\[x\]\s*Unfit\b/i) || markdown.match(/\[X\]\s*Unfit\b/i)) {
+          normalizedData.structured_data.certification.unfit = true;
         }
       }
       
@@ -274,6 +327,14 @@ export function normalizeExtractedData(extractedData: any): any {
       }
     }
   }
+  
+  console.log("Normalized data structure:", 
+    JSON.stringify({
+      certification: normalizedData.structured_data.certification,
+      restrictions: normalizedData.structured_data.restrictions,
+      examination_results: normalizedData.structured_data.examination_results
+    }, null, 2)
+  );
   
   return normalizedData;
 }
