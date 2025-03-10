@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check
+  Check, Edit, Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input"; 
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
@@ -160,6 +163,8 @@ const DocumentViewer = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [validatorData, setValidatorData] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<any>(null);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -532,6 +537,113 @@ const DocumentViewer = () => {
     setIsValidating(true);
   };
 
+  const toggleEditMode = () => {
+    if (isEditing) {
+      handleSaveEditedData();
+    } else {
+      setIsEditing(true);
+      setEditedData(JSON.parse(JSON.stringify(document.extractedData)));
+    }
+  };
+
+  const handleSaveEditedData = async () => {
+    try {
+      console.log('Saving edited data:', editedData);
+      
+      if (id) {
+        const { error } = await supabase
+          .from('documents')
+          .update({
+            extracted_data: editedData,
+            is_validated: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error saving edited data to Supabase:', error);
+          toast.error("Failed to save changes", {
+            description: "There was an error saving your changes to the database."
+          });
+          return;
+        }
+      }
+      
+      setDocument(prev => {
+        if (!prev) return null;
+        
+        return {
+          ...prev,
+          extractedData: editedData,
+          jsonData: JSON.stringify(editedData, null, 2),
+          validationStatus: 'validated'
+        };
+      });
+      
+      setIsEditing(false);
+      setRefreshKey(prevKey => prevKey + 1);
+      
+      toast.success("Changes saved successfully", {
+        description: "Your edits have been saved to the database."
+      });
+    } catch (error) {
+      console.error('Exception saving edited data:', error);
+      toast.error("Failed to save changes", {
+        description: "There was an error processing your request."
+      });
+    }
+  };
+
+  const handleInputChange = (path: string[], value: any) => {
+    setEditedData(prevData => {
+      const newData = JSON.parse(JSON.stringify(prevData));
+      let current = newData;
+      
+      for (let i = 0; i < path.length - 1; i++) {
+        if (!current[path[i]]) {
+          current[path[i]] = {};
+        }
+        current = current[path[i]];
+      }
+      
+      current[path[path.length - 1]] = value;
+      return newData;
+    });
+  };
+
+  const renderEditableField = (label: string, path: string[], value: any) => {
+    const fieldId = path.join('-');
+    const formattedLabel = label.replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace('_', ' ');
+    
+    if (typeof value === 'string' && value.length > 50) {
+      return (
+        <div key={fieldId} className="space-y-1 mb-4">
+          <Label htmlFor={fieldId}>{formattedLabel}</Label>
+          <Textarea
+            id={fieldId}
+            value={value}
+            onChange={(e) => handleInputChange(path, e.target.value)}
+            className="resize-y"
+          />
+        </div>
+      );
+    }
+    
+    return (
+      <div key={fieldId} className="space-y-1 mb-4">
+        <Label htmlFor={fieldId}>{formattedLabel}</Label>
+        <Input
+          id={fieldId}
+          type="text"
+          value={value !== null ? value.toString() : ''}
+          onChange={(e) => handleInputChange(path, e.target.value)}
+        />
+      </div>
+    );
+  };
+
   const renderExtractedData = () => {
     if (isValidating && document) {
       console.log('Data passed to validator:', validatorData || document.extractedData);
@@ -559,7 +671,7 @@ const DocumentViewer = () => {
       );
     }
     
-    const extractedData = document.extractedData;
+    const extractedData = isEditing ? editedData : document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
       console.log("Passing to CertificateTemplate:", extractedData);
@@ -586,14 +698,17 @@ const DocumentViewer = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(structuredData.patient).map(([key, value]: [string, any]) => {
                   if (typeof value === 'object' && value !== null) return null;
-                  return (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">
-                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                      </p>
-                      <p className="font-medium">{value !== null ? value.toString() : 'N/A'}</p>
-                    </div>
-                  );
+                  
+                  return isEditing ? 
+                    renderEditableField(key, ['structured_data', 'patient', key], value) :
+                    (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                        </p>
+                        <p className="font-medium">{value !== null ? value.toString() : 'N/A'}</p>
+                      </div>
+                    );
                 })}
               </div>
             </div>
@@ -607,21 +722,23 @@ const DocumentViewer = () => {
                 <h3 className="text-lg font-medium mb-3">Medical Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(structuredData.medical_details).map(([key, value]: [string, any]) => {
+                    if (typeof value === 'object' && value !== null) return null;
+                    
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
-                    } else if (typeof value === 'object' && value !== null) {
-                      return null;
                     }
                     
-                    return (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                      </div>
-                    );
+                    return isEditing ? 
+                      renderEditableField(key, ['structured_data', 'medical_details', key], displayValue) :
+                      (
+                        <div key={key} className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                          </p>
+                          <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                        </div>
+                      );
                   })}
                 </div>
               </div>
@@ -636,21 +753,23 @@ const DocumentViewer = () => {
                 <h3 className="text-lg font-medium mb-3">Examination Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(structuredData.examination_results).map(([key, value]: [string, any]) => {
+                    if (typeof value === 'object' && value !== null) return null;
+                    
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
-                    } else if (typeof value === 'object' && value !== null) {
-                      return null;
                     }
                     
-                    return (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                      </div>
-                    );
+                    return isEditing ? 
+                      renderEditableField(key, ['structured_data', 'examination_results', key], displayValue) :
+                      (
+                        <div key={key} className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                          </p>
+                          <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                        </div>
+                      );
                   })}
                 </div>
               </div>
@@ -665,21 +784,23 @@ const DocumentViewer = () => {
                 <h3 className="text-lg font-medium mb-3">Certification</h3>
                 <div className="grid grid-cols-1 gap-4">
                   {Object.entries(structuredData.certification).map(([key, value]: [string, any]) => {
+                    if (typeof value === 'object' && value !== null) return null;
+                    
                     let displayValue = value;
                     if (Array.isArray(value)) {
                       displayValue = value.join(', ');
-                    } else if (typeof value === 'object' && value !== null) {
-                      return null;
                     }
                     
-                    return (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
-                        </p>
-                        <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
-                      </div>
-                    );
+                    return isEditing ? 
+                      renderEditableField(key, ['structured_data', 'certification', key], displayValue) :
+                      (
+                        <div key={key} className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace('_', ' ')}
+                          </p>
+                          <p className="font-medium">{displayValue !== null ? displayValue.toString() : 'N/A'}</p>
+                        </div>
+                      );
                   })}
                 </div>
               </div>
@@ -869,19 +990,19 @@ const DocumentViewer = () => {
             </Button>
             {!isValidating && (
               <Button 
-                variant={document.validationStatus === 'validated' ? 'outline' : 'default'}
+                variant={isEditing ? "warning" : "default"}
                 size="sm"
-                onClick={startValidation}
+                onClick={toggleEditMode}
               >
-                {document.validationStatus === 'validated' ? (
+                {isEditing ? (
                   <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Edit Validation
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
                   </>
                 ) : (
                   <>
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Validate
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Data
                   </>
                 )}
               </Button>
@@ -937,9 +1058,9 @@ const DocumentViewer = () => {
           >
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">
-                {isValidating ? "Validate Document Data" : "Extracted Data"}
+                {isEditing ? "Edit Document Data" : "Extracted Data"}
               </h2>
-              {!isValidating && (
+              {!isEditing && !isValidating && (
                 <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
                   {document.status === 'processed' ? (
                     <>
@@ -954,7 +1075,13 @@ const DocumentViewer = () => {
                   )}
                 </Badge>
               )}
-              {!isValidating && document.validationStatus === 'validated' && (
+              {isEditing && (
+                <Badge variant="warning" className="text-xs">
+                  <Edit className="h-3 w-3 mr-1" />
+                  Editing
+                </Badge>
+              )}
+              {!isEditing && !isValidating && document.validationStatus === 'validated' && (
                 <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
                   <Check className="h-3 w-3 mr-1" />
                   Validated
@@ -1013,19 +1140,41 @@ const DocumentViewer = () => {
             
             {!isValidating && (
               <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/dashboard")}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-                {document.status === 'processed' && !isValidating && (
+                {isEditing && (
                   <Button
-                    onClick={startValidation}
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditedData(null);
+                    }}
                   >
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
+                    Cancel
+                  </Button>
+                )}
+                {!isEditing && (
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/dashboard")}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-2" />
+                    Back to Dashboard
+                  </Button>
+                )}
+                {document.status === 'processed' && !isValidating && !isEditing && (
+                  <Button
+                    onClick={toggleEditMode}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Data
+                  </Button>
+                )}
+                {isEditing && (
+                  <Button
+                    variant="success"
+                    onClick={handleSaveEditedData}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
                   </Button>
                 )}
               </div>
