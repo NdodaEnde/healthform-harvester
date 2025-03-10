@@ -623,7 +623,7 @@ const DocumentViewer = () => {
           <Label htmlFor={fieldId}>{formattedLabel}</Label>
           <Textarea
             id={fieldId}
-            value={value}
+            value={value || ''}
             onChange={(e) => handleInputChange(path, e.target.value)}
             className="resize-y"
           />
@@ -637,7 +637,7 @@ const DocumentViewer = () => {
         <Input
           id={fieldId}
           type="text"
-          value={value !== null ? value.toString() : ''}
+          value={value !== null && value !== undefined ? value.toString() : ''}
           onChange={(e) => handleInputChange(path, e.target.value)}
         />
       </div>
@@ -1029,7 +1029,7 @@ const DocumentViewer = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Original Document</h2>
                 <Badge variant="outline" className="text-xs">
-                  {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
+                  {document?.name?.split('.').pop()?.toUpperCase() || 'PDF'}
                 </Badge>
               </div>
               <Card className="overflow-hidden h-[calc(100vh-220px)]">
@@ -1061,8 +1061,8 @@ const DocumentViewer = () => {
                 {isEditing ? "Edit Document Data" : "Extracted Data"}
               </h2>
               {!isEditing && !isValidating && (
-                <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
-                  {document.status === 'processed' ? (
+                <Badge variant={document?.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
+                  {document?.status === 'processed' ? (
                     <>
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Processed
@@ -1081,7 +1081,7 @@ const DocumentViewer = () => {
                   Editing
                 </Badge>
               )}
-              {!isEditing && !isValidating && document.validationStatus === 'validated' && (
+              {!isEditing && !isValidating && document?.validationStatus === 'validated' && (
                 <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
                   <Check className="h-3 w-3 mr-1" />
                   Validated
@@ -1119,7 +1119,7 @@ const DocumentViewer = () => {
                               size="sm" 
                               className="absolute top-1 right-1"
                               onClick={() => {
-                                navigator.clipboard.writeText(document.jsonData);
+                                navigator.clipboard.writeText(document?.jsonData || '');
                                 toast.success("JSON data copied to clipboard");
                               }}
                             >
@@ -1127,7 +1127,7 @@ const DocumentViewer = () => {
                               Copy
                             </Button>
                             <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                              {document.jsonData}
+                              {document?.jsonData}
                             </pre>
                           </div>
                         </ScrollArea>
@@ -1160,7 +1160,7 @@ const DocumentViewer = () => {
                     Back to Dashboard
                   </Button>
                 )}
-                {document.status === 'processed' && !isValidating && !isEditing && (
+                {document?.status === 'processed' && !isValidating && !isEditing && (
                   <Button
                     onClick={toggleEditMode}
                   >
