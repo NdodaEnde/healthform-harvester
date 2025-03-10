@@ -541,16 +541,13 @@ const DocumentViewer = () => {
     setEditedData(structureEditableData(document?.extractedData));
   };
 
-  // Function to convert the extracted data into an editable format
   const structureEditableData = (data: any) => {
     if (!data) return {};
     
-    // If data already has a structured format we can use
     if (data.structured_data) {
       return JSON.parse(JSON.stringify(data));
     }
     
-    // If the data is in a different format, create a standard structure
     return {
       structured_data: {
         patient: data.patient || {},
@@ -561,7 +558,6 @@ const DocumentViewer = () => {
     };
   };
 
-  // Handle updating the edited data
   const handleDataChange = (section: string, key: string, value: any) => {
     setEditedData((prev: any) => {
       if (!prev || !prev.structured_data) return prev;
@@ -577,7 +573,6 @@ const DocumentViewer = () => {
     });
   };
 
-  // Handle saving the edited data
   const handleSaveEdits = async () => {
     if (!editedData || !document || !id) {
       toast.error("Error saving changes", {
@@ -639,7 +634,6 @@ const DocumentViewer = () => {
     }
   };
 
-  // Function to render input fields for editing
   const renderEditableField = (section: string, key: string, value: any, label?: string) => {
     const displayLabel = label || key.replace(/([A-Z])/g, ' $1')
       .replace(/^./, str => str.toUpperCase())
@@ -671,7 +665,6 @@ const DocumentViewer = () => {
     );
   };
 
-  // Render editable sections for structured data
   const renderEditableSection = (sectionName: string, sectionData: Record<string, any>) => {
     return (
       <div className="space-y-3 mb-5">
@@ -692,7 +685,6 @@ const DocumentViewer = () => {
 
   const renderExtractedData = () => {
     if (isEditing && document) {
-      // Render edit form
       return (
         <div className="space-y-5 px-1 py-2">
           <div className="flex justify-between items-center mb-4">
@@ -916,3 +908,218 @@ const DocumentViewer = () => {
             <p className="text-sm text-muted-foreground mb-4">
               This displays the raw data extracted from your document using the Agentic Document Extraction API.
             </p>
+            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+              {JSON.stringify(extractedData, null, 2)}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-3">Raw Extracted Information</h3>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+            {JSON.stringify(extractedData, null, 2)}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="container max-w-screen-xl mx-auto py-4 px-4 md:px-6">
+      <div className="flex items-center mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(-1)}
+          className="mr-4"
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <h1 className="text-2xl font-bold">{document?.name || 'Loading document...'}</h1>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : document ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between bg-muted/50 p-4">
+                <div className="flex items-center space-x-4">
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium">{document.type}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded on {new Date(document.uploadedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="ghost" size="icon">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => {
+                    if (document.jsonData) {
+                      navigator.clipboard.writeText(document.jsonData);
+                      toast.success("JSON data copied to clipboard");
+                    }
+                  }}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <Badge className={document.status === 'processed' ? 'bg-green-500' : 'bg-amber-500'}>
+                      {document.status === 'processed' ? (
+                        <>
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Processed
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-3 w-3 mr-1" />
+                          Processing
+                        </>
+                      )}
+                    </Badge>
+                  </div>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowOriginal(!showOriginal)}
+                  >
+                    {showOriginal ? (
+                      <>
+                        <ClipboardCheck className="h-4 w-4 mr-2" />
+                        Show Extracted
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Show Original
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+                {showOriginal ? (
+                  <div className="rounded border overflow-hidden h-[calc(100vh-400px)]">
+                    {document.status === 'processing' ? (
+                      <div className="flex flex-col items-center justify-center h-full space-y-4">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <p className="text-muted-foreground text-sm">Processing document...</p>
+                      </div>
+                    ) : !imageUrl ? (
+                      <div className="flex flex-col items-center justify-center h-full space-y-4">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-muted-foreground text-sm">Preview not available</p>
+                      </div>
+                    ) : (
+                      <img 
+                        src={imageUrl} 
+                        alt={document.name}
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4 h-[calc(100vh-400px)] overflow-y-auto">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold">Patient Information</h2>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Name</p>
+                          <p className="font-medium">{document.patientName}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">ID</p>
+                          <p className="font-medium">{document.patientId}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h2 className="text-xl font-semibold">Extracted Data</h2>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={startValidation}
+                        >
+                          {isEditing ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Save Changes
+                            </>
+                          ) : (
+                            <>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Validate Data
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      
+                      <Tabs defaultValue="structured">
+                        <TabsList className="mb-4">
+                          <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                          <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="structured" className="mt-0">
+                          <ScrollArea className="h-[calc(100vh-550px)]">
+                            {renderExtractedData()}
+                          </ScrollArea>
+                        </TabsContent>
+                        
+                        <TabsContent value="raw" className="mt-0">
+                          <ScrollArea className="h-[calc(100vh-550px)]">
+                            <div className="p-4 rounded bg-muted">
+                              <pre className="text-xs overflow-auto">
+                                {document.jsonData}
+                              </pre>
+                            </div>
+                          </ScrollArea>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center space-y-4">
+            <AlertCircle className="h-8 w-8 text-muted-foreground" />
+            <p className="text-muted-foreground">Document not found</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DocumentViewer;
