@@ -1,4 +1,3 @@
-
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
@@ -14,7 +13,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     console.log(`Landing AI API response received for document ID: ${documentId}`);
     
     // Log the full API response for debugging
-    console.log(`API Response for document ID ${documentId}:`, JSON.stringify(result, null, 2));
+    console.log(`Full API Response for document ID ${documentId}:`, JSON.stringify(result, null, 2));
     
     // If there's markdown data, log it separately for better debugging
     if (result.data && result.data.markdown) {
@@ -215,25 +214,21 @@ function cleanStructuredData(data: any) {
     if (data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
       cleanStructuredData(data[key]);
     } 
-    // If it's an array, clean each item in the array
+    // If it's an array, safely clean each item in the array
     else if (Array.isArray(data[key])) {
-      // Create a new array to store cleaned items
-      const cleanedArray: any[] = [];
-      
-      data[key].forEach((item: any, index: number) => {
-        if (typeof item === 'object') {
+      // Create a new array with cleaned values instead of modifying in place
+      const cleanedArray = data[key].map((item: any) => {
+        if (typeof item === 'object' && item !== null) {
           cleanStructuredData(item);
-          cleanedArray.push(item);
+          return item;
         } else if (typeof item === 'string') {
           // Clean HTML table cells from array items
-          if (item.includes('<td>[ ]</td>') || item === '[ ]' || item === '[]') {
-            cleanedArray.push('N/A');
-          } else {
-            cleanedArray.push(item);
+          if (item.includes('<td>[ ]</td>') || item === '[ ]' || item === '[]' || item === 'None') {
+            return 'N/A';
           }
-        } else {
-          cleanedArray.push(item);
+          return item;
         }
+        return item;
       });
       
       // Replace the original array with the cleaned one
@@ -241,7 +236,7 @@ function cleanStructuredData(data: any) {
     }
     // If it's a string, clean HTML table cells
     else if (typeof data[key] === 'string') {
-      if (data[key].includes('<td>[ ]</td>') || data[key] === '[ ]' || data[key] === '[]') {
+      if (data[key].includes('<td>[ ]</td>') || data[key] === '[ ]' || data[key] === '[]' || data[key] === 'None') {
         data[key] = 'N/A';
       }
     }
@@ -259,6 +254,7 @@ function cleanStructuredData(data: any) {
       if (key.endsWith('_results')) {
         if (!testResults[key] || 
             testResults[key] === '' || 
+            testResults[key] === 'None' ||
             testResults[key].includes('<td>[ ]</td>') || 
             testResults[key] === '[ ]' || 
             testResults[key] === '[]') {
