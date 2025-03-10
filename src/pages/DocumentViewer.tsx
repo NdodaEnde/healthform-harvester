@@ -156,6 +156,7 @@ const DocumentViewer = () => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const extractPatientName = (extractedData: any) => {
     if (!extractedData) return "Unknown";
@@ -454,19 +455,56 @@ const DocumentViewer = () => {
         clearTimeout(processingTimeout);
       }
     };
-  }, [id, document?.status, processingTimeout]);
+  }, [id, document?.status, processingTimeout, refreshKey]);
 
-  const handleValidationSave = (validatedData: any) => {
+  const handleValidationSave = async (validatedData: any) => {
     setDocument(prev => {
       if (!prev) return null;
-      return {
+      
+      const updatedDoc = {
         ...prev,
         extractedData: validatedData,
         jsonData: JSON.stringify(validatedData, null, 2),
         validationStatus: 'validated'
       };
+      
+      if (id) {
+        sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+      }
+      
+      return updatedDoc;
     });
+    
+    setRefreshKey(prevKey => prevKey + 1);
+    
     setIsValidating(false);
+    
+    if (id) {
+      try {
+        const { error } = await supabase
+          .from('documents')
+          .update({
+            extracted_data: validatedData,
+            is_validated: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error saving validated data to Supabase:', error);
+          toast.error("Failed to save validation", {
+            description: "There was an error saving your changes to the database."
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Exception saving validated data:', error);
+        toast.error("Failed to save validation", {
+          description: "There was an error saving your changes to the database."
+        });
+        return;
+      }
+    }
     
     toast.success("Validation completed", {
       description: "The document data has been validated and saved."
@@ -867,6 +905,7 @@ const DocumentViewer = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
+            key={`document-content-${refreshKey}`}
           >
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">
