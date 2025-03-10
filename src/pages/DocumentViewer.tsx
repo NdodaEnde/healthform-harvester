@@ -397,6 +397,521 @@ const DocumentViewer = () => {
     }
   };
 
+  const updateEditableData = (path: string[], value: any) => {
+    setEditableData((prev: any) => {
+      if (!prev) return prev;
+      
+      const newData = JSON.parse(JSON.stringify(prev));
+      
+      let current = newData;
+      for (let i = 0; i < path.length - 1; i++) {
+        if (!current[path[i]]) {
+          current[path[i]] = {};
+        }
+        current = current[path[i]];
+      }
+      
+      current[path[path.length - 1]] = value;
+      
+      return newData;
+    });
+  };
+
+  const renderCertificateSection = (data: any) => {
+    if (!data || !data.structured_data) return null;
+    
+    const structuredData = data.structured_data;
+    
+    const renderPatientSection = () => {
+      const patient = structuredData.patient || {};
+      
+      return (
+        <div className="space-y-4 mb-4">
+          <h3 className="text-lg font-medium">Patient Information</h3>
+          <div className="flex justify-between space-x-4">
+            <div className="flex-1">
+              <div className="flex items-center">
+                <span className="font-semibold mr-1">Initials & Surname:</span>
+                <Input 
+                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                  value={patient.name || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'patient', 'name'], e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center">
+                <span className="font-semibold mr-1">ID NO:</span>
+                <Input 
+                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                  value={patient.id_number || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <span className="font-semibold mr-1">Company Name:</span>
+            <Input 
+              className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+              value={patient.company || ''}
+              onChange={(e) => updateEditableData(['structured_data', 'patient', 'company'], e.target.value)}
+            />
+          </div>
+          
+          <div className="flex justify-between space-x-4">
+            <div className="flex-1">
+              <div className="flex items-center">
+                <span className="font-semibold mr-1">Date of Examination:</span>
+                <Input 
+                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                  value={(structuredData.examination_results?.date) || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'examination_results', 'date'], e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center">
+                <span className="font-semibold mr-1">Expiry Date:</span>
+                <Input 
+                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                  value={(structuredData.certification?.valid_until) || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'valid_until'], e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <span className="font-semibold mr-1">Job Title:</span>
+            <Input 
+              className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+              value={patient.occupation || ''}
+              onChange={(e) => updateEditableData(['structured_data', 'patient', 'occupation'], e.target.value)}
+            />
+          </div>
+        </div>
+      );
+    };
+    
+    const renderExaminationTypeSection = () => {
+      const examinationType = structuredData.examination_results?.type || {};
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Examination Type</h3>
+          <table className="w-full border border-gray-400">
+            <thead>
+              <tr>
+                <th className="border border-gray-400 py-1 w-1/3 text-center bg-gray-100 text-sm">PRE-EMPLOYMENT</th>
+                <th className="border border-gray-400 py-1 w-1/3 text-center bg-gray-100 text-sm">PERIODICAL</th>
+                <th className="border border-gray-400 py-1 w-1/3 text-center bg-gray-100 text-sm">EXIT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-gray-400 h-8 text-center">
+                  <Checkbox 
+                    checked={!!examinationType.pre_employment} 
+                    onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'pre_employment'], !!checked)}
+                    className="mx-auto"
+                  />
+                </td>
+                <td className="border border-gray-400 h-8 text-center">
+                  <Checkbox 
+                    checked={!!examinationType.periodical} 
+                    onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'periodical'], !!checked)}
+                    className="mx-auto"
+                  />
+                </td>
+                <td className="border border-gray-400 h-8 text-center">
+                  <Checkbox 
+                    checked={!!examinationType.exit} 
+                    onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'exit'], !!checked)}
+                    className="mx-auto"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+    
+    const renderTestResultsSection = () => {
+      const testResults = structuredData.examination_results?.test_results || {};
+      
+      const renderTestRow = (label: string, doneKey: string, resultsKey: string) => (
+        <tr>
+          <td className="border border-gray-400 pl-2 text-sm">{label}</td>
+          <td className="border border-gray-400 text-center">
+            <Checkbox 
+              checked={!!testResults[doneKey]} 
+              onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'test_results', doneKey], !!checked)}
+              className="mx-auto"
+            />
+          </td>
+          <td className="border border-gray-400 p-1 text-sm">
+            <Input 
+              className="w-full border-0 p-0 h-6 bg-transparent shadow-none focus-visible:ring-0" 
+              value={testResults[resultsKey] || ''}
+              onChange={(e) => updateEditableData(['structured_data', 'examination_results', 'test_results', resultsKey], e.target.value)}
+            />
+          </td>
+        </tr>
+      );
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Medical Tests</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <table className="w-full border border-gray-400">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">Tests</th>
+                    <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
+                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {renderTestRow("BLOODS", "bloods_done", "bloods_results")}
+                  {renderTestRow("FAR, NEAR VISION", "far_near_vision_done", "far_near_vision_results")}
+                  {renderTestRow("SIDE & DEPTH", "side_depth_done", "side_depth_results")}
+                  {renderTestRow("NIGHT VISION", "night_vision_done", "night_vision_results")}
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <table className="w-full border border-gray-400">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Tests</th>
+                    <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
+                    <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {renderTestRow("Hearing", "hearing_done", "hearing_results")}
+                  {renderTestRow("Working at Heights", "heights_done", "heights_results")}
+                  {renderTestRow("Lung Function", "lung_function_done", "lung_function_results")}
+                  {renderTestRow("X-Ray", "x_ray_done", "x_ray_results")}
+                  {renderTestRow("Drug Screen", "drug_screen_done", "drug_screen_results")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    };
+    
+    const renderFollowUpSection = () => {
+      const certification = structuredData.certification || {};
+      
+      return (
+        <div className="mb-4">
+          <div className="flex items-center">
+            <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
+            <div className="border-b border-gray-400 flex-1">
+              <Input 
+                className="border-0 p-0 h-6 w-full bg-transparent shadow-none focus-visible:ring-0" 
+                value={certification.follow_up || ''}
+                onChange={(e) => updateEditableData(['structured_data', 'certification', 'follow_up'], e.target.value)}
+              />
+            </div>
+            <div className="ml-2">
+              <div className="text-sm">
+                <span className="font-semibold mr-1">Review Date:</span>
+                <Input 
+                  className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600" 
+                  value={certification.review_date || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'review_date'], e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+    
+    const renderRestrictionsSection = () => {
+      const restrictions = structuredData.restrictions || {};
+      
+      const renderRestrictionCell = (label: string, key: string) => (
+        <td className={`border border-gray-400 p-2 text-center`}>
+          <div className="font-semibold">{label}</div>
+          <div className="flex justify-center mt-1">
+            <Checkbox 
+              checked={!!restrictions[key]} 
+              onCheckedChange={(checked) => updateEditableData(['structured_data', 'restrictions', key], !!checked)}
+            />
+          </div>
+        </td>
+      );
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Restrictions</h3>
+          <table className="w-full border border-gray-400 text-sm">
+            <tbody>
+              <tr>
+                {renderRestrictionCell("Heights", "heights")}
+                {renderRestrictionCell("Dust Exposure", "dust_exposure")}
+                {renderRestrictionCell("Motorized Equipment", "motorized_equipment")}
+                {renderRestrictionCell("Wear Hearing Protection", "wear_hearing_protection")}
+              </tr>
+              <tr>
+                {renderRestrictionCell("Confined Spaces", "confined_spaces")}
+                {renderRestrictionCell("Chemical Exposure", "chemical_exposure")}
+                {renderRestrictionCell("Wear Spectacles", "wear_spectacles")}
+                {renderRestrictionCell("Remain on Treatment for Chronic Conditions", "remain_on_treatment_for_chronic_conditions")}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+    
+    const renderFitnessAssessmentSection = () => {
+      const certification = structuredData.certification || {};
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Fitness Assessment</h3>
+          <table className="w-full border border-gray-400">
+            <tbody>
+              <tr>
+                <th className="border border-gray-400 p-2 text-center">
+                  FIT
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.fit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  Fit with Restriction
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.fit_with_restrictions} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit_with_restrictions'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  Fit with Condition
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.fit_with_condition} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit_with_condition'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  Temporary Unfit
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.temporarily_unfit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'temporarily_unfit'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  UNFIT
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.unfit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'unfit'], !!checked)}
+                    />
+                  </div>
+                </th>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+    
+    const renderCommentsSection = () => {
+      const certification = structuredData.certification || {};
+      
+      return (
+        <div className="mb-4">
+          <div className="font-semibold text-sm mb-1">Comments:</div>
+          <Textarea 
+            className="border border-gray-400 p-2 min-h-16 text-sm w-full resize-none focus-visible:ring-0" 
+            value={certification.comments || ''}
+            onChange={(e) => updateEditableData(['structured_data', 'certification', 'comments'], e.target.value)}
+          />
+        </div>
+      );
+    };
+    
+    return (
+      <div className="space-y-6 px-6">
+        {renderPatientSection()}
+        <Separator />
+        {renderExaminationTypeSection()}
+        <Separator />
+        {renderTestResultsSection()}
+        <Separator />
+        {renderFollowUpSection()}
+        <Separator />
+        {renderRestrictionsSection()}
+        <Separator />
+        {renderFitnessAssessmentSection()}
+        <Separator />
+        {renderCommentsSection()}
+        
+        <div className="mt-6 flex justify-end space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsEditing(false);
+              setEditableData(null);
+            }}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEdits}>
+            <Save className="h-4 w-4 mr-2" />
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderExtractedData = () => {
+    if (isValidating && document) {
+      console.log('Data passed to validator:', validatorData || document.extractedData);
+      
+      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
+      
+      return (
+        <CertificateValidator 
+          documentId={document.id}
+          extractedData={dataForValidator}
+          onSave={handleValidationSave}
+          onCancel={() => {
+            setIsValidating(false);
+            setValidatorData(null);
+          }}
+        />
+      );
+    }
+    
+    if (!document || !document.extractedData) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available</p>
+        </div>
+      );
+    }
+    
+    const extractedData = isEditing ? editableData : document.extractedData;
+    
+    if (document.type === 'Certificate of Fitness') {
+      if (isEditing) {
+        return renderCertificateSection(extractedData);
+      }
+      
+      console.log("Passing to CertificateTemplate:", extractedData);
+      return (
+        <div className="certificate-container pb-6">
+          <CertificateTemplate extractedData={extractedData} />
+        </div>
+      );
+    }
+    
+    if (
+      typeof extractedData === 'object' && 
+      extractedData !== null && 
+      !Array.isArray(extractedData) && 
+      extractedData.structured_data
+    ) {
+      const structuredData = extractedData.structured_data;
+      
+      return (
+        <div className="space-y-6">
+          {structuredData.patient && (
+            <>
+              {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.medical_details && (
+            <>
+              {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.examination_results && (
+            <>
+              {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.certification && (
+            <>
+              {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
+            </>
+          )}
+          
+          {isEditing && (
+            <div className="mt-6 flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditableData(null);
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          )}
+          
+          {!structuredData.patient && !structuredData.medical_details && 
+           !structuredData.examination_results && !structuredData.certification && (
+            <div>
+              <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
+              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                {JSON.stringify(structuredData, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            The data structure from this extraction doesn't match the expected format. 
+            Here's the raw data that was extracted:
+          </p>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+            {JSON.stringify(extractedData, null, 2)}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       if (!id) {
@@ -601,308 +1116,6 @@ const DocumentViewer = () => {
     setIsValidating(true);
   };
 
-  const renderEditableField = (
-    section: string, 
-    key: string, 
-    value: any, 
-    path: string[]
-  ) => {
-    const updateNestedValue = (newValue: any) => {
-      setEditableData((prev: any) => {
-        const newData = { ...prev };
-        let current = newData;
-        
-        for (let i = 0; i < path.length - 1; i++) {
-          if (!current[path[i]]) {
-            current[path[i]] = {};
-          }
-          current = current[path[i]];
-        }
-        
-        current[path[path.length - 1]] = newValue;
-        return newData;
-      });
-    };
-
-    const fieldId = `${section}-${key}-${path.join('-')}`;
-    const displayName = key.replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .replace(/_/g, ' ');
-
-    if (typeof value === 'boolean') {
-      return (
-        <div key={fieldId} className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id={fieldId}
-              checked={value || false}
-              onCheckedChange={(checked) => updateNestedValue(!!checked)}
-            />
-            <Label htmlFor={fieldId} className="text-sm">
-              {displayName}
-            </Label>
-          </div>
-        </div>
-      );
-    }
-    
-    if (typeof value === 'string' && value.length > 100) {
-      return (
-        <div key={fieldId} className="space-y-1">
-          <Label htmlFor={fieldId} className="text-sm text-muted-foreground">
-            {displayName}
-          </Label>
-          <Textarea 
-            id={fieldId}
-            value={value || ''}
-            onChange={(e) => updateNestedValue(e.target.value)}
-            className="min-h-[100px]"
-          />
-        </div>
-      );
-    }
-    
-    return (
-      <div key={fieldId} className="space-y-1">
-        <Label htmlFor={fieldId} className="text-sm text-muted-foreground">
-          {displayName}
-        </Label>
-        <Input 
-          id={fieldId}
-          value={value !== null && value !== undefined ? value.toString() : ''}
-          onChange={(e) => updateNestedValue(e.target.value)}
-        />
-      </div>
-    );
-  };
-
-  const renderStructuredSection = (
-    title: string,
-    data: Record<string, any>,
-    path: string[] = []
-  ) => {
-    return (
-      <div>
-        <h3 className="text-lg font-medium mb-3">{title}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(data).map(([key, value]) => {
-            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-              return null;
-            }
-            
-            if (Array.isArray(value)) {
-              if (isEditing) {
-                return renderEditableField(title.toLowerCase(), key, value.join(', '), [...path, key]);
-              }
-              return (
-                <div key={`${title}-${key}`} className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    {key.replace(/([A-Z])/g, ' $1')
-                      .replace(/^./, str => str.toUpperCase())
-                      .replace(/_/g, ' ')}
-                  </p>
-                  <p className="font-medium">{value.join(', ') || 'N/A'}</p>
-                </div>
-              );
-            }
-            
-            if (isEditing) {
-              return renderEditableField(title.toLowerCase(), key, value, [...path, key]);
-            }
-            
-            return (
-              <div key={`${title}-${key}`} className="space-y-1">
-                <p className="text-sm text-muted-foreground">
-                  {key.replace(/([A-Z])/g, ' $1')
-                    .replace(/^./, str => str.toUpperCase())
-                    .replace(/_/g, ' ')}
-                </p>
-                <p className="font-medium">{value !== null && value !== undefined ? value.toString() : 'N/A'}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderExtractedData = () => {
-    if (isValidating && document) {
-      console.log('Data passed to validator:', validatorData || document.extractedData);
-      
-      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
-      
-      return (
-        <CertificateValidator 
-          documentId={document.id}
-          extractedData={dataForValidator}
-          onSave={handleValidationSave}
-          onCancel={() => {
-            setIsValidating(false);
-            setValidatorData(null);
-          }}
-        />
-      );
-    }
-    
-    if (!document || !document.extractedData) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No data available</p>
-        </div>
-      );
-    }
-    
-    const extractedData = isEditing ? editableData : document.extractedData;
-    
-    if (document.type === 'Certificate of Fitness') {
-      if (isEditing) {
-        return (
-          <div className="space-y-6">
-            {extractedData.structured_data && (
-              <>
-                {extractedData.structured_data.patient && (
-                  <>
-                    {renderStructuredSection("Patient Information", extractedData.structured_data.patient, ['structured_data', 'patient'])}
-                    <Separator />
-                  </>
-                )}
-                
-                {extractedData.structured_data.medical_details && (
-                  <>
-                    {renderStructuredSection("Medical Information", extractedData.structured_data.medical_details, ['structured_data', 'medical_details'])}
-                    <Separator />
-                  </>
-                )}
-                
-                {extractedData.structured_data.examination_results && (
-                  <>
-                    {renderStructuredSection("Examination Results", extractedData.structured_data.examination_results, ['structured_data', 'examination_results'])}
-                    <Separator />
-                  </>
-                )}
-                
-                {extractedData.structured_data.certification && (
-                  <>
-                    {renderStructuredSection("Certification", extractedData.structured_data.certification, ['structured_data', 'certification'])}
-                  </>
-                )}
-                
-                <div className="mt-6 flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditableData(null);
-                    }}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveEdits}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        );
-      }
-      
-      console.log("Passing to CertificateTemplate:", extractedData);
-      return (
-        <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
-        </div>
-      );
-    }
-    
-    if (
-      typeof extractedData === 'object' && 
-      extractedData !== null && 
-      !Array.isArray(extractedData) && 
-      extractedData.structured_data
-    ) {
-      const structuredData = extractedData.structured_data;
-      
-      return (
-        <div className="space-y-6">
-          {structuredData.patient && (
-            <>
-              {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
-              <Separator />
-            </>
-          )}
-          
-          {structuredData.medical_details && (
-            <>
-              {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
-              <Separator />
-            </>
-          )}
-          
-          {structuredData.examination_results && (
-            <>
-              {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
-              <Separator />
-            </>
-          )}
-          
-          {structuredData.certification && (
-            <>
-              {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
-            </>
-          )}
-          
-          {isEditing && (
-            <div className="mt-6 flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditableData(null);
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button onClick={handleSaveEdits}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </Button>
-            </div>
-          )}
-          
-          {!structuredData.patient && !structuredData.medical_details && 
-           !structuredData.examination_results && !structuredData.certification && (
-            <div>
-              <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                {JSON.stringify(structuredData, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      );
-    }
-    
-    return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            The data structure from this extraction doesn't match the expected format. 
-            Here's the raw data that was extracted:
-          </p>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-            {JSON.stringify(extractedData, null, 2)}
-          </pre>
-        </div>
-      </div>
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1012,7 +1225,7 @@ const DocumentViewer = () => {
               </Button>
             )}
             {!isValidating && !isEditing && document.validationStatus === 'validated' && (
-              <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+              <Badge variant="default" className="text-xs">
                 <Check className="h-3 w-3 mr-1" />
                 Validated
               </Badge>
@@ -1208,4 +1421,3 @@ const DocumentViewer = () => {
 };
 
 export default DocumentViewer;
-
