@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -29,18 +30,20 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
     
     const structuredData = {
       structured_data: {
-        patient: { ...extractedData.structured_data.patient } || {},
-        certification: { ...extractedData.structured_data.certification } || {},
+        patient: extractedData.structured_data.patient || {},
+        certification: extractedData.structured_data.certification || {},
         examination_results: { 
-          test_results: { ...extractedData.structured_data.examination_results?.test_results } || {},
-          type: { ...extractedData.structured_data.examination_results?.type } || {}
+          test_results: extractedData.structured_data.examination_results?.test_results || {},
+          type: extractedData.structured_data.examination_results?.type || {}
         },
-        restrictions: { ...extractedData.structured_data.restrictions } || {}
+        restrictions: extractedData.structured_data.restrictions || {}
       }
     };
     
     // Ensure examination date is set in examination_results
-    if (extractedData.structured_data.examination_results?.date) {
+    if (extractedData.structured_data.examination_results && 
+        typeof extractedData.structured_data.examination_results === 'object' &&
+        'date' in extractedData.structured_data.examination_results) {
       structuredData.structured_data.examination_results.date = 
         extractedData.structured_data.examination_results.date;
     }
@@ -91,11 +94,12 @@ export function mapExtractedDataToValidatorFormat(extractedData: any) {
 
   // Map examination results and test results
   if (extractedData.examination_results) {
-    // Check if the date property exists before trying to set it
+    // Add date property if it exists
     if (typeof extractedData.examination_results === 'object' && 
         extractedData.examination_results !== null &&
         'date' in extractedData.examination_results) {
-      structuredData.structured_data.examination_results.date = extractedData.examination_results.date;
+      // Add the date property explicitly to the type
+      (structuredData.structured_data.examination_results as any).date = extractedData.examination_results.date;
     }
     
     // Map examination type, with multiple name variations to catch different data formats
@@ -238,5 +242,5 @@ export const isCheckboxMarked = (markdown: string, fieldName: string): boolean =
   return patterns.some(pattern => pattern.test(context));
 };
 
-// Corrected import statement to use the actual names exported from use-toast.ts
+// Export the useToast and toast from use-toast.ts
 export { useToast, toast } from "@/hooks/use-toast";
