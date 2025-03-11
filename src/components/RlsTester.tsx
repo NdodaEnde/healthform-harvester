@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { rlsTester } from "@/utils/rls-tester";
-import { Shield, ShieldAlert, ShieldCheck, User, Building, FileText, Edit, ArrowRight, AlertTriangle, CheckCircle2, Database, LockCheck } from "lucide-react";
+import { Shield, ShieldAlert, ShieldCheck, User, Building, FileText, Edit, ArrowRight, AlertTriangle, CheckCircle2, Database, Lock } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -147,7 +146,7 @@ const RlsTester = () => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <LockCheck className="h-5 w-5" />
+          <Lock className="h-5 w-5" />
           RLS Policy Tester
         </CardTitle>
         <CardDescription>
