@@ -147,7 +147,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
 
   const getStatusBadge = (invitation: Invitation) => {
     if (invitation.accepted_at) {
-      return <Badge variant="success">Accepted</Badge>;
+      return <Badge className="bg-green-600 text-white">Accepted</Badge>;
     }
     
     if (isExpired(invitation.expires_at)) {

@@ -139,8 +139,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       const { data: clients, error: clientsError } = await supabase
         .from("organization_relationships")
         .select(`
-          client_id,
-          organizations:client_id (
+          client:client_id (
             id,
             name,
             organization_type,
@@ -156,7 +155,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         throw clientsError;
       }
       
-      const clientOrgs = clients?.map(c => c.organizations) || [];
+      const clientOrgs = clients?.map(c => c.client) || [];
       setClientOrganizations(clientOrgs);
       
       // Check for stored client selection
