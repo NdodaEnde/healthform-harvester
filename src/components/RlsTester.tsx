@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { rlsTester } from "@/utils/rls-tester";
-import { Shield, ShieldAlert, ShieldCheck, User, Building, FileText, Edit, ArrowRight, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Shield, ShieldAlert, ShieldCheck, User, Building, FileText, Edit, ArrowRight, AlertTriangle, CheckCircle2, Database, LockCheck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 
 type TestResult = {
   success: boolean;
@@ -18,14 +19,20 @@ type TestResult = {
 
 const RlsTester = () => {
   const [loading, setLoading] = useState(false);
+  const [runningTest, setRunningTest] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<Record<string, TestResult> | null>(null);
   const [expandedTest, setExpandedTest] = useState<string | null>(null);
   const [showTestData, setShowTestData] = useState<string | null>(null);
 
   const runTests = async () => {
     setLoading(true);
+    setResults(null);
+    setProgress(0);
+    
     try {
-      const testResults = await rlsTester.runAllTests();
+      // Run tests with progress tracking
+      const testResults = await runTestsWithProgress();
       setResults(testResults);
       
       // Display a toast when done
@@ -43,9 +50,59 @@ const RlsTester = () => {
           variant: "destructive",
         });
       }
+    } catch (error) {
+      console.error("Error running RLS tests:", error);
+      toast({
+        title: "Test Error",
+        description: "Failed to run RLS tests. Check console for details.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
+      setRunningTest(null);
+      setProgress(100);
     }
+  };
+
+  // Run tests with progress updates
+  const runTestsWithProgress = async () => {
+    const testFunctions = {
+      documents: { fn: rlsTester.testTableAccess.bind(rlsTester, 'documents'), label: "Testing documents table access" },
+      patients: { fn: rlsTester.testTableAccess.bind(rlsTester, 'patients'), label: "Testing patients table access" },
+      organizations: { fn: rlsTester.testTableAccess.bind(rlsTester, 'organizations'), label: "Testing organizations table access" },
+      documentAccessControl: { fn: rlsTester.testDocumentAccessControl.bind(rlsTester), label: "Testing document access control" },
+      organizationAccess: { fn: rlsTester.testOrganizationAccess.bind(rlsTester), label: "Testing organization access" },
+      patientAccess: { fn: rlsTester.testPatientAccess.bind(rlsTester), label: "Testing patient access" },
+      writeOperations: { fn: rlsTester.testWriteOperations.bind(rlsTester), label: "Testing write operations" },
+    };
+    
+    const testNames = Object.keys(testFunctions);
+    const totalTests = testNames.length;
+    const results: Record<string, TestResult> = {};
+    
+    for (let i = 0; i < testNames.length; i++) {
+      const testName = testNames[i];
+      const { fn, label } = testFunctions[testName as keyof typeof testFunctions];
+      
+      setRunningTest(label);
+      setProgress(Math.round((i / totalTests) * 100));
+      
+      try {
+        results[testName] = await fn();
+      } catch (error) {
+        console.error(`Error in test ${testName}:`, error);
+        results[testName] = {
+          success: false,
+          message: `Error running test: ${error instanceof Error ? error.message : String(error)}`,
+          error
+        };
+      }
+      
+      // Small delay to make progress visible
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    return results;
   };
 
   // Helper function to render the appropriate icon based on test name
@@ -58,11 +115,12 @@ const RlsTester = () => {
       case 'organizationAccess':
         return <Building className="h-4 w-4" />;
       case 'patients':
+      case 'patientAccess':
         return <User className="h-4 w-4" />;
       case 'writeOperations':
         return <Edit className="h-4 w-4" />;
       default:
-        return <Shield className="h-4 w-4" />;
+        return <Database className="h-4 w-4" />;
     }
   };
 
@@ -71,7 +129,8 @@ const RlsTester = () => {
     return testName
       .replace(/([A-Z])/g, ' $1')
       .replace(/^./, str => str.toUpperCase())
-      .replace('RLS', 'RLS ');
+      .replace('RLS', 'RLS ')
+      .replace('Access Control', 'Access');
   };
 
   const getTotalResults = () => {
@@ -88,7 +147,7 @@ const RlsTester = () => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
+          <LockCheck className="h-5 w-5" />
           RLS Policy Tester
         </CardTitle>
         <CardDescription>
@@ -96,6 +155,16 @@ const RlsTester = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {loading && (
+          <div className="mb-6 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">{runningTest || "Running tests..."}</span>
+              <span className="text-sm font-medium">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        )}
+
         {results && (
           <>
             <div className="mb-6">
@@ -217,7 +286,7 @@ const RlsTester = () => {
             </div>
           </>
         )}
-        {!results && (
+        {!results && !loading && (
           <div className="text-center py-4 text-muted-foreground">
             Click the button below to run RLS policy tests
           </div>
