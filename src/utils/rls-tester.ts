@@ -2,6 +2,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
+// Define allowed table names for type safety
+type TableName = 'documents' | 'patients' | 'organizations';
+
 /**
  * Utility to test and validate Row Level Security (RLS) policies
  * for multi-tenant systems
@@ -12,7 +15,7 @@ export const rlsTester = {
    * @param tableName The table to test
    * @returns Object with test results
    */
-  async testTableAccess(tableName: string) {
+  async testTableAccess(tableName: TableName) {
     try {
       const { data, error } = await supabase
         .from(tableName)

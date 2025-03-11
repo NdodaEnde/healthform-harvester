@@ -45,7 +45,7 @@ const RlsTester = () => {
               <div key={testName} className="border rounded-md p-4">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="font-medium">{testName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</h3>
-                  <Badge variant={result.success ? "success" : "destructive"} className="flex items-center gap-1">
+                  <Badge variant={result.success ? "default" : "destructive"} className="flex items-center gap-1">
                     {result.success ? 
                       <><ShieldCheck className="h-3 w-3" /> Passed</> : 
                       <><ShieldAlert className="h-3 w-3" /> Failed</>

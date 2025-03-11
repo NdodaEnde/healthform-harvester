@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUploader from "@/components/DocumentUploader";
@@ -11,16 +12,19 @@ import RlsTester from "@/components/RlsTester";
 const Dashboard = () => {
   const [uploading, setUploading] = useState(false);
 
-  const { data: documents, isLoading, error } = useQuery('documents', async () => {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*');
+  const { data: documents, isLoading, error } = useQuery({
+    queryKey: ['documents'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*');
 
-    if (error) {
-      throw new Error(error.message);
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
     }
-
-    return data;
   });
 
   return (
@@ -35,7 +39,7 @@ const Dashboard = () => {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <DocumentUploader setUploading={setUploading} />
+              <DocumentUploader />
               {uploading && <p>Uploading...</p>}
             </div>
           </div>
@@ -56,8 +60,8 @@ const Dashboard = () => {
                   <div>Loading documents...</div>
                 ) : error ? (
                   <div>Error: {error.message}</div>
-                ) : (
-                  documents?.map((document) => (
+                ) : documents && documents.length > 0 ? (
+                  documents.map((document) => (
                     <Card key={document.id}>
                       <CardHeader>
                         <CardTitle>{document.file_name}</CardTitle>
@@ -72,6 +76,8 @@ const Dashboard = () => {
                       </CardFooter>
                     </Card>
                   ))
+                ) : (
+                  <div>No documents found.</div>
                 )}
               </motion.div>
             </TabsContent>
