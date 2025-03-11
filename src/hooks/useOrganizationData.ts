@@ -92,32 +92,42 @@ export function useOrganizationData() {
   
   const loadClientOrganizations = async (serviceProviderId: string) => {
     try {
-      const { data: clients, error: clientsError } = await supabase
+      // Fixed query that avoids the ambiguous relationship error
+      const { data: relationships, error: relationshipsError } = await supabase
         .from("organization_relationships")
-        .select(`
-          client:client_id (
-            id,
-            name,
-            organization_type,
-            logo_url,
-            contact_email,
-            settings
-          )
-        `)
+        .select("client_id")
         .eq("service_provider_id", serviceProviderId)
         .eq("is_active", true);
+        
+      if (relationshipsError) {
+        throw relationshipsError;
+      }
+      
+      // Extract client IDs
+      const clientIds = relationships.map(rel => rel.client_id);
+      
+      if (clientIds.length === 0) {
+        setClientOrganizations([]);
+        setCurrentClient(null);
+        return;
+      }
+      
+      // Fetch client organizations separately using the client IDs
+      const { data: clients, error: clientsError } = await supabase
+        .from("organizations")
+        .select("id, name, organization_type, logo_url, contact_email, settings")
+        .in("id", clientIds);
         
       if (clientsError) {
         throw clientsError;
       }
       
-      const clientOrgs = clients?.map(c => c.client) || [];
-      setClientOrganizations(clientOrgs);
+      setClientOrganizations(clients || []);
       
       // Check for stored client selection
       const storedClientId = localStorage.getItem("currentClientId");
       if (storedClientId) {
-        const client = clientOrgs.find(c => c.id === storedClientId);
+        const client = clients?.find(c => c.id === storedClientId);
         if (client) {
           setCurrentClient(client);
         } else {
