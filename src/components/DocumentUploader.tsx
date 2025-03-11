@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
@@ -8,22 +7,45 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 type DocumentUploaderProps = {
   onUploadComplete: (data?: any) => void;
 };
 
 const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
+  const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>("medical-questionnaire");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingDocumentId, setProcessingDocumentId] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingAttemptsRef = useRef<number>(0);
   const maxPollingAttempts = 20; // About 60 seconds with 3-second intervals
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    };
+    
+    checkAuth();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    
+    return () => {
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!processingDocumentId) return;
@@ -199,7 +221,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         statusPollingRef.current = null;
       }
     };
-  }, [processingDocumentId, documentType, maxPollingAttempts, onUploadComplete]);
+  }, [processingDocumentId, documentType, maxPollingAttempts, onUploadComplete, navigate]);
 
   const getFileUrl = async (filePath: string) => {
     try {
@@ -330,6 +352,20 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const handleUpload = async () => {
     if (!file) return;
 
+    // Check if user is authenticated first
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      toast.error("Authentication required", {
+        description: "You need to be logged in to upload documents.",
+        action: {
+          label: "Sign In",
+          onClick: () => navigate("/auth")
+        }
+      });
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
     pollingAttemptsRef.current = 0;
@@ -349,26 +385,10 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     progressIntervalRef.current = progressInterval;
 
     try {
-      // Check for user authentication
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setIsUploading(false);
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-          progressIntervalRef.current = null;
-        }
-        
-        toast.error("Authentication required", {
-          description: "You need to be logged in to upload documents."
-        });
-        return;
-      }
-      
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
-      formData.append('userId', user.id);
+      formData.append('userId', session.user.id);
       
       const SUPABASE_URL = "https://wgkbsiczgyaqmgoyirjs.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
@@ -378,7 +398,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         fileType: file.type,
         fileSize: file.size,
         documentType,
-        userID: user.id
+        userID: session.user.id
       });
       
       const response = await fetch(
@@ -387,7 +407,7 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
           method: 'POST',
           body: formData,
           headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            'Authorization': `Bearer ${session.access_token}`
           }
         }
       );
@@ -445,6 +465,22 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
       fileInputRef.current.value = "";
     }
   };
+
+  // Authentication message when not logged in
+  if (isAuthenticated === false) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+        <h3 className="text-xl font-medium mb-2">Authentication Required</h3>
+        <p className="text-muted-foreground mb-6 max-w-md">
+          You need to be logged in to upload and process documents.
+        </p>
+        <Button onClick={() => navigate("/auth")}>
+          Sign In or Create Account
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 py-4">
