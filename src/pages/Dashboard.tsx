@@ -12,7 +12,7 @@ import RlsTester from "@/components/RlsTester";
 const Dashboard = () => {
   const [uploading, setUploading] = useState(false);
 
-  const { data: documents, isLoading, error } = useQuery({
+  const { data: documents, isLoading, error, refetch } = useQuery({
     queryKey: ['documents'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -27,6 +27,12 @@ const Dashboard = () => {
     }
   });
 
+  const handleUploadComplete = () => {
+    // Refresh the documents list after upload completes
+    refetch();
+    setUploading(false);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-10">
@@ -39,7 +45,7 @@ const Dashboard = () => {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <DocumentUploader />
+              <DocumentUploader onUploadComplete={handleUploadComplete} />
               {uploading && <p>Uploading...</p>}
             </div>
           </div>
