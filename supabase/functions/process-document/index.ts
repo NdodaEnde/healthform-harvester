@@ -18,6 +18,7 @@ serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get('file');
     const documentType = formData.get('documentType');
+    const userId = formData.get('userId');
 
     if (!file) {
       return new Response(
@@ -31,10 +32,13 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Upload file to Supabase Storage
+    // 1. Upload file to Supabase Storage - organize by user ID for security
     const fileName = file.name;
     const fileExt = fileName.split('.').pop();
-    const filePath = `documents/${crypto.randomUUID()}.${fileExt}`;
+    
+    // Generate a folder structure based on userID
+    const userFolder = userId ? `${userId}` : 'anonymous';
+    const filePath = `${userFolder}/documents/${crypto.randomUUID()}.${fileExt}`;
     
     const { data: storageData, error: storageError } = await supabase
       .storage

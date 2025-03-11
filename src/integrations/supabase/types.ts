@@ -64,6 +64,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          client_organization_id: string | null
           created_at: string
           document_type: string | null
           extracted_data: Json | null
@@ -71,12 +72,14 @@ export type Database = {
           file_path: string
           id: string
           mime_type: string
+          organization_id: string | null
           processed_at: string | null
           processing_error: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          client_organization_id?: string | null
           created_at?: string
           document_type?: string | null
           extracted_data?: Json | null
@@ -84,12 +87,14 @@ export type Database = {
           file_path: string
           id?: string
           mime_type: string
+          organization_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          client_organization_id?: string | null
           created_at?: string
           document_type?: string | null
           extracted_data?: Json | null
@@ -97,15 +102,157 @@ export type Database = {
           file_path?: string
           id?: string
           mime_type?: string
+          organization_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
           status?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "documents_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_relationships: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          relationship_start_date: string | null
+          service_provider_id: string
+          settings: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          relationship_start_date?: string | null
+          service_provider_id: string
+          settings?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          relationship_start_date?: string | null
+          service_provider_id?: string
+          settings?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_relationships_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_relationships_service_provider_id_fkey"
+            columns: ["service_provider_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          role: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          role: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          address: Json | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          industry: string | null
+          logo_url: string | null
+          name: string
+          organization_type: string
+          settings: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: Json | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          name: string
+          organization_type: string
+          settings?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: Json | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          name?: string
+          organization_type?: string
+          settings?: Json | null
+          updated_at?: string | null
+        }
         Relationships: []
       }
       patients: {
         Row: {
+          client_organization_id: string | null
           contact_info: Json | null
           created_at: string
           date_of_birth: string
@@ -114,9 +261,11 @@ export type Database = {
           id: string
           last_name: string
           medical_history: Json | null
+          organization_id: string | null
           updated_at: string
         }
         Insert: {
+          client_organization_id?: string | null
           contact_info?: Json | null
           created_at?: string
           date_of_birth: string
@@ -125,9 +274,11 @@ export type Database = {
           id?: string
           last_name: string
           medical_history?: Json | null
+          organization_id?: string | null
           updated_at?: string
         }
         Update: {
+          client_organization_id?: string | null
           contact_info?: Json | null
           created_at?: string
           date_of_birth?: string
@@ -136,9 +287,25 @@ export type Database = {
           id?: string
           last_name?: string
           medical_history?: Json | null
+          organization_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "patients_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       processing_documents: {
         Row: {
@@ -166,7 +333,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_organizations: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      is_superadmin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      user_belongs_to_organization: {
+        Args: {
+          org_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

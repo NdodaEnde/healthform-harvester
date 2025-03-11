@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
@@ -225,10 +226,17 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         extractedData.raw_response.data.markdown) {
       
       const markdown = extractedData.raw_response.data.markdown;
-      const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/);
+      const namePatterns = [
+        /\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/,
+        /\*\*Name\*\*:\s*(.*?)(?=\n|\r|$)/,
+        /Name:\s*(.*?)(?=\n|\r|$)/
+      ];
       
-      if (nameMatch && nameMatch[1]) {
-        return nameMatch[1].trim();
+      for (const pattern of namePatterns) {
+        const nameMatch = markdown.match(pattern);
+        if (nameMatch && nameMatch[1]) {
+          return nameMatch[1].trim();
+        }
       }
     }
     
@@ -249,10 +257,18 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         extractedData.raw_response.data.markdown) {
       
       const markdown = extractedData.raw_response.data.markdown;
-      const idMatch = markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/);
+      const idPatterns = [
+        /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i,
+        /\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i,
+        /ID No[.:]\s*(.*?)(?=\n|\r|$)/i,
+        /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i
+      ];
       
-      if (idMatch && idMatch[1]) {
-        return idMatch[1].trim();
+      for (const pattern of idPatterns) {
+        const idMatch = markdown.match(pattern);
+        if (idMatch && idMatch[1]) {
+          return idMatch[1].trim();
+        }
       }
     }
     
@@ -333,9 +349,26 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     progressIntervalRef.current = progressInterval;
 
     try {
+      // Check for user authentication
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setIsUploading(false);
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        
+        toast.error("Authentication required", {
+          description: "You need to be logged in to upload documents."
+        });
+        return;
+      }
+      
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
+      formData.append('userId', user.id);
       
       const SUPABASE_URL = "https://wgkbsiczgyaqmgoyirjs.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2JzaWN6Z3lhcW1nb3lpcmpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODQ3NjcsImV4cCI6MjA1NTk2MDc2N30.WVI1UFFrL5A0_jYt-j7BDZJtzqHqnb5PXHZSGKr6qxE";
@@ -344,7 +377,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
-        documentType
+        documentType,
+        userID: user.id
       });
       
       const response = await fetch(

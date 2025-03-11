@@ -22,4 +22,10 @@ enabled = true
 enabled = true
 
 [storage.buckets]
-medical-documents = { public = false, file_size_limit = "50MiB", allowed_mime_types = ["application/pdf", "image/png", "image/jpeg"] }
+medical-documents = { 
+  public = false, 
+  file_size_limit = "50MiB", 
+  allowed_mime_types = ["application/pdf", "image/png", "image/jpeg"],
+  owner_only = false
+}
+
