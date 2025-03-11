@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FileText, Mail, Lock, ArrowRight, User, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,9 @@ const Auth = () => {
   };
 
   // Run on component mount
-  useState(() => {
+  useEffect(() => {
     checkAuthState();
-  });
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +169,15 @@ const Auth = () => {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                         />
+                      </div>
+                      
+                      <div className="flex justify-end">
+                        <Link 
+                          to="/auth/reset-password" 
+                          className="text-sm text-primary hover:underline"
+                        >
+                          Forgot password?
+                        </Link>
                       </div>
                     </div>
                     

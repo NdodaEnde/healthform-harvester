@@ -1,0 +1,225 @@
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "@/components/ui/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, RefreshCw } from "lucide-react";
+import { format, isAfter } from "date-fns";
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+}
+
+interface InvitationListProps {
+  organizationId: string;
+  onRefresh?: () => void;
+}
+
+export default function InvitationList({ organizationId, onRefresh }: InvitationListProps) {
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInvitations = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      setInvitations(data || []);
+    } catch (error: any) {
+      console.error("Error fetching invitations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load invitations",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (organizationId) {
+      fetchInvitations();
+    }
+  }, [organizationId]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("invitations")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update the local state
+      setInvitations(invitations.filter(inv => inv.id !== id));
+      
+      toast({
+        title: "Invitation Deleted",
+        description: "The invitation has been deleted successfully",
+      });
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error: any) {
+      console.error("Error deleting invitation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete invitation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResend = async (invitation: Invitation) => {
+    try {
+      // Update the expiration date
+      const expires_at = new Date();
+      expires_at.setDate(expires_at.getDate() + 7);
+
+      const { error } = await supabase
+        .from("invitations")
+        .update({
+          expires_at: expires_at.toISOString()
+        })
+        .eq("id", invitation.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Get organization name
+      const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", organizationId)
+        .single();
+
+      if (orgError) {
+        console.error("Error getting organization:", orgError);
+      }
+
+      // In a real app, we would now send a new email with the invite link
+      
+      toast({
+        title: "Invitation Resent",
+        description: `The invitation to ${invitation.email} has been resent`,
+      });
+      
+      // Refresh the list
+      fetchInvitations();
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error: any) {
+      console.error("Error resending invitation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to resend invitation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isExpired = (expiresAt: string) => {
+    return !isAfter(new Date(expiresAt), new Date());
+  };
+
+  const getStatusBadge = (invitation: Invitation) => {
+    if (invitation.accepted_at) {
+      return <Badge variant="success">Accepted</Badge>;
+    }
+    
+    if (isExpired(invitation.expires_at)) {
+      return <Badge variant="destructive">Expired</Badge>;
+    }
+    
+    return <Badge variant="secondary">Pending</Badge>;
+  };
+
+  if (loading) {
+    return <div className="py-4 text-center">Loading invitations...</div>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-xl flex justify-between items-center">
+          <span>Pending Invitations</span>
+          <Button variant="outline" size="sm" onClick={fetchInvitations}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {invitations.length === 0 ? (
+          <div className="text-center py-4 text-muted-foreground">
+            No pending invitations
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {invitations.map((invitation) => (
+              <div 
+                key={invitation.id}
+                className="flex items-center justify-between p-3 border rounded-md"
+              >
+                <div>
+                  <div className="font-medium">{invitation.email}</div>
+                  <div className="text-sm text-muted-foreground flex items-center space-x-2">
+                    <span>Role: {invitation.role}</span>
+                    <span>•</span>
+                    <span>Sent: {format(new Date(invitation.created_at), 'MMM d, yyyy')}</span>
+                    <span>•</span>
+                    {getStatusBadge(invitation)}
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  {!invitation.accepted_at && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleResend(invitation)}
+                        disabled={!isExpired(invitation.expires_at)}
+                      >
+                        Resend
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => handleDelete(invitation.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
