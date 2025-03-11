@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,7 @@ import { Suspense, lazy, useState, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import OrganizationProtectedRoute from "@/components/OrganizationProtectedRoute";
 
 // Lazy load pages for better performance
 const Index = lazy(() => import("./pages/Index"));
@@ -70,30 +70,32 @@ const App = () => (
         <BrowserRouter>
           <AnimatePresence mode="wait">
             <Suspense fallback={<LoadingFallback />}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/accept-invite" element={<AcceptInvitePage />} />
-                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/document/:id" 
-                  element={
-                    <ProtectedRoute>
-                      <DocumentViewer />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <OrganizationProtectedRoute>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/accept-invite" element={<AcceptInvitePage />} />
+                  <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
+                  <Route 
+                    path="/dashboard" 
+                    element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/document/:id" 
+                    element={
+                      <ProtectedRoute>
+                        <DocumentViewer />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </OrganizationProtectedRoute>
             </Suspense>
           </AnimatePresence>
         </BrowserRouter>
