@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ const CreateFirstOrganization = () => {
       }
       
       console.log("Authenticated user:", user.id);
+      console.log("Creating organization with type:", organizationType);
       
       // Call the security definer function to create the organization
       const { data: organizationId, error: orgError } = await supabase.rpc(
