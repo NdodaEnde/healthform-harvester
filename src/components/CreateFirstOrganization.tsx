@@ -50,7 +50,37 @@ const CreateFirstOrganization = () => {
       }
       
       console.log("Authenticated user:", user.id);
-      console.log("Creating organization with type:", organizationType);
+      
+      // First, check if user already has an organization
+      const { data: existingOrgs, error: existingError } = await supabase
+        .from("organization_users")
+        .select("organization_id")
+        .eq("user_id", user.id);
+        
+      if (existingError) {
+        console.error("Error checking existing organizations:", existingError);
+        throw new Error(`Failed to check existing organizations: ${existingError.message}`);
+      }
+      
+      // If user already has an organization, use that
+      if (existingOrgs && existingOrgs.length > 0) {
+        console.log("User already has an organization:", existingOrgs[0].organization_id);
+        
+        // Set the organization as current in localStorage
+        localStorage.setItem("currentOrganizationId", existingOrgs[0].organization_id);
+        
+        toast({
+          title: "Existing organization found",
+          description: "You've been connected to your existing organization.",
+        });
+        
+        // Redirect to dashboard
+        navigate("/dashboard");
+        return;
+      }
+      
+      // Only create a new organization if the user doesn't have one
+      console.log("Creating new organization with type:", organizationType);
       
       // Call the security definer function to create the organization
       const { data: organizationId, error: orgError } = await supabase.rpc(
