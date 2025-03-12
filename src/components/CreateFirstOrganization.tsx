@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,7 @@ const CreateFirstOrganization = () => {
       setError(null);
       setDetailedError(null);
       
-      // Get current user
+      // Get current user to verify they're authenticated
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
@@ -51,50 +50,16 @@ const CreateFirstOrganization = () => {
       
       console.log("Authenticated user:", user.id);
       
-      // Check if the user already has any organizations
-      const { data: existingOrgs, error: existingOrgsError } = await supabase
-        .from("organization_users")
-        .select("organization_id")
-        .eq("user_id", user.id);
-        
-      if (existingOrgsError) {
-        console.error("Error checking existing organizations:", existingOrgsError);
-        setDetailedError(existingOrgsError);
-        throw new Error(`Failed to check existing organizations: ${existingOrgsError.message}`);
-      }
+      // Call the security definer function to create the organization
+      const { data: organizationId, error: orgError } = await supabase.rpc(
+        'create_first_organization',
+        {
+          org_name: name,
+          org_type: organizationType,
+          org_email: contactEmail || null
+        }
+      );
       
-      if (existingOrgs && existingOrgs.length > 0) {
-        toast({
-          title: "Organization already exists",
-          description: "You already have an organization. Redirecting to dashboard.",
-          variant: "default",
-        });
-        
-        // Set the organization as current in localStorage
-        localStorage.setItem("currentOrganizationId", existingOrgs[0].organization_id);
-        
-        // Redirect to dashboard
-        navigate("/dashboard");
-        return;
-      }
-      
-      console.log("Creating organization with payload:", {
-        name,
-        organization_type: organizationType,
-        contact_email: contactEmail || null,
-      });
-      
-      // Step 1: Create the organization (without relying on the trigger)
-      const { data: organization, error: orgError } = await supabase
-        .from("organizations")
-        .insert({
-          name,
-          organization_type: organizationType,
-          contact_email: contactEmail || null,
-        })
-        .select()
-        .single();
-        
       if (orgError) {
         console.error("Organization creation error:", orgError);
         console.error("Organization creation error details:", {
@@ -107,28 +72,7 @@ const CreateFirstOrganization = () => {
         throw new Error(`Failed to create organization: ${orgError.message}`);
       }
       
-      console.log("Organization created successfully:", organization);
-      
-      // Step 2: Manually create the organization_users association
-      const { data: orgUser, error: associationError } = await supabase
-        .from("organization_users")
-        .insert({
-          organization_id: organization.id,
-          user_id: user.id,
-          role: 'admin'
-        })
-        .select()
-        .single();
-        
-      if (associationError) {
-        console.error("Error creating organization user association:", associationError);
-        // The organization was created, but we couldn't associate the user
-        // This is a critical error as the user won't have access to the org they created
-        setDetailedError(associationError);
-        throw new Error(`Organization created but failed to associate you with it: ${associationError.message}`);
-      }
-      
-      console.log("User associated with organization:", orgUser);
+      console.log("Organization created successfully with ID:", organizationId);
       
       toast({
         title: "Organization created",
@@ -136,7 +80,7 @@ const CreateFirstOrganization = () => {
       });
       
       // Set the organization as current in localStorage
-      localStorage.setItem("currentOrganizationId", organization.id);
+      localStorage.setItem("currentOrganizationId", organizationId);
       
       // Redirect to dashboard
       navigate("/dashboard");

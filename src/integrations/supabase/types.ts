@@ -377,6 +377,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_first_organization: {
+        Args: {
+          org_name: string
+          org_type: string
+          org_email?: string
+        }
+        Returns: string
+      }
       get_user_organizations: {
         Args: Record<PropertyKey, never>
         Returns: string[]
