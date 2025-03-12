@@ -80,6 +80,13 @@ const CreateFirstOrganization = () => {
       }
       
       // Insert organization - the trigger will automatically associate the user
+      // We'll add more detailed error handling to troubleshoot any issues
+      console.log("Creating organization with payload:", {
+        name,
+        organization_type: organizationType,
+        contact_email: contactEmail || null,
+      });
+      
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
@@ -92,11 +99,33 @@ const CreateFirstOrganization = () => {
         
       if (orgError) {
         console.error("Organization creation error:", orgError);
+        console.error("Organization creation error details:", {
+          code: orgError.code,
+          message: orgError.message,
+          details: orgError.details,
+          hint: orgError.hint
+        });
         setDetailedError(orgError);
         throw new Error(`Failed to create organization: ${orgError.message}`);
       }
       
-      console.log("Organization created:", organization);
+      console.log("Organization created successfully:", organization);
+      
+      // Verify the organization_users entry was created by the trigger
+      const { data: orgUser, error: verifyError } = await supabase
+        .from("organization_users")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .eq("user_id", user.id)
+        .single();
+        
+      if (verifyError) {
+        console.warn("Warning: Could not verify organization user association:", verifyError);
+        console.warn("This may indicate the trigger didn't work, but organization was created");
+        // We'll continue anyway, the organization was created
+      } else {
+        console.log("Organization user association verified:", orgUser);
+      }
       
       toast({
         title: "Organization created",
@@ -111,9 +140,10 @@ const CreateFirstOrganization = () => {
     } catch (error: any) {
       console.error("Error creating organization:", error);
       
-      // Determine if this is an RLS policy issue
+      // Enhanced error handling for RLS issues
       if (error.message?.includes("new row violates row-level security policy")) {
-        setError("Permission denied: Unable to create organization due to security policy restrictions. Please contact support.");
+        setError("Permission denied: Unable to create organization due to security policy restrictions. This might indicate an issue with the database trigger not firing properly.");
+        console.error("RLS policy violation. This might indicate the trigger is not working or user authentication is not being properly passed.");
       } else {
         setError(error.message || "Failed to create organization. Please try again later.");
       }
