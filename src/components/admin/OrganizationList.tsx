@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Table, 
@@ -12,22 +11,21 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
-import { Edit, Users, Link as LinkIcon } from "lucide-react";
+import { Edit, Users } from "lucide-react";
+import { Organization } from "@/types/organization";
 
-interface OrganizationData {
-  id: string;
-  name: string;
-  organization_type: string;
+type OrganizationWithStatus = Organization & {
   is_active?: boolean;
-}
+};
 
 interface OrganizationListProps {
-  organizations: OrganizationData[];
+  organizations: OrganizationWithStatus[];
 }
 
 export default function OrganizationList({ organizations }: OrganizationListProps) {
-  const [orgs, setOrgs] = useState<OrganizationData[]>(organizations);
+  const [orgs, setOrgs] = useState<OrganizationWithStatus[]>(organizations);
   
   const toggleOrganizationStatus = async (id: string, isActive: boolean) => {
     try {
@@ -79,7 +77,7 @@ export default function OrganizationList({ organizations }: OrganizationListProp
                     : org.organization_type}
               </TableCell>
               <TableCell>
-                <Badge variant={org.is_active !== false ? "default" : "destructive"}>
+                <Badge variant={org.is_active !== false ? "success" : "destructive"}>
                   {org.is_active !== false ? "Active" : "Inactive"}
                 </Badge>
               </TableCell>
@@ -95,13 +93,6 @@ export default function OrganizationList({ organizations }: OrganizationListProp
                       <Users className="h-4 w-4" />
                     </Button>
                   </Link>
-                  {org.organization_type === "service_provider" && (
-                    <Link to={`/admin/organizations/${org.id}/clients`}>
-                      <Button variant="outline" size="sm">
-                        <LinkIcon className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                  )}
                   <Button 
                     variant={org.is_active !== false ? "destructive" : "outline"} 
                     size="sm"

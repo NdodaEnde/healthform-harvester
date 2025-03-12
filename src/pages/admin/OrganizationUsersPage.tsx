@@ -9,20 +9,23 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import UserManagementList from "@/components/admin/UserManagementList";
-import { InviteUserForm } from "@/components/InviteUserForm";
+import InviteUserForm from "@/components/admin/InviteUserForm";
+import { toast } from "@/components/ui/use-toast";
 
 export default function OrganizationUsersPage() {
   const { id } = useParams<{ id: string }>();
   const [organization, setOrganization] = useState<any>(null);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     async function fetchOrganizationData() {
-      if (!id) return;
-      
       setLoading(true);
       try {
+        if (!id) {
+          throw new Error("No organization ID provided");
+        }
+        
         // Fetch organization details
         const { data: org, error: orgError } = await supabase
           .from("organizations")
@@ -47,8 +50,13 @@ export default function OrganizationUsersPage() {
           
         if (usersError) throw usersError;
         setUsers(usersData || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching organization data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load organization users",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -56,10 +64,6 @@ export default function OrganizationUsersPage() {
     
     fetchOrganizationData();
   }, [id]);
-  
-  const handleUserUpdate = (updatedUsers: any[]) => {
-    setUsers(updatedUsers);
-  };
   
   return (
     <div className="container mx-auto py-8">
@@ -85,8 +89,8 @@ export default function OrganizationUsersPage() {
               ) : (
                 <UserManagementList 
                   users={users} 
-                  organizationId={id || ''}
-                  onUpdate={handleUserUpdate}
+                  organizationId={id || ""}
+                  onUpdate={(updatedUsers) => setUsers(updatedUsers)}
                 />
               )}
             </CardContent>
@@ -99,9 +103,10 @@ export default function OrganizationUsersPage() {
               <CardTitle>Invite User</CardTitle>
             </CardHeader>
             <CardContent>
-              {organization && (
-                <InviteUserForm organizationId={id || ''} />
-              )}
+              <InviteUserForm 
+                organizationId={id || ""} 
+                onInvite={(newUser) => setUsers([...users, newUser])}
+              />
             </CardContent>
           </Card>
         </div>

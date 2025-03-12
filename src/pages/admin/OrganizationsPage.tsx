@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import OrganizationList from "@/components/admin/OrganizationList";
+import { toast } from "@/components/ui/use-toast";
 
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState([]);
@@ -27,8 +28,13 @@ export default function OrganizationsPage() {
           
         if (error) throw error;
         setOrganizations(data || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching organizations:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load organizations",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -42,8 +48,8 @@ export default function OrganizationsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Organizations</h1>
         <Link to="/admin/organizations/new">
-          <Button className="flex items-center">
-            <Plus className="mr-2 h-4 w-4" />
+          <Button className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
             Add Organization
           </Button>
         </Link>

@@ -19,32 +19,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 
-interface UserData {
+interface User {
   id: string;
   user_id: string;
   role: string;
-  created_at: string;
   profile?: {
     email: string;
   };
 }
 
 interface UserManagementListProps {
-  users: UserData[];
+  users: User[];
   organizationId: string;
-  onUpdate?: (updatedUsers: UserData[]) => void;
+  onUpdate?: (users: User[]) => void;
 }
 
 export default function UserManagementList({ users, organizationId, onUpdate }: UserManagementListProps) {
-  const [usersList, setUsersList] = useState<UserData[]>(users);
-  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
+  const [usersList, setUsersList] = useState<User[]>(users);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
   useEffect(() => {
     async function fetchCurrentUser() {
       const { data } = await supabase.auth.getUser();
-      if (data && data.user) {
-        setCurrentUser(data.user);
-      }
+      setCurrentUser(data.user);
     }
     
     fetchCurrentUser();
