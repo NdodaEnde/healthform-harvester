@@ -79,7 +79,7 @@ const CreateFirstOrganization = () => {
         return;
       }
       
-      // Insert organization in a transaction
+      // Insert organization - the trigger will automatically associate the user
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
@@ -97,21 +97,6 @@ const CreateFirstOrganization = () => {
       }
       
       console.log("Organization created:", organization);
-      
-      // Associate user with organization as admin
-      const { error: userOrgError } = await supabase
-        .from("organization_users")
-        .insert({
-          organization_id: organization.id,
-          user_id: user.id,
-          role: "admin",
-        });
-        
-      if (userOrgError) {
-        console.error("Organization user association error:", userOrgError);
-        setDetailedError(userOrgError);
-        throw new Error(`Failed to associate user with organization: ${userOrgError.message}`);
-      }
       
       toast({
         title: "Organization created",
