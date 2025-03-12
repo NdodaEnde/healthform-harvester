@@ -6,23 +6,37 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import LoadingFallback from "@/components/LoadingFallback";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const FirstTimeSetupPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        
         // Check if user is authenticated
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          setError("Failed to verify authentication status. Please try signing in again.");
+          return;
+        }
         
         if (!session) {
           // Redirect to auth if not logged in
+          console.log("No session found, redirecting to auth page");
           navigate("/auth");
           return;
         }
+        
+        console.log("User authenticated:", session.user.id);
         
         // Check if user already has organizations
         const { data: orgUsers, error } = await supabase
@@ -32,15 +46,23 @@ const FirstTimeSetupPage = () => {
           
         if (error) {
           console.error("Error checking organizations:", error);
+          setError(`Failed to check organizations: ${error.message}`);
+          return;
         }
+        
+        console.log("User organizations:", orgUsers);
         
         // If user already has organizations, redirect to dashboard
         if (orgUsers && orgUsers.length > 0) {
+          console.log("User already has organizations, redirecting to dashboard");
           navigate("/dashboard");
           return;
         }
-      } catch (error) {
+        
+        console.log("User has no organizations, showing setup page");
+      } catch (error: any) {
         console.error("Setup page error:", error);
+        setError(error.message || "An unexpected error occurred");
       } finally {
         setIsLoading(false);
       }
@@ -65,14 +87,22 @@ const FirstTimeSetupPage = () => {
       </header>
       
       <main className="flex-1 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md"
-        >
-          <CreateFirstOrganization />
-        </motion.div>
+        {error ? (
+          <Alert variant="destructive" className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md"
+          >
+            <CreateFirstOrganization />
+          </motion.div>
+        )}
       </main>
     </div>
   );

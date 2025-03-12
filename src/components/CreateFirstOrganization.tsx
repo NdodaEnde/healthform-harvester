@@ -18,6 +18,7 @@ const CreateFirstOrganization = () => {
   const [contactEmail, setContactEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailedError, setDetailedError] = useState<any>(null);
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,17 +35,24 @@ const CreateFirstOrganization = () => {
     try {
       setIsSubmitting(true);
       setError(null);
+      setDetailedError(null);
       
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (!user) {
-        throw new Error("User not authenticated");
+      if (userError) {
+        console.error("Error getting user:", userError);
+        throw new Error("Failed to get current user. Please try again or sign in again.");
       }
       
+      if (!user) {
+        throw new Error("User not authenticated. Please sign in again.");
+      }
+      
+      console.log("Authenticated user:", user.id);
       console.log("Attempting to create organization:", { name, organizationType, contactEmail });
       
-      // Insert organization with service_role key to bypass RLS
+      // Insert organization
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
@@ -57,7 +65,8 @@ const CreateFirstOrganization = () => {
         
       if (orgError) {
         console.error("Organization creation error:", orgError);
-        throw orgError;
+        setDetailedError(orgError);
+        throw new Error(`Failed to create organization: ${orgError.message}`);
       }
       
       console.log("Organization created:", organization);
@@ -73,7 +82,8 @@ const CreateFirstOrganization = () => {
         
       if (userOrgError) {
         console.error("Organization user association error:", userOrgError);
-        throw userOrgError;
+        setDetailedError(userOrgError);
+        throw new Error(`Failed to associate user with organization: ${userOrgError.message}`);
       }
       
       toast({
@@ -115,6 +125,15 @@ const CreateFirstOrganization = () => {
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
+          )}
+          
+          {detailedError && (
+            <div className="text-xs text-red-500 p-2 bg-red-50 rounded border border-red-100 mb-4">
+              <p className="font-medium">Detailed error information:</p>
+              <pre className="mt-1 overflow-x-auto">
+                {JSON.stringify(detailedError, null, 2)}
+              </pre>
+            </div>
           )}
           
           <div className="space-y-2">
