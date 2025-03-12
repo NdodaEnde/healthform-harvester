@@ -19,7 +19,33 @@ const CreateFirstOrganization = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailedError, setDetailedError] = useState<any>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+
+  const extractOrgIdFromError = (errorDetails: string): string | null => {
+    try {
+      const match = errorDetails.match(/\(organization_id, user_id\)=\(([^,]+),/);
+      return match ? match[1] : null;
+    } catch (e) {
+      console.error("Failed to extract organization ID from error:", e);
+      return null;
+    }
+  };
+
+  const getUserOrganization = async (userId: string): Promise<string | null> => {
+    try {
+      const { data: orgUsers, error } = await supabase
+        .from("organization_users")
+        .select("organization_id")
+        .eq("user_id", userId)
+        .limit(1);
+        
+      if (error) throw error;
+      
+      return orgUsers && orgUsers.length > 0 ? orgUsers[0].organization_id : null;
+    } catch (e) {
+      console.error("Error getting user organization:", e);
+      return null;
+    }
+  };
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,69 +63,38 @@ const CreateFirstOrganization = () => {
       setIsSubmitting(true);
       setError(null);
       setDetailedError(null);
-      setDebugInfo(null);
       
-      // Get current user to verify they're authenticated
+      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError) {
-        console.error("Error getting user:", userError);
-        throw new Error("Failed to get current user. Please try again or sign in again.");
+      if (userError || !user) {
+        throw new Error(userError?.message || "User not authenticated. Please sign in again.");
       }
       
-      if (!user) {
-        throw new Error("User not authenticated. Please sign in again.");
-      }
+      console.log("Authenticated user ID:", user.id);
       
-      console.log("Authenticated user:", user.id);
+      // Double-check if user already has an organization (direct DB check)
+      const existingOrgId = await getUserOrganization(user.id);
       
-      // First, check if user already has an organization
-      const { data: existingOrgs, error: existingError } = await supabase
-        .from("organization_users")
-        .select("organization_id, role, created_at")
-        .eq("user_id", user.id);
-        
-      if (existingError) {
-        console.error("Error checking existing organizations:", existingError);
-        throw new Error(`Failed to check existing organizations: ${existingError.message}`);
-      }
-      
-      // Log detailed info about existing organizations for debugging
-      console.log("Existing organizations check:", { 
-        userId: user.id,
-        existingOrgs: existingOrgs || [],
-        count: existingOrgs?.length || 0
-      });
-      
-      setDebugInfo({
-        userId: user.id,
-        existingOrgs: existingOrgs || []
-      });
-      
-      // If user already has an organization, use that
-      if (existingOrgs && existingOrgs.length > 0) {
-        console.log("User already has an organization:", existingOrgs[0].organization_id);
-        
-        // Set the organization as current in localStorage
-        localStorage.setItem("currentOrganizationId", existingOrgs[0].organization_id);
+      // If user already has an organization, use it
+      if (existingOrgId) {
+        console.log("Found existing organization:", existingOrgId);
+        localStorage.setItem("currentOrganizationId", existingOrgId);
         
         toast({
-          title: "Existing organization found",
+          title: "Organization connected",
           description: "You've been connected to your existing organization.",
         });
         
-        // Redirect to dashboard
         navigate("/dashboard");
         return;
       }
       
-      // Handle potential race condition by directly checking in the database
-      // and handling any unique constraint violation gracefully
-      console.log("Creating new organization with type:", organizationType);
-      
+      // Try to create a new organization
       try {
-        // Call the security definer function to create the organization
-        const { data: organizationId, error: orgError } = await supabase.rpc(
+        console.log("Creating new organization:", name, organizationType);
+        
+        const { data: orgId, error: createError } = await supabase.rpc(
           'create_first_organization',
           {
             org_name: name,
@@ -108,109 +103,83 @@ const CreateFirstOrganization = () => {
           }
         );
         
-        if (orgError) {
-          console.error("Organization creation error:", orgError);
-          console.error("Organization creation error details:", {
-            code: orgError.code,
-            message: orgError.message,
-            details: orgError.details,
-            hint: orgError.hint
-          });
+        if (createError) {
+          console.error("Organization creation error:", createError);
+          setDetailedError(createError);
           
-          // Handle duplicate key violation specifically
-          if (orgError.code === '23505' && orgError.message.includes('organization_users_organization_id_user_id_key')) {
-            // This means the user already belongs to this organization
-            // We can fetch the existing organization ID and proceed
-            const { data: existingOrgUsers } = await supabase
-              .from("organization_users")
-              .select("organization_id")
-              .eq("user_id", user.id)
-              .single();
-              
-            if (existingOrgUsers) {
-              // Set the organization as current in localStorage
-              localStorage.setItem("currentOrganizationId", existingOrgUsers.organization_id);
+          // Handle duplicate key error
+          if (createError.code === '23505' && createError.details?.includes('organization_users_organization_id_user_id_key')) {
+            const extractedOrgId = extractOrgIdFromError(createError.details);
+            
+            if (extractedOrgId) {
+              console.log("Extracted existing organization ID from error:", extractedOrgId);
+              localStorage.setItem("currentOrganizationId", extractedOrgId);
               
               toast({
-                title: "Organization access granted",
-                description: "You already have access to an organization.",
+                title: "Organization connected",
+                description: "You've been connected to your existing organization.",
               });
               
-              // Redirect to dashboard
+              navigate("/dashboard");
+              return;
+            }
+            
+            // If we couldn't extract the ID, try one more direct check
+            const fallbackOrgId = await getUserOrganization(user.id);
+            
+            if (fallbackOrgId) {
+              console.log("Fallback: found existing organization:", fallbackOrgId);
+              localStorage.setItem("currentOrganizationId", fallbackOrgId);
+              
+              toast({
+                title: "Organization connected",
+                description: "You've been connected to your existing organization.",
+              });
+              
               navigate("/dashboard");
               return;
             }
           }
           
-          setDetailedError(orgError);
-          throw new Error(`Failed to create organization: ${orgError.message}`);
+          throw createError;
         }
         
-        console.log("Organization created successfully with ID:", organizationId);
+        console.log("Organization created with ID:", orgId);
+        localStorage.setItem("currentOrganizationId", orgId);
         
         toast({
           title: "Organization created",
           description: `${name} has been created successfully.`,
         });
         
-        // Set the organization as current in localStorage
-        localStorage.setItem("currentOrganizationId", organizationId);
-        
-        // Redirect to dashboard
         navigate("/dashboard");
-      } catch (orgCreationError: any) {
-        // If there's a unique constraint violation, it means the user already has an org
-        // but our previous check didn't catch it (possibly due to race condition)
-        if (orgCreationError.code === '23505' || 
-            (orgCreationError.message && orgCreationError.message.includes('duplicate key value'))) {
+        return;
+      } catch (createErr: any) {
+        // Final fallback - check one more time for an organization
+        if (createErr.code === '23505') {
+          console.log("Handling duplicate key error, final attempt");
           
-          console.log("Handling duplicate key error with direct query");
+          const finalOrgId = await getUserOrganization(user.id);
           
-          // Extract the organization ID from the error message if possible
-          let orgId = null;
-          try {
-            const match = orgCreationError.details.match(/\(organization_id, user_id\)=\((.*?),/);
-            if (match && match[1]) {
-              orgId = match[1];
-              console.log("Extracted organization ID from error:", orgId);
-            }
-          } catch (e) {
-            console.error("Error extracting organization ID:", e);
-          }
-          
-          // Try to get the organization ID directly
-          if (!orgId) {
-            const { data: directOrgCheck } = await supabase
-              .from("organization_users")
-              .select("organization_id")
-              .eq("user_id", user.id)
-              .single();
-              
-            if (directOrgCheck) {
-              orgId = directOrgCheck.organization_id;
-            }
-          }
-          
-          if (orgId) {
-            // Set the organization as current in localStorage
-            localStorage.setItem("currentOrganizationId", orgId);
+          if (finalOrgId) {
+            console.log("Final attempt: found existing organization:", finalOrgId);
+            localStorage.setItem("currentOrganizationId", finalOrgId);
             
             toast({
               title: "Organization connected",
-              description: "You've been connected to your organization.",
+              description: "You've been connected to your existing organization.",
             });
             
-            // Redirect to dashboard
             navigate("/dashboard");
             return;
           }
         }
         
-        // If we reach here, it's a genuine error we couldn't handle
-        throw orgCreationError;
+        throw createErr;
       }
+      
     } catch (error: any) {
-      console.error("Error creating organization:", error);
+      console.error("Error creating/finding organization:", error);
       setError(error.message || "Failed to create organization. Please try again later.");
       
       toast({
@@ -246,15 +215,6 @@ const CreateFirstOrganization = () => {
               <p className="font-medium">Detailed error information:</p>
               <pre className="mt-1 overflow-x-auto">
                 {JSON.stringify(detailedError, null, 2)}
-              </pre>
-            </div>
-          )}
-          
-          {debugInfo && (
-            <div className="text-xs text-blue-500 p-2 bg-blue-50 rounded border border-blue-100 mb-4">
-              <p className="font-medium">Debug information:</p>
-              <pre className="mt-1 overflow-x-auto">
-                {JSON.stringify(debugInfo, null, 2)}
               </pre>
             </div>
           )}
