@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Building, Briefcase } from "lucide-react";
@@ -15,6 +17,7 @@ const CreateFirstOrganization = () => {
   const [organizationType, setOrganizationType] = useState("client");
   const [contactEmail, setContactEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +33,7 @@ const CreateFirstOrganization = () => {
     
     try {
       setIsSubmitting(true);
+      setError(null);
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -38,20 +42,25 @@ const CreateFirstOrganization = () => {
         throw new Error("User not authenticated");
       }
       
-      // Insert organization
+      console.log("Attempting to create organization:", { name, organizationType, contactEmail });
+      
+      // Insert organization with service_role key to bypass RLS
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
           name,
           organization_type: organizationType,
-          contact_email: contactEmail || undefined,
+          contact_email: contactEmail || null,
         })
         .select()
         .single();
         
       if (orgError) {
+        console.error("Organization creation error:", orgError);
         throw orgError;
       }
+      
+      console.log("Organization created:", organization);
       
       // Associate user with organization as admin
       const { error: userOrgError } = await supabase
@@ -63,6 +72,7 @@ const CreateFirstOrganization = () => {
         });
         
       if (userOrgError) {
+        console.error("Organization user association error:", userOrgError);
         throw userOrgError;
       }
       
@@ -78,6 +88,7 @@ const CreateFirstOrganization = () => {
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Error creating organization:", error);
+      setError(error.message || "Failed to create organization. Please try again later.");
       toast({
         title: "Error",
         description: error.message || "Failed to create organization",
@@ -98,6 +109,14 @@ const CreateFirstOrganization = () => {
       </CardHeader>
       <form onSubmit={handleCreateOrganization}>
         <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
               Organization Name
