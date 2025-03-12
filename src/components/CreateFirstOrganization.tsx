@@ -18,21 +18,11 @@ const CreateFirstOrganization = () => {
   const [contactEmail, setContactEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detailedError, setDetailedError] = useState<any>(null);
 
-  const extractOrgIdFromError = (errorDetails: string): string | null => {
+  // Function to directly query the user's organizations
+  const getUserOrganizations = async (userId: string): Promise<string | null> => {
     try {
-      const match = errorDetails.match(/\(organization_id, user_id\)=\(([^,]+),/);
-      return match ? match[1] : null;
-    } catch (e) {
-      console.error("Failed to extract organization ID from error:", e);
-      return null;
-    }
-  };
-
-  const getUserOrganization = async (userId: string): Promise<string | null> => {
-    try {
-      const { data: orgUsers, error } = await supabase
+      const { data, error } = await supabase
         .from("organization_users")
         .select("organization_id")
         .eq("user_id", userId)
@@ -40,9 +30,20 @@ const CreateFirstOrganization = () => {
         
       if (error) throw error;
       
-      return orgUsers && orgUsers.length > 0 ? orgUsers[0].organization_id : null;
+      return data && data.length > 0 ? data[0].organization_id : null;
     } catch (e) {
-      console.error("Error getting user organization:", e);
+      console.error("Error getting user organizations:", e);
+      return null;
+    }
+  };
+
+  // Function to extract org ID from error message
+  const extractOrgIdFromError = (errorDetails: string): string | null => {
+    try {
+      const match = errorDetails.match(/\(organization_id, user_id\)=\(([^,]+),/);
+      return match ? match[1] : null;
+    } catch (e) {
+      console.error("Failed to extract organization ID from error:", e);
       return null;
     }
   };
@@ -62,7 +63,6 @@ const CreateFirstOrganization = () => {
     try {
       setIsSubmitting(true);
       setError(null);
-      setDetailedError(null);
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -71,14 +71,13 @@ const CreateFirstOrganization = () => {
         throw new Error(userError?.message || "User not authenticated. Please sign in again.");
       }
       
-      console.log("Authenticated user ID:", user.id);
+      console.log("Creating organization for user:", user.id);
       
-      // Double-check if user already has an organization (direct DB check)
-      const existingOrgId = await getUserOrganization(user.id);
+      // Check if user already has an organization
+      const existingOrgId = await getUserOrganizations(user.id);
       
-      // If user already has an organization, use it
       if (existingOrgId) {
-        console.log("Found existing organization:", existingOrgId);
+        console.log("User already has organization:", existingOrgId);
         localStorage.setItem("currentOrganizationId", existingOrgId);
         
         toast({
@@ -92,8 +91,6 @@ const CreateFirstOrganization = () => {
       
       // Try to create a new organization
       try {
-        console.log("Creating new organization:", name, organizationType);
-        
         const { data: orgId, error: createError } = await supabase.rpc(
           'create_first_organization',
           {
@@ -104,15 +101,12 @@ const CreateFirstOrganization = () => {
         );
         
         if (createError) {
-          console.error("Organization creation error:", createError);
-          setDetailedError(createError);
-          
-          // Handle duplicate key error
+          // Special handling for duplicate key error
           if (createError.code === '23505' && createError.details?.includes('organization_users_organization_id_user_id_key')) {
+            // Try to extract the existing organization ID from the error message
             const extractedOrgId = extractOrgIdFromError(createError.details);
             
             if (extractedOrgId) {
-              console.log("Extracted existing organization ID from error:", extractedOrgId);
               localStorage.setItem("currentOrganizationId", extractedOrgId);
               
               toast({
@@ -124,11 +118,10 @@ const CreateFirstOrganization = () => {
               return;
             }
             
-            // If we couldn't extract the ID, try one more direct check
-            const fallbackOrgId = await getUserOrganization(user.id);
+            // If we couldn't extract the ID from the error, try another direct check
+            const fallbackOrgId = await getUserOrganizations(user.id);
             
             if (fallbackOrgId) {
-              console.log("Fallback: found existing organization:", fallbackOrgId);
               localStorage.setItem("currentOrganizationId", fallbackOrgId);
               
               toast({
@@ -139,6 +132,9 @@ const CreateFirstOrganization = () => {
               navigate("/dashboard");
               return;
             }
+            
+            // If we still can't get the organization ID, inform the user
+            throw new Error("You already have an organization but we couldn't determine which one. Please contact support.");
           }
           
           throw createError;
@@ -153,33 +149,12 @@ const CreateFirstOrganization = () => {
         });
         
         navigate("/dashboard");
-        return;
-      } catch (createErr: any) {
-        // Final fallback - check one more time for an organization
-        if (createErr.code === '23505') {
-          console.log("Handling duplicate key error, final attempt");
-          
-          const finalOrgId = await getUserOrganization(user.id);
-          
-          if (finalOrgId) {
-            console.log("Final attempt: found existing organization:", finalOrgId);
-            localStorage.setItem("currentOrganizationId", finalOrgId);
-            
-            toast({
-              title: "Organization connected",
-              description: "You've been connected to your existing organization.",
-            });
-            
-            navigate("/dashboard");
-            return;
-          }
-        }
-        
-        throw createErr;
+      } catch (err: any) {
+        throw err;
       }
       
     } catch (error: any) {
-      console.error("Error creating/finding organization:", error);
+      console.error("Error creating organization:", error);
       setError(error.message || "Failed to create organization. Please try again later.");
       
       toast({
@@ -208,15 +183,6 @@ const CreateFirstOrganization = () => {
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
-          )}
-          
-          {detailedError && (
-            <div className="text-xs text-red-500 p-2 bg-red-50 rounded border border-red-100 mb-4">
-              <p className="font-medium">Detailed error information:</p>
-              <pre className="mt-1 overflow-x-auto">
-                {JSON.stringify(detailedError, null, 2)}
-              </pre>
-            </div>
           )}
           
           <div className="space-y-2">
