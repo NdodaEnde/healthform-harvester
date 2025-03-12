@@ -52,7 +52,7 @@ const CreateFirstOrganization = () => {
       console.log("Authenticated user:", user.id);
       console.log("Attempting to create organization:", { name, organizationType, contactEmail });
       
-      // Insert organization
+      // Insert organization with explicit RPC call
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
