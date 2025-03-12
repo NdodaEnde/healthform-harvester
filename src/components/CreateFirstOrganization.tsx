@@ -14,7 +14,7 @@ import { Building, Briefcase } from "lucide-react";
 const CreateFirstOrganization = () => {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [organizationType, setOrganizationType] = useState("client_organization");
+  const [organizationType, setOrganizationType] = useState("direct_client");
   const [contactEmail, setContactEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,7 +152,7 @@ const CreateFirstOrganization = () => {
                 <SelectValue placeholder="Select organization type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="client_organization">
+                <SelectItem value="direct_client">
                   <div className="flex items-center">
                     <Building className="mr-2 h-4 w-4" />
                     <span>Client Organization</span>
