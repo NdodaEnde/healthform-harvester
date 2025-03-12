@@ -19,6 +19,7 @@ const CreateFirstOrganization = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailedError, setDetailedError] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +37,7 @@ const CreateFirstOrganization = () => {
       setIsSubmitting(true);
       setError(null);
       setDetailedError(null);
+      setDebugInfo(null);
       
       // Get current user to verify they're authenticated
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -54,13 +56,25 @@ const CreateFirstOrganization = () => {
       // First, check if user already has an organization
       const { data: existingOrgs, error: existingError } = await supabase
         .from("organization_users")
-        .select("organization_id")
+        .select("organization_id, role, created_at")
         .eq("user_id", user.id);
         
       if (existingError) {
         console.error("Error checking existing organizations:", existingError);
         throw new Error(`Failed to check existing organizations: ${existingError.message}`);
       }
+      
+      // Log detailed info about existing organizations for debugging
+      console.log("Existing organizations check:", { 
+        userId: user.id,
+        existingOrgs: existingOrgs || [],
+        count: existingOrgs?.length || 0
+      });
+      
+      setDebugInfo({
+        userId: user.id,
+        existingOrgs: existingOrgs || []
+      });
       
       // If user already has an organization, use that
       if (existingOrgs && existingOrgs.length > 0) {
@@ -77,6 +91,22 @@ const CreateFirstOrganization = () => {
         // Redirect to dashboard
         navigate("/dashboard");
         return;
+      }
+      
+      // As an extra check, directly query the function we made to debug
+      try {
+        const { data: funcDebugData, error: funcDebugError } = await supabase.rpc(
+          'debug_user_organizations'
+        );
+        
+        if (funcDebugError) {
+          console.warn("Unable to get debug data from function:", funcDebugError);
+        } else {
+          console.log("Function debug data:", funcDebugData);
+          setDebugInfo(prevInfo => ({ ...prevInfo, functionCheck: funcDebugData }));
+        }
+      } catch (debugErr) {
+        console.warn("Debug function error:", debugErr);
       }
       
       // Only create a new organization if the user doesn't have one
@@ -179,6 +209,15 @@ const CreateFirstOrganization = () => {
               <p className="font-medium">Detailed error information:</p>
               <pre className="mt-1 overflow-x-auto">
                 {JSON.stringify(detailedError, null, 2)}
+              </pre>
+            </div>
+          )}
+          
+          {debugInfo && (
+            <div className="text-xs text-blue-500 p-2 bg-blue-50 rounded border border-blue-100 mb-4">
+              <p className="font-medium">Debug information:</p>
+              <pre className="mt-1 overflow-x-auto">
+                {JSON.stringify(debugInfo, null, 2)}
               </pre>
             </div>
           )}
