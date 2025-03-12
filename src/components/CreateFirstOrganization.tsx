@@ -70,6 +70,32 @@ const CreateFirstOrganization = () => {
           details: orgError.details,
           hint: orgError.hint
         });
+        
+        // Handle duplicate key violation specifically
+        if (orgError.code === '23505' && orgError.message.includes('organization_users_organization_id_user_id_key')) {
+          // This means the user already belongs to this organization
+          // We can fetch the existing organization ID and proceed
+          const { data: existingOrgUsers } = await supabase
+            .from("organization_users")
+            .select("organization_id")
+            .eq("user_id", user.id)
+            .single();
+            
+          if (existingOrgUsers) {
+            // Set the organization as current in localStorage
+            localStorage.setItem("currentOrganizationId", existingOrgUsers.organization_id);
+            
+            toast({
+              title: "Organization access granted",
+              description: "You already have access to an organization.",
+            });
+            
+            // Redirect to dashboard
+            navigate("/dashboard");
+            return;
+          }
+        }
+        
         setDetailedError(orgError);
         throw new Error(`Failed to create organization: ${orgError.message}`);
       }
