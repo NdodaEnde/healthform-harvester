@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -13,27 +12,10 @@ import {
 } from "@/components/ui/form";
 import { toast } from "@/components/ui/use-toast";
 import { useForm } from "react-hook-form";
-import { Organization } from "@/types/organization";
+import { Organization, BrandingSettings, AddressData, getOrganizationBranding } from "@/types/organization";
 import { Json } from "@/integrations/supabase/types";
 
-// Define the expected branding properties
-interface BrandingSettings {
-  primary_color: string;
-  secondary_color: string;
-  text_color: string;
-}
-
-// Define the expected address properties
-interface AddressData {
-  street?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  country?: string;
-}
-
-// Define the form values
-interface FormValues {
+interface OrganizationFormValues {
   name: string;
   contact_email?: string;
   contact_phone?: string;
@@ -52,31 +34,24 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(organization?.logo_url || null);
   
-  // Parse address and branding from JSON if needed
+  // Parse address from JSON if needed
   const address = organization?.address ? 
     (typeof organization.address === 'string' ? 
       JSON.parse(organization.address as string) : 
       organization.address as unknown as AddressData) : 
     {};
   
-  const branding = organization?.settings?.branding ? 
-    (typeof organization.settings === 'string' ? 
-      JSON.parse(organization.settings as string)?.branding : 
-      (organization.settings as unknown as { branding?: BrandingSettings })?.branding) : 
-    undefined;
+  // Get branding using the helper function
+  const branding = getOrganizationBranding(organization);
   
-  const form = useForm<FormValues>({
+  const form = useForm<OrganizationFormValues>({
     defaultValues: {
       name: organization?.name || "",
       contact_email: organization?.contact_email || "",
       contact_phone: organization?.contact_phone || "",
       industry: organization?.industry || "",
-      address: address as AddressData || {},
-      branding: branding || {
-        primary_color: "#3B82F6",
-        secondary_color: "#1E40AF",
-        text_color: "#111827"
-      }
+      address: address || {},
+      branding: branding
     }
   });
   
@@ -88,7 +63,7 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
     }
   };
   
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (data: OrganizationFormValues) => {
     setIsSubmitting(true);
     
     try {
@@ -98,8 +73,11 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
       };
       
       // Prepare settings object with branding
+      const existingSettings = typeof organization.settings === 'object' ? 
+        organization.settings as Record<string, any> : {};
+        
       updatedData.settings = {
-        ...(typeof organization.settings === 'object' ? organization.settings : {}),
+        ...existingSettings,
         branding: data.branding
       } as Json;
       
