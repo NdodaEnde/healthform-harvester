@@ -56,3 +56,39 @@ export interface OrganizationFormValues {
   address: AddressData;
   branding: BrandingSettings;
 }
+
+// Function to safely extract branding information from organization settings
+export function getOrganizationBranding(organization: Organization | null): BrandingSettings {
+  // Default branding values
+  const defaultBranding: BrandingSettings = {
+    primary_color: "#0f172a",
+    secondary_color: "#6366f1",
+    text_color: "#ffffff"
+  };
+
+  if (!organization) return defaultBranding;
+
+  // Try to get branding from the organization object
+  if (organization.branding) {
+    return {
+      primary_color: organization.branding.primary_color || defaultBranding.primary_color,
+      secondary_color: organization.branding.secondary_color || defaultBranding.secondary_color,
+      text_color: organization.branding.text_color || defaultBranding.text_color
+    };
+  }
+
+  // Try to get branding from settings
+  if (organization.settings && typeof organization.settings === 'object') {
+    const settings = organization.settings as Record<string, any>;
+    
+    if (settings.branding) {
+      return {
+        primary_color: settings.branding.primary_color || defaultBranding.primary_color,
+        secondary_color: settings.branding.secondary_color || defaultBranding.secondary_color,
+        text_color: settings.branding.text_color || defaultBranding.text_color
+      };
+    }
+  }
+
+  return defaultBranding;
+}
