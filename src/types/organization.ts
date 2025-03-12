@@ -15,6 +15,11 @@ export interface Organization {
   updated_at?: string;
   is_active?: boolean;
   userRole?: string;
+  branding?: {
+    primary_color?: string;
+    secondary_color?: string;
+    text_color?: string;
+  };
 }
 
 export interface OrganizationContextType {
@@ -27,4 +32,27 @@ export interface OrganizationContextType {
   switchClient: (clientId: string | null) => void;
   isServiceProvider: () => boolean;
   getEffectiveOrganizationId: () => string | null;
+}
+
+export interface BrandingSettings {
+  primary_color: string;
+  secondary_color: string;
+  text_color: string;
+}
+
+export interface AddressData {
+  street?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
+export interface OrganizationFormValues {
+  name: string;
+  contact_email: string;
+  contact_phone: string;
+  industry: string;
+  address: AddressData;
+  branding: BrandingSettings;
 }
