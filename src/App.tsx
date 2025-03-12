@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const UpdatePasswordPage = lazy(() => import("./pages/UpdatePasswordPage"));
+const FirstTimeSetupPage = lazy(() => import("./pages/FirstTimeSetupPage"));
 
 // Loading fallback
 import LoadingFallback from "./components/LoadingFallback";
@@ -77,6 +79,7 @@ const App = () => (
                   <Route path="/auth/accept-invite" element={<AcceptInvitePage />} />
                   <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
+                  <Route path="/setup" element={<FirstTimeSetupPage />} />
                   <Route 
                     path="/dashboard" 
                     element={

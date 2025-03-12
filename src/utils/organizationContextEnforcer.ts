@@ -27,16 +27,8 @@ export const useOrganizationEnforcer = () => {
       // If authenticated but no organization context is available (after loading is complete)
       if (!loading && !currentOrganization && userOrganizations.length === 0) {
         // This means the user is authenticated but doesn't belong to any organization
-        toast({
-          title: "Organization Required",
-          description: "You need to be part of an organization to access this application.",
-          variant: "destructive",
-        });
-        
-        // You might want to redirect to a specific page where users can request org access
-        // For now, we'll just sign them out
-        await supabase.auth.signOut();
-        navigate("/auth");
+        // Redirect to first-time setup page instead of signing out
+        navigate("/setup");
       }
     };
     
@@ -47,7 +39,7 @@ export const useOrganizationEnforcer = () => {
 };
 
 // Public routes that don't require organization context
-export const PUBLIC_ROUTES = ["/", "/auth", "/auth/accept-invite", "/auth/reset-password", "/auth/update-password"];
+export const PUBLIC_ROUTES = ["/", "/auth", "/auth/accept-invite", "/auth/reset-password", "/auth/update-password", "/setup"];
 
 // Helper to check if a route is public
 export const isPublicRoute = (pathname: string) => {
