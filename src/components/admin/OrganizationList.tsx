@@ -16,9 +16,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Edit, Users } from "lucide-react";
 import { Organization } from "@/types/organization";
 
-type OrganizationWithStatus = Organization & {
-  is_active?: boolean;
-};
+type OrganizationWithStatus = Organization;
 
 interface OrganizationListProps {
   organizations: OrganizationWithStatus[];
@@ -77,7 +75,7 @@ export default function OrganizationList({ organizations }: OrganizationListProp
                     : org.organization_type}
               </TableCell>
               <TableCell>
-                <Badge variant={org.is_active !== false ? "success" : "destructive"}>
+                <Badge variant={org.is_active !== false ? "default" : "destructive"}>
                   {org.is_active !== false ? "Active" : "Inactive"}
                 </Badge>
               </TableCell>
