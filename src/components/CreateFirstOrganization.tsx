@@ -52,7 +52,34 @@ const CreateFirstOrganization = () => {
       console.log("Authenticated user:", user.id);
       console.log("Attempting to create organization:", { name, organizationType, contactEmail });
       
-      // Insert organization with explicit RPC call
+      // First, check if the user already has any organizations
+      const { data: existingOrgs, error: existingOrgsError } = await supabase
+        .from("organization_users")
+        .select("organization_id")
+        .eq("user_id", user.id);
+        
+      if (existingOrgsError) {
+        console.error("Error checking existing organizations:", existingOrgsError);
+        setDetailedError(existingOrgsError);
+        throw new Error(`Failed to check existing organizations: ${existingOrgsError.message}`);
+      }
+      
+      if (existingOrgs && existingOrgs.length > 0) {
+        toast({
+          title: "Organization already exists",
+          description: "You already have an organization. Redirecting to dashboard.",
+          variant: "default",
+        });
+        
+        // Set the organization as current in localStorage
+        localStorage.setItem("currentOrganizationId", existingOrgs[0].organization_id);
+        
+        // Redirect to dashboard
+        navigate("/dashboard");
+        return;
+      }
+      
+      // Insert organization in a transaction
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
@@ -98,7 +125,14 @@ const CreateFirstOrganization = () => {
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Error creating organization:", error);
-      setError(error.message || "Failed to create organization. Please try again later.");
+      
+      // Determine if this is an RLS policy issue
+      if (error.message?.includes("new row violates row-level security policy")) {
+        setError("Permission denied: Unable to create organization due to security policy restrictions. Please contact support.");
+      } else {
+        setError(error.message || "Failed to create organization. Please try again later.");
+      }
+      
       toast({
         title: "Error",
         description: error.message || "Failed to create organization",
