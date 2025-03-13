@@ -4,6 +4,9 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/Sidebar';
 import CertificateTemplate from '@/components/CertificateTemplate';
+import { Button } from '@/components/ui/button';
+import { Pencil, Save, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Basic document viewer component
 const DocumentViewer = () => {
@@ -12,6 +15,9 @@ const DocumentViewer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editedData, setEditedData] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchDocument = async () => {
@@ -48,6 +54,53 @@ const DocumentViewer = () => {
 
     fetchDocument();
   }, [id]);
+
+  // Handle edit mode toggle
+  const toggleEditMode = () => {
+    if (editMode) {
+      // Cancel edit mode
+      setEditMode(false);
+      setEditedData(null);
+    } else {
+      // Enter edit mode
+      setEditMode(true);
+      setEditedData(document.extracted_data);
+    }
+  };
+
+  // Handle data changes from certificate editor
+  const handleDataChange = (updatedData: any) => {
+    setEditedData(updatedData);
+  };
+
+  // Save edited data
+  const saveEditedData = async () => {
+    if (!id || !editedData) return;
+    
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ extracted_data: editedData })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Update local document state with new data
+      setDocument({
+        ...document,
+        extracted_data: editedData
+      });
+      
+      setEditMode(false);
+      toast.success('Certificate data updated successfully');
+    } catch (err: any) {
+      console.error('Error saving data:', err);
+      toast.error('Failed to save data: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -124,10 +177,49 @@ const DocumentViewer = () => {
             {/* Certificate Template or Document Details */}
             {isCertificateOfFitness && document.extracted_data ? (
               <div className="bg-white border rounded-lg shadow-sm overflow-hidden h-[600px]">
-                <div className="p-4 border-b bg-gray-50">
+                <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                   <h2 className="font-medium">Certificate of Fitness</h2>
+                  {editMode ? (
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={toggleEditMode}
+                        disabled={saving}
+                      >
+                        <X className="mr-1 h-4 w-4" />
+                        Cancel
+                      </Button>
+                      <Button 
+                        variant="success" 
+                        size="sm" 
+                        onClick={saveEditedData}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1" />
+                        ) : (
+                          <Save className="mr-1 h-4 w-4" />
+                        )}
+                        Save
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={toggleEditMode}
+                    >
+                      <Pencil className="mr-1 h-4 w-4" />
+                      Edit
+                    </Button>
+                  )}
                 </div>
-                <CertificateTemplate extractedData={document.extracted_data} />
+                <CertificateTemplate 
+                  extractedData={editMode ? editedData : document.extracted_data} 
+                  isEditable={editMode}
+                  onDataChange={handleDataChange}
+                />
               </div>
             ) : (
               <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
