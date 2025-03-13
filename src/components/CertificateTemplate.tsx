@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -780,4 +781,70 @@ const CertificateTemplate = ({
                                 <Checkbox 
                                   id="fitWithCondition"
                                   checked={fitnessStatus.fitWithCondition} 
-                                  onCheckedChange={(checked) => handleCheckboxChange("certification.fit_with
+                                  onCheckedChange={(checked) => handleCheckboxChange("certification.fit_with_condition", !!checked)}
+                                  className="mr-2"
+                                />
+                                <Label htmlFor="fitWithCondition">Fit with Condition</Label>
+                              </div>
+                            ) : (
+                              <div className="flex items-center">
+                                <span className="w-6 flex-shrink-0">{fitnessStatus.fitWithCondition ? '✓' : ''}</span>
+                                <span>Fit with Condition</span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 p-2">
+                            {isEditable ? (
+                              <div className="flex items-center">
+                                <Checkbox 
+                                  id="temporarilyUnfit"
+                                  checked={fitnessStatus.temporarilyUnfit} 
+                                  onCheckedChange={(checked) => handleCheckboxChange("certification.temporarily_unfit", !!checked)}
+                                  className="mr-2"
+                                />
+                                <Label htmlFor="temporarilyUnfit">Temporarily Unfit</Label>
+                              </div>
+                            ) : (
+                              <div className="flex items-center">
+                                <span className="w-6 flex-shrink-0">{fitnessStatus.temporarilyUnfit ? '✓' : ''}</span>
+                                <span>Temporarily Unfit</span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 p-2">
+                            {isEditable ? (
+                              <div className="flex items-center">
+                                <Checkbox 
+                                  id="unfit"
+                                  checked={fitnessStatus.unfit} 
+                                  onCheckedChange={(checked) => handleCheckboxChange("certification.unfit", !!checked)}
+                                  className="mr-2"
+                                />
+                                <Label htmlFor="unfit">UNFIT</Label>
+                              </div>
+                            ) : (
+                              <div className="flex items-center">
+                                <span className="w-6 flex-shrink-0">{fitnessStatus.unfit ? '✓' : ''}</span>
+                                <span>UNFIT</span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
