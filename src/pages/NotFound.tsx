@@ -20,24 +20,30 @@ const NotFound = () => {
       pathname
     );
     
-    // Show a toast notification
-    if (isDocumentUrlMismatch) {
-      toast.error("Document URL format incorrect", {
-        description: "Using 'document' instead of 'documents' in the URL. Redirecting to correct URL.",
+    // Immediately redirect if this is a document URL mismatch
+    if (isDocumentUrlMismatch && correctedPath) {
+      toast.info("Redirecting to correct document URL", {
+        description: "Using '/documents/' format instead of '/document/'",
       });
-      
-      // Auto-redirect after a short delay if this is a document URL mismatch
-      const timer = setTimeout(() => {
-        if (correctedPath) navigate(correctedPath);
-      }, 3000);
-      
-      return () => clearTimeout(timer);
+      navigate(correctedPath);
     } else {
       toast.error("Page not found", {
         description: `The page "${pathname}" does not exist or is not accessible.`,
       });
     }
   }, [pathname, navigate, isDocumentUrlMismatch, correctedPath]);
+
+  // If we're about to redirect, we can show a simpler loading state
+  if (isDocumentUrlMismatch && correctedPath) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <div className="text-center">
+          <div className="animate-spin mb-4 h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+          <p className="text-xl text-gray-700 dark:text-gray-300">Redirecting to document...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
@@ -48,18 +54,11 @@ const NotFound = () => {
         <h1 className="text-5xl font-bold mb-2 text-gray-900 dark:text-gray-100">404</h1>
         <p className="text-xl text-gray-700 dark:text-gray-300 mb-2">Page Not Found</p>
         <p className="text-gray-500 dark:text-gray-400 mb-8">
-          {isDocumentUrlMismatch 
-            ? "You're using 'document' instead of 'documents' in the URL. Redirecting you shortly..." 
-            : "The page you're looking for doesn't exist or you don't have permission to access it."}
+          The page you're looking for doesn't exist or you don't have permission to access it.
           <br />
           <span className="text-sm mt-2 block font-mono bg-gray-100 dark:bg-gray-800 p-2 rounded">
             {pathname}
           </span>
-          {correctedPath && (
-            <span className="text-sm mt-2 block font-mono bg-green-50 dark:bg-green-900 p-2 rounded border border-green-200 dark:border-green-800">
-              Correct URL: {correctedPath}
-            </span>
-          )}
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button 
@@ -77,16 +76,6 @@ const NotFound = () => {
             <Home className="mr-2 h-4 w-4" />
             Return to Home
           </Button>
-          {correctedPath && (
-            <Button 
-              onClick={() => navigate(correctedPath)}
-              variant="default"
-              className="flex items-center bg-green-600 hover:bg-green-700"
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Go to Document
-            </Button>
-          )}
         </div>
       </div>
     </div>
