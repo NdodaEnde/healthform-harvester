@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -79,7 +80,7 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
       updatedData.settings = {
         ...existingSettings,
         branding: data.branding
-      } as Json;
+      } as unknown as Json;
       
       // Upload logo if a new file was selected
       if (logoFile) {

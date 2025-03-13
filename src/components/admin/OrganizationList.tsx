@@ -16,14 +16,12 @@ import { toast } from "@/components/ui/use-toast";
 import { Edit, Users } from "lucide-react";
 import { Organization } from "@/types/organization";
 
-type OrganizationWithStatus = Organization;
-
 interface OrganizationListProps {
-  organizations: OrganizationWithStatus[];
+  organizations: Organization[];
 }
 
 export default function OrganizationList({ organizations }: OrganizationListProps) {
-  const [orgs, setOrgs] = useState<OrganizationWithStatus[]>(organizations);
+  const [orgs, setOrgs] = useState<Organization[]>(organizations);
   
   const toggleOrganizationStatus = async (id: string, isActive: boolean) => {
     try {
