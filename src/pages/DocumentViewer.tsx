@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,6 +65,7 @@ const DocumentViewer = () => {
     } else {
       // Enter edit mode
       setEditMode(true);
+      // Create a deep copy of the data to avoid reference issues
       setEditedData(JSON.parse(JSON.stringify(document.extracted_data)));
     }
   };
@@ -71,7 +73,8 @@ const DocumentViewer = () => {
   // Handle data changes from certificate editor
   const handleDataChange = (updatedData: any) => {
     console.log("Data changed in DocumentViewer:", updatedData);
-    setEditedData(updatedData);
+    // Create a new copy to ensure React detects the change
+    setEditedData({...updatedData});
   };
 
   // Save edited data
