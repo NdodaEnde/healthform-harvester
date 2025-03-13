@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -158,9 +157,9 @@ const DocumentViewer = () => {
       <Sidebar />
       <div className="flex-1 ml-64">
         <div className="container py-10">
-          <h1 className="text-2xl font-bold mb-6">{document.file_name}</h1>
+          <h1 className="text-2xl font-bold mb-6">{document?.file_name}</h1>
           
-          {/* Toggle for hiding original document - only show for certificates with data */}
+          {/* Toggle for hiding original document */}
           {isCertificateOfFitness && document.extracted_data && (
             <div className="mb-6 flex items-center space-x-2">
               <Button 
@@ -185,7 +184,7 @@ const DocumentViewer = () => {
           )}
           
           <div className={`grid ${hideOriginal ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
-            {/* Document Preview - hide when toggle is active */}
+            {/* Document Preview */}
             {!hideOriginal && (
               <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
                 <div className="p-4 border-b bg-gray-50">
