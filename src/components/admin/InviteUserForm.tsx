@@ -50,10 +50,9 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
     setIsSubmitting(true);
     
     try {
-      // TODO: Replace with actual invitation logic
-      // For now, we'll just create a mock response
+      // TODO: Replace with actual invitation logic via Supabase
+      // For now, we're using mock data since we don't have the invitation API set up yet
       
-      // Mock successful invitation
       console.log("Inviting user:", data.email, "with role:", data.role, "to organization:", organizationId);
       
       toast({

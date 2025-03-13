@@ -41,6 +41,8 @@ export default function ClientRelationshipTable({
     if (!type) return "";
     
     switch (type) {
+      case "direct_client":
+        return "Direct Client";
       case "client":
         return "Client";
       default:

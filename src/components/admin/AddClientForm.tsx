@@ -93,6 +93,8 @@ export default function AddClientForm({
   
   const formatOrgType = (type: string) => {
     switch (type) {
+      case "direct_client":
+        return "Direct Client";
       case "client":
         return "Client";
       default:
