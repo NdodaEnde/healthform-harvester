@@ -77,8 +77,15 @@ const DocumentViewer = () => {
     );
   }
 
-  // Check if this is a certificate of fitness document
-  const isCertificateOfFitness = document.document_type === 'certificate-of-fitness';
+  // Check if this is a certificate of fitness document - handle different variations of the type name
+  const isCertificateOfFitness = 
+    document.document_type === 'certificate-of-fitness' || 
+    document.document_type === 'certificate-fitness' || 
+    document.document_type === 'certificate_of_fitness';
+
+  console.log('Document type:', document.document_type);
+  console.log('Is certificate of fitness:', isCertificateOfFitness);
+  console.log('Has extracted data:', !!document.extracted_data);
 
   return (
     <div className="min-h-screen bg-background flex">
