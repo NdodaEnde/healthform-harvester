@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,9 +6,6 @@ import CertificateTemplate from '@/components/CertificateTemplate';
 import { Button } from '@/components/ui/button';
 import { Pencil, Save, X, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { Toggle } from '@/components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 // Basic document viewer component
 const DocumentViewer = () => {
@@ -68,7 +64,7 @@ const DocumentViewer = () => {
     } else {
       // Enter edit mode
       setEditMode(true);
-      setEditedData(document.extracted_data);
+      setEditedData(JSON.parse(JSON.stringify(document.extracted_data)));
     }
   };
 
