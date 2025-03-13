@@ -66,8 +66,8 @@ const DocumentViewer = () => {
     } else {
       // Enter edit mode
       setEditMode(true);
-      // Create a deep copy of the data to avoid reference issues
-      setEditedData(JSON.parse(JSON.stringify(document.extracted_data || {})));
+      // Make sure to create a deep copy of the extracted_data to avoid reference issues
+      setEditedData(document.extracted_data ? JSON.parse(JSON.stringify(document.extracted_data)) : {});
     }
   };
 
@@ -208,20 +208,41 @@ const DocumentViewer = () => {
             <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
               <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                 <h2 className="font-medium">Edit Certificate of Fitness</h2>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={toggleEditMode}
-                >
-                  <X className="mr-1 h-4 w-4" />
-                  Cancel
-                </Button>
+                <div className="space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={toggleEditMode}
+                  >
+                    <X className="mr-1 h-4 w-4" />
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={saveEditedData}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin mr-1 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-1 h-4 w-4" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
               <CertificateValidator 
                 documentId={id || ''}
                 extractedData={document.extracted_data}
                 onSave={handleValidatorSave}
                 onCancel={handleValidatorCancel}
+                initialData={editedData}
               />
             </div>
           ) : (
