@@ -76,24 +76,43 @@ export default function OrganizationClientsPage() {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First get the relationship records
+      const { data: relationships, error: relationshipsError } = await supabase
         .from("organization_relationships")
         .select(`
           id,
           client_id,
           is_active,
-          relationship_start_date,
-          client:client_id (
-            id,
-            name,
-            organization_type,
-            contact_email
-          )
+          relationship_start_date
         `)
         .eq("service_provider_id", id);
         
-      if (error) throw error;
-      setClients(data || []);
+      if (relationshipsError) throw relationshipsError;
+      
+      // Now fetch the client details for each relationship
+      if (relationships && relationships.length > 0) {
+        const clientIds = relationships.map(rel => rel.client_id);
+        
+        const { data: clientsData, error: clientsError } = await supabase
+          .from("organizations")
+          .select("id, name, organization_type, contact_email")
+          .in("id", clientIds);
+          
+        if (clientsError) throw clientsError;
+        
+        // Combine the data
+        const clientsWithDetails: ClientRelationship[] = relationships.map(rel => {
+          const clientDetails = clientsData?.find(c => c.id === rel.client_id);
+          return {
+            ...rel,
+            client: clientDetails
+          };
+        });
+        
+        setClients(clientsWithDetails);
+      } else {
+        setClients([]);
+      }
     } catch (error: any) {
       console.error("Error fetching clients:", error);
       toast({

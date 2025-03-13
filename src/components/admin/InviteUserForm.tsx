@@ -32,9 +32,10 @@ type FormValues = z.infer<typeof formSchema>;
 interface InviteUserFormProps {
   organizationId: string;
   onInvite?: (newUser: any) => void;
+  onUserAdded?: (newUser: any) => void;
 }
 
-export default function InviteUserForm({ organizationId, onInvite }: InviteUserFormProps) {
+export default function InviteUserForm({ organizationId, onInvite, onUserAdded }: InviteUserFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm<FormValues>({
@@ -60,15 +61,21 @@ export default function InviteUserForm({ organizationId, onInvite }: InviteUserF
         description: `Invitation has been sent to ${data.email}`,
       });
       
-      // Call onInvite callback with mock data
+      // Call callbacks with mock data
+      const mockUser = {
+        id: `temp-${Date.now()}`,
+        email: data.email,
+        role: data.role,
+        user_id: `temp-user-${Date.now()}`,
+        created_at: new Date().toISOString()
+      };
+      
       if (onInvite) {
-        onInvite({
-          id: `temp-${Date.now()}`,
-          profile: { email: data.email },
-          role: data.role,
-          user_id: null,
-          created_at: new Date().toISOString()
-        });
+        onInvite(mockUser);
+      }
+      
+      if (onUserAdded) {
+        onUserAdded(mockUser);
       }
       
       form.reset();

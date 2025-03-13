@@ -24,9 +24,7 @@ interface User {
   user_id: string;
   role: string;
   created_at: string;
-  users?: {
-    email: string;
-  };
+  email?: string;
 }
 
 interface UserTableProps {
@@ -132,7 +130,7 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
           users.map((user) => (
             <TableRow key={user.id}>
               <TableCell className="font-medium">
-                {user.users?.email || "Unknown Email"}
+                {user.email || "Unknown Email"}
                 {user.user_id === currentUser?.id && (
                   <span className="ml-2 text-xs text-gray-500">(You)</span>
                 )}
