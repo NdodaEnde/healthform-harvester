@@ -74,6 +74,7 @@ const DocumentViewer = () => {
 
   // Handle data changes from certificate editor
   const handleDataChange = (updatedData: any) => {
+    console.log("Data changed in DocumentViewer:", updatedData);
     setEditedData(updatedData);
   };
 
@@ -83,6 +84,7 @@ const DocumentViewer = () => {
     
     setSaving(true);
     try {
+      console.log("Saving data to database:", editedData);
       const { error } = await supabase
         .from('documents')
         .update({ extracted_data: editedData })
@@ -148,6 +150,8 @@ const DocumentViewer = () => {
   console.log('Document type:', document.document_type);
   console.log('Is certificate of fitness:', isCertificateOfFitness);
   console.log('Has extracted data:', !!document.extracted_data);
+  console.log('Edit mode:', editMode);
+  console.log('Edited data:', editedData);
 
   return (
     <div className="min-h-screen bg-background flex">

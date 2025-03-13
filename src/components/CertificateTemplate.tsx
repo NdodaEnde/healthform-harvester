@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -283,6 +284,8 @@ const CertificateTemplate = ({
     }
     
     current[keys[keys.length - 1]] = value;
+    console.log(`Updating path ${path} with value:`, value);
+    console.log("New data:", newData);
     
     setLocalData(newData);
     if (onDataChange) {
@@ -427,6 +430,7 @@ const CertificateTemplate = ({
         <Checkbox 
           checked={checked} 
           onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
+          id={`checkbox-${path}`}
         />
       );
     }
