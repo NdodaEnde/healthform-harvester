@@ -241,22 +241,22 @@ const CertificateTemplate = ({
       if (obj.markdown && typeof obj.markdown === 'string') {
         console.log(`Found markdown at deep path: ${path}.markdown`);
         return obj.markdown;
+      }
+      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
+        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
+        return obj.raw_response.data.markdown;
+      }
+      if (obj.data && obj.data.markdown) {
+        console.log(`Found markdown at deep path: ${path}.data.markdown`);
+        return obj.data.markdown;
+      }
+      for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+          const result = searchForMarkdown(obj[key], `${path}.${key}`);
+          if (result) return result;
         }
-        if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
-            console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
-            return obj.raw_response.data.markdown;
-        }
-        if (obj.data && obj.data.markdown) {
-            console.log(`Found markdown at deep path: ${path}.data.markdown`);
-            return obj.data.markdown;
-        }
-        for (const key in obj) {
-            if (typeof obj[key] === 'object' && obj[key] !== null) {
-                const result = searchForMarkdown(obj[key], `${path}.${key}`);
-                if (result) return result;
-            }
-        }
-        return null;
+      }
+      return null;
     };
     
     const deepMarkdown = searchForMarkdown(data);
@@ -413,7 +413,7 @@ const CertificateTemplate = ({
           <Input 
             className="border-b border-gray-400 flex-1 h-7 px-1 py-0 text-sm"
             value={value || ''}
-            onChange={(e) => handleTextChange(`structured_data.${path}`, e)}
+            onChange={(e) => handleTextChange(path, e)}
           />
         </div>
       );
@@ -431,7 +431,7 @@ const CertificateTemplate = ({
       return (
         <Checkbox 
           checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(`structured_data.${path}`, !!checked)}
+          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
           id={`checkbox-${path}`}
         />
       );
@@ -709,4 +709,80 @@ const CertificateTemplate = ({
                                 onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.heights_done", !!checked)}
                               />
                             ) : (
-                              medicalTests.heights.done ?
+                              medicalTests.heights.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.heights.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.heights_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.heights.results
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
+                          <td className="border border-gray-400 text-center">
+                            {isEditable ? (
+                              <Checkbox 
+                                checked={medicalTests.lungFunction.done} 
+                                onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.lung_function_done", !!checked)}
+                              />
+                            ) : (
+                              medicalTests.lungFunction.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.lungFunction.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.lung_function_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.lungFunction.results
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
+                          <td className="border border-gray-400 text-center">
+                            {isEditable ? (
+                              <Checkbox 
+                                checked={medicalTests.xRay.done} 
+                                onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.x_ray_done", !!checked)}
+                              />
+                            ) : (
+                              medicalTests.xRay.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.xRay.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.x_ray_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.xRay.results
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
