@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,6 +65,7 @@ const DocumentViewer = () => {
     } else {
       // Enter edit mode
       setEditMode(true);
+      // Create a deep copy to avoid modifying the original object directly
       setEditedData(JSON.parse(JSON.stringify(document.extracted_data)));
     }
   };
