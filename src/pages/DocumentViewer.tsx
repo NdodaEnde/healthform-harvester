@@ -5,8 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/Sidebar';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import { Button } from '@/components/ui/button';
-import { Pencil, Save, X } from 'lucide-react';
+import { Pencil, Save, X, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
+import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 // Basic document viewer component
 const DocumentViewer = () => {
@@ -18,6 +21,7 @@ const DocumentViewer = () => {
   const [editMode, setEditMode] = useState(false);
   const [editedData, setEditedData] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [hideOriginal, setHideOriginal] = useState(false);
 
   useEffect(() => {
     const fetchDocument = async () => {
@@ -102,6 +106,11 @@ const DocumentViewer = () => {
     }
   };
 
+  // Toggle visibility of original document
+  const toggleOriginalVisibility = () => {
+    setHideOriginal(!hideOriginal);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex">
@@ -147,36 +156,62 @@ const DocumentViewer = () => {
         <div className="container py-10">
           <h1 className="text-2xl font-bold mb-6">{document.file_name}</h1>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Document Preview */}
-            <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
-              <div className="p-4 border-b bg-gray-50">
-                <h2 className="font-medium">Document Preview</h2>
-              </div>
-              <div className="p-4">
-                {fileUrl ? (
-                  document.file_name.endsWith('.pdf') ? (
-                    <iframe 
-                      src={fileUrl} 
-                      className="w-full h-[600px]" 
-                      title="Document Preview"
-                    />
-                  ) : (
-                    <img 
-                      src={fileUrl} 
-                      alt="Document Preview" 
-                      className="max-w-full" 
-                    />
-                  )
+          {/* Toggle for hiding original document - only show for certificates with data */}
+          {isCertificateOfFitness && document.extracted_data && (
+            <div className="mb-6 flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={toggleOriginalVisibility}
+                className="flex items-center gap-2"
+              >
+                {hideOriginal ? (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Show Original Document
+                  </>
                 ) : (
-                  <p>No preview available</p>
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Hide Original Document
+                  </>
                 )}
-              </div>
+              </Button>
             </div>
+          )}
+          
+          <div className={`grid ${hideOriginal ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
+            {/* Document Preview - hide when toggle is active */}
+            {!hideOriginal && (
+              <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                <div className="p-4 border-b bg-gray-50">
+                  <h2 className="font-medium">Document Preview</h2>
+                </div>
+                <div className="p-4">
+                  {fileUrl ? (
+                    document.file_name.endsWith('.pdf') ? (
+                      <iframe 
+                        src={fileUrl} 
+                        className="w-full h-[600px]" 
+                        title="Document Preview"
+                      />
+                    ) : (
+                      <img 
+                        src={fileUrl} 
+                        alt="Document Preview" 
+                        className="max-w-full" 
+                      />
+                    )
+                  ) : (
+                    <p>No preview available</p>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* Certificate Template or Document Details */}
             {isCertificateOfFitness && document.extracted_data ? (
-              <div className="bg-white border rounded-lg shadow-sm overflow-hidden h-[600px]">
+              <div className={`bg-white border rounded-lg shadow-sm overflow-hidden h-[600px] ${hideOriginal ? 'max-w-4xl mx-auto' : ''}`}>
                 <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                   <h2 className="font-medium">Certificate of Fitness</h2>
                   {editMode ? (
