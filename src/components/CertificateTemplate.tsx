@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,8 +22,7 @@ const CertificateTemplate = ({
 
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
-    // Ensure we're using a deep copy to avoid reference issues
-    setLocalData(JSON.parse(JSON.stringify(extractedData)));
+    setLocalData(extractedData);
   }, [extractedData]);
 
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
@@ -209,7 +209,7 @@ const CertificateTemplate = ({
 
     const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
     if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$)/i);
+    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
     if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
     const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
     if (commentsMatch && commentsMatch[1]) {
@@ -272,10 +272,7 @@ const CertificateTemplate = ({
   };
 
   const updateNestedValue = (path: string, value: any) => {
-    if (!path) return;
-    
     const keys = path.split('.');
-    // Create a deep copy of the current data to ensure React detects the change
     const newData = JSON.parse(JSON.stringify(localData));
     let current = newData;
     
@@ -287,9 +284,7 @@ const CertificateTemplate = ({
       current = current[key];
     }
     
-    const lastKey = keys[keys.length - 1];
-    current[lastKey] = value;
-    
+    current[keys[keys.length - 1]] = value;
     console.log(`Updating path ${path} with value:`, value);
     console.log("New data:", newData);
     
@@ -332,54 +327,6 @@ const CertificateTemplate = ({
   const certification = structuredData.certification || structuredData.fitness_assessment || {};
   const testResults = examination.test_results || examination.tests || {};
 
-  console.log("Certificate template using data:", {
-    name: getValue(patient, 'name'),
-    id: getValue(patient, 'id_number'),
-    company: getValue(patient, 'company'),
-    occupation: getValue(patient, 'occupation'),
-    examDate: getValue(examination, 'date'),
-    expiryDate: getValue(certification, 'valid_until'),
-    // examinationType,
-    // fitnessStatus,
-    // medicalTests,
-    // restrictionsData
-  });
-
-  const renderField = (label: string, value: string, path: string) => {
-    if (isEditable) {
-      return (
-        <div className="flex items-center">
-          <span className="font-semibold mr-1">{label}:</span>
-          <Input 
-            className="border-b border-gray-400 flex-1 h-7 px-1 py-0 text-sm"
-            value={value || ''}
-            onChange={(e) => handleTextChange(path, e)}
-          />
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-center">
-        <span className="font-semibold mr-1">{label}:</span>
-        <span className="border-b border-gray-400 flex-1">{value}</span>
-      </div>
-    );
-  };
-
-  const renderCheckbox = (path: string, checked: boolean) => {
-    if (isEditable) {
-      return (
-        <Checkbox 
-          checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
-          id={`checkbox-${path}`}
-        />
-      );
-    }
-    return checked ? '✓' : '';
-  };
-
-  // Extract the rest of the data from the structuredData
   const fitnessStatus = {
     fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
     fitWithRestriction: isChecked(certification.fit_with_restrictions),
@@ -442,6 +389,53 @@ const CertificateTemplate = ({
     preEmployment: isChecked(examination.pre_employment) || isChecked(examination.type?.pre_employment),
     periodical: isChecked(examination.periodical) || isChecked(examination.type?.periodical),
     exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
+  };
+
+  console.log("Certificate template using data:", {
+    name: getValue(patient, 'name'),
+    id: getValue(patient, 'id_number'),
+    company: getValue(patient, 'company'),
+    occupation: getValue(patient, 'occupation'),
+    examDate: getValue(examination, 'date'),
+    expiryDate: getValue(certification, 'valid_until'),
+    examinationType,
+    fitnessStatus,
+    medicalTests,
+    restrictionsData
+  });
+
+  const renderField = (label: string, value: string, path: string) => {
+    if (isEditable) {
+      return (
+        <div className="flex items-center">
+          <span className="font-semibold mr-1">{label}:</span>
+          <Input 
+            className="border-b border-gray-400 flex-1 h-7 px-1 py-0 text-sm"
+            value={value || ''}
+            onChange={(e) => handleTextChange(path, e)}
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center">
+        <span className="font-semibold mr-1">{label}:</span>
+        <span className="border-b border-gray-400 flex-1">{value}</span>
+      </div>
+    );
+  };
+
+  const renderCheckbox = (path: string, checked: boolean) => {
+    if (isEditable) {
+      return (
+        <Checkbox 
+          checked={checked} 
+          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
+          id={`checkbox-${path}`}
+        />
+      );
+    }
+    return checked ? '✓' : '';
   };
 
   return (
@@ -713,4 +707,358 @@ const CertificateTemplate = ({
                                 checked={medicalTests.heights.done} 
                                 onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.heights_done", !!checked)}
                               />
-                            )
+                            ) : (
+                              medicalTests.heights.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.heights.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.heights_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.heights.results
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
+                          <td className="border border-gray-400 text-center">
+                            {isEditable ? (
+                              <Checkbox 
+                                checked={medicalTests.lungFunction.done} 
+                                onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.lung_function_done", !!checked)}
+                              />
+                            ) : (
+                              medicalTests.lungFunction.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.lungFunction.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.lung_function_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.lungFunction.results
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
+                          <td className="border border-gray-400 text-center">
+                            {isEditable ? (
+                              <Checkbox 
+                                checked={medicalTests.xRay.done} 
+                                onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.x_ray_done", !!checked)}
+                              />
+                            ) : (
+                              medicalTests.xRay.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.xRay.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.x_ray_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.xRay.results
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
+                          <td className="border border-gray-400 text-center">
+                            {isEditable ? (
+                              <Checkbox 
+                                checked={medicalTests.drugScreen.done} 
+                                onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.drug_screen_done", !!checked)}
+                              />
+                            ) : (
+                              medicalTests.drugScreen.done ? '✓' : ''
+                            )}
+                          </td>
+                          <td className="border border-gray-400 p-1 text-sm">
+                            {isEditable ? (
+                              <Input 
+                                className="w-full h-7 text-xs" 
+                                value={medicalTests.drugScreen.results || ''} 
+                                onChange={(e) => handleTextChange("examination_results.test_results.drug_screen_results", e)} 
+                              />
+                            ) : (
+                              medicalTests.drugScreen.results
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-4 mb-4">
+              <div className="flex items-center">
+                <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
+                <div className={`border-b border-gray-400 flex-1 ${isEditable ? 'py-1' : ''}`}>
+                  {isEditable ? (
+                    <Input 
+                      className="w-full h-7 text-sm border-none p-0" 
+                      value={getValue(certification, 'follow_up') || getValue(certification, 'referral') || ''} 
+                      onChange={(e) => handleTextChange("certification.follow_up", e)} 
+                    />
+                  ) : (
+                    getValue(certification, 'follow_up') || getValue(certification, 'referral')
+                  )}
+                </div>
+                <div className="ml-2">
+                  <div className="text-sm">
+                    <span className="font-semibold mr-1">Review Date:</span>
+                    {isEditable ? (
+                      <Input 
+                        className="w-32 h-7 text-sm border-none p-0 text-red-600" 
+                        value={getValue(certification, 'review_date') || ''} 
+                        onChange={(e) => handleTextChange("certification.review_date", e)} 
+                      />
+                    ) : (
+                      <span className="text-red-600">{getValue(certification, 'review_date')}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                Restrictions:
+              </div>
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400 text-sm">
+                  <tbody>
+                    <tr>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Heights</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.heights} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.heights", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.heights && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Dust Exposure</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.dustExposure} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.dust_exposure", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.dustExposure && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Motorized Equipment</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.motorizedEquipment} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.motorized_equipment", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Hearing Protection</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.hearingProtection} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.hearing_protection", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.hearingProtection && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Confined Spaces</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.confinedSpaces} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.confined_spaces", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.confinedSpaces && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Chemical Exposure</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.chemicalExposure} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.chemical_exposure", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.chemicalExposure && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Wear Spectacles</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.wearSpectacles} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.wear_spectacles", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.wearSpectacles && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                        <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={restrictionsData.chronicConditions} 
+                            onCheckedChange={(checked) => handleCheckboxChange("restrictions.chronic_conditions", !!checked)}
+                          />
+                        ) : (
+                          restrictionsData.chronicConditions && <div className="text-xs">✓</div>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+                FITNESS ASSESSMENT
+              </div>
+              
+              <div className="px-4">
+                <table className="w-full border border-gray-400">
+                  <tbody>
+                    <tr>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                        FIT
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={fitnessStatus.fit} 
+                            onCheckedChange={(checked) => handleCheckboxChange("certification.fit", !!checked)}
+                          />
+                        ) : (
+                          fitnessStatus.fit && <div className="text-green-600 text-lg">✓</div>
+                        )}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        Fit with Restriction
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={fitnessStatus.fitWithRestriction} 
+                            onCheckedChange={(checked) => handleCheckboxChange("certification.fit_with_restrictions", !!checked)}
+                          />
+                        ) : (
+                          fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-lg">✓</div>
+                        )}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        Fit with Condition
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={fitnessStatus.fitWithCondition} 
+                            onCheckedChange={(checked) => handleCheckboxChange("certification.fit_with_condition", !!checked)}
+                          />
+                        ) : (
+                          fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-lg">✓</div>
+                        )}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        Temporary Unfit
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={fitnessStatus.temporarilyUnfit} 
+                            onCheckedChange={(checked) => handleCheckboxChange("certification.temporarily_unfit", !!checked)}
+                          />
+                        ) : (
+                          fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-lg">✓</div>
+                        )}
+                      </th>
+                      <th className={`border border-gray-400 p-2 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        UNFIT
+                        {isEditable ? (
+                          <Checkbox 
+                            checked={fitnessStatus.unfit} 
+                            onCheckedChange={(checked) => handleCheckboxChange("certification.permanently_unfit", !!checked)}
+                          />
+                        ) : (
+                          fitnessStatus.unfit && <div className="text-red-600 text-lg">✓</div>
+                        )}
+                      </th>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="px-4 mb-4">
+              <div className="font-semibold text-sm mb-1">Comments:</div>
+              <div className="border border-gray-400 p-2 min-h-16 text-sm">
+                {isEditable ? (
+                  <Input 
+                    className="w-full border-none p-0" 
+                    value={getValue(certification, 'comments') || ''} 
+                    onChange={(e) => handleTextChange("certification.comments", e)} 
+                  />
+                ) : (
+                  getValue(certification, 'comments')
+                )}
+              </div>
+            </div>
+            
+            <div className="px-4 mb-4">
+              <div className="flex justify-between items-end">
+                <div className="flex-1">
+                  <div className="border-t border-gray-400 pt-1 mt-8 max-w-56">
+                    <div className="text-center font-semibold text-sm">SIGNATURE</div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 px-2 flex justify-center">
+                  <div className="w-fit max-w-md text-center">
+                    <p className="text-sm font-semibold">Occupational Health Practitioner / Occupational Medical</p>
+                    <p className="text-sm font-semibold">Practitioner</p>
+                    <p className="text-xs italic">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
+                    <p className="text-xs">Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
+                    <p className="text-xs">SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
+                    <p className="text-xs">Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
+                  </div>
+                </div>
+                
+                <div className="flex-1 text-right">
+                  <div className="border-t border-gray-400 pt-1 mt-8 max-w-56 ml-auto">
+                    <div className="text-center font-semibold text-sm">STAMP</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-800 text-white text-center py-2 text-xs">
+              <p>This certificate was electronically generated by BlueCollar Occupational Health Services.</p>
+              <p>© {new Date().getFullYear()} BlueCollar Health & Wellness</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </ScrollArea>
+  );
+};
+
+export default CertificateTemplate;
