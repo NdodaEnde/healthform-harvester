@@ -20,6 +20,7 @@ import { CreateOrganizationPage } from './pages/admin';
 import { EditOrganizationPage } from './pages/admin';
 import { OrganizationUsersPage } from './pages/admin';
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -69,6 +70,8 @@ function App() {
                     </OrganizationProtectedRoute>
                   } />
                   <Route path="/setup" element={<FirstTimeSetupPage />} />
+                  
+                  {/* Document Viewer - Ensure this route is correctly defined */}
                   <Route path="/documents/:id" element={
                     <OrganizationProtectedRoute>
                       <DocumentViewer />
@@ -80,6 +83,7 @@ function App() {
                 </Routes>
               </main>
               <Toaster />
+              <SonnerToaster position="top-right" />
             </OrganizationProvider>
           </AuthProvider>
         </BrowserRouter>
