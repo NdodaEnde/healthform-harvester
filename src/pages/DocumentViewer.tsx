@@ -28,11 +28,11 @@ const DocumentViewer = () => {
         setDocument(data);
 
         // Get download URL for the document
-        if (data.storage_path) {
+        if (data.file_path) {
           const { data: fileData, error: fileError } = await supabase
             .storage
             .from('medical-documents')
-            .createSignedUrl(data.storage_path, 3600); // 1 hour expiry
+            .createSignedUrl(data.file_path, 3600); // 1 hour expiry
 
           if (fileError) throw fileError;
           setFileUrl(fileData.signedUrl);
