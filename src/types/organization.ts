@@ -38,10 +38,12 @@ export interface OrganizationContextType {
   getEffectiveOrganizationId: () => string | null;
 }
 
+// Modified to have string indexing for compatibility with Record<string, string>
 export interface BrandingSettings {
   primary_color: string;
   secondary_color: string;
   text_color: string;
+  [key: string]: string; // Add index signature to make it assignable to Record<string, string>
 }
 
 export interface AddressData {
