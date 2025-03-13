@@ -241,22 +241,22 @@ const CertificateTemplate = ({
       if (obj.markdown && typeof obj.markdown === 'string') {
         console.log(`Found markdown at deep path: ${path}.markdown`);
         return obj.markdown;
-      }
-      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
-        return obj.raw_response.data.markdown;
-      }
-      if (obj.data && obj.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.data.markdown`);
-        return obj.data.markdown;
-      }
-      for (const key in obj) {
-        if (typeof obj[key] === 'object' && obj[key] !== null) {
-          const result = searchForMarkdown(obj[key], `${path}.${key}`);
-          if (result) return result;
         }
-      }
-      return null;
+        if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
+            console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
+            return obj.raw_response.data.markdown;
+        }
+        if (obj.data && obj.data.markdown) {
+            console.log(`Found markdown at deep path: ${path}.data.markdown`);
+            return obj.data.markdown;
+        }
+        for (const key in obj) {
+            if (typeof obj[key] === 'object' && obj[key] !== null) {
+                const result = searchForMarkdown(obj[key], `${path}.${key}`);
+                if (result) return result;
+            }
+        }
+        return null;
     };
     
     const deepMarkdown = searchForMarkdown(data);
@@ -413,7 +413,7 @@ const CertificateTemplate = ({
           <Input 
             className="border-b border-gray-400 flex-1 h-7 px-1 py-0 text-sm"
             value={value || ''}
-            onChange={(e) => handleTextChange(path, e)}
+            onChange={(e) => handleTextChange(`structured_data.${path}`, e)}
           />
         </div>
       );
@@ -431,7 +431,7 @@ const CertificateTemplate = ({
       return (
         <Checkbox 
           checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
+          onCheckedChange={(checked) => handleCheckboxChange(`structured_data.${path}`, !!checked)}
           id={`checkbox-${path}`}
         />
       );
@@ -709,5 +709,4 @@ const CertificateTemplate = ({
                                 onCheckedChange={(checked) => handleCheckboxChange("examination_results.test_results.heights_done", !!checked)}
                               />
                             ) : (
-                              medicalTests.heights.done ? '✓' : ''
-                            )}
+                              medicalTests.heights.done ?
