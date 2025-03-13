@@ -78,7 +78,7 @@ const Dashboard = () => {
                         <p>Type: {document.document_type}</p>
                       </CardContent>
                       <CardFooter className="flex justify-between">
-                        <Button onClick={() => window.open(`/document/${document.id}`, '_blank')}>View</Button>
+                        <Button onClick={() => window.open(`/documents/${document.id}`, '_blank')}>View</Button>
                       </CardFooter>
                     </Card>
                   ))
