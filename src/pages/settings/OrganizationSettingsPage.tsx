@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Card, 
@@ -10,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
-import { useOrganization } from "@/contexts/OrganizationContext";
 import { Organization } from "@/types/organization";
 import GeneralSettingsForm from "@/components/settings/GeneralSettingsForm";
 import BrandingSettingsForm from "@/components/settings/BrandingSettingsForm";
@@ -24,13 +24,15 @@ export default function OrganizationSettingsPage() {
   
   useEffect(() => {
     async function fetchOrganization() {
+      if (!currentOrganization?.id) {
+        setError("No organization selected");
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       try {
-        if (!currentOrganization?.id) {
-          throw new Error("No organization selected");
-        }
-        
-        // Fetch fresh organization details
+        // Fetch organization details to get the most up-to-date data
         const { data, error } = await supabase
           .from("organizations")
           .select("*")
@@ -40,9 +42,9 @@ export default function OrganizationSettingsPage() {
         if (error) throw error;
         
         setOrganization(data as Organization);
-      } catch (err: any) {
-        console.error("Error fetching organization:", err);
-        setError(err.message);
+      } catch (error: any) {
+        console.error("Error fetching organization:", error);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -52,7 +54,7 @@ export default function OrganizationSettingsPage() {
   }, [currentOrganization]);
   
   const handleUpdateOrganization = async (updatedData: Partial<Organization>) => {
-    if (!organization) return false;
+    if (!organization?.id) return false;
     
     try {
       const { error } = await supabase
@@ -71,11 +73,11 @@ export default function OrganizationSettingsPage() {
       });
       
       return true;
-    } catch (err: any) {
-      console.error("Error updating organization:", err);
+    } catch (error: any) {
+      console.error("Error updating organization:", error);
       toast({
         title: "Error",
-        description: err.message || "Failed to update settings",
+        description: error.message || "Failed to update settings",
         variant: "destructive",
       });
       return false;
@@ -90,26 +92,13 @@ export default function OrganizationSettingsPage() {
     );
   }
   
-  if (error) {
+  if (error || !organization) {
     return (
       <div className="container py-10">
         <Card>
           <CardContent className="p-8 text-center">
             <h2 className="text-xl font-bold mb-2">Error</h2>
-            <p className="text-gray-500">{error}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
-  if (!organization) {
-    return (
-      <div className="container py-10">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <h2 className="text-xl font-bold mb-2">No Organization Selected</h2>
-            <p className="text-gray-500">Please select an organization first</p>
+            <p className="text-gray-500">{error || "Failed to load organization"}</p>
           </CardContent>
         </Card>
       </div>

@@ -1,5 +1,8 @@
 
 import { useState } from "react";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -11,16 +14,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Organization } from "@/types/organization";
 
 const formSchema = z.object({
-  name: z.string().min(1, "Organization name is required"),
-  contact_email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  contact_phone: z.string().optional().or(z.literal("")),
-  industry: z.string().optional().or(z.literal("")),
+  name: z.string().min(2, { message: "Organization name is required" }),
+  contact_email: z.string().email({ message: "Invalid email address" }).optional().nullable(),
+  contact_phone: z.string().optional().nullable(),
+  industry: z.string().optional().nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -82,7 +82,7 @@ export default function GeneralSettingsForm({ organization, onUpdate }: GeneralS
             <FormItem>
               <FormLabel>Industry</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <Input {...field} value={field.value || ""} />
               </FormControl>
               <FormDescription>
                 What industry or sector does your organization operate in?
@@ -99,7 +99,7 @@ export default function GeneralSettingsForm({ organization, onUpdate }: GeneralS
             <FormItem>
               <FormLabel>Contact Email</FormLabel>
               <FormControl>
-                <Input type="email" {...field} />
+                <Input type="email" {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -113,7 +113,7 @@ export default function GeneralSettingsForm({ organization, onUpdate }: GeneralS
             <FormItem>
               <FormLabel>Contact Phone</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <Input {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -1,5 +1,8 @@
 
 import { useState } from "react";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -11,17 +14,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Organization, BrandingSettings } from "@/types/organization";
+import { toast } from "@/components/ui/use-toast";
+
+// Color validation regex
+const colorRegex = /^#([0-9A-F]{3}){1,2}$/i;
 
 const formSchema = z.object({
   branding: z.object({
-    primary_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Invalid color format"),
-    secondary_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Invalid color format"),
-    text_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Invalid color format"),
-  }),
+    primary_color: z.string().regex(colorRegex, { message: "Must be a valid hex color code" }),
+    secondary_color: z.string().regex(colorRegex, { message: "Must be a valid hex color code" }),
+    text_color: z.string().regex(colorRegex, { message: "Must be a valid hex color code" })
+  })
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -38,24 +42,29 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
   
   // Initialize branding if it doesn't exist
   const defaultBranding: BrandingSettings = {
-    primary_color: "#3B82F6",
-    secondary_color: "#1E40AF",
-    text_color: "#111827"
+    primary_color: "#0f172a",
+    secondary_color: "#6366f1",
+    text_color: "#ffffff"
   };
   
-  // Get existing branding or use defaults
-  const existingBranding = organization.branding || defaultBranding;
+  // Use existing branding or defaults
+  const currentBranding = organization?.branding || defaultBranding;
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      branding: existingBranding as BrandingSettings
+      branding: {
+        primary_color: currentBranding.primary_color || defaultBranding.primary_color,
+        secondary_color: currentBranding.secondary_color || defaultBranding.secondary_color,
+        text_color: currentBranding.text_color || defaultBranding.text_color
+      }
     }
   });
   
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
     }
@@ -65,31 +74,49 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
     setIsSubmitting(true);
     
     try {
-      const updatedData: Partial<Organization> = { ...data };
+      let updatedData: Partial<Organization> = { 
+        branding: data.branding 
+      };
       
       // Upload logo if a new file was selected
       if (logoFile) {
-        const fileExt = logoFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `logos/${fileName}`;
-        
-        // Check if storage bucket exists
         try {
-          // Try to upload
-          const { error: uploadError } = await supabase.storage
-            .from("assets")
-            .upload(filePath, logoFile);
-            
-          if (uploadError) throw uploadError;
+          // First check if the bucket exists
+          const { data: buckets } = await supabase.storage.listBuckets();
+          const assetsBucket = buckets?.find(b => b.name === "assets");
           
-          const { data: urlData } = supabase.storage
-            .from("assets")
-            .getPublicUrl(filePath);
+          if (!assetsBucket) {
+            // If the bucket doesn't exist, show an error
+            toast({
+              title: "Storage not configured",
+              description: "The assets storage bucket is not configured. Logo upload is unavailable.",
+              variant: "destructive",
+            });
+          } else {
+            const fileExt = logoFile.name.split('.').pop();
+            const fileName = `${Date.now()}.${fileExt}`;
+            const filePath = `logos/${fileName}`;
             
-          updatedData.logo_url = urlData.publicUrl;
+            const { error: uploadError } = await supabase.storage
+              .from("assets")
+              .upload(filePath, logoFile);
+              
+            if (uploadError) throw uploadError;
+            
+            const { data: urlData } = supabase.storage
+              .from("assets")
+              .getPublicUrl(filePath);
+              
+            updatedData.logo_url = urlData.publicUrl;
+          }
         } catch (error: any) {
-          console.error("Error uploading logo:", error);
-          throw new Error("Failed to upload logo. Make sure storage is configured correctly.");
+          console.error("Logo upload error:", error);
+          toast({
+            title: "Logo upload failed",
+            description: error.message || "Failed to upload logo",
+            variant: "destructive",
+          });
+          // Continue with saving other branding changes even if logo upload fails
         }
       }
       
@@ -99,9 +126,6 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
         // Reset the file input
         setLogoFile(null);
       }
-    } catch (error: any) {
-      console.error("Error updating branding:", error);
-      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -128,8 +152,8 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
               onChange={handleLogoChange} 
             />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Note: Logo upload requires storage bucket configuration
+          <p className="text-sm text-muted-foreground mt-2">
+            Recommended size: 512x512px. Max file size: 2MB.
           </p>
         </div>
         
@@ -142,7 +166,7 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
               <div className="flex items-center">
                 <input
                   type="color"
-                  value={field.value || defaultBranding.primary_color}
+                  value={field.value}
                   onChange={field.onChange}
                   className="h-9 w-9 p-0 border-0"
                 />
@@ -150,7 +174,6 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
                   <Input 
                     className="ml-2" 
                     {...field} 
-                    value={field.value || defaultBranding.primary_color}
                   />
                 </FormControl>
               </div>
@@ -168,7 +191,7 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
               <div className="flex items-center">
                 <input
                   type="color"
-                  value={field.value || defaultBranding.secondary_color}
+                  value={field.value}
                   onChange={field.onChange}
                   className="h-9 w-9 p-0 border-0"
                 />
@@ -176,7 +199,6 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
                   <Input 
                     className="ml-2" 
                     {...field} 
-                    value={field.value || defaultBranding.secondary_color}
                   />
                 </FormControl>
               </div>
@@ -194,7 +216,7 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
               <div className="flex items-center">
                 <input
                   type="color"
-                  value={field.value || defaultBranding.text_color}
+                  value={field.value}
                   onChange={field.onChange}
                   className="h-9 w-9 p-0 border-0"
                 />
@@ -202,7 +224,6 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
                   <Input 
                     className="ml-2" 
                     {...field} 
-                    value={field.value || defaultBranding.text_color}
                   />
                 </FormControl>
               </div>
@@ -215,15 +236,15 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
           <h3 className="text-sm font-medium mb-2">Preview</h3>
           <div 
             className="p-4 rounded"
-            style={{ backgroundColor: form.watch("branding.primary_color") || defaultBranding.primary_color }}
+            style={{ backgroundColor: form.watch("branding.primary_color") }}
           >
             <div 
               className="p-4 rounded"
-              style={{ backgroundColor: form.watch("branding.secondary_color") || defaultBranding.secondary_color }}
+              style={{ backgroundColor: form.watch("branding.secondary_color") }}
             >
               <p 
                 className="text-center font-medium"
-                style={{ color: form.watch("branding.text_color") || defaultBranding.text_color }}
+                style={{ color: form.watch("branding.text_color") }}
               >
                 {organization?.name || "Organization Name"}
               </p>

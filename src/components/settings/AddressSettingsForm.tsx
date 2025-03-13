@@ -1,5 +1,8 @@
 
 import { useState } from "react";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -10,19 +13,16 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Organization, AddressData } from "@/types/organization";
 
 const formSchema = z.object({
   address: z.object({
-    street: z.string().optional().or(z.literal("")),
-    city: z.string().optional().or(z.literal("")),
-    state: z.string().optional().or(z.literal("")),
-    postal_code: z.string().optional().or(z.literal("")),
-    country: z.string().optional().or(z.literal("")),
-  }),
+    street: z.string().optional().nullable(),
+    city: z.string().optional().nullable(),
+    state: z.string().optional().nullable(),
+    postal_code: z.string().optional().nullable(),
+    country: z.string().optional().nullable()
+  })
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -41,16 +41,22 @@ export default function AddressSettingsForm({ organization, onUpdate }: AddressS
     city: "",
     state: "",
     postal_code: "",
-    country: "",
+    country: ""
   };
   
-  // Get current address or use defaults
-  const currentAddress = organization.address as AddressData || defaultAddress;
+  // Use existing address or defaults
+  const currentAddress = organization?.address as AddressData || defaultAddress;
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      address: currentAddress
+      address: {
+        street: currentAddress.street || "",
+        city: currentAddress.city || "",
+        state: currentAddress.state || "",
+        postal_code: currentAddress.postal_code || "",
+        country: currentAddress.country || ""
+      }
     }
   });
   
