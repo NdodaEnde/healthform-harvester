@@ -23,6 +23,7 @@ export interface Organization {
   created_at?: string;
   is_active?: boolean;
   userRole?: string;
+  branding?: Record<string, string>;
 }
 
 export interface OrganizationContextType {

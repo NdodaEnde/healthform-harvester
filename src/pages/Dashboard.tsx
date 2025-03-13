@@ -8,9 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import RlsTester from "@/components/RlsTester";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const [uploading, setUploading] = useState(false);
+  const navigate = useNavigate();
 
   const { data: documents, isLoading, error, refetch } = useQuery({
     queryKey: ['documents'],
@@ -31,6 +33,10 @@ const Dashboard = () => {
     // Refresh the documents list after upload completes
     refetch();
     setUploading(false);
+  };
+
+  const handleViewDocument = (documentId: string) => {
+    navigate(`/documents/${documentId}`);
   };
 
   return (
@@ -78,7 +84,7 @@ const Dashboard = () => {
                         <p>Type: {document.document_type}</p>
                       </CardContent>
                       <CardFooter className="flex justify-between">
-                        <Button onClick={() => window.open(`/documents/${document.id}`, '_blank')}>View</Button>
+                        <Button onClick={() => handleViewDocument(document.id)}>View</Button>
                       </CardFooter>
                     </Card>
                   ))
