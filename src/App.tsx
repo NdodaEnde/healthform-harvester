@@ -19,6 +19,7 @@ import { OrganizationsPage } from './pages/admin';
 import { CreateOrganizationPage } from './pages/admin';
 import { EditOrganizationPage } from './pages/admin';
 import { OrganizationUsersPage } from './pages/admin';
+import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
 
@@ -60,6 +61,11 @@ function App() {
                   <Route path="/admin/organizations/:id/users" element={
                     <OrganizationProtectedRoute>
                       <OrganizationUsersPage />
+                    </OrganizationProtectedRoute>
+                  } />
+                  <Route path="/admin/organizations/:id/clients" element={
+                    <OrganizationProtectedRoute>
+                      <OrganizationClientsPage />
                     </OrganizationProtectedRoute>
                   } />
                   

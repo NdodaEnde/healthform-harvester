@@ -1,96 +1,139 @@
 
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  CardDescription
 } from "@/components/ui/card";
-import UserManagementList from "@/components/admin/UserManagementList";
-import InviteUserForm from "@/components/admin/InviteUserForm";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import UserTable from "@/components/admin/UserTable";
+import InviteUserForm from "@/components/admin/InviteUserForm";
+import { Organization } from "@/types/organization";
+
+interface OrgUser {
+  id: string;
+  user_id: string;
+  role: string;
+  created_at: string;
+  users?: {
+    email: string;
+  };
+}
 
 export default function OrganizationUsersPage() {
   const { id } = useParams<{ id: string }>();
-  const [organization, setOrganization] = useState<any>(null);
-  const [users, setUsers] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [users, setUsers] = useState<OrgUser[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    async function fetchOrganizationData() {
-      setLoading(true);
-      try {
-        if (!id) {
-          throw new Error("No organization ID provided");
-        }
-        
-        // Fetch organization details
-        const { data: org, error: orgError } = await supabase
-          .from("organizations")
-          .select("*")
-          .eq("id", id)
-          .single();
-          
-        if (orgError) throw orgError;
-        setOrganization(org);
-        
-        // Fetch organization users
-        const { data: usersData, error: usersError } = await supabase
-          .from("organization_users")
-          .select(`
-            id,
-            user_id,
-            role,
-            created_at,
-            profile:user_id (email)
-          `)
-          .eq("organization_id", id);
-          
-        if (usersError) throw usersError;
-        setUsers(usersData || []);
-      } catch (error: any) {
-        console.error("Error fetching organization data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load organization users",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
+    if (id) {
+      fetchOrganization();
+      fetchUsers();
     }
-    
-    fetchOrganizationData();
   }, [id]);
   
+  const fetchOrganization = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("*")
+        .eq("id", id)
+        .single();
+        
+      if (error) throw error;
+      setOrganization(data);
+    } catch (error: any) {
+      console.error("Error fetching organization:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load organization details",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const fetchUsers = async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("organization_users")
+        .select(`
+          id,
+          user_id,
+          role,
+          created_at,
+          users:user_id (email)
+        `)
+        .eq("organization_id", id);
+        
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error: any) {
+      console.error("Error fetching organization users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load organization users",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleUserAdded = (newUser: OrgUser) => {
+    setUsers([...users, newUser]);
+  };
+  
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">
-        {loading 
-          ? "Loading..." 
-          : organization 
-            ? `${organization.name} - User Management` 
-            : "Organization not found"}
-      </h1>
+    <div className="container py-10">
+      <Button 
+        variant="ghost" 
+        className="mb-6 flex items-center gap-2"
+        onClick={() => navigate("/admin/organizations")}
+      >
+        <ArrowLeft size={16} /> Back to Organizations
+      </Button>
+      
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">
+          {organization ? organization.name : "Organization"} - Users
+        </h1>
+        {organization && (
+          <p className="text-gray-500 mt-1">
+            Manage users and permissions for this organization
+          </p>
+        )}
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Users</CardTitle>
+              <CardDescription>
+                All users who have access to this organization
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex justify-center p-4">
-                  <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-r-transparent rounded-full"></div>
+                <div className="py-8 flex justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div>
               ) : (
-                <UserManagementList 
+                <UserTable 
                   users={users} 
                   organizationId={id || ""}
-                  onUpdate={(updatedUsers) => setUsers(updatedUsers)}
+                  onUserUpdated={fetchUsers}
                 />
               )}
             </CardContent>
@@ -101,11 +144,14 @@ export default function OrganizationUsersPage() {
           <Card>
             <CardHeader>
               <CardTitle>Invite User</CardTitle>
+              <CardDescription>
+                Send an invitation to join this organization
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <InviteUserForm 
                 organizationId={id || ""} 
-                onInvite={(newUser) => setUsers([...users, newUser])}
+                onUserAdded={handleUserAdded}
               />
             </CardContent>
           </Card>
