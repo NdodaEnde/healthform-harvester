@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/Sidebar';
+import CertificateTemplate from '@/components/CertificateTemplate';
 
 // Basic document viewer component
 const DocumentViewer = () => {
@@ -76,6 +77,9 @@ const DocumentViewer = () => {
     );
   }
 
+  // Check if this is a certificate of fitness document
+  const isCertificateOfFitness = document.document_type === 'certificate-of-fitness';
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -110,40 +114,49 @@ const DocumentViewer = () => {
               </div>
             </div>
             
-            {/* Document Details */}
-            <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
-              <div className="p-4 border-b bg-gray-50">
-                <h2 className="font-medium">Document Details</h2>
+            {/* Certificate Template or Document Details */}
+            {isCertificateOfFitness && document.extracted_data ? (
+              <div className="bg-white border rounded-lg shadow-sm overflow-hidden h-[600px]">
+                <div className="p-4 border-b bg-gray-50">
+                  <h2 className="font-medium">Certificate of Fitness</h2>
+                </div>
+                <CertificateTemplate extractedData={document.extracted_data} />
               </div>
-              <div className="p-4">
-                <dl className="space-y-4">
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">File Name</dt>
-                    <dd className="mt-1">{document.file_name}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Type</dt>
-                    <dd className="mt-1">{document.document_type || 'Unknown'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Upload Date</dt>
-                    <dd className="mt-1">{new Date(document.created_at).toLocaleDateString()}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Status</dt>
-                    <dd className="mt-1">{document.status}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Extracted Data</dt>
-                    <dd className="mt-1">
-                      <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-[300px]">
-                        {document.extracted_data ? JSON.stringify(document.extracted_data, null, 2) : 'No data extracted'}
-                      </pre>
-                    </dd>
-                  </div>
-                </dl>
+            ) : (
+              <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                <div className="p-4 border-b bg-gray-50">
+                  <h2 className="font-medium">Document Details</h2>
+                </div>
+                <div className="p-4">
+                  <dl className="space-y-4">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">File Name</dt>
+                      <dd className="mt-1">{document.file_name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Type</dt>
+                      <dd className="mt-1">{document.document_type || 'Unknown'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Upload Date</dt>
+                      <dd className="mt-1">{new Date(document.created_at).toLocaleDateString()}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Status</dt>
+                      <dd className="mt-1">{document.status}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Extracted Data</dt>
+                      <dd className="mt-1">
+                        <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-[300px]">
+                          {document.extracted_data ? JSON.stringify(document.extracted_data, null, 2) : 'No data extracted'}
+                        </pre>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
