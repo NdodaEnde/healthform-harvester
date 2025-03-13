@@ -67,12 +67,14 @@ const DocumentViewer = () => {
       setEditMode(true);
       // Create a deep copy to avoid modifying the original object directly
       setEditedData(JSON.parse(JSON.stringify(document.extracted_data)));
+      console.log("Entering edit mode with data:", JSON.parse(JSON.stringify(document.extracted_data)));
     }
   };
 
   // Handle data changes from certificate editor
   const handleDataChange = (updatedData: any) => {
     console.log("Data changed in DocumentViewer:", updatedData);
+    // Make sure we're replacing the entire editedData object, not just updating properties
     setEditedData(updatedData);
   };
 
