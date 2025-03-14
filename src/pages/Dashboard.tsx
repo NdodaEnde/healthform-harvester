@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUploader from "@/components/DocumentUploader";
@@ -10,9 +9,10 @@ import { motion } from "framer-motion";
 import RlsTester from "@/components/RlsTester";
 import { useNavigate } from "react-router-dom";
 import { FileText, Plus, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const Dashboard = () => {
-  const [uploading, setUploading] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const navigate = useNavigate();
 
   const { data: documents, isLoading, error, refetch } = useQuery({
@@ -30,10 +30,10 @@ const Dashboard = () => {
     }
   });
 
-  const handleUploadComplete = () => {
+  const handleUploadComplete = (data?: any) => {
     // Refresh the documents list after upload completes
     refetch();
-    setUploading(false);
+    setShowUploadDialog(false);
   };
 
   const handleViewDocument = (documentId: string) => {
@@ -58,14 +58,25 @@ const Dashboard = () => {
             <Plus size={16} />
             <span>Add Organization</span>
           </Button>
-          <DocumentUploader onUploadComplete={handleUploadComplete}>
-            <Button className="flex items-center gap-2">
-              <Upload size={16} />
-              <span>Upload Document</span>
-            </Button>
-          </DocumentUploader>
+          <Button 
+            className="flex items-center gap-2" 
+            onClick={() => setShowUploadDialog(true)}
+          >
+            <Upload size={16} />
+            <span>Upload Document</span>
+          </Button>
         </div>
       </div>
+      
+      {/* Document Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+          </DialogHeader>
+          <DocumentUploader onUploadComplete={handleUploadComplete} />
+        </DialogContent>
+      </Dialog>
       
       <Tabs defaultValue="documents" className="w-full">
         <TabsList className="mb-8">
@@ -128,12 +139,14 @@ const Dashboard = () => {
               <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">No documents found</h3>
               <p className="text-muted-foreground mb-4">Upload your first document to get started</p>
-              <DocumentUploader onUploadComplete={handleUploadComplete}>
-                <Button variant="outline" className="mx-auto">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Document
-                </Button>
-              </DocumentUploader>
+              <Button 
+                variant="outline" 
+                className="mx-auto"
+                onClick={() => setShowUploadDialog(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Document
+              </Button>
             </div>
           )}
         </TabsContent>
