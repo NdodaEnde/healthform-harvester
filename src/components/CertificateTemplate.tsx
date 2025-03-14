@@ -103,18 +103,28 @@ const CertificateTemplate = ({
     );
   };
 
-  // Render checkbox for display or editing
-  const renderCheckbox = (path: string, checked: boolean) => {
+  // Render checkbox for display or editing - FIX HERE
+  const renderCheckbox = (label: string, path: string, checked: boolean) => {
     if (isEditable) {
       return (
-        <Checkbox 
-          checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
-          id={`checkbox-${path}`}
-        />
+        <div className="flex items-start space-x-2">
+          <Checkbox 
+            checked={checked} 
+            onCheckedChange={(value) => handleCheckboxChange(path, !!value)}
+            id={`checkbox-${path}`}
+          />
+          <Label htmlFor={`checkbox-${path}`} className="text-sm font-normal">{label}</Label>
+        </div>
       );
     }
-    return checked ? '✓' : '';
+    return (
+      <div className="flex items-start space-x-2">
+        <div className="h-4 w-4 border border-gray-300 rounded-sm flex items-center justify-center">
+          {checked ? <span className="text-xs">✓</span> : null}
+        </div>
+        <span className="text-sm font-normal">{label}</span>
+      </div>
+    );
   };
 
   // Extract data from the structure
@@ -216,6 +226,7 @@ const CertificateTemplate = ({
           renderField={renderField}
           renderCheckbox={renderCheckbox}
           getValue={getValue}
+          handleCheckboxChange={handleCheckboxChange}
         />
       </Card>
     </ScrollArea>
