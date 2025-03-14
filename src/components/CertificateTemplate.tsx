@@ -104,14 +104,20 @@ const CertificateTemplate = ({
   };
 
   // Render checkbox for display or editing
-  const renderCheckbox = (path: string, checked: boolean) => {
+  const renderCheckbox = (path: string, checked: boolean, label?: string) => {
     if (isEditable) {
       return (
-        <Checkbox 
-          checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
-          id={`checkbox-${path}`}
-        />
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            id={`checkbox-${path}`}
+            checked={checked} 
+            onCheckedChange={(checked) => {
+              console.log(`Checkbox ${path} changed to:`, checked);
+              handleCheckboxChange(path, checked === true);
+            }}
+          />
+          {label && <Label htmlFor={`checkbox-${path}`}>{label}</Label>}
+        </div>
       );
     }
     return checked ? '✓' : '';
@@ -202,7 +208,7 @@ const CertificateTemplate = ({
   };
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full max-h-screen">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <CertificateTemplateContent
           patient={patient}
