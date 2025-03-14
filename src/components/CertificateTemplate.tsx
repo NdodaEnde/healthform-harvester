@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import CertificateTemplateContent from "./CertificateTemplateContent";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 type CertificateTemplateProps = {
   extractedData: any;
