@@ -55,3 +55,49 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
     return { success: false, error };
   }
 };
+
+/**
+ * Utility to delete all files from the medical-documents storage bucket
+ */
+export const deleteAllStorageFiles = async () => {
+  try {
+    // List all files in the medical-documents bucket
+    const { data: files, error } = await supabase
+      .storage
+      .from('medical-documents')
+      .list('', { limit: 1000 });
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!files || files.length === 0) {
+      return { success: true, count: 0, message: "No files found to delete" };
+    }
+    
+    // Get all file paths
+    const filePaths = files.map(file => file.name);
+    
+    // Delete all files
+    const { error: deleteError } = await supabase
+      .storage
+      .from('medical-documents')
+      .remove(filePaths);
+    
+    if (deleteError) {
+      throw deleteError;
+    }
+    
+    return { 
+      success: true, 
+      count: filePaths.length, 
+      message: `Successfully deleted ${filePaths.length} files` 
+    };
+  } catch (error: any) {
+    console.error("Error deleting storage files:", error);
+    return { 
+      success: false, 
+      error: error.message || "An unexpected error occurred" 
+    };
+  }
+};

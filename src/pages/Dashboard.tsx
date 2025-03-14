@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUploader from "@/components/DocumentUploader";
@@ -9,14 +8,16 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import RlsTester from "@/components/RlsTester";
 import { useNavigate } from "react-router-dom";
-import { FileText, Plus, Upload } from "lucide-react";
+import { FileText, Plus, Upload, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { toast } from "@/components/ui/use-toast";
 import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
+import { StorageCleanupUtility } from "@/components/StorageCleanupUtility";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showCleanupTools, setShowCleanupTools] = useState(false);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -109,6 +110,14 @@ const Dashboard = () => {
         <div className="flex items-center gap-4 z-10 relative">
           <Button 
             variant="outline" 
+            onClick={() => setShowCleanupTools(prev => !prev)} 
+            className="flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            <span>Cleanup Tools</span>
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={() => navigate('/admin/organizations/new')} 
             className="flex items-center gap-2"
           >
@@ -148,6 +157,13 @@ const Dashboard = () => {
       {orphanedDocsCount && orphanedDocsCount > 0 && (
         <div className="mb-6">
           <OrphanedDocumentFixer />
+        </div>
+      )}
+
+      {/* Show cleanup tools if enabled */}
+      {showCleanupTools && (
+        <div className="mb-6">
+          <StorageCleanupUtility />
         </div>
       )}
       
