@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,20 +20,17 @@ const CertificateTemplate = ({
 }: CertificateTemplateProps) => {
   const [localData, setLocalData] = useState<any>(extractedData);
 
-  // Update local data when props change
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
     setLocalData(extractedData);
   }, [extractedData]);
 
-  // Helper function to check boolean values
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value).toLowerCase().trim();
     return trueValues.includes(stringValue) || value === true;
   };
 
-  // Helper function to safely get values from nested objects
   const getValue = (obj: any, path: string, defaultValue: any = '') => {
     if (!obj || !path) return defaultValue;
     const keys = path.split('.');
@@ -48,19 +44,16 @@ const CertificateTemplate = ({
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
-  // Handle text input changes
   const handleTextChange = (path: string, e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     console.log(`Text change at ${path}:`, e.target.value);
     updateNestedValue(`structured_data.${path}`, e.target.value);
   };
 
-  // Handle checkbox changes
   const handleCheckboxChange = (path: string, checked: boolean) => {
     console.log(`Checkbox change at ${path}:`, checked);
     updateNestedValue(`structured_data.${path}`, checked);
   };
 
-  // Update nested value in data object
   const updateNestedValue = (path: string, value: any) => {
     console.log(`Attempting to update path ${path} with value:`, value);
     const keys = path.split('.');
@@ -81,7 +74,6 @@ const CertificateTemplate = ({
     onDataChange(newData);
   };
 
-  // Render field for display or editing
   const renderField = (label: string, value: string, path: string) => {
     if (isEditable) {
       return (
@@ -103,8 +95,7 @@ const CertificateTemplate = ({
     );
   };
 
-  // Render checkbox for display or editing - FIX HERE
-  const renderCheckbox = (label: string, path: string, checked: boolean) => {
+  const renderCheckbox = (path: string, checked: boolean, label?: string) => {
     if (isEditable) {
       return (
         <div className="flex items-start space-x-2">
@@ -127,7 +118,6 @@ const CertificateTemplate = ({
     );
   };
 
-  // Extract data from the structure
   let structuredData: any = {};
 
   if (localData?.structured_data) {
