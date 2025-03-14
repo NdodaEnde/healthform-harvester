@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,17 +21,20 @@ const CertificateTemplate = ({
 }: CertificateTemplateProps) => {
   const [localData, setLocalData] = useState<any>(extractedData);
 
+  // Update local data when props change
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
     setLocalData(extractedData);
   }, [extractedData]);
 
+  // Helper function to check boolean values
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value).toLowerCase().trim();
     return trueValues.includes(stringValue) || value === true;
   };
 
+  // Helper function to safely get values from nested objects
   const getValue = (obj: any, path: string, defaultValue: any = '') => {
     if (!obj || !path) return defaultValue;
     const keys = path.split('.');
@@ -44,16 +48,19 @@ const CertificateTemplate = ({
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
+  // Handle text input changes
   const handleTextChange = (path: string, e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     console.log(`Text change at ${path}:`, e.target.value);
     updateNestedValue(`structured_data.${path}`, e.target.value);
   };
 
+  // Handle checkbox changes
   const handleCheckboxChange = (path: string, checked: boolean) => {
     console.log(`Checkbox change at ${path}:`, checked);
     updateNestedValue(`structured_data.${path}`, checked);
   };
 
+  // Update nested value in data object
   const updateNestedValue = (path: string, value: any) => {
     console.log(`Attempting to update path ${path} with value:`, value);
     const keys = path.split('.');
@@ -74,6 +81,7 @@ const CertificateTemplate = ({
     onDataChange(newData);
   };
 
+  // Render field for display or editing
   const renderField = (label: string, value: string, path: string) => {
     if (isEditable) {
       return (
@@ -95,29 +103,21 @@ const CertificateTemplate = ({
     );
   };
 
-  const renderCheckbox = (path: string, checked: boolean, label?: string) => {
+  // Render checkbox for display or editing
+  const renderCheckbox = (path: string, checked: boolean) => {
     if (isEditable) {
       return (
-        <div className="flex items-start space-x-2">
-          <Checkbox 
-            checked={checked} 
-            onCheckedChange={(value) => handleCheckboxChange(path, !!value)}
-            id={`checkbox-${path}`}
-          />
-          <Label htmlFor={`checkbox-${path}`} className="text-sm font-normal">{label}</Label>
-        </div>
+        <Checkbox 
+          checked={checked} 
+          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
+          id={`checkbox-${path}`}
+        />
       );
     }
-    return (
-      <div className="flex items-start space-x-2">
-        <div className="h-4 w-4 border border-gray-300 rounded-sm flex items-center justify-center">
-          {checked ? <span className="text-xs">✓</span> : null}
-        </div>
-        <span className="text-sm font-normal">{label}</span>
-      </div>
-    );
+    return checked ? '✓' : '';
   };
 
+  // Extract data from the structure
   let structuredData: any = {};
 
   if (localData?.structured_data) {
@@ -216,7 +216,6 @@ const CertificateTemplate = ({
           renderField={renderField}
           renderCheckbox={renderCheckbox}
           getValue={getValue}
-          handleCheckboxChange={handleCheckboxChange}
         />
       </Card>
     </ScrollArea>
