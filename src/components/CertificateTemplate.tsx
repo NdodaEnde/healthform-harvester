@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -201,7 +199,7 @@ const CertificateTemplate = ({
 
   return (
     <div className="w-full">
-      <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black pb-24">
+      <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <CertificateTemplateContent
           patient={patient}
           examination={examination}

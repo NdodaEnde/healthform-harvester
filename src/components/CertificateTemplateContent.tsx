@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -65,7 +64,7 @@ const CertificateTemplateContent = ({
   handleCheckboxChange
 }: CertificateTemplateContentProps) => {
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden pb-24">
       <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none" aria-hidden="true">
         <span className="text-8xl font-bold tracking-widest text-gray-400 rotate-45">
           OCCUPATIONAL HEALTH
@@ -597,7 +596,7 @@ const CertificateTemplateContent = ({
         </div>
 
         {/* MEDICAL FITNESS DECLARATION SECTION */}
-        <div className="mb-4">
+        <div className="mb-12">
           <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
             MEDICAL FITNESS DECLARATION
           </div>
