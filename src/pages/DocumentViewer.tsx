@@ -216,7 +216,7 @@ const DocumentViewer = () => {
           
           {/* Certificate Template or Document Details */}
           {isCertificateOfFitness && document.extracted_data ? (
-            <div className={`bg-white border rounded-lg shadow-sm overflow-hidden ${hideOriginal ? 'w-full max-w-4xl' : 'w-1/2'} flex flex-col`}>
+            <div className={`bg-white border rounded-lg shadow-sm overflow-auto ${hideOriginal ? 'w-full max-w-4xl' : 'w-1/2'} flex flex-col`}>
               <div className="p-4 border-b bg-gray-50 flex justify-between items-center flex-shrink-0">
                 <h2 className="font-medium">Certificate of Fitness</h2>
                 {editMode ? (
@@ -255,7 +255,7 @@ const DocumentViewer = () => {
                   </Button>
                 )}
               </div>
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto p-4">
                 <CertificateTemplate 
                   extractedData={editMode ? editedData : document.extracted_data} 
                   isEditable={editMode}

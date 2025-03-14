@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -70,6 +71,7 @@ const CertificateTemplate = ({
     
     current[keys[keys.length - 1]] = value;
     
+    console.log("Updated data:", newData);
     setLocalData(newData);
     onDataChange(newData);
   };
@@ -198,8 +200,8 @@ const CertificateTemplate = ({
   };
 
   return (
-    <ScrollArea className="h-full w-full overflow-visible">
-      <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black pb-16">
+    <div className="w-full">
+      <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black pb-24">
         <CertificateTemplateContent
           patient={patient}
           examination={examination}
@@ -216,7 +218,7 @@ const CertificateTemplate = ({
           handleCheckboxChange={handleCheckboxChange}
         />
       </Card>
-    </ScrollArea>
+    </div>
   );
 };
 
