@@ -109,9 +109,12 @@ const CertificateTemplate = ({
       return (
         <div className="flex items-center space-x-2">
           <Checkbox 
-            checked={checked} 
-            onCheckedChange={(value) => handleCheckboxChange(path, !!value)}
             id={`checkbox-${path}`}
+            checked={checked} 
+            onCheckedChange={(checked) => {
+              console.log(`Checkbox ${path} changed to:`, checked);
+              handleCheckboxChange(path, checked === true);
+            }}
           />
           {label && <Label htmlFor={`checkbox-${path}`}>{label}</Label>}
         </div>
