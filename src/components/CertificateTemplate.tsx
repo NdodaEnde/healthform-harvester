@@ -216,6 +216,8 @@ const CertificateTemplate = ({
           renderField={renderField}
           renderCheckbox={renderCheckbox}
           getValue={getValue}
+          handleTextChange={handleTextChange}
+          handleCheckboxChange={handleCheckboxChange}
         />
       </Card>
     </ScrollArea>
