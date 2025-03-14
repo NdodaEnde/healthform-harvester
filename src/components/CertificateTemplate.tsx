@@ -104,14 +104,17 @@ const CertificateTemplate = ({
   };
 
   // Render checkbox for display or editing
-  const renderCheckbox = (path: string, checked: boolean) => {
+  const renderCheckbox = (path: string, checked: boolean, label?: string) => {
     if (isEditable) {
       return (
-        <Checkbox 
-          checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
-          id={`checkbox-${path}`}
-        />
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            checked={checked} 
+            onCheckedChange={(value) => handleCheckboxChange(path, !!value)}
+            id={`checkbox-${path}`}
+          />
+          {label && <Label htmlFor={`checkbox-${path}`}>{label}</Label>}
+        </div>
       );
     }
     return checked ? '✓' : '';
