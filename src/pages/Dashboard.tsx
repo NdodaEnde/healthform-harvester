@@ -13,6 +13,7 @@ import { FileText, Plus, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { toast } from "@/components/ui/use-toast";
+import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -27,6 +28,25 @@ const Dashboard = () => {
   // Get the effective organization ID (either client organization if selected, or current organization)
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
+
+  // Check for documents without organization context
+  const { data: orphanedDocsCount } = useQuery({
+    queryKey: ['orphaned-documents-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .is('organization_id', null);
+
+      if (error) {
+        console.error('Error checking for orphaned documents:', error);
+        return 0;
+      }
+
+      return count || 0;
+    },
+    enabled: !!currentOrganization
+  });
 
   const { data: documents, isLoading, error, refetch } = useQuery({
     queryKey: ['documents', organizationId],
@@ -123,6 +143,13 @@ const Dashboard = () => {
           />
         </DialogContent>
       </Dialog>
+      
+      {/* Show orphaned document fixer if needed */}
+      {orphanedDocsCount && orphanedDocsCount > 0 && (
+        <div className="mb-6">
+          <OrphanedDocumentFixer />
+        </div>
+      )}
       
       <Tabs defaultValue="documents" className="w-full">
         <TabsList className="mb-8">
