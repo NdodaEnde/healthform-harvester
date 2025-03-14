@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUploader from "@/components/DocumentUploader";
@@ -41,7 +42,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div>
+    <div className="mt-4">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -49,7 +50,7 @@ const Dashboard = () => {
             Manage your documents and organization
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 z-10 relative">
           <Button 
             variant="outline" 
             onClick={() => navigate('/admin/organizations/new')} 
