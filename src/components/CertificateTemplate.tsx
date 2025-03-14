@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -426,6 +427,7 @@ const CertificateTemplate = ({
     );
   };
 
+  // Here's the key fix for the checkbox functionality
   const renderCheckbox = (path: string, checked: boolean) => {
     if (isEditable) {
       return (
