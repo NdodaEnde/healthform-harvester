@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -5,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import CertificateTemplateContent from "./CertificateTemplateContent";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type CertificateTemplateProps = {
   extractedData: any;
@@ -198,7 +200,7 @@ const CertificateTemplate = ({
   };
 
   return (
-    <div className="w-full">
+    <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <CertificateTemplateContent
           patient={patient}
@@ -216,7 +218,7 @@ const CertificateTemplate = ({
           handleCheckboxChange={handleCheckboxChange}
         />
       </Card>
-    </div>
+    </ScrollArea>
   );
 };
 
