@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -156,8 +155,8 @@ const DocumentViewer = () => {
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
-      <div className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
-        <div className="container py-6 flex-shrink-0">
+      <div className="flex-1 ml-64">
+        <div className="container py-10">
           <h1 className="text-2xl font-bold mb-6">{document?.file_name}</h1>
           
           {/* Toggle for hiding original document */}
@@ -183,121 +182,119 @@ const DocumentViewer = () => {
               </Button>
             </div>
           )}
-        </div>
           
-        <div className={`flex-1 overflow-auto container pb-6 ${hideOriginal ? 'grid-cols-1' : 'grid grid-cols-1 lg:grid-cols-2'} gap-6`}>
-          {/* Document Preview */}
-          {!hideOriginal && (
-            <div className="bg-white border rounded-lg shadow-sm overflow-hidden h-fit">
-              <div className="p-4 border-b bg-gray-50">
-                <h2 className="font-medium">Document Preview</h2>
-              </div>
-              <div className="p-4">
-                {fileUrl ? (
-                  document.file_name.endsWith('.pdf') ? (
-                    <iframe 
-                      src={fileUrl} 
-                      className="w-full h-[600px]" 
-                      title="Document Preview"
-                    />
+          <div className={`grid ${hideOriginal ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
+            {/* Document Preview */}
+            {!hideOriginal && (
+              <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                <div className="p-4 border-b bg-gray-50">
+                  <h2 className="font-medium">Document Preview</h2>
+                </div>
+                <div className="p-4">
+                  {fileUrl ? (
+                    document.file_name.endsWith('.pdf') ? (
+                      <iframe 
+                        src={fileUrl} 
+                        className="w-full h-[600px]" 
+                        title="Document Preview"
+                      />
+                    ) : (
+                      <img 
+                        src={fileUrl} 
+                        alt="Document Preview" 
+                        className="max-w-full" 
+                      />
+                    )
                   ) : (
-                    <img 
-                      src={fileUrl} 
-                      alt="Document Preview" 
-                      className="max-w-full" 
-                    />
-                  )
-                ) : (
-                  <p>No preview available</p>
-                )}
+                    <p>No preview available</p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Certificate Template or Document Details */}
-          {isCertificateOfFitness && document.extracted_data ? (
-            <div className={`bg-white border rounded-lg shadow-sm overflow-hidden ${hideOriginal ? 'max-w-4xl mx-auto w-full' : ''}`}>
-              <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                <h2 className="font-medium">Certificate of Fitness</h2>
-                {editMode ? (
-                  <div className="flex space-x-2">
+            )}
+            
+            {/* Certificate Template or Document Details */}
+            {isCertificateOfFitness && document.extracted_data ? (
+              <div className={`bg-white border rounded-lg shadow-sm overflow-hidden h-[600px] ${hideOriginal ? 'max-w-4xl mx-auto' : ''}`}>
+                <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                  <h2 className="font-medium">Certificate of Fitness</h2>
+                  {editMode ? (
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={toggleEditMode}
+                        disabled={saving}
+                      >
+                        <X className="mr-1 h-4 w-4" />
+                        Cancel
+                      </Button>
+                      <Button 
+                        variant="success" 
+                        size="sm" 
+                        onClick={saveEditedData}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1" />
+                        ) : (
+                          <Save className="mr-1 h-4 w-4" />
+                        )}
+                        Save
+                      </Button>
+                    </div>
+                  ) : (
                     <Button 
-                      variant="outline" 
+                      variant="secondary" 
                       size="sm" 
                       onClick={toggleEditMode}
-                      disabled={saving}
                     >
-                      <X className="mr-1 h-4 w-4" />
-                      Cancel
+                      <Pencil className="mr-1 h-4 w-4" />
+                      Edit
                     </Button>
-                    <Button 
-                      variant="success" 
-                      size="sm" 
-                      onClick={saveEditedData}
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1" />
-                      ) : (
-                        <Save className="mr-1 h-4 w-4" />
-                      )}
-                      Save
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    onClick={toggleEditMode}
-                  >
-                    <Pencil className="mr-1 h-4 w-4" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-              <div className="h-[calc(100vh-240px)] overflow-auto">
+                  )}
+                </div>
                 <CertificateTemplate 
                   extractedData={editMode ? editedData : document.extracted_data} 
                   isEditable={editMode}
                   onDataChange={handleDataChange}
                 />
               </div>
-            </div>
-          ) : (
-            <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
-              <div className="p-4 border-b bg-gray-50">
-                <h2 className="font-medium">Document Details</h2>
+            ) : (
+              <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                <div className="p-4 border-b bg-gray-50">
+                  <h2 className="font-medium">Document Details</h2>
+                </div>
+                <div className="p-4">
+                  <dl className="space-y-4">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">File Name</dt>
+                      <dd className="mt-1">{document.file_name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Type</dt>
+                      <dd className="mt-1">{document.document_type || 'Unknown'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Upload Date</dt>
+                      <dd className="mt-1">{new Date(document.created_at).toLocaleDateString()}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Status</dt>
+                      <dd className="mt-1">{document.status}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Extracted Data</dt>
+                      <dd className="mt-1">
+                        <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-[300px]">
+                          {document.extracted_data ? JSON.stringify(document.extracted_data, null, 2) : 'No data extracted'}
+                        </pre>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
-              <div className="p-4">
-                <dl className="space-y-4">
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">File Name</dt>
-                    <dd className="mt-1">{document.file_name}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Type</dt>
-                    <dd className="mt-1">{document.document_type || 'Unknown'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Upload Date</dt>
-                    <dd className="mt-1">{new Date(document.created_at).toLocaleDateString()}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Status</dt>
-                    <dd className="mt-1">{document.status}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Extracted Data</dt>
-                    <dd className="mt-1">
-                      <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-[300px]">
-                        {document.extracted_data ? JSON.stringify(document.extracted_data, null, 2) : 'No data extracted'}
-                      </pre>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
