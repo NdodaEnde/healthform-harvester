@@ -202,26 +202,22 @@ const CertificateTemplate = ({
   };
 
   return (
-    <ScrollArea className="h-full w-full">
-      <div className="w-full max-w-3xl mx-auto font-sans text-black p-6">
-        <Card className="border-0 shadow-none bg-white">
-          <CertificateTemplateContent
-            patient={patient}
-            examination={examination}
-            certification={certification}
-            examinationType={examinationType}
-            medicalTests={medicalTests}
-            restrictionsData={restrictionsData}
-            fitnessStatus={fitnessStatus}
-            isEditable={isEditable}
-            renderField={renderField}
-            renderCheckbox={renderCheckbox}
-            getValue={getValue}
-            handleTextChange={handleTextChange}
-            handleCheckboxChange={handleCheckboxChange}
-          />
-        </Card>
-      </div>
+    <ScrollArea className="h-full">
+      <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
+        <CertificateTemplateContent
+          patient={patient}
+          examination={examination}
+          certification={certification}
+          examinationType={examinationType}
+          medicalTests={medicalTests}
+          restrictionsData={restrictionsData}
+          fitnessStatus={fitnessStatus}
+          isEditable={isEditable}
+          renderField={renderField}
+          renderCheckbox={renderCheckbox}
+          getValue={getValue}
+        />
+      </Card>
     </ScrollArea>
   );
 };
