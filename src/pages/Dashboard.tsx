@@ -11,35 +11,71 @@ import RlsTester from "@/components/RlsTester";
 import { useNavigate } from "react-router-dom";
 import { FileText, Plus, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { toast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const navigate = useNavigate();
+  const { 
+    currentOrganization, 
+    currentClient,
+    isServiceProvider,
+    getEffectiveOrganizationId
+  } = useOrganization();
+
+  // Get the effective organization ID (either client organization if selected, or current organization)
+  const organizationId = getEffectiveOrganizationId();
+  const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
   const { data: documents, isLoading, error, refetch } = useQuery({
-    queryKey: ['documents'],
+    queryKey: ['documents', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('documents')
         .select('*');
+      
+      // If viewing as service provider with a client selected
+      if (currentClient && isServiceProvider()) {
+        query = query.eq('client_organization_id', currentClient.id);
+      } 
+      // If viewing own organization
+      else if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
+        toast({
+          title: "Error fetching documents",
+          description: error.message,
+          variant: "destructive"
+        });
         throw new Error(error.message);
       }
 
-      return data;
-    }
+      return data || [];
+    },
+    enabled: !!organizationId
   });
 
-  const handleUploadComplete = (data?: any) => {
+  const handleUploadComplete = () => {
     // Refresh the documents list after upload completes
     refetch();
     setShowUploadDialog(false);
+    toast({
+      title: "Document uploaded successfully",
+      description: "Your document has been uploaded and will be processed shortly.",
+    });
   };
 
   const handleViewDocument = (documentId: string) => {
     navigate(`/documents/${documentId}`);
   };
+
+  // Only show upload button if we have an organization context
+  const canUpload = !!organizationId;
 
   return (
     <div className="mt-4">
@@ -47,7 +83,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your documents and organization
+            {contextLabel ? `Viewing documents for ${contextLabel}` : "Manage your documents and organization"}
           </p>
         </div>
         <div className="flex items-center gap-4 z-10 relative">
@@ -62,6 +98,7 @@ const Dashboard = () => {
           <Button 
             className="flex items-center gap-2" 
             onClick={() => setShowUploadDialog(true)}
+            disabled={!canUpload}
           >
             <Upload size={16} />
             <span>Upload Document</span>
@@ -73,9 +110,17 @@ const Dashboard = () => {
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
+            <DialogTitle>
+              {currentClient 
+                ? `Upload Document for ${currentClient.name}` 
+                : "Upload Document"}
+            </DialogTitle>
           </DialogHeader>
-          <DocumentUploader onUploadComplete={handleUploadComplete} />
+          <DocumentUploader 
+            onUploadComplete={handleUploadComplete} 
+            organizationId={currentOrganization?.id}
+            clientOrganizationId={currentClient?.id}
+          />
         </DialogContent>
       </Dialog>
       
@@ -85,13 +130,19 @@ const Dashboard = () => {
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
         <TabsContent value="documents">
-          {isLoading ? (
+          {!organizationId ? (
+            <div className="text-center py-10 border rounded-lg bg-background">
+              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+              <p className="text-muted-foreground mb-4">Please select an organization to view documents</p>
+            </div>
+          ) : isLoading ? (
             <div className="flex justify-center py-10">
               <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
             </div>
           ) : error ? (
             <div className="py-10 text-center">
-              <p className="text-destructive">Error: {error.message}</p>
+              <p className="text-destructive">Error: {(error as Error).message}</p>
             </div>
           ) : documents && documents.length > 0 ? (
             <motion.div
@@ -127,6 +178,14 @@ const Dashboard = () => {
                         <span className="text-sm font-medium">Type:</span>
                         <span className="text-sm">{document.document_type || 'Unknown'}</span>
                       </div>
+                      {document.client_organization_id && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Client:</span>
+                          <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                            For client
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-between">
@@ -144,6 +203,7 @@ const Dashboard = () => {
                 variant="outline" 
                 className="mx-auto"
                 onClick={() => setShowUploadDialog(true)}
+                disabled={!canUpload}
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Document
