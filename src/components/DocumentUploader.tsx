@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Upload, X, Loader2, FileCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,10 @@ import { useNavigate } from "react-router-dom";
 
 type DocumentUploaderProps = {
   onUploadComplete: (data?: any) => void;
+  children?: ReactNode;
 };
 
-const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
+const DocumentUploader = ({ onUploadComplete, children }: DocumentUploaderProps) => {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>("medical-questionnaire");
@@ -25,9 +26,8 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingAttemptsRef = useRef<number>(0);
-  const maxPollingAttempts = 20; // About 60 seconds with 3-second intervals
+  const maxPollingAttempts = 20;
 
-  // Check authentication status
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -352,7 +352,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
   const handleUpload = async () => {
     if (!file) return;
 
-    // Check if user is authenticated first
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -466,7 +465,6 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
     }
   };
 
-  // Authentication message when not logged in
   if (isAuthenticated === false) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -478,6 +476,21 @@ const DocumentUploader = ({ onUploadComplete }: DocumentUploaderProps) => {
         <Button onClick={() => navigate("/auth")}>
           Sign In or Create Account
         </Button>
+      </div>
+    );
+  }
+
+  if (children) {
+    return (
+      <div onClick={() => fileInputRef.current?.click()}>
+        {children}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg"
+          onChange={handleFileChange}
+        />
       </div>
     );
   }
