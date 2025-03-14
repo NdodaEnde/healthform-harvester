@@ -94,18 +94,30 @@ const DocumentUploader = ({
       
       setUploadProgress(80);
       
-      // Update the document record with organization context if not done by the function
-      if (data?.documentId) {
-        await supabase
-          .from('documents')
-          .update({
-            organization_id: organizationId,
-            client_organization_id: clientOrganizationId || null
-          })
-          .eq('id', data.documentId);
+      // First verify if the document has been properly created
+      if (!data?.documentId) {
+        throw new Error("No document ID returned from processing function");
+      }
+      
+      // Update the document record with organization context
+      const { error: updateError } = await supabase
+        .from('documents')
+        .update({
+          organization_id: organizationId,
+          client_organization_id: clientOrganizationId || null
+        })
+        .eq('id', data.documentId);
+        
+      if (updateError) {
+        throw updateError;
       }
       
       setUploadProgress(100);
+      
+      toast({
+        title: "Upload successful",
+        description: "Your document has been uploaded and is being processed",
+      });
       
       if (onUploadComplete) {
         onUploadComplete(data);
