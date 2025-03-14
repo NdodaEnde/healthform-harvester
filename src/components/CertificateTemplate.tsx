@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,20 +19,17 @@ const CertificateTemplate = ({
 }: CertificateTemplateProps) => {
   const [localData, setLocalData] = useState<any>(extractedData);
 
-  // Update local data when props change
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
     setLocalData(extractedData);
   }, [extractedData]);
 
-  // Helper function to check boolean values
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
     if (value === undefined || value === null) return false;
     const stringValue = String(value).toLowerCase().trim();
     return trueValues.includes(stringValue) || value === true;
   };
 
-  // Helper function to safely get values from nested objects
   const getValue = (obj: any, path: string, defaultValue: any = '') => {
     if (!obj || !path) return defaultValue;
     const keys = path.split('.');
@@ -48,19 +43,16 @@ const CertificateTemplate = ({
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
-  // Handle text input changes
   const handleTextChange = (path: string, e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     console.log(`Text change at ${path}:`, e.target.value);
     updateNestedValue(`structured_data.${path}`, e.target.value);
   };
 
-  // Handle checkbox changes
   const handleCheckboxChange = (path: string, checked: boolean) => {
     console.log(`Checkbox change at ${path}:`, checked);
     updateNestedValue(`structured_data.${path}`, checked);
   };
 
-  // Update nested value in data object
   const updateNestedValue = (path: string, value: any) => {
     console.log(`Attempting to update path ${path} with value:`, value);
     const keys = path.split('.');
@@ -77,11 +69,11 @@ const CertificateTemplate = ({
     
     current[keys[keys.length - 1]] = value;
     
+    console.log("Updated data:", newData);
     setLocalData(newData);
     onDataChange(newData);
   };
 
-  // Render field for display or editing
   const renderField = (label: string, value: string, path: string) => {
     if (isEditable) {
       return (
@@ -103,21 +95,25 @@ const CertificateTemplate = ({
     );
   };
 
-  // Render checkbox for display or editing
-  const renderCheckbox = (path: string, checked: boolean) => {
+  const renderCheckbox = (path: string, checked: boolean, label?: string) => {
     if (isEditable) {
       return (
-        <Checkbox 
-          checked={checked} 
-          onCheckedChange={(checked) => handleCheckboxChange(path, !!checked)}
-          id={`checkbox-${path}`}
-        />
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            id={`checkbox-${path}`}
+            checked={checked} 
+            onCheckedChange={(checked) => {
+              console.log(`Checkbox ${path} changed to:`, checked);
+              handleCheckboxChange(path, checked === true);
+            }}
+          />
+          {label && <Label htmlFor={`checkbox-${path}`}>{label}</Label>}
+        </div>
       );
     }
     return checked ? '✓' : '';
   };
 
-  // Extract data from the structure
   let structuredData: any = {};
 
   if (localData?.structured_data) {
@@ -202,7 +198,7 @@ const CertificateTemplate = ({
   };
 
   return (
-    <ScrollArea className="h-full">
+    <div className="w-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <CertificateTemplateContent
           patient={patient}
@@ -216,9 +212,11 @@ const CertificateTemplate = ({
           renderField={renderField}
           renderCheckbox={renderCheckbox}
           getValue={getValue}
+          handleTextChange={handleTextChange}
+          handleCheckboxChange={handleCheckboxChange}
         />
       </Card>
-    </ScrollArea>
+    </div>
   );
 };
 
