@@ -5,6 +5,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import OrganizationSwitcher from './OrganizationSwitcher';
+import { Settings } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -27,7 +36,23 @@ const HeaderComponent: React.FC = () => {
           {user ? (
             <>
               {currentOrganization && (
-                <OrganizationSwitcher />
+                <>
+                  <OrganizationSwitcher />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Settings className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/settings/organization')}>
+                        Organization Settings
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               )}
               <Button variant="ghost" onClick={handleSignOut}>
                 Sign Out
