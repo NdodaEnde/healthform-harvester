@@ -15,7 +15,6 @@ import { Organization } from "@/types/organization";
 import GeneralSettingsForm from "@/components/settings/GeneralSettingsForm";
 import BrandingSettingsForm from "@/components/settings/BrandingSettingsForm";
 import AddressSettingsForm from "@/components/settings/AddressSettingsForm";
-import { Sidebar } from "@/components/Sidebar";
 
 export default function OrganizationSettingsPage() {
   const { currentOrganization } = useOrganization();
@@ -85,64 +84,67 @@ export default function OrganizationSettingsPage() {
     }
   };
   
-  return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className="flex-1 ml-64">
-        <div className="container py-10">
-          <h1 className="text-3xl font-bold mb-6">Organization Settings</h1>
-          
-          {loading ? (
-            <div className="py-10 flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-          ) : error || !organization ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <h2 className="text-xl font-bold mb-2">Error</h2>
-                <p className="text-gray-500">{error || "Failed to load organization"}</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>{organization.name}</CardTitle>
-                <CardDescription>Manage your organization settings and branding</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="general">
-                  <TabsList className="mb-6">
-                    <TabsTrigger value="general">General</TabsTrigger>
-                    <TabsTrigger value="branding">Branding</TabsTrigger>
-                    <TabsTrigger value="address">Address</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="general">
-                    <GeneralSettingsForm 
-                      organization={organization} 
-                      onUpdate={handleUpdateOrganization} 
-                    />
-                  </TabsContent>
-                  
-                  <TabsContent value="branding">
-                    <BrandingSettingsForm 
-                      organization={organization}
-                      onUpdate={handleUpdateOrganization}
-                    />
-                  </TabsContent>
-                  
-                  <TabsContent value="address">
-                    <AddressSettingsForm 
-                      organization={organization}
-                      onUpdate={handleUpdateOrganization}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+  if (loading) {
+    return (
+      <div className="container py-10 flex justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
+    );
+  }
+  
+  if (error || !organization) {
+    return (
+      <div className="container py-10">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h2 className="text-xl font-bold mb-2">Error</h2>
+            <p className="text-gray-500">{error || "Failed to load organization"}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="container py-10">
+      <h1 className="text-3xl font-bold mb-6">Organization Settings</h1>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>{organization.name}</CardTitle>
+          <CardDescription>Manage your organization settings and branding</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="general">
+            <TabsList className="mb-6">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="branding">Branding</TabsTrigger>
+              <TabsTrigger value="address">Address</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="general">
+              <GeneralSettingsForm 
+                organization={organization} 
+                onUpdate={handleUpdateOrganization} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="branding">
+              <BrandingSettingsForm 
+                organization={organization}
+                onUpdate={handleUpdateOrganization}
+              />
+            </TabsContent>
+            
+            <TabsContent value="address">
+              <AddressSettingsForm 
+                organization={organization}
+                onUpdate={handleUpdateOrganization}
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

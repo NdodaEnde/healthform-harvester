@@ -20,7 +20,6 @@ import { CreateOrganizationPage } from './pages/admin';
 import { EditOrganizationPage } from './pages/admin';
 import { OrganizationUsersPage } from './pages/admin';
 import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
-import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
 
@@ -67,13 +66,6 @@ function App() {
                   <Route path="/admin/organizations/:id/clients" element={
                     <OrganizationProtectedRoute>
                       <OrganizationClientsPage />
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* Organization Settings */}
-                  <Route path="/settings/organization" element={
-                    <OrganizationProtectedRoute>
-                      <OrganizationSettingsPage />
                     </OrganizationProtectedRoute>
                   } />
                   
