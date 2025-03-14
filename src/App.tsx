@@ -23,6 +23,7 @@ import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
+import { DashboardLayout } from './components/DashboardLayout';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -35,60 +36,80 @@ function App() {
           <AuthProvider>
             <OrganizationProvider>
               <HeaderComponent />
-              <main className="pt-16 pb-8">
+              <main>
                 <Routes>
+                  {/* Public Routes */}
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/update-password" element={<UpdatePasswordPage />} />
                   <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                  <Route path="/setup" element={<FirstTimeSetupPage />} />
+                  
+                  {/* Protected Routes with Dashboard Layout */}
+                  <Route path="/dashboard" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <Dashboard />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/documents/:id" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <DocumentViewer />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
                   
                   {/* Organization Management */}
                   <Route path="/admin/organizations" element={
                     <OrganizationProtectedRoute>
-                      <OrganizationsPage />
+                      <DashboardLayout>
+                        <OrganizationsPage />
+                      </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
+                  
                   <Route path="/admin/organizations/new" element={
                     <OrganizationProtectedRoute>
-                      <CreateOrganizationPage />
+                      <DashboardLayout>
+                        <CreateOrganizationPage />
+                      </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
+                  
                   <Route path="/admin/organizations/:id/edit" element={
                     <OrganizationProtectedRoute>
-                      <EditOrganizationPage />
+                      <DashboardLayout>
+                        <EditOrganizationPage />
+                      </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
+                  
                   <Route path="/admin/organizations/:id/users" element={
                     <OrganizationProtectedRoute>
-                      <OrganizationUsersPage />
+                      <DashboardLayout>
+                        <OrganizationUsersPage />
+                      </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
+                  
                   <Route path="/admin/organizations/:id/clients" element={
                     <OrganizationProtectedRoute>
-                      <OrganizationClientsPage />
+                      <DashboardLayout>
+                        <OrganizationClientsPage />
+                      </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
                   
                   {/* Settings Pages */}
                   <Route path="/settings/organization" element={
                     <OrganizationProtectedRoute>
-                      <OrganizationSettingsPage />
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* Protected Routes */}
-                  <Route path="/dashboard" element={
-                    <OrganizationProtectedRoute>
-                      <Dashboard />
-                    </OrganizationProtectedRoute>
-                  } />
-                  <Route path="/setup" element={<FirstTimeSetupPage />} />
-                  
-                  {/* Document Viewer - Ensure this route is correctly defined */}
-                  <Route path="/documents/:id" element={
-                    <OrganizationProtectedRoute>
-                      <DocumentViewer />
+                      <DashboardLayout>
+                        <OrganizationSettingsPage />
+                      </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
                   
