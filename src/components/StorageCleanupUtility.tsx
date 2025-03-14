@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +22,6 @@ export const StorageCleanupUtility = () => {
     setDeletedFiles(0);
     
     try {
-      // List all files in the medical-documents bucket
       const { data: files, error } = await supabase
         .storage
         .from('medical-documents')
@@ -44,7 +42,6 @@ export const StorageCleanupUtility = () => {
       
       setTotalFiles(files.length);
       
-      // Create a recursive function to delete files in batches
       const deleteFiles = async (paths: string[], startIndex: number, batchSize: number) => {
         if (startIndex >= paths.length) {
           setProgress(100);
@@ -54,7 +51,6 @@ export const StorageCleanupUtility = () => {
         
         const batch = paths.slice(startIndex, startIndex + batchSize);
         
-        // Delete the batch of files
         const { error: deleteError } = await supabase
           .storage
           .from('medical-documents')
@@ -69,23 +65,20 @@ export const StorageCleanupUtility = () => {
           });
         }
         
-        // Update progress
         const newDeletedCount = startIndex + batch.length;
         setDeletedFiles(newDeletedCount);
         setProgress(Math.floor((newDeletedCount / paths.length) * 100));
         
-        // Process next batch
         await deleteFiles(paths, startIndex + batchSize, batchSize);
       };
       
-      // Start deleting files - get all file paths
       const filePaths = files.map(file => file.name);
-      await deleteFiles(filePaths, 0, 20); // Delete in batches of 20
+      await deleteFiles(filePaths, 0, 20);
       
       toast({
         title: "Files deleted successfully",
         description: `Deleted ${filePaths.length} files from storage.`,
-        variant: "success"
+        variant: "default"
       });
       
     } catch (error: any) {
