@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface OrganizationData {
   id?: string;
@@ -37,6 +38,7 @@ interface OrganizationFormProps {
 export default function OrganizationForm({ organization, isEdit = false }: OrganizationFormProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { currentOrganization } = useOrganization();
   
   const [name, setName] = useState(organization?.name || "");
   const [organizationType, setOrganizationType] = useState(organization?.organization_type || "client");
@@ -79,19 +81,38 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
           description: "Organization has been updated successfully",
         });
       } else {
-        // Create new organization
-        const { data: newOrg, error } = await supabase
-          .from("organizations")
-          .insert(formData)
-          .select()
-          .single();
+        // Check if we're creating a client organization from a service provider
+        if (organizationType === "client" && currentOrganization?.organization_type === "service_provider") {
+          // Create client organization and relationship in a single transaction using RPC
+          const { data: newClientOrg, error } = await supabase.rpc(
+            'create_client_organization',
+            {
+              org_name: name,
+              org_email: contactEmail || null
+            }
+          );
+            
+          if (error) throw error;
           
-        if (error) throw error;
-        
-        toast({
-          title: "Organization created",
-          description: "Organization has been created successfully",
-        });
+          toast({
+            title: "Client organization created",
+            description: "Client organization has been created and linked to your service provider",
+          });
+        } else {
+          // Regular organization creation
+          const { data: newOrg, error } = await supabase
+            .from("organizations")
+            .insert(formData)
+            .select()
+            .single();
+            
+          if (error) throw error;
+          
+          toast({
+            title: "Organization created",
+            description: "Organization has been created successfully",
+          });
+        }
       }
       
       // Redirect back to organizations list
