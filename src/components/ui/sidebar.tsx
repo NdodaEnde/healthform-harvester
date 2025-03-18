@@ -47,22 +47,26 @@ export function Sidebar() {
             <div className="space-y-2">
               <h4 className="text-sm font-semibold px-2">Clients</h4>
               <div className="space-y-1">
-                <Select 
-                  onValueChange={switchClient} 
-                  defaultValue={currentClient?.id || "all_clients"}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all_clients">All Clients</SelectItem>
-                    {clientOrganizations.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {clientOrganizations.length > 0 ? (
+                  <Select 
+                    onValueChange={switchClient} 
+                    defaultValue={currentClient?.id || "all_clients"}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_clients">All Clients</SelectItem>
+                      {clientOrganizations.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground px-3 py-2">No clients available</p>
+                )}
               </div>
             </div>
           )}

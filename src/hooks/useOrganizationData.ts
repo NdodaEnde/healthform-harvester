@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -163,9 +162,9 @@ export function useOrganizationData() {
     }
   };
   
-  const switchClient = (clientId: string | null) => {
+  const switchClient = (clientId: string) => {
     // Handle "all_clients" value
-    if (clientId === "all_clients" || clientId === null) {
+    if (clientId === "all_clients") {
       setCurrentClient(null);
       localStorage.removeItem("currentClientId");
       return;
@@ -179,12 +178,10 @@ export function useOrganizationData() {
     }
   };
   
-  // Helper method to determine if current user is in a service provider or direct client
   const isServiceProvider = () => {
     return currentOrganization?.organization_type === "service_provider";
   };
   
-  // Get the effective organization for queries (the client if selected, otherwise the main org)
   const getEffectiveOrganizationId = () => {
     if (isServiceProvider() && currentClient) {
       return currentClient.id;
