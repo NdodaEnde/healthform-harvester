@@ -22,6 +22,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useOrganization } from "@/contexts/OrganizationContext";
 
+// Define allowed organization types explicitly to match database constraint
+type OrganizationType = 'service_provider' | 'client';
+
 interface OrganizationData {
   id?: string;
   name: string;
@@ -41,8 +44,8 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
   const { currentOrganization } = useOrganization();
   
   const [name, setName] = useState(organization?.name || "");
-  const [organizationType, setOrganizationType] = useState<'service_provider' | 'client'>(
-    (organization?.organization_type as 'service_provider' | 'client') || "client"
+  const [organizationType, setOrganizationType] = useState<OrganizationType>(
+    (organization?.organization_type as OrganizationType) || "client"
   );
   const [contactEmail, setContactEmail] = useState(organization?.contact_email || "");
   const [isActive, setIsActive] = useState(organization?.is_active !== false);
@@ -62,12 +65,19 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
     }
     
     try {
+      // Ensure organization_type is one of the allowed values
+      if (organizationType !== 'service_provider' && organizationType !== 'client') {
+        throw new Error("Invalid organization type. Must be 'service_provider' or 'client'");
+      }
+      
       const formData = {
         name,
-        organization_type: organizationType, // This is now strictly typed as 'service_provider' | 'client'
+        organization_type: organizationType,
         contact_email: contactEmail || null,
         ...(isEdit && { is_active: isActive })
       };
+      
+      console.log("Submitting organization data:", formData);
       
       if (isEdit && organization?.id) {
         // Update existing organization
@@ -85,8 +95,10 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
       } else {
         // Check if we're creating a client organization from a service provider
         if (organizationType === "client" && currentOrganization?.organization_type === "service_provider") {
-          // Create client organization and relationship in a single transaction using RPC
-          const { data: newClientOrg, error } = await supabase.rpc(
+          console.log("Creating client organization via RPC function");
+          
+          // Create client organization and relationship using RPC
+          const { data: newClientId, error } = await supabase.rpc(
             "create_client_organization",
             {
               org_name: name,
@@ -94,13 +106,20 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
             }
           );
             
-          if (error) throw error;
+          if (error) {
+            console.error("RPC error details:", error);
+            throw error;
+          }
+          
+          console.log("Client organization created with ID:", newClientId);
           
           toast({
             title: "Client organization created",
             description: "Client organization has been created and linked to your service provider",
           });
         } else {
+          console.log("Creating regular organization");
+          
           // Regular organization creation
           const { data: newOrg, error } = await supabase
             .from("organizations")
@@ -108,7 +127,12 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
             .select()
             .single();
             
-          if (error) throw error;
+          if (error) {
+            console.error("Insert error details:", error);
+            throw error;
+          }
+          
+          console.log("Regular organization created:", newOrg);
           
           toast({
             title: "Organization created",
@@ -121,6 +145,10 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
       navigate("/admin/organizations");
     } catch (error: any) {
       console.error("Error saving organization:", error);
+      // Log additional details to help diagnose the issue
+      if (error.details) console.error("Error details:", error.details);
+      if (error.hint) console.error("Error hint:", error.hint);
+      
       toast({
         title: "Error",
         description: `Failed to ${isEdit ? 'update' : 'create'} organization: ${error.message}`,
@@ -153,7 +181,7 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
             <Label htmlFor="organization_type">Organization Type</Label>
             <Select 
               value={organizationType}
-              onValueChange={(value: 'service_provider' | 'client') => setOrganizationType(value)}
+              onValueChange={(value: OrganizationType) => setOrganizationType(value)}
               disabled={isEdit} // Can't change type after creation
             >
               <SelectTrigger id="organization_type">
