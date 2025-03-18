@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -163,15 +162,13 @@ export function useOrganizationData() {
     }
   };
   
+  // Updated switchClient to match the type signature and handle edge cases
   const switchClient = (clientId: string) => {
-    // Validate input - make sure clientId is not empty string
-    if (!clientId || clientId === "") {
-      console.error("Invalid client ID provided");
-      return;
-    }
+    console.log("switchClient called with:", clientId);
     
     // Handle "all_clients" value
     if (clientId === "all_clients") {
+      console.log("Switching to all clients view");
       setCurrentClient(null);
       localStorage.removeItem("currentClientId");
       return;
@@ -180,6 +177,7 @@ export function useOrganizationData() {
     const client = clientOrganizations.find(c => c.id === clientId);
     
     if (client) {
+      console.log("Switching to client:", client.name);
       setCurrentClient(client);
       localStorage.setItem("currentClientId", client.id);
     } else {

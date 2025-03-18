@@ -94,7 +94,10 @@ export default function OrganizationSwitcher() {
               <DropdownMenuItem 
                 key={client.id}
                 className="flex justify-between items-center cursor-pointer"
-                onClick={() => switchClient(client.id)}
+                onClick={() => {
+                  console.log("OrganizationSwitcher - Switching to client:", client.id);
+                  switchClient(client.id);
+                }}
               >
                 <div className="flex items-center truncate">
                   <Building className="h-4 w-4 mr-2 opacity-70" />

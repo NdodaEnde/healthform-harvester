@@ -49,13 +49,13 @@ export function Sidebar() {
               <div className="space-y-1">
                 {clientOrganizations.length > 0 ? (
                   <Select 
+                    value={currentClient?.id || "all_clients"}
                     onValueChange={(value) => {
-                      // Make sure value is not empty
+                      console.log("Sidebar - Select value changed to:", value);
                       if (value && value !== "") {
                         switchClient(value);
                       }
                     }}
-                    value={currentClient?.id || "all_clients"}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select Client" />
