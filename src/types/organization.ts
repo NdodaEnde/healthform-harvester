@@ -33,7 +33,7 @@ export interface OrganizationContextType {
   clientOrganizations: Organization[];
   loading: boolean;
   switchOrganization: (organizationId: string) => Promise<void>;
-  switchClient: (clientId: string | null) => void;
+  switchClient: (clientId: string) => void;
   isServiceProvider: () => boolean;
   getEffectiveOrganizationId: () => string | null;
 }
