@@ -126,7 +126,7 @@ export function useOrganizationData() {
       
       // Check for stored client selection
       const storedClientId = localStorage.getItem("currentClientId");
-      if (storedClientId) {
+      if (storedClientId && storedClientId !== "all_clients") {
         const client = clients?.find(c => c.id === storedClientId);
         if (client) {
           setCurrentClient(client);
