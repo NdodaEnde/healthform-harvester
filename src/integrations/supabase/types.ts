@@ -380,6 +380,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_client_organization: {
+        Args: {
+          org_name: string
+          org_email?: string
+        }
+        Returns: string
+      }
       create_first_organization: {
         Args: {
           org_name: string

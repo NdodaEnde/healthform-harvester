@@ -85,7 +85,7 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
         if (organizationType === "client" && currentOrganization?.organization_type === "service_provider") {
           // Create client organization and relationship in a single transaction using RPC
           const { data: newClientOrg, error } = await supabase.rpc(
-            'create_client_organization',
+            "create_client_organization",
             {
               org_name: name,
               org_email: contactEmail || null
