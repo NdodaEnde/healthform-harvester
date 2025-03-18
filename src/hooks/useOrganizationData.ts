@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -163,6 +164,12 @@ export function useOrganizationData() {
   };
   
   const switchClient = (clientId: string) => {
+    // Validate input - make sure clientId is not empty string
+    if (!clientId || clientId === "") {
+      console.error("Invalid client ID provided");
+      return;
+    }
+    
     // Handle "all_clients" value
     if (clientId === "all_clients") {
       setCurrentClient(null);
@@ -175,6 +182,8 @@ export function useOrganizationData() {
     if (client) {
       setCurrentClient(client);
       localStorage.setItem("currentClientId", client.id);
+    } else {
+      console.warn(`Client with ID ${clientId} not found`);
     }
   };
   
