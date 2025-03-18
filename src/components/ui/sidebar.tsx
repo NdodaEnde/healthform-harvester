@@ -1,10 +1,16 @@
 
 import { NavLink } from "react-router-dom";
-import { Home, Building } from "lucide-react";
+import { Home, Building, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useOrganization } from "@/contexts/OrganizationContext";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Sidebar() {
   const { currentOrganization, currentClient, switchClient, clientOrganizations } = useOrganization();
@@ -48,27 +54,41 @@ export function Sidebar() {
               <h4 className="text-sm font-semibold px-2">Clients</h4>
               <div className="space-y-1">
                 {clientOrganizations.length > 0 ? (
-                  <Select 
-                    value={currentClient?.id || "all_clients"}
-                    onValueChange={(value) => {
-                      console.log("Sidebar - Select value changed to:", value);
-                      if (value && value !== "") {
-                        switchClient(value);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all_clients">All Clients</SelectItem>
-                      {clientOrganizations.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full flex items-center justify-between">
+                          <span className="mr-2 truncate">
+                            {currentClient ? currentClient.name : "All Clients"}
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56" align="start">
+                        <DropdownMenuItem 
+                          className="cursor-pointer"
+                          onClick={() => {
+                            console.log("Switching to all clients");
+                            switchClient("all_clients");
+                          }}
+                        >
+                          All Clients
+                        </DropdownMenuItem>
+                        {clientOrganizations.map((client) => (
+                          <DropdownMenuItem 
+                            key={client.id}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              console.log("Switching to client:", client.id);
+                              switchClient(client.id);
+                            }}
+                          >
+                            {client.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground px-3 py-2">No clients available</p>
                 )}
