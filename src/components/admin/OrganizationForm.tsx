@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,16 +64,11 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
     }
     
     try {
-      // Ensure organization_type is one of the allowed values
-      if (organizationType !== 'service_provider' && organizationType !== 'client') {
-        throw new Error("Invalid organization type. Must be 'service_provider' or 'client'");
-      }
-      
       const formData = {
-        name,
+        name: name.trim(),
         organization_type: organizationType,
-        contact_email: contactEmail || null,
-        ...(isEdit && { is_active: isActive })
+        contact_email: contactEmail?.trim() || null,
+        is_active: isEdit ? isActive : true
       };
       
       console.log("Submitting organization data:", formData);
@@ -97,19 +91,15 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
         if (organizationType === "client" && currentOrganization?.organization_type === "service_provider") {
           console.log("Creating client organization via RPC function");
           
-          // Create client organization and relationship using RPC
           const { data: newClientId, error } = await supabase.rpc(
             "create_client_organization",
             {
-              org_name: name,
-              org_email: contactEmail || null
+              org_name: name.trim(),
+              org_email: contactEmail?.trim() || null
             }
           );
             
-          if (error) {
-            console.error("RPC error details:", error);
-            throw error;
-          }
+          if (error) throw error;
           
           console.log("Client organization created with ID:", newClientId);
           
@@ -120,17 +110,13 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
         } else {
           console.log("Creating regular organization");
           
-          // Regular organization creation
           const { data: newOrg, error } = await supabase
             .from("organizations")
             .insert(formData)
             .select()
             .single();
             
-          if (error) {
-            console.error("Insert error details:", error);
-            throw error;
-          }
+          if (error) throw error;
           
           console.log("Regular organization created:", newOrg);
           
@@ -145,9 +131,6 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
       navigate("/admin/organizations");
     } catch (error: any) {
       console.error("Error saving organization:", error);
-      // Log additional details to help diagnose the issue
-      if (error.details) console.error("Error details:", error.details);
-      if (error.hint) console.error("Error hint:", error.hint);
       
       toast({
         title: "Error",
