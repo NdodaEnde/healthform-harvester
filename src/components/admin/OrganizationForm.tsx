@@ -41,7 +41,9 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
   const { currentOrganization } = useOrganization();
   
   const [name, setName] = useState(organization?.name || "");
-  const [organizationType, setOrganizationType] = useState(organization?.organization_type || "client");
+  const [organizationType, setOrganizationType] = useState<'service_provider' | 'client'>(
+    (organization?.organization_type as 'service_provider' | 'client') || "client"
+  );
   const [contactEmail, setContactEmail] = useState(organization?.contact_email || "");
   const [isActive, setIsActive] = useState(organization?.is_active !== false);
   
@@ -60,15 +62,9 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
     }
     
     try {
-      // Make sure organizationType is either 'client' or 'service_provider'
-      // This ensures we don't violate the check constraint
-      const validatedOrgType = organizationType === 'service_provider' 
-        ? 'service_provider' 
-        : 'client';
-      
       const formData = {
         name,
-        organization_type: validatedOrgType,
+        organization_type: organizationType, // This is now strictly typed as 'service_provider' | 'client'
         contact_email: contactEmail || null,
         ...(isEdit && { is_active: isActive })
       };
@@ -88,7 +84,7 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
         });
       } else {
         // Check if we're creating a client organization from a service provider
-        if (validatedOrgType === "client" && currentOrganization?.organization_type === "service_provider") {
+        if (organizationType === "client" && currentOrganization?.organization_type === "service_provider") {
           // Create client organization and relationship in a single transaction using RPC
           const { data: newClientOrg, error } = await supabase.rpc(
             "create_client_organization",
@@ -157,7 +153,7 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
             <Label htmlFor="organization_type">Organization Type</Label>
             <Select 
               value={organizationType}
-              onValueChange={setOrganizationType}
+              onValueChange={(value: 'service_provider' | 'client') => setOrganizationType(value)}
               disabled={isEdit} // Can't change type after creation
             >
               <SelectTrigger id="organization_type">
