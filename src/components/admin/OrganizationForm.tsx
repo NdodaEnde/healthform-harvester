@@ -60,9 +60,15 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
     }
     
     try {
+      // Make sure organizationType is either 'client' or 'service_provider'
+      // This ensures we don't violate the check constraint
+      const validatedOrgType = organizationType === 'service_provider' 
+        ? 'service_provider' 
+        : 'client';
+      
       const formData = {
         name,
-        organization_type: organizationType,
+        organization_type: validatedOrgType,
         contact_email: contactEmail || null,
         ...(isEdit && { is_active: isActive })
       };
@@ -82,7 +88,7 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
         });
       } else {
         // Check if we're creating a client organization from a service provider
-        if (organizationType === "client" && currentOrganization?.organization_type === "service_provider") {
+        if (validatedOrgType === "client" && currentOrganization?.organization_type === "service_provider") {
           // Create client organization and relationship in a single transaction using RPC
           const { data: newClientOrg, error } = await supabase.rpc(
             "create_client_organization",
