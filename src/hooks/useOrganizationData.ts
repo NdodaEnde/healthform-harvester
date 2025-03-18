@@ -164,8 +164,8 @@ export function useOrganizationData() {
   };
   
   const switchClient = (clientId: string | null) => {
-    // null means "All Clients"
-    if (clientId === null) {
+    // Handle "all_clients" value
+    if (clientId === "all_clients" || clientId === null) {
       setCurrentClient(null);
       localStorage.removeItem("currentClientId");
       return;

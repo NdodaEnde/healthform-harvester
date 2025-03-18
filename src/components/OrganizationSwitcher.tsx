@@ -80,7 +80,7 @@ export default function OrganizationSwitcher() {
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="flex justify-between items-center cursor-pointer"
-              onClick={() => switchClient(null)}
+              onClick={() => switchClient("all_clients")}
             >
               <div className="flex items-center">
                 <Users className="h-4 w-4 mr-2 opacity-70" />
