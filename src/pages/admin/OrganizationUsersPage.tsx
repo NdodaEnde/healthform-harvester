@@ -15,6 +15,7 @@ import { toast } from "@/components/ui/use-toast";
 import UserTable from "@/components/admin/UserTable";
 import InviteUserForm from "@/components/admin/InviteUserForm";
 import { Organization } from "@/types/organization";
+import InvitationList from "@/components/InvitationList";
 
 interface OrgUser {
   id: string;
@@ -113,6 +114,10 @@ export default function OrganizationUsersPage() {
   const handleUserAdded = (newUser: OrgUser) => {
     setUsers([...users, newUser]);
   };
+
+  const handleRefresh = () => {
+    fetchUsers();
+  };
   
   return (
     <div className="container py-10">
@@ -137,7 +142,7 @@ export default function OrganizationUsersPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card>
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle>Users</CardTitle>
               <CardDescription>
@@ -158,6 +163,12 @@ export default function OrganizationUsersPage() {
               )}
             </CardContent>
           </Card>
+          
+          {/* Invitation List */}
+          <InvitationList 
+            organizationId={id || ""} 
+            onRefresh={handleRefresh}
+          />
         </div>
         
         <div>

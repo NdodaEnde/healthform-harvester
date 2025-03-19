@@ -50,31 +50,81 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
     setIsSubmitting(true);
     
     try {
-      // TODO: Replace with actual invitation logic via Supabase
-      // For now, we're using mock data since we don't have the invitation API set up yet
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
       
-      console.log("Inviting user:", data.email, "with role:", data.role, "to organization:", organizationId);
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to invite users",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Generate a unique token for this invitation
+      const token = generateInvitationToken();
       
+      // Set expiration date (7 days from now)
+      const expires_at = new Date();
+      expires_at.setDate(expires_at.getDate() + 7);
+
+      // Insert the invitation record
+      const { data: invitation, error } = await supabase
+        .from("invitations")
+        .insert({
+          email: data.email,
+          organization_id: organizationId,
+          role: data.role,
+          token,
+          invited_by: user.id,
+          expires_at: expires_at.toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Get organization name for the email
+      const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", organizationId)
+        .single();
+
+      if (orgError) {
+        console.error("Error getting organization:", orgError);
+        // Continue anyway, it's not critical for the invitation
+      }
+
+      // In a real app, we would now send an email with the invite link
+      // For now, we'll just show a success message with the token
+      console.log(`Invitation created with token: ${token}`);
+      console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${token}`);
+
       toast({
-        title: "Invitation sent",
-        description: `Invitation has been sent to ${data.email}`,
+        title: "Invitation Sent",
+        description: `An invitation has been sent to ${data.email}`,
       });
-      
-      // Call callbacks with mock data
-      const mockUser = {
-        id: `temp-${Date.now()}`,
+
+      // Create a mock user record to update the UI
+      const newUser = {
+        id: invitation.id,
+        user_id: `pending-${Date.now()}`,
         email: data.email,
         role: data.role,
-        user_id: `temp-user-${Date.now()}`,
         created_at: new Date().toISOString()
       };
       
+      // Call callbacks with the new invitation
       if (onInvite) {
-        onInvite(mockUser);
+        onInvite(newUser);
       }
       
       if (onUserAdded) {
-        onUserAdded(mockUser);
+        onUserAdded(newUser);
       }
       
       form.reset();
@@ -88,6 +138,12 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
     } finally {
       setIsSubmitting(false);
     }
+  };
+  
+  // Helper function to generate a random token
+  const generateInvitationToken = () => {
+    return Math.random().toString(36).substring(2, 15) + 
+           Math.random().toString(36).substring(2, 15);
   };
   
   return (

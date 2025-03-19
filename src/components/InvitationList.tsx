@@ -119,6 +119,8 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       }
 
       // In a real app, we would now send a new email with the invite link
+      console.log(`Invitation resent to ${invitation.email}`);
+      console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${invitation.token}`);
       
       toast({
         title: "Invitation Resent",
