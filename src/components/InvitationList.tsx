@@ -15,6 +15,7 @@ interface Invitation {
   created_at: string;
   expires_at: string;
   accepted_at: string | null;
+  token?: string; // Add token as an optional property to match what's coming from the database
 }
 
 interface InvitationListProps {
@@ -119,8 +120,26 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       }
 
       // In a real app, we would now send a new email with the invite link
+      // For demonstration purposes, we'll log the information
       console.log(`Invitation resent to ${invitation.email}`);
-      console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${invitation.token}`);
+      
+      // Generate the invitation link - check if token exists first
+      if (invitation.token) {
+        console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${invitation.token}`);
+      } else {
+        // If no token is available, we'll need to fetch the full invitation
+        const { data, error: fetchError } = await supabase
+          .from("invitations")
+          .select("token")
+          .eq("id", invitation.id)
+          .single();
+          
+        if (fetchError) {
+          console.error("Error getting invitation token:", fetchError);
+        } else if (data && data.token) {
+          console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${data.token}`);
+        }
+      }
       
       toast({
         title: "Invitation Resent",
