@@ -23,9 +23,7 @@ interface User {
   id: string;
   user_id: string;
   role: string;
-  profile?: {
-    email: string;
-  };
+  email?: string;
 }
 
 interface UserManagementListProps {
@@ -128,7 +126,7 @@ export default function UserManagementList({ users, organizationId, onUpdate }: 
         {usersList.length > 0 ? (
           usersList.map((user) => (
             <TableRow key={user.id}>
-              <TableCell>{user.profile?.email || "Unknown"}</TableCell>
+              <TableCell>{user.email || "Unknown"}</TableCell>
               <TableCell>
                 <Select
                   value={user.role}

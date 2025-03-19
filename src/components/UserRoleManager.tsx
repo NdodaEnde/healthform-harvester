@@ -52,7 +52,7 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
         setCurrentUserEmail(user.email);
       }
 
-      // Unfortunately we can't directly join with auth.users, so we need to get this data separately
+      // Get organization users
       const { data: organizationUsers, error } = await supabase
         .from("organization_users")
         .select("*")
@@ -61,26 +61,23 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
 
       if (error) throw error;
 
-      // Now get email addresses for each user
-      const usersWithEmail = await Promise.all(
-        (organizationUsers || []).map(async (orgUser) => {
-          try {
-            // This is a workaround since we cannot directly query auth.users
-            // In a production app, you would have a profiles table with user info
-            const { data } = await supabase.auth.admin.getUserById(orgUser.user_id);
-            return {
-              ...orgUser,
-              email: data?.user?.email || "Unknown Email"
-            };
-          } catch (error) {
-            console.error("Error fetching user:", error);
-            return {
-              ...orgUser,
-              email: "Unknown Email"
-            };
-          }
-        })
-      );
+      // Get emails from profiles table
+      const userIds = organizationUsers?.map(ou => ou.user_id) || [];
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", userIds);
+        
+      if (profilesError) throw profilesError;
+
+      // Combine organization users with profiles
+      const usersWithEmail = organizationUsers?.map(orgUser => {
+        const profile = profiles?.find(p => p.id === orgUser.user_id);
+        return {
+          ...orgUser,
+          email: profile?.email || "Unknown Email"
+        };
+      }) || [];
 
       setUsers(usersWithEmail);
     } catch (error: any) {

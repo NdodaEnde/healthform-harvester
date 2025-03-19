@@ -63,8 +63,7 @@ export default function OrganizationUsersPage() {
     
     setLoading(true);
     try {
-      // Get organization users with user emails from auth.users
-      // We use RPC for this since we can't directly query auth.users
+      // Get organization users with user emails from profiles table
       const { data: orgUsers, error: orgUsersError } = await supabase
         .from("organization_users")
         .select(`
@@ -77,32 +76,28 @@ export default function OrganizationUsersPage() {
         
       if (orgUsersError) throw orgUsersError;
       
-      // Fetch the user emails separately from auth using admin functions or user info
-      // In a production app, this would typically be done server-side or via edge functions
-      
-      const processedUsers: OrgUser[] = [];
-      
-      // Process each user to get their email
-      for (const orgUser of orgUsers) {
-        try {
-          // Try to get user email using auth.getUser (works if current user has necessary permissions)
-          const { data } = await supabase.auth.admin.getUserById(orgUser.user_id);
+      if (orgUsers && orgUsers.length > 0) {
+        // Fetch emails from profiles table
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .in("id", orgUsers.map(user => user.user_id));
           
-          processedUsers.push({
-            ...orgUser,
-            email: data?.user?.email || `user-${orgUser.user_id.slice(0, 8)}@example.com`
-          });
-        } catch (error) {
-          console.error("Error fetching user email:", error);
-          // Fallback to placeholder if we can't get the real email
-          processedUsers.push({
-            ...orgUser,
-            email: `user-${orgUser.user_id.slice(0, 8)}@example.com`
-          });
-        }
+        if (profilesError) throw profilesError;
+        
+        // Map profiles to users
+        const usersWithProfiles = orgUsers.map(user => {
+          const profile = profiles?.find(p => p.id === user.user_id);
+          return {
+            ...user,
+            email: profile?.email || `Unknown (${user.user_id.slice(0, 8)})`
+          };
+        });
+        
+        setUsers(usersWithProfiles);
+      } else {
+        setUsers([]);
       }
-      
-      setUsers(processedUsers);
     } catch (error: any) {
       console.error("Error fetching organization users:", error);
       toast({
