@@ -18,6 +18,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
 
 interface User {
   id: string;
@@ -35,6 +36,7 @@ interface UserTableProps {
 
 export default function UserTable({ users, organizationId, onUserUpdated }: UserTableProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   useEffect(() => {
     const getUser = async () => {
@@ -51,6 +53,7 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
   
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
+      setIsLoading(true);
       const { error } = await supabase
         .from("organization_users")
         .update({ role: newRole })
@@ -72,6 +75,8 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
         description: "Failed to update user role",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -91,6 +96,7 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
     }
     
     try {
+      setIsLoading(true);
       const { error } = await supabase
         .from("organization_users")
         .delete()
@@ -112,66 +118,78 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
         description: "Failed to remove user",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
   
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Email</TableHead>
-          <TableHead>Role</TableHead>
-          <TableHead>Since</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {users.length > 0 ? (
-          users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell className="font-medium">
-                {user.email || "Unknown Email"}
-                {user.user_id === currentUser?.id && (
-                  <span className="ml-2 text-xs text-gray-500">(You)</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <Select
-                  defaultValue={user.role}
-                  onValueChange={(value) => updateUserRole(user.user_id, value)}
-                  disabled={user.user_id === currentUser?.id}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>{formatDate(user.created_at)}</TableCell>
-              <TableCell>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={user.user_id === currentUser?.id}
-                  onClick={() => removeUser(user.user_id)}
-                >
-                  Remove
-                </Button>
+    <div>
+      {isLoading && (
+        <div className="flex justify-center my-4">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      )}
+      
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Email</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Since</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.length > 0 ? (
+            users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">
+                  {user.email || "Unknown Email"}
+                  {user.user_id === currentUser?.id && (
+                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      You
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Select
+                    defaultValue={user.role}
+                    onValueChange={(value) => updateUserRole(user.user_id, value)}
+                    disabled={user.user_id === currentUser?.id || isLoading}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>{formatDate(user.created_at)}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={user.user_id === currentUser?.id || isLoading}
+                    onClick={() => removeUser(user.user_id)}
+                  >
+                    Remove
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-10 text-gray-500">
+                No users found
               </TableCell>
             </TableRow>
-          ))
-        ) : (
-          <TableRow>
-            <TableCell colSpan={4} className="text-center py-10 text-gray-500">
-              No users found
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
