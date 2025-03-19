@@ -128,7 +128,7 @@ export default function AddClientForm({
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>
+                    <SelectItem value="no_clients" disabled>
                       No available clients
                     </SelectItem>
                   )}
