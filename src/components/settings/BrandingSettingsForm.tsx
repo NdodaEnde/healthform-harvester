@@ -39,6 +39,7 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(organization?.logo_url || null);
+  const [logoError, setLogoError] = useState<string | null>(null);
   
   // Initialize branding if it doesn't exist
   const defaultBranding: BrandingSettings = {
@@ -65,6 +66,15 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
+      
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        setLogoError("Logo file size must be less than 2MB");
+        return;
+      }
+      
+      // Reset any previous errors
+      setLogoError(null);
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
     }
@@ -72,6 +82,7 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
   
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
+    setLogoError(null);
     
     try {
       let updatedData: Partial<Organization> = { 
@@ -81,41 +92,56 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
       // Upload logo if a new file was selected
       if (logoFile) {
         try {
-          // First check if the bucket exists
-          const { data: buckets } = await supabase.storage.listBuckets();
-          const assetsBucket = buckets?.find(b => b.name === "assets");
+          const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('assets');
           
-          if (!assetsBucket) {
-            // If the bucket doesn't exist, show an error
-            toast({
-              title: "Storage not configured",
-              description: "The assets storage bucket is not configured. Logo upload is unavailable.",
-              variant: "destructive",
+          // If bucket doesn't exist, create it
+          if (bucketError && bucketError.message.includes('The resource was not found')) {
+            const { error: createError } = await supabase.storage.createBucket('assets', {
+              public: true,
+              fileSizeLimit: 2097152, // 2MB
             });
-          } else {
-            const fileExt = logoFile.name.split('.').pop();
-            const fileName = `${Date.now()}.${fileExt}`;
-            const filePath = `logos/${fileName}`;
             
-            const { error: uploadError } = await supabase.storage
-              .from("assets")
-              .upload(filePath, logoFile);
-              
-            if (uploadError) throw uploadError;
-            
-            const { data: urlData } = supabase.storage
-              .from("assets")
-              .getPublicUrl(filePath);
-              
-            updatedData.logo_url = urlData.publicUrl;
+            if (createError) {
+              throw new Error(`Failed to create storage bucket: ${createError.message}`);
+            }
+          } else if (bucketError) {
+            throw bucketError;
           }
+          
+          // Proceed with upload now that we know the bucket exists
+          const fileExt = logoFile.name.split('.').pop();
+          const fileName = `${Date.now()}.${fileExt}`;
+          const filePath = `logos/${fileName}`;
+          
+          // Delete previous logo if exists
+          if (organization.logo_url) {
+            try {
+              const previousPath = organization.logo_url.split('/').slice(-2).join('/'); // Extract "logos/filename.ext"
+              await supabase.storage.from("assets").remove([previousPath]);
+            } catch (removeError) {
+              console.error("Failed to remove previous logo:", removeError);
+              // Continue even if removal fails
+            }
+          }
+          
+          // Upload new logo
+          const { error: uploadError } = await supabase.storage
+            .from("assets")
+            .upload(filePath, logoFile, {
+              cacheControl: '3600',
+              upsert: false
+            });
+            
+          if (uploadError) throw uploadError;
+          
+          const { data: urlData } = supabase.storage
+            .from("assets")
+            .getPublicUrl(filePath);
+            
+          updatedData.logo_url = urlData.publicUrl;
         } catch (error: any) {
           console.error("Logo upload error:", error);
-          toast({
-            title: "Logo upload failed",
-            description: error.message || "Failed to upload logo",
-            variant: "destructive",
-          });
+          setLogoError(error.message || "Failed to upload logo");
           // Continue with saving other branding changes even if logo upload fails
         }
       }
@@ -123,9 +149,20 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
       const success = await onUpdate(updatedData);
       
       if (success) {
+        toast({
+          title: "Branding updated",
+          description: "Your organization branding has been saved successfully",
+        });
         // Reset the file input
         setLogoFile(null);
       }
+    } catch (error: any) {
+      console.error("Error saving branding:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update branding",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -152,6 +189,9 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
               onChange={handleLogoChange} 
             />
           </div>
+          {logoError && (
+            <p className="text-sm text-destructive mt-1">{logoError}</p>
+          )}
           <p className="text-sm text-muted-foreground mt-2">
             Recommended size: 512x512px. Max file size: 2MB.
           </p>
