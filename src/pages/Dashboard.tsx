@@ -10,12 +10,16 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import RlsTester from "@/components/RlsTester";
 import { useNavigate } from "react-router-dom";
-import { FileText, Plus, Upload, Trash2 } from "lucide-react";
+import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { toast } from "@/components/ui/use-toast";
 import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
 import { StorageCleanupUtility } from "@/components/StorageCleanupUtility";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -78,7 +82,11 @@ const Dashboard = () => {
         throw new Error(error.message);
       }
 
-      return data || [];
+      return data?.map(doc => ({
+        ...doc, 
+        reviewStatus: localStorage.getItem(`doc-review-${doc.id}`) as ReviewStatus || 'not-reviewed',
+        reviewNote: localStorage.getItem(`doc-review-note-${doc.id}`) || ''
+      })) || [];
     },
     enabled: !!organizationId
   });
@@ -97,8 +105,47 @@ const Dashboard = () => {
     navigate(`/documents/${documentId}`);
   };
 
+  const updateDocumentReviewStatus = (documentId: string, reviewStatus: ReviewStatus, reviewNote?: string) => {
+    // Store review status in localStorage
+    localStorage.setItem(`doc-review-${documentId}`, reviewStatus);
+    if (reviewNote) {
+      localStorage.setItem(`doc-review-note-${documentId}`, reviewNote);
+    }
+    
+    // Update the UI by refetching the documents
+    refetch();
+    
+    toast({
+      title: "Review status updated",
+      description: `Document has been marked as ${reviewStatus.replace('-', ' ')}`
+    });
+  };
+
+  const getReviewStatusBadge = (reviewStatus: ReviewStatus | undefined) => {
+    if (!reviewStatus || reviewStatus === 'not-reviewed') {
+      return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
+    } else if (reviewStatus === 'reviewed') {
+      return <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600 text-white">Reviewed</Badge>;
+    } else if (reviewStatus === 'needs-correction') {
+      return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
+    }
+  };
+
   // Only show upload button if we have an organization context
   const canUpload = !!organizationId;
+
+  // Calculate review statistics
+  const notReviewedCount = documents?.filter(doc => 
+    !doc.reviewStatus || doc.reviewStatus === 'not-reviewed'
+  ).length || 0;
+  
+  const reviewedCount = documents?.filter(doc => 
+    doc.reviewStatus === 'reviewed'
+  ).length || 0;
+  
+  const needsCorrectionCount = documents?.filter(doc => 
+    doc.reviewStatus === 'needs-correction'
+  ).length || 0;
 
   return (
     <div className="mt-4">
@@ -192,55 +239,114 @@ const Dashboard = () => {
               <p className="text-destructive">Error: {(error as Error).message}</p>
             </div>
           ) : documents && documents.length > 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-            >
-              {documents.map((document) => (
-                <Card key={document.id}>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle className="text-lg">{document.file_name}</CardTitle>
-                    </div>
-                    <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
+            <>
+              {/* Review status summary */}
+              {documents.length > 0 && (
+                <div className="mb-6 flex items-center gap-4 text-sm">
+                  <span className="font-medium">Review Status:</span>
+                  {notReviewedCount > 0 && <span className="text-muted-foreground">{notReviewedCount} not reviewed</span>}
+                  {reviewedCount > 0 && <span className="text-green-500">{reviewedCount} reviewed</span>}
+                  {needsCorrectionCount > 0 && <span className="text-red-500">{needsCorrectionCount} needs correction</span>}
+                </div>
+              )}
+            
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {documents.map((document) => (
+                  <Card key={document.id}>
+                    <CardHeader>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Status:</span>
-                        <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                          document.status === 'processed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : document.status === 'processing' 
-                              ? 'bg-blue-100 text-blue-800' 
-                              : 'bg-red-100 text-red-800'
-                        }`}>
-                          {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <CardTitle className="text-lg">{document.file_name}</CardTitle>
+                        </div>
+                        <div>
+                          {getReviewStatusBadge(document.reviewStatus)}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Type:</span>
-                        <span className="text-sm">{document.document_type || 'Unknown'}</span>
-                      </div>
-                      {document.client_organization_id && (
+                      <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Client:</span>
-                          <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                            For client
+                          <span className="text-sm font-medium">Status:</span>
+                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                            document.status === 'processed' 
+                              ? 'bg-green-100 text-green-800' 
+                              : document.status === 'processing' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-red-100 text-red-800'
+                          }`}>
+                            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
                           </span>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button onClick={() => handleViewDocument(document.id)}>View</Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </motion.div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Type:</span>
+                          <span className="text-sm">{document.document_type || 'Unknown'}</span>
+                        </div>
+                        {document.client_organization_id && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Client:</span>
+                            <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              For client
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <div className="flex gap-2">
+                        <Button onClick={() => handleViewDocument(document.id)} variant="default">
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </Button>
+                      </div>
+                      <div className="flex gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-9 w-9"
+                                onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
+                              >
+                                <CheckCircle className="h-5 w-5 text-green-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Mark as reviewed</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-9 w-9"
+                                onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
+                              >
+                                <AlertCircle className="h-5 w-5 text-red-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Mark as needs correction</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </motion.div>
+            </>
           ) : (
             <div className="text-center py-10 border rounded-lg bg-background">
               <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
