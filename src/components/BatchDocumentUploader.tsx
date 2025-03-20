@@ -1,14 +1,16 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, X, FileText, Upload, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, X, FileText, Upload, CheckCircle, AlertCircle, Save, Archive, Eye, FileBadge } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import OrganizationCard from "./OrganizationCard";
 
 const DOCUMENT_TYPES = [
@@ -21,6 +23,8 @@ const DOCUMENT_TYPES = [
   { label: "Other", value: "other" }
 ];
 
+const BATCH_LOCAL_STORAGE_KEY = "doc-batch-";
+
 export interface BatchDocumentUploaderProps {
   onUploadComplete?: (data?: any) => void;
   organizationId?: string;
@@ -28,6 +32,7 @@ export interface BatchDocumentUploaderProps {
 }
 
 type FileStatus = 'pending' | 'uploading' | 'processing' | 'complete' | 'error';
+type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
 interface QueuedFile {
   file: File;
@@ -36,6 +41,27 @@ interface QueuedFile {
   progress: number;
   error?: string;
   documentId?: string;
+  reviewStatus?: ReviewStatus;
+  reviewNote?: string;
+}
+
+interface SavedFile {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  documentType: string;
+  status: FileStatus;
+  progress: number;
+  error?: string;
+  documentId?: string;
+  reviewStatus?: ReviewStatus;
+  reviewNote?: string;
+}
+
+interface SavedBatch {
+  timestamp: number;
+  files: SavedFile[];
+  defaultDocumentType: string;
 }
 
 const BatchDocumentUploader = ({ 
@@ -47,7 +73,25 @@ const BatchDocumentUploader = ({
   const [defaultDocumentType, setDefaultDocumentType] = useState<string>("certificate-fitness");
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [hasSavedBatch, setHasSavedBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for saved batch on load
+  useEffect(() => {
+    if (!organizationId) return;
+    
+    const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
+    const savedBatchJson = localStorage.getItem(savedBatchKey);
+    
+    if (savedBatchJson) {
+      try {
+        setHasSavedBatch(true);
+      } catch (e) {
+        console.error("Error parsing saved batch", e);
+        localStorage.removeItem(savedBatchKey);
+      }
+    }
+  }, [organizationId, clientOrganizationId]);
 
   const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -55,7 +99,8 @@ const BatchDocumentUploader = ({
         file,
         documentType: defaultDocumentType,
         status: 'pending' as FileStatus,
-        progress: 0
+        progress: 0,
+        reviewStatus: 'not-reviewed' as ReviewStatus
       }));
       
       setQueuedFiles(prev => [...prev, ...newFiles]);
@@ -106,6 +151,18 @@ const BatchDocumentUploader = ({
           status, 
           documentId: documentId || item.documentId,
           error: error || item.error
+        } : item
+      )
+    );
+  };
+
+  const updateFileReviewStatus = (index: number, reviewStatus: ReviewStatus, reviewNote?: string) => {
+    setQueuedFiles(prev => 
+      prev.map((item, i) => 
+        i === index ? { 
+          ...item, 
+          reviewStatus,
+          reviewNote: reviewNote || item.reviewNote
         } : item
       )
     );
@@ -247,6 +304,154 @@ const BatchDocumentUploader = ({
     }
   };
 
+  const saveBatchProgress = () => {
+    if (!organizationId || queuedFiles.length === 0) return;
+    
+    try {
+      const savedFiles: SavedFile[] = queuedFiles.map(file => ({
+        fileName: file.file.name,
+        fileType: file.file.type,
+        fileSize: file.file.size,
+        documentType: file.documentType,
+        status: file.status,
+        progress: file.progress,
+        error: file.error,
+        documentId: file.documentId,
+        reviewStatus: file.reviewStatus || 'not-reviewed',
+        reviewNote: file.reviewNote
+      }));
+      
+      const batchToSave: SavedBatch = {
+        timestamp: Date.now(),
+        files: savedFiles,
+        defaultDocumentType
+      };
+      
+      const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
+      localStorage.setItem(savedBatchKey, JSON.stringify(batchToSave));
+      
+      toast({
+        title: "Batch progress saved",
+        description: `You can continue this batch later`,
+      });
+      
+      setHasSavedBatch(true);
+    } catch (error) {
+      console.error("Error saving batch progress:", error);
+      toast({
+        title: "Could not save progress",
+        description: "There was an error saving your batch progress",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadSavedBatch = () => {
+    if (!organizationId) return;
+    
+    try {
+      const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
+      const savedBatchJson = localStorage.getItem(savedBatchKey);
+      
+      if (!savedBatchJson) {
+        toast({
+          title: "No saved batch found",
+          description: "Could not find a previously saved batch",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const savedBatch: SavedBatch = JSON.parse(savedBatchJson);
+      setDefaultDocumentType(savedBatch.defaultDocumentType);
+      
+      // Keep only files that have been uploaded and have document IDs
+      // since we can't restore the actual File objects
+      const loadableFiles = savedBatch.files.filter(file => 
+        (file.status === 'complete' || file.status === 'processing') && file.documentId
+      );
+      
+      if (loadableFiles.length === 0) {
+        toast({
+          title: "No documents to restore",
+          description: "The saved batch does not contain any processed documents",
+          variant: "destructive"
+        });
+        localStorage.removeItem(savedBatchKey);
+        setHasSavedBatch(false);
+        return;
+      }
+      
+      // Create placeholder File objects (with limited functionality)
+      const restoredFiles: QueuedFile[] = loadableFiles.map(file => ({
+        file: new File([], file.fileName, { type: file.fileType }),
+        documentType: file.documentType,
+        status: file.status,
+        progress: file.progress,
+        error: file.error,
+        documentId: file.documentId,
+        reviewStatus: file.reviewStatus,
+        reviewNote: file.reviewNote
+      }));
+      
+      setQueuedFiles(prev => [...prev, ...restoredFiles]);
+      
+      toast({
+        title: "Batch restored",
+        description: `Restored ${restoredFiles.length} document(s) from your saved batch`,
+      });
+      
+      // Fetch latest document statuses from database
+      restoredFiles.forEach(async (file, index) => {
+        if (file.documentId) {
+          const { data, error } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('id', file.documentId)
+            .single();
+            
+          if (!error && data) {
+            // Update the file status based on latest database info
+            const updatedStatus = data.status === 'completed' 
+              ? 'complete' as FileStatus 
+              : data.status === 'processing' 
+                ? 'processing' as FileStatus 
+                : file.status;
+                
+            setQueuedFiles(prev => 
+              prev.map((item, i) => 
+                i === prev.length - restoredFiles.length + index 
+                  ? { ...item, status: updatedStatus } 
+                  : item
+              )
+            );
+          }
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error loading saved batch:", error);
+      toast({
+        title: "Could not load saved batch",
+        description: "There was an error loading your saved batch",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const clearSavedBatch = () => {
+    if (!organizationId) return;
+    
+    const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
+    localStorage.removeItem(savedBatchKey);
+    setHasSavedBatch(false);
+    
+    toast({
+      title: "Saved batch cleared",
+      description: "Your saved batch has been cleared"
+    });
+  };
+
   const getOverallProgress = () => {
     if (queuedFiles.length === 0) return 0;
     const totalProgress = queuedFiles.reduce((sum, file) => sum + file.progress, 0);
@@ -258,6 +463,13 @@ const BatchDocumentUploader = ({
   const completedCount = queuedFiles.filter(f => f.status === 'complete').length;
   const errorCount = queuedFiles.filter(f => f.status === 'error').length;
   const totalCount = queuedFiles.length;
+  
+  const notReviewedCount = queuedFiles.filter(f => 
+    (f.status === 'complete' || f.status === 'processing') && 
+    (!f.reviewStatus || f.reviewStatus === 'not-reviewed')
+  ).length;
+  const reviewedCount = queuedFiles.filter(f => f.reviewStatus === 'reviewed').length;
+  const needsCorrectionCount = queuedFiles.filter(f => f.reviewStatus === 'needs-correction').length;
 
   const getStatusIcon = (status: FileStatus) => {
     switch (status) {
@@ -268,9 +480,54 @@ const BatchDocumentUploader = ({
       case 'error': return <AlertCircle className="h-4 w-4 text-red-500" />;
     }
   };
+  
+  const getReviewStatusBadge = (reviewStatus: ReviewStatus | undefined) => {
+    if (!reviewStatus || reviewStatus === 'not-reviewed') {
+      return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
+    } else if (reviewStatus === 'reviewed') {
+      return <Badge variant="success" className="text-xs bg-green-500 hover:bg-green-600">Reviewed</Badge>;
+    } else if (reviewStatus === 'needs-correction') {
+      return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
+    }
+  };
+  
+  // Card actions for save/load functionality
+  const cardActions = (
+    <>
+      {queuedFiles.length > 0 && !uploading && !processing && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={saveBatchProgress}>
+                <Save className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Save batch progress</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      
+      {hasSavedBatch && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={loadSavedBatch}>
+                <Archive className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Load saved batch</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </>
+  );
 
   return (
-    <OrganizationCard title="Batch Document Upload">
+    <OrganizationCard title="Batch Document Upload" actions={cardActions}>
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="document-type">Default Document Type</Label>
@@ -321,6 +578,23 @@ const BatchDocumentUploader = ({
           </div>
         )}
         
+        {hasSavedBatch && (
+          <div className="bg-muted p-3 rounded-md text-sm flex items-center justify-between">
+            <div>
+              <p className="font-medium">You have a saved batch</p>
+              <p className="text-xs text-muted-foreground">You can load your previously saved progress</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={loadSavedBatch}>
+                <Archive className="h-4 w-4 mr-1" /> Load
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSavedBatch}>
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
+        
         {queuedFiles.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -341,13 +615,25 @@ const BatchDocumentUploader = ({
               </Button>
             </div>
             
+            {completedCount > 0 && (
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-sm">
+                  <span className="font-medium">Review Status:</span>
+                  {notReviewedCount > 0 && <span className="text-muted-foreground ml-2">{notReviewedCount} not reviewed</span>}
+                  {reviewedCount > 0 && <span className="text-green-500 ml-2">{reviewedCount} reviewed</span>}
+                  {needsCorrectionCount > 0 && <span className="text-red-500 ml-2">{needsCorrectionCount} needs correction</span>}
+                </div>
+              </div>
+            )}
+            
             <Card>
               <CardHeader className="py-2 px-4">
                 <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground">
                   <div className="col-span-5">Filename</div>
-                  <div className="col-span-3">Document Type</div>
+                  <div className="col-span-2">Document Type</div>
                   <div className="col-span-2">Status</div>
-                  <div className="col-span-2">Actions</div>
+                  <div className="col-span-2">Review</div>
+                  <div className="col-span-1">Actions</div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -364,7 +650,7 @@ const BatchDocumentUploader = ({
                             {queuedFile.file.name}
                           </span>
                         </div>
-                        <div className="col-span-3">
+                        <div className="col-span-2">
                           {queuedFile.status === 'pending' ? (
                             <Select 
                               value={queuedFile.documentType} 
@@ -405,7 +691,76 @@ const BatchDocumentUploader = ({
                             </span>
                           )}
                         </div>
-                        <div className="col-span-2 flex justify-end">
+                        <div className="col-span-2">
+                          {(queuedFile.status === 'complete' || queuedFile.documentId) && (
+                            <div className="flex gap-1 items-center">
+                              {getReviewStatusBadge(queuedFile.reviewStatus)}
+                              
+                              {queuedFile.documentId && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6"
+                                        onClick={() => {
+                                          window.open(`/document/${queuedFile.documentId}`, '_blank');
+                                        }}
+                                      >
+                                        <Eye className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>View document</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              
+                              {queuedFile.documentId && (
+                                <div className="flex gap-1">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => updateFileReviewStatus(index, 'reviewed')}
+                                        >
+                                          <CheckCircle className="h-3 w-3 text-green-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Mark as reviewed</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => updateFileReviewStatus(index, 'needs-correction')}
+                                        >
+                                          <AlertCircle className="h-3 w-3 text-red-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Needs correction</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-span-1 flex justify-end">
                           {queuedFile.status === 'pending' && (
                             <Button 
                               variant="ghost" 

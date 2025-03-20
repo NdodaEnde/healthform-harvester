@@ -9,13 +9,15 @@ interface OrganizationCardProps {
   children: React.ReactNode;
   className?: string;
   showLogo?: boolean;
+  actions?: React.ReactNode;
 }
 
 const OrganizationCard: React.FC<OrganizationCardProps> = ({ 
   title, 
   children, 
   className = '',
-  showLogo = true
+  showLogo = true,
+  actions
 }) => {
   const { currentOrganization, currentClient } = useOrganization();
   
@@ -36,7 +38,10 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             </p>
           )}
         </div>
-        {showLogo && <OrganizationLogo size="sm" />}
+        <div className="flex items-center gap-2">
+          {actions}
+          {showLogo && <OrganizationLogo size="sm" />}
+        </div>
       </CardHeader>
       <CardContent className="pt-4">
         {children}
