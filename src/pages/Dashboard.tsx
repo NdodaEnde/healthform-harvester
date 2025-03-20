@@ -1,6 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUploader from "@/components/DocumentUploader";
+import BatchDocumentUploader from "@/components/BatchDocumentUploader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -170,8 +172,10 @@ const Dashboard = () => {
       <Tabs defaultValue="documents" className="w-full">
         <TabsList className="mb-8">
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="uploads">Upload Documents</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
+        
         <TabsContent value="documents">
           {!organizationId ? (
             <div className="text-center py-10 border rounded-lg bg-background">
@@ -251,6 +255,24 @@ const Dashboard = () => {
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Document
               </Button>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="uploads">
+          {!organizationId ? (
+            <div className="text-center py-10 border rounded-lg bg-background">
+              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+              <p className="text-muted-foreground mb-4">Please select an organization to upload documents</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <BatchDocumentUploader 
+                onUploadComplete={handleUploadComplete}
+                organizationId={currentOrganization?.id}
+                clientOrganizationId={currentClient?.id}
+              />
             </div>
           )}
         </TabsContent>

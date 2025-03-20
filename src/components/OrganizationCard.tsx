@@ -7,18 +7,38 @@ import OrganizationLogo from './OrganizationLogo';
 interface OrganizationCardProps {
   title: string;
   children: React.ReactNode;
+  className?: string;
+  showLogo?: boolean;
 }
 
-const OrganizationCard: React.FC<OrganizationCardProps> = ({ title, children }) => {
-  const { currentOrganization } = useOrganization();
+const OrganizationCard: React.FC<OrganizationCardProps> = ({ 
+  title, 
+  children, 
+  className = '',
+  showLogo = true
+}) => {
+  const { currentOrganization, currentClient } = useOrganization();
+  
+  // Determine which organization to display (client takes precedence if selected)
+  const displayOrganization = currentClient || currentOrganization;
   
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-        <h3 className="font-medium">{title}</h3>
-        <OrganizationLogo size="sm" />
+    <Card className={className}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b">
+        <div className="space-y-1">
+          <h3 className="font-medium">{title}</h3>
+          {displayOrganization && (
+            <p className="text-xs text-muted-foreground">
+              {currentClient 
+                ? `Client: ${displayOrganization.name}` 
+                : displayOrganization.name
+              }
+            </p>
+          )}
+        </div>
+        {showLogo && <OrganizationLogo size="sm" />}
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         {children}
       </CardContent>
     </Card>

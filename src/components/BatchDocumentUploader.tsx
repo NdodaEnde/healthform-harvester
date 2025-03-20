@@ -1,0 +1,476 @@
+
+import { useState, useRef } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2, X, FileText, Upload, CheckCircle, AlertCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import OrganizationCard from "./OrganizationCard";
+
+const DOCUMENT_TYPES = [
+  { label: "Certificate of Fitness", value: "certificate-fitness" },
+  { label: "Medical Questionnaire", value: "medical-questionnaire" },
+  { label: "Medical Report", value: "medical-report" },
+  { label: "Audiogram", value: "audiogram" },
+  { label: "Spirometry", value: "spirometry" },
+  { label: "X-Ray Report", value: "xray-report" },
+  { label: "Other", value: "other" }
+];
+
+export interface BatchDocumentUploaderProps {
+  onUploadComplete?: (data?: any) => void;
+  organizationId?: string;
+  clientOrganizationId?: string;
+}
+
+type FileStatus = 'pending' | 'uploading' | 'processing' | 'complete' | 'error';
+
+interface QueuedFile {
+  file: File;
+  documentType: string;
+  status: FileStatus;
+  progress: number;
+  error?: string;
+  documentId?: string;
+}
+
+const BatchDocumentUploader = ({ 
+  onUploadComplete,
+  organizationId,
+  clientOrganizationId 
+}: BatchDocumentUploaderProps) => {
+  const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
+  const [defaultDocumentType, setDefaultDocumentType] = useState<string>("certificate-fitness");
+  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files).map(file => ({
+        file,
+        documentType: defaultDocumentType,
+        status: 'pending' as FileStatus,
+        progress: 0
+      }));
+      
+      setQueuedFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setQueuedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearQueue = () => {
+    if (!uploading && !processing) {
+      setQueuedFiles([]);
+    }
+  };
+
+  const handleSetDocumentType = (index: number, type: string) => {
+    setQueuedFiles(prev => 
+      prev.map((item, i) => 
+        i === index ? { ...item, documentType: type } : item
+      )
+    );
+  };
+
+  const handleSetAllDocumentTypes = (type: string) => {
+    setDefaultDocumentType(type);
+    
+    // Only update document types for files that haven't started uploading
+    setQueuedFiles(prev => 
+      prev.map(item => 
+        item.status === 'pending' ? { ...item, documentType: type } : item
+      )
+    );
+  };
+
+  const updateFileProgress = (index: number, progress: number) => {
+    setQueuedFiles(prev => 
+      prev.map((item, i) => 
+        i === index ? { ...item, progress } : item
+      )
+    );
+  };
+
+  const updateFileStatus = (index: number, status: FileStatus, documentId?: string, error?: string) => {
+    setQueuedFiles(prev => 
+      prev.map((item, i) => 
+        i === index ? { 
+          ...item, 
+          status, 
+          documentId: documentId || item.documentId,
+          error: error || item.error
+        } : item
+      )
+    );
+  };
+
+  const uploadFile = async (fileItem: QueuedFile, index: number) => {
+    updateFileStatus(index, 'uploading');
+    updateFileProgress(index, 10);
+
+    try {
+      // Get current user for folder path organization
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Create a formData object
+      const formData = new FormData();
+      formData.append('file', fileItem.file);
+      formData.append('documentType', fileItem.documentType);
+      formData.append('userId', user.id);
+
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        updateFileProgress(index, prev => {
+          if (prev < 60) return prev + 5;
+          return prev;
+        });
+      }, 300);
+
+      // Call the Supabase Edge Function to process the document
+      const { data, error } = await supabase.functions.invoke('process-document', {
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+      
+      if (error) throw error;
+      
+      updateFileProgress(index, 80);
+      updateFileStatus(index, 'processing', data?.documentId);
+      
+      // First verify if the document has been properly created
+      if (!data?.documentId) {
+        throw new Error("No document ID returned from processing function");
+      }
+      
+      // Update the document record with organization context
+      const { error: updateError } = await supabase
+        .from('documents')
+        .update({
+          organization_id: organizationId,
+          client_organization_id: clientOrganizationId || null
+        })
+        .eq('id', data.documentId);
+        
+      if (updateError) {
+        throw updateError;
+      }
+      
+      updateFileProgress(index, 100);
+      updateFileStatus(index, 'complete', data.documentId);
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error uploading document:", error);
+      updateFileStatus(index, 'error', undefined, error.message || "Upload failed");
+      throw error;
+    }
+  };
+
+  const processBatch = async () => {
+    if (queuedFiles.length === 0) {
+      toast({
+        title: "No files in queue",
+        description: "Please add files to the upload queue first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!organizationId) {
+      toast({
+        title: "No organization context",
+        description: "Please select an organization before uploading",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setProcessing(true);
+      
+      // Get pending files only
+      const pendingFiles = queuedFiles.filter(f => f.status === 'pending');
+      
+      if (pendingFiles.length === 0) {
+        setUploading(false);
+        return;
+      }
+      
+      toast({
+        title: "Batch upload started",
+        description: `Uploading ${pendingFiles.length} document(s)`,
+      });
+      
+      // Process files sequentially to avoid overwhelming the server
+      const results = [];
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const fileIndex = queuedFiles.findIndex(f => f === pendingFiles[i]);
+        if (fileIndex !== -1) {
+          try {
+            const result = await uploadFile(pendingFiles[i], fileIndex);
+            results.push(result);
+          } catch (error) {
+            console.error(`Error processing file ${i}:`, error);
+            // Continue with next file
+          }
+        }
+      }
+
+      const successCount = results.length;
+      const failCount = pendingFiles.length - successCount;
+      
+      toast({
+        title: "Batch upload complete",
+        description: `Successfully uploaded ${successCount} document(s)${failCount > 0 ? `. ${failCount} failed.` : ''}`,
+        variant: successCount > 0 ? "default" : "destructive"
+      });
+      
+      if (onUploadComplete && successCount > 0) {
+        onUploadComplete(results);
+      }
+    } catch (error: any) {
+      console.error("Batch processing error:", error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "There was an error uploading your documents",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      setProcessing(false);
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const getOverallProgress = () => {
+    if (queuedFiles.length === 0) return 0;
+    const totalProgress = queuedFiles.reduce((sum, file) => sum + file.progress, 0);
+    return Math.round(totalProgress / queuedFiles.length);
+  };
+
+  const pendingCount = queuedFiles.filter(f => f.status === 'pending').length;
+  const processingCount = queuedFiles.filter(f => f.status === 'processing').length;
+  const completedCount = queuedFiles.filter(f => f.status === 'complete').length;
+  const errorCount = queuedFiles.filter(f => f.status === 'error').length;
+  const totalCount = queuedFiles.length;
+
+  const getStatusIcon = (status: FileStatus) => {
+    switch (status) {
+      case 'pending': return <FileText className="h-4 w-4 text-muted-foreground" />;
+      case 'uploading': return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+      case 'processing': return <Loader2 className="h-4 w-4 animate-spin text-amber-500" />;
+      case 'complete': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'error': return <AlertCircle className="h-4 w-4 text-red-500" />;
+    }
+  };
+
+  return (
+    <OrganizationCard title="Batch Document Upload">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="document-type">Default Document Type</Label>
+          <Select 
+            value={defaultDocumentType} 
+            onValueChange={handleSetAllDocumentTypes}
+            disabled={uploading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select document type" />
+            </SelectTrigger>
+            <SelectContent>
+              {DOCUMENT_TYPES.map(type => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            This type will be applied to all new files added to the queue
+          </p>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="files">Select Documents</Label>
+          <Input 
+            id="files" 
+            type="file" 
+            onChange={handleFilesChange}
+            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+            disabled={uploading}
+            multiple
+            ref={fileInputRef}
+          />
+          <p className="text-xs text-muted-foreground">
+            Supported formats: PDF, PNG, JPG, JPEG, DOC, DOCX, TXT
+          </p>
+        </div>
+
+        {organizationId && (
+          <div className="text-xs text-muted-foreground">
+            {clientOrganizationId ? (
+              <p>These documents will be uploaded for client organization</p>
+            ) : (
+              <p>These documents will be uploaded to your organization</p>
+            )}
+          </div>
+        )}
+        
+        {queuedFiles.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">
+                Upload Queue ({totalCount} files)
+                {pendingCount > 0 && <span className="text-muted-foreground ml-2">{pendingCount} pending</span>}
+                {processingCount > 0 && <span className="text-amber-500 ml-2">{processingCount} processing</span>}
+                {completedCount > 0 && <span className="text-green-500 ml-2">{completedCount} completed</span>}
+                {errorCount > 0 && <span className="text-red-500 ml-2">{errorCount} failed</span>}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleClearQueue}
+                disabled={uploading || processing}
+              >
+                Clear Queue
+              </Button>
+            </div>
+            
+            <Card>
+              <CardHeader className="py-2 px-4">
+                <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground">
+                  <div className="col-span-5">Filename</div>
+                  <div className="col-span-3">Document Type</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-2">Actions</div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[240px] w-full rounded-md border">
+                  <div className="p-2 space-y-2">
+                    {queuedFiles.map((queuedFile, index) => (
+                      <div 
+                        key={index}
+                        className="grid grid-cols-12 gap-2 p-2 text-sm items-center border-b last:border-b-0"
+                      >
+                        <div className="col-span-5 flex items-center gap-2 truncate">
+                          {getStatusIcon(queuedFile.status)}
+                          <span className="truncate" title={queuedFile.file.name}>
+                            {queuedFile.file.name}
+                          </span>
+                        </div>
+                        <div className="col-span-3">
+                          {queuedFile.status === 'pending' ? (
+                            <Select 
+                              value={queuedFile.documentType} 
+                              onValueChange={(value) => handleSetDocumentType(index, value)}
+                              disabled={uploading}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {DOCUMENT_TYPES.map(type => (
+                                  <SelectItem key={type.value} value={type.value}>
+                                    {type.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs">
+                              {DOCUMENT_TYPES.find(t => t.value === queuedFile.documentType)?.label || queuedFile.documentType}
+                            </span>
+                          )}
+                        </div>
+                        <div className="col-span-2">
+                          {queuedFile.status === 'uploading' || queuedFile.status === 'processing' ? (
+                            <Progress value={queuedFile.progress} className="h-2" />
+                          ) : queuedFile.status === 'error' ? (
+                            <span className="text-xs text-red-500" title={queuedFile.error}>
+                              Failed
+                            </span>
+                          ) : queuedFile.status === 'complete' ? (
+                            <span className="text-xs text-green-500">
+                              Complete
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Pending
+                            </span>
+                          )}
+                        </div>
+                        <div className="col-span-2 flex justify-end">
+                          {queuedFile.status === 'pending' && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleRemoveFile(index)}
+                              disabled={uploading}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+            
+            {(uploading || processing) && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Overall Progress</span>
+                  <span>{getOverallProgress()}%</span>
+                </div>
+                <Progress value={getOverallProgress()} className="h-2" />
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="flex gap-2">
+          <Button 
+            onClick={processBatch} 
+            disabled={pendingCount === 0 || uploading || !organizationId}
+            className="w-full"
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                <span>Start Batch Upload</span>
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </OrganizationCard>
+  );
+};
+
+export default BatchDocumentUploader;
