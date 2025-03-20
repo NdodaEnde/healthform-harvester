@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -90,11 +89,11 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
       let updatedData: Partial<Organization> = {};
       
       // Get current settings or initialize empty object
-      const currentSettings = organization.settings || {};
+      const currentSettings = typeof organization.settings === 'object' ? organization.settings : {};
       
       // Update settings with branding info
       updatedData.settings = {
-        ...currentSettings,
+        ...(currentSettings as Record<string, unknown>),
         branding: data.branding
       };
       
