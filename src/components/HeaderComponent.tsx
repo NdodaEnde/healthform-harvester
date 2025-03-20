@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -34,9 +34,21 @@ const HeaderComponent: React.FC = () => {
   return (
     <header className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-50">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
-        <Link to="/" className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          DocManager
-        </Link>
+        <div className="flex items-center">
+          <Link to="/" className="flex items-center mr-4">
+            {currentOrganization?.logo_url ? (
+              <img 
+                src={currentOrganization.logo_url} 
+                alt={`${currentOrganization.name} logo`}
+                className="h-8 w-auto mr-2"
+              />
+            ) : (
+              <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                DocManager
+              </div>
+            )}
+          </Link>
+        </div>
         
         <div className="flex items-center space-x-4">
           {user ? (
