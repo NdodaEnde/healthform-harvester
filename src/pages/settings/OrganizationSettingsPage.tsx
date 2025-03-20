@@ -31,20 +31,30 @@ export default function OrganizationSettingsPage() {
       }
       
       setLoading(true);
+      setError(null); // Clear previous errors
       try {
+        console.log("Fetching organization with ID:", currentOrganization.id);
+        
         // Fetch organization details to get the most up-to-date data
         const { data, error } = await supabase
           .from("organizations")
           .select("*")
           .eq("id", currentOrganization.id)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single
           
         if (error) throw error;
         
+        if (!data) {
+          setError("Organization not found");
+          console.log("No organization data found");
+          return;
+        }
+        
+        console.log("Organization data fetched:", data);
         setOrganization(data as Organization);
       } catch (error: any) {
         console.error("Error fetching organization:", error);
-        setError(error.message);
+        setError(error.message || "Failed to load organization data");
       } finally {
         setLoading(false);
       }
@@ -72,9 +82,13 @@ export default function OrganizationSettingsPage() {
         .from("organizations")
         .select("*")
         .eq("id", organization.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle here too
         
       if (refreshError) throw refreshError;
+      
+      if (!refreshedData) {
+        throw new Error("Failed to refresh organization data");
+      }
       
       // Update local state
       setOrganization(refreshedData as Organization);
@@ -96,6 +110,7 @@ export default function OrganizationSettingsPage() {
     }
   };
   
+  // If currentOrganization is available but we're waiting for the detailed data
   if (loading) {
     return (
       <div className="container py-10 flex justify-center">
@@ -104,7 +119,11 @@ export default function OrganizationSettingsPage() {
     );
   }
   
-  if (error || !organization) {
+  // Fall back to using currentOrganization if we couldn't fetch detailed organization data
+  const organizationToUse = organization || currentOrganization;
+  
+  // If no organization is available at all
+  if (error && !organizationToUse) {
     return (
       <div className="container py-10">
         <Card>
@@ -117,13 +136,21 @@ export default function OrganizationSettingsPage() {
     );
   }
   
+  // If we have some organization data to show (either detailed or from context)
   return (
     <div className="container py-10">
       <h1 className="text-3xl font-bold mb-6">Organization Settings</h1>
       
+      {error && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md text-amber-700">
+          <p>Warning: {error}</p>
+          <p className="text-sm">Using cached organization data. Some features may be limited.</p>
+        </div>
+      )}
+      
       <Card>
         <CardHeader>
-          <CardTitle>{organization.name}</CardTitle>
+          <CardTitle>{organizationToUse?.name || "Organization"}</CardTitle>
           <CardDescription>Manage your organization settings and branding</CardDescription>
         </CardHeader>
         <CardContent>
@@ -136,21 +163,21 @@ export default function OrganizationSettingsPage() {
             
             <TabsContent value="general">
               <GeneralSettingsForm 
-                organization={organization} 
+                organization={organizationToUse} 
                 onUpdate={handleUpdateOrganization} 
               />
             </TabsContent>
             
             <TabsContent value="branding">
               <BrandingSettingsForm 
-                organization={organization}
+                organization={organizationToUse}
                 onUpdate={handleUpdateOrganization}
               />
             </TabsContent>
             
             <TabsContent value="address">
               <AddressSettingsForm 
-                organization={organization}
+                organization={organizationToUse}
                 onUpdate={handleUpdateOrganization}
               />
             </TabsContent>
