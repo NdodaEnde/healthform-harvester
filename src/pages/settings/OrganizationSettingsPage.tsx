@@ -57,6 +57,9 @@ export default function OrganizationSettingsPage() {
     if (!organization?.id) return false;
     
     try {
+      console.log("Updating organization with data:", updatedData);
+      
+      // Use update() for organization data
       const { error } = await supabase
         .from("organizations")
         .update(updatedData)
@@ -64,8 +67,17 @@ export default function OrganizationSettingsPage() {
         
       if (error) throw error;
       
+      // Refetch the organization to get the updated data
+      const { data: refreshedData, error: refreshError } = await supabase
+        .from("organizations")
+        .select("*")
+        .eq("id", organization.id)
+        .single();
+        
+      if (refreshError) throw refreshError;
+      
       // Update local state
-      setOrganization({ ...organization, ...updatedData });
+      setOrganization(refreshedData as Organization);
       
       toast({
         title: "Settings saved",

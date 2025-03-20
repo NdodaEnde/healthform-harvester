@@ -85,8 +85,17 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
     setLogoError(null);
     
     try {
-      let updatedData: Partial<Organization> = { 
-        branding: data.branding 
+      // Instead of directly updating the branding field, we'll update the settings
+      // field which includes branding information
+      let updatedData: Partial<Organization> = {};
+      
+      // Get current settings or initialize empty object
+      const currentSettings = organization.settings || {};
+      
+      // Update settings with branding info
+      updatedData.settings = {
+        ...currentSettings,
+        branding: data.branding
       };
       
       // Upload logo if a new file was selected
