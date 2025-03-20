@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -84,7 +83,6 @@ const BatchDocumentUploader = ({
   const handleSetAllDocumentTypes = (type: string) => {
     setDefaultDocumentType(type);
     
-    // Only update document types for files that haven't started uploading
     setQueuedFiles(prev => 
       prev.map(item => 
         item.status === 'pending' ? { ...item, documentType: type } : item
@@ -118,27 +116,22 @@ const BatchDocumentUploader = ({
     updateFileProgress(index, 10);
 
     try {
-      // Get current user for folder path organization
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("User not authenticated");
       }
       
-      // Create a formData object
       const formData = new FormData();
       formData.append('file', fileItem.file);
       formData.append('documentType', fileItem.documentType);
       formData.append('userId', user.id);
 
-      // Simulate progress
       const progressInterval = setInterval(() => {
-        updateFileProgress(index, prev => {
-          if (prev < 60) return prev + 5;
-          return prev;
-        });
+        const currentProgress = queuedFiles[index].progress;
+        const newProgress = currentProgress < 60 ? currentProgress + 5 : currentProgress;
+        updateFileProgress(index, newProgress);
       }, 300);
 
-      // Call the Supabase Edge Function to process the document
       const { data, error } = await supabase.functions.invoke('process-document', {
         body: formData,
       });
@@ -150,12 +143,10 @@ const BatchDocumentUploader = ({
       updateFileProgress(index, 80);
       updateFileStatus(index, 'processing', data?.documentId);
       
-      // First verify if the document has been properly created
       if (!data?.documentId) {
         throw new Error("No document ID returned from processing function");
       }
       
-      // Update the document record with organization context
       const { error: updateError } = await supabase
         .from('documents')
         .update({
@@ -202,7 +193,6 @@ const BatchDocumentUploader = ({
       setUploading(true);
       setProcessing(true);
       
-      // Get pending files only
       const pendingFiles = queuedFiles.filter(f => f.status === 'pending');
       
       if (pendingFiles.length === 0) {
@@ -215,7 +205,6 @@ const BatchDocumentUploader = ({
         description: `Uploading ${pendingFiles.length} document(s)`,
       });
       
-      // Process files sequentially to avoid overwhelming the server
       const results = [];
       for (let i = 0; i < pendingFiles.length; i++) {
         const fileIndex = queuedFiles.findIndex(f => f === pendingFiles[i]);
@@ -225,7 +214,6 @@ const BatchDocumentUploader = ({
             results.push(result);
           } catch (error) {
             console.error(`Error processing file ${i}:`, error);
-            // Continue with next file
           }
         }
       }
@@ -253,7 +241,6 @@ const BatchDocumentUploader = ({
       setUploading(false);
       setProcessing(false);
       
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
