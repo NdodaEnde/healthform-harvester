@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -100,23 +101,10 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
       // Upload logo if a new file was selected
       if (logoFile) {
         try {
-          const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('assets');
+          // Skip the bucket check since we know it exists now
+          // Just proceed with the upload
           
-          // If bucket doesn't exist, create it
-          if (bucketError && bucketError.message.includes('The resource was not found')) {
-            const { error: createError } = await supabase.storage.createBucket('assets', {
-              public: true,
-              fileSizeLimit: 2097152, // 2MB
-            });
-            
-            if (createError) {
-              throw new Error(`Failed to create storage bucket: ${createError.message}`);
-            }
-          } else if (bucketError) {
-            throw bucketError;
-          }
-          
-          // Proceed with upload now that we know the bucket exists
+          // Prepare for file upload
           const fileExt = logoFile.name.split('.').pop();
           const fileName = `${Date.now()}.${fileExt}`;
           const filePath = `logos/${fileName}`;
@@ -137,7 +125,7 @@ export default function BrandingSettingsForm({ organization, onUpdate }: Brandin
             .from("assets")
             .upload(filePath, logoFile, {
               cacheControl: '3600',
-              upsert: false
+              upsert: true // Changed to true to avoid conflicts
             });
             
           if (uploadError) throw uploadError;
