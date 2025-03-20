@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -485,7 +486,7 @@ const BatchDocumentUploader = ({
     if (!reviewStatus || reviewStatus === 'not-reviewed') {
       return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
     } else if (reviewStatus === 'reviewed') {
-      return <Badge variant="success" className="text-xs bg-green-500 hover:bg-green-600">Reviewed</Badge>;
+      return <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600 text-white">Reviewed</Badge>;
     } else if (reviewStatus === 'needs-correction') {
       return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
     }
