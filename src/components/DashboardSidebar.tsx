@@ -7,7 +7,8 @@ import {
   Building, 
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  UserRound
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,11 @@ export function DashboardSidebar() {
       name: "Documents", 
       href: "/dashboard", 
       icon: FileText 
+    },
+    {
+      name: "Patients",
+      href: "/patients",
+      icon: UserRound
     },
     ...(isServiceProvider() ? [
       { 
