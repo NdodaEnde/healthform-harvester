@@ -1,4 +1,3 @@
-
 import { extractPath, cleanValue, isChecked } from "../utils.ts";
 
 // Process certificate of fitness data from Landing AI response
@@ -27,7 +26,9 @@ export function processCertificateOfFitnessData(apiResponse: any) {
                   cleanValue(extractPath(extractedData, 'patient.job_title')) || 
                   cleanValue(extractPath(extractedData, 'occupation')) || 
                   cleanValue(extractPath(extractedData, 'job_title')) || '',
-        gender: cleanValue(extractPath(extractedData, 'patient.gender')) || ''
+        gender: cleanValue(extractPath(extractedData, 'patient.gender')) || 
+               cleanValue(extractPath(extractedData, 'gender')) || 
+               inferGenderFromMarkdown(markdown) || 'unknown'
       },
       examination_results: {
         date: cleanValue(extractPath(extractedData, 'examination.date')) || 
@@ -95,7 +96,8 @@ export function processCertificateOfFitnessData(apiResponse: any) {
     return {
       patient: {
         name: "Unknown",
-        employee_id: "Unknown"
+        employee_id: "Unknown",
+        gender: "unknown"
       },
       examination_results: {
         date: new Date().toISOString().split('T')[0],
@@ -168,7 +170,51 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
     }
   }
   
+  // Gender extraction - try multiple patterns
+  const genderPatterns = [
+    /\*\*Gender\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Gender:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Sex:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*Sex\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i
+  ];
+  
+  for (const pattern of genderPatterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      let gender = cleanValue(match[1].trim().toLowerCase());
+      // Normalize gender values
+      if (gender === 'm' || gender.includes('male')) {
+        gender = 'male';
+      } else if (gender === 'f' || gender.includes('female')) {
+        gender = 'female';
+      } else {
+        gender = 'other';
+      }
+      structuredData.patient.gender = gender;
+      console.log('Extracted gender:', structuredData.patient.gender);
+      break;
+    }
+  }
+  
   return structuredData;
+}
+
+// Helper function to infer gender from markdown if not explicitly stated
+function inferGenderFromMarkdown(markdown: string): string | null {
+  if (!markdown) return null;
+  
+  // Look for gender/sex indicators in the text
+  if (markdown.match(/\bmale\b/i) && !markdown.match(/\bfemale\b/i)) {
+    return 'male';
+  } else if (markdown.match(/\bfemale\b/i) && !markdown.match(/\bmale\b/i)) {
+    return 'female';
+  } else if (markdown.match(/\bsex:\s*m\b/i) || markdown.match(/\bgender:\s*m\b/i)) {
+    return 'male';
+  } else if (markdown.match(/\bsex:\s*f\b/i) || markdown.match(/\bgender:\s*f\b/i)) {
+    return 'female';
+  }
+  
+  return null;
 }
 
 // Helper function to extract examination type from markdown
