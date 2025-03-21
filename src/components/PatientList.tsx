@@ -87,12 +87,12 @@ const PatientList = () => {
         </div>
         
         <div className="flex items-center gap-4">
-          <Select onValueChange={setFilterGender} value={filterGender}>
+          <Select onValueChange={setFilterGender} value={filterGender || "all"}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by gender" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All</SelectItem>
+              <SelectItem value="all">All Genders</SelectItem>
               <SelectItem value="male">Male</SelectItem>
               <SelectItem value="female">Female</SelectItem>
               <SelectItem value="other">Other</SelectItem>
