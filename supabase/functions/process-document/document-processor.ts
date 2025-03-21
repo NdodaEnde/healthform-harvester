@@ -67,6 +67,9 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
           .from('documents')
           .update({ status: 'processed' })
           .eq('id', documentId);
+          
+        // Create or update patient record from the extracted data
+        await createOrUpdatePatientFromDocument(structuredData, documentType, updateData[0], supabase);
       }
     }
     
@@ -124,6 +127,166 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       console.error('Error updating document status after processing failure:', updateError);
     }
   }
+}
+
+// Create or update patient record from document data
+async function createOrUpdatePatientFromDocument(structuredData: any, documentType: string, documentData: any, supabase: any) {
+  try {
+    console.log('Creating or updating patient from document data');
+    
+    // Extract patient information based on document type
+    let patientInfo;
+    if (documentType === 'medical-questionnaire') {
+      patientInfo = extractPatientInfoFromMedicalQuestionnaire(structuredData);
+    } else {
+      patientInfo = extractPatientInfoFromCertificate(structuredData);
+    }
+    
+    if (!patientInfo || !patientInfo.firstName || !patientInfo.lastName) {
+      console.log('Insufficient patient information to create a record', patientInfo);
+      return;
+    }
+    
+    console.log('Extracted patient info:', patientInfo);
+    
+    // Check if patient already exists with the same name and date of birth
+    const { data: existingPatients, error: searchError } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('first_name', patientInfo.firstName)
+      .eq('last_name', patientInfo.lastName);
+      
+    if (searchError) {
+      console.error('Error searching for existing patients:', searchError);
+      return;
+    }
+    
+    // Use date of birth as additional matching criterion if available
+    let matchedPatient = null;
+    if (patientInfo.dateOfBirth && existingPatients && existingPatients.length > 0) {
+      matchedPatient = existingPatients.find(p => 
+        p.date_of_birth === patientInfo.dateOfBirth
+      );
+    } else if (existingPatients && existingPatients.length > 0) {
+      // If no DOB, just use the first match by name
+      matchedPatient = existingPatients[0];
+    }
+    
+    // Prepare medical history data if available
+    const medicalHistory = documentType === 'medical-questionnaire' 
+      ? structuredData.medical_history 
+      : {};
+    
+    if (matchedPatient) {
+      console.log('Updating existing patient record:', matchedPatient.id);
+      
+      // Update existing patient record
+      const { error: updateError } = await supabase
+        .from('patients')
+        .update({
+          gender: patientInfo.gender || matchedPatient.gender,
+          date_of_birth: patientInfo.dateOfBirth || matchedPatient.date_of_birth,
+          medical_history: {
+            ...matchedPatient.medical_history,
+            ...medicalHistory,
+            documents: [
+              ...(matchedPatient.medical_history?.documents || []),
+              { 
+                document_id: documentData.id,
+                document_type: documentType,
+                processed_at: documentData.processed_at
+              }
+            ]
+          },
+          contact_info: patientInfo.contactInfo || matchedPatient.contact_info,
+          organization_id: documentData.organization_id,
+          client_organization_id: documentData.client_organization_id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', matchedPatient.id);
+        
+      if (updateError) {
+        console.error('Error updating patient record:', updateError);
+      } else {
+        console.log('Patient record updated successfully');
+      }
+    } else {
+      console.log('Creating new patient record');
+      
+      // Create new patient record
+      const { data: newPatient, error: insertError } = await supabase
+        .from('patients')
+        .insert({
+          first_name: patientInfo.firstName,
+          last_name: patientInfo.lastName,
+          gender: patientInfo.gender || null,
+          date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
+          medical_history: {
+            ...medicalHistory,
+            documents: [{
+              document_id: documentData.id,
+              document_type: documentType,
+              processed_at: documentData.processed_at
+            }]
+          },
+          contact_info: patientInfo.contactInfo || null,
+          organization_id: documentData.organization_id,
+          client_organization_id: documentData.client_organization_id
+        })
+        .select();
+        
+      if (insertError) {
+        console.error('Error creating patient record:', insertError);
+      } else {
+        console.log('New patient record created:', newPatient);
+      }
+    }
+  } catch (error) {
+    console.error('Error creating/updating patient from document:', error);
+  }
+}
+
+// Extract patient info from medical questionnaire
+function extractPatientInfoFromMedicalQuestionnaire(data: any) {
+  if (!data || !data.patient) return null;
+  
+  const patientData = data.patient;
+  const names = patientData.name ? patientData.name.split(' ') : ['Unknown', 'Patient'];
+  
+  return {
+    firstName: names[0] || 'Unknown',
+    lastName: names.length > 1 ? names.slice(1).join(' ') : 'Patient',
+    dateOfBirth: patientData.date_of_birth || null,
+    gender: patientData.gender || null,
+    employeeId: patientData.employee_id || null,
+    contactInfo: {
+      email: null,
+      phone: null,
+      address: null
+    }
+  };
+}
+
+// Extract patient info from certificate of fitness
+function extractPatientInfoFromCertificate(data: any) {
+  if (!data || !data.patient) return null;
+  
+  const patientData = data.patient;
+  const names = patientData.name ? patientData.name.split(' ') : ['Unknown', 'Patient'];
+  
+  return {
+    firstName: names[0] || 'Unknown',
+    lastName: names.length > 1 ? names.slice(1).join(' ') : 'Patient',
+    dateOfBirth: patientData.date_of_birth || null,
+    gender: patientData.gender || null,
+    employeeId: patientData.employee_id || null,
+    contactInfo: {
+      email: null,
+      phone: null,
+      company: patientData.company || null,
+      occupation: patientData.occupation || null
+    }
+  };
 }
 
 // Helper function to clean any problematic data in the structured data

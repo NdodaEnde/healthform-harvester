@@ -18,7 +18,7 @@ import {
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterGender, setFilterGender] = useState<string | undefined>(undefined);
+  const [filterGender, setFilterGender] = useState<string | undefined>("all");
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -51,8 +51,8 @@ const PatientList = () => {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
       
-      // Apply gender filter
-      if (filterGender) {
+      // Apply gender filter (only if not "all")
+      if (filterGender && filterGender !== "all") {
         query = query.eq('gender', filterGender);
       }
       
@@ -87,7 +87,7 @@ const PatientList = () => {
         </div>
         
         <div className="flex items-center gap-4">
-          <Select onValueChange={setFilterGender} value={filterGender || "all"}>
+          <Select onValueChange={setFilterGender} value={filterGender}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by gender" />
             </SelectTrigger>
@@ -117,10 +117,10 @@ const PatientList = () => {
       ) : !patients?.length ? (
         <div className="text-center py-8 border rounded-lg bg-background">
           <h3 className="text-lg font-medium mb-2">No patients found</h3>
-          <p className="text-muted-foreground mb-4">Add your first patient to get started</p>
+          <p className="text-muted-foreground mb-4">Patients will be automatically created when documents are processed</p>
           <Button variant="outline" onClick={handleAddPatient}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Patient
+            Add Patient Manually
           </Button>
         </div>
       ) : (
