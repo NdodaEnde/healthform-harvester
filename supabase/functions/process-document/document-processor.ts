@@ -1,4 +1,3 @@
-
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
@@ -142,12 +141,12 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       patientInfo = extractPatientInfoFromCertificate(structuredData);
     }
     
+    console.log('Extracted patient info:', JSON.stringify(patientInfo, null, 2));
+    
     if (!patientInfo || !patientInfo.firstName || !patientInfo.lastName) {
       console.log('Insufficient patient information to create a record', patientInfo);
       return;
     }
-    
-    console.log('Extracted patient info:', patientInfo);
     
     // Check if patient already exists with the same name and date of birth
     const { data: existingPatients, error: searchError } = await supabase
@@ -161,36 +160,27 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       return;
     }
     
-    // Use date of birth as additional matching criterion if available
-    let matchedPatient = null;
-    if (patientInfo.dateOfBirth && existingPatients && existingPatients.length > 0) {
-      matchedPatient = existingPatients.find(p => 
-        p.date_of_birth === patientInfo.dateOfBirth
-      );
-    } else if (existingPatients && existingPatients.length > 0) {
-      // If no DOB, just use the first match by name
-      matchedPatient = existingPatients[0];
-    }
+    console.log('Found existing patients:', existingPatients?.length || 0);
     
     // Prepare medical history data if available
     const medicalHistory = documentType === 'medical-questionnaire' 
       ? structuredData.medical_history 
       : {};
     
-    if (matchedPatient) {
-      console.log('Updating existing patient record:', matchedPatient.id);
+    if (existingPatients && existingPatients.length > 0) {
+      console.log('Updating existing patient record:', existingPatients[0].id);
       
       // Update existing patient record
       const { error: updateError } = await supabase
         .from('patients')
         .update({
-          gender: patientInfo.gender || matchedPatient.gender,
-          date_of_birth: patientInfo.dateOfBirth || matchedPatient.date_of_birth,
+          gender: patientInfo.gender || existingPatients[0].gender,
+          date_of_birth: patientInfo.dateOfBirth || existingPatients[0].date_of_birth,
           medical_history: {
-            ...matchedPatient.medical_history,
+            ...existingPatients[0].medical_history,
             ...medicalHistory,
             documents: [
-              ...(matchedPatient.medical_history?.documents || []),
+              ...(existingPatients[0].medical_history?.documents || []),
               { 
                 document_id: documentData.id,
                 document_type: documentType,
@@ -198,12 +188,12 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
               }
             ]
           },
-          contact_info: patientInfo.contactInfo || matchedPatient.contact_info,
+          contact_info: patientInfo.contactInfo || existingPatients[0].contact_info,
           organization_id: documentData.organization_id,
           client_organization_id: documentData.client_organization_id,
           updated_at: new Date().toISOString()
         })
-        .eq('id', matchedPatient.id);
+        .eq('id', existingPatients[0].id);
         
       if (updateError) {
         console.error('Error updating patient record:', updateError);
@@ -238,7 +228,7 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       if (insertError) {
         console.error('Error creating patient record:', insertError);
       } else {
-        console.log('New patient record created:', newPatient);
+        console.log('New patient record created:', newPatient[0]?.id);
       }
     }
   } catch (error) {

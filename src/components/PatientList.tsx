@@ -18,7 +18,7 @@ import {
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterGender, setFilterGender] = useState<string | undefined>("all");
+  const [filterGender, setFilterGender] = useState<string>("all");
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -61,6 +61,8 @@ const PatientList = () => {
       if (error) {
         throw new Error(`Error fetching patients: ${error.message}`);
       }
+      
+      console.log('Patients fetched:', data?.length, 'Query params:', { organizationId, searchTerm, filterGender });
       
       return data || [];
     },
