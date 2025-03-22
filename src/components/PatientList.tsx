@@ -30,7 +30,7 @@ const PatientList = () => {
   const organizationId = getEffectiveOrganizationId();
   
   // Query patients with organization context
-  const { data: patients, isLoading, error } = useQuery({
+  const { data: patients, isLoading, error, refetch } = useQuery({
     queryKey: ['patients', organizationId, searchTerm, filterGender],
     queryFn: async () => {
       let query = supabase
@@ -64,6 +64,16 @@ const PatientList = () => {
       
       console.log('Patients fetched:', data?.length, 'Query params:', { organizationId, searchTerm, filterGender });
       
+      if (!data || data.length === 0) {
+        console.log('No patients found for this organization. Organization ID:', organizationId);
+      } else {
+        console.log('Retrieved patients:', data.map(p => ({
+          id: p.id, 
+          name: `${p.first_name} ${p.last_name}`,
+          gender: p.gender
+        })));
+      }
+      
       return data || [];
     },
     enabled: !!organizationId,
@@ -71,6 +81,10 @@ const PatientList = () => {
 
   const handleAddPatient = () => {
     navigate('/patients/new');
+  };
+
+  const handleRefresh = () => {
+    refetch();
   };
 
   return (
@@ -98,8 +112,13 @@ const PatientList = () => {
               <SelectItem value="male">Male</SelectItem>
               <SelectItem value="female">Female</SelectItem>
               <SelectItem value="other">Other</SelectItem>
+              <SelectItem value="unknown">Unknown</SelectItem>
             </SelectContent>
           </Select>
+          
+          <Button variant="outline" onClick={handleRefresh} className="mr-2">
+            Refresh
+          </Button>
           
           <Button onClick={handleAddPatient}>
             <Plus className="mr-2 h-4 w-4" />

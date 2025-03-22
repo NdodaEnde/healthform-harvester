@@ -1,3 +1,4 @@
+
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
@@ -144,16 +145,37 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
     console.log('Extracted patient info:', JSON.stringify(patientInfo, null, 2));
     
     if (!patientInfo || !patientInfo.firstName || !patientInfo.lastName) {
-      console.log('Insufficient patient information to create a record', patientInfo);
-      return;
+      console.log('WARNING: Insufficient patient information to create a record', patientInfo);
+      
+      // Fallback to generic patient information if name extraction failed
+      if (!patientInfo) {
+        patientInfo = {
+          firstName: 'Unknown',
+          lastName: documentData.file_name || 'Patient',
+          gender: 'unknown'
+        };
+      } else if (!patientInfo.firstName) {
+        patientInfo.firstName = 'Unknown';
+      } else if (!patientInfo.lastName) {
+        patientInfo.lastName = documentData.file_name || 'Patient';
+      }
+      
+      console.log('Using fallback patient information:', patientInfo);
     }
     
-    // Check if patient already exists with the same name and date of birth
+    // Always make sure gender field exists and has a valid default
+    if (!patientInfo.gender || patientInfo.gender === '') {
+      patientInfo.gender = 'unknown';
+      console.log('Setting default gender to "unknown"');
+    }
+    
+    // Check if patient already exists with the same name and organization
     const { data: existingPatients, error: searchError } = await supabase
       .from('patients')
       .select('*')
       .eq('first_name', patientInfo.firstName)
-      .eq('last_name', patientInfo.lastName);
+      .eq('last_name', patientInfo.lastName)
+      .eq('organization_id', documentData.organization_id);
       
     if (searchError) {
       console.error('Error searching for existing patients:', searchError);
@@ -174,8 +196,8 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       const { error: updateError } = await supabase
         .from('patients')
         .update({
-          gender: patientInfo.gender || existingPatients[0].gender,
-          date_of_birth: patientInfo.dateOfBirth || existingPatients[0].date_of_birth,
+          gender: patientInfo.gender || existingPatients[0].gender || 'unknown',
+          date_of_birth: patientInfo.dateOfBirth || existingPatients[0].date_of_birth || new Date().toISOString().split('T')[0],
           medical_history: {
             ...existingPatients[0].medical_history,
             ...medicalHistory,
@@ -209,7 +231,7 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
         .insert({
           first_name: patientInfo.firstName,
           last_name: patientInfo.lastName,
-          gender: patientInfo.gender || null,
+          gender: patientInfo.gender || 'unknown',
           date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
           medical_history: {
             ...medicalHistory,
@@ -231,6 +253,26 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
         console.log('New patient record created:', newPatient[0]?.id);
       }
     }
+    
+    // Verify patient was created successfully
+    const { data: verifyPatients, error: verifyError } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('first_name', patientInfo.firstName)
+      .eq('last_name', patientInfo.lastName)
+      .eq('organization_id', documentData.organization_id);
+      
+    if (verifyError) {
+      console.error('Error verifying patient creation:', verifyError);
+    } else {
+      console.log(`Verification found ${verifyPatients?.length || 0} matching patients`);
+      if (verifyPatients && verifyPatients.length > 0) {
+        console.log('Patient verification succeeded - patient record exists:', verifyPatients[0].id);
+      } else {
+        console.error('Patient verification failed - no matching patient found after creation attempt');
+      }
+    }
+    
   } catch (error) {
     console.error('Error creating/updating patient from document:', error);
   }
@@ -247,7 +289,7 @@ function extractPatientInfoFromMedicalQuestionnaire(data: any) {
     firstName: names[0] || 'Unknown',
     lastName: names.length > 1 ? names.slice(1).join(' ') : 'Patient',
     dateOfBirth: patientData.date_of_birth || null,
-    gender: patientData.gender || null,
+    gender: patientData.gender || 'unknown',
     employeeId: patientData.employee_id || null,
     contactInfo: {
       email: null,
@@ -264,12 +306,37 @@ function extractPatientInfoFromCertificate(data: any) {
   const patientData = data.patient;
   const names = patientData.name ? patientData.name.split(' ') : ['Unknown', 'Patient'];
   
+  // Extract gender with more reliable methods
+  let gender = patientData.gender || null;
+  
+  // If gender wasn't found, try to infer it from other fields
+  if (!gender && typeof data.raw_content === 'string') {
+    const genderMatches = data.raw_content.match(/gender:\s*(male|female|other)/i) || 
+                        data.raw_content.match(/sex:\s*(m|male|f|female)/i);
+    
+    if (genderMatches && genderMatches[1]) {
+      const genderValue = genderMatches[1].toLowerCase();
+      if (genderValue === 'm' || genderValue.includes('male')) {
+        gender = 'male';
+      } else if (genderValue === 'f' || genderValue.includes('female')) {
+        gender = 'female';
+      } else {
+        gender = 'other';
+      }
+    }
+  }
+  
+  // Always default to 'unknown' if gender is still not determined
+  if (!gender) {
+    gender = 'unknown';
+  }
+  
   return {
     firstName: names[0] || 'Unknown',
     lastName: names.length > 1 ? names.slice(1).join(' ') : 'Patient',
     dateOfBirth: patientData.date_of_birth || null,
-    gender: patientData.gender || null,
-    employeeId: patientData.employee_id || null,
+    gender: gender,
+    employeeId: patientData.employee_id || patientData.id_number || null,
     contactInfo: {
       email: null,
       phone: null,

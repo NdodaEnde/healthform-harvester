@@ -88,6 +88,12 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       structuredData.restrictions = extractRestrictionsFromMarkdown(markdown);
     }
     
+    // Ensure patient always has a gender value
+    if (!structuredData.patient.gender || structuredData.patient.gender === '') {
+      structuredData.patient.gender = 'unknown';
+      console.log('Setting default gender to "unknown"');
+    }
+    
     return structuredData;
     
   } catch (error) {
@@ -157,7 +163,8 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
   // Job Title extraction - try multiple patterns
   const jobTitlePatterns = [
     /\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
-    /Job Title:\s*(.*?)(?=\n|\r|$|<!--)/i,
+    /Job Title:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Job\s*Title\s*[:\-]\s*(.*?)(?=\n|\r|$|<!--)/i,
     /Job\s*Title\s*[:\-]\s*(.*?)(?=\n|\r|$|<)/i
   ];
   
@@ -178,6 +185,7 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
     /\*\*Sex\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i
   ];
   
+  let foundGender = false;
   for (const pattern of genderPatterns) {
     const match = markdown.match(pattern);
     if (match && match[1]) {
@@ -185,15 +193,37 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
       // Normalize gender values
       if (gender === 'm' || gender.includes('male')) {
         gender = 'male';
+        foundGender = true;
       } else if (gender === 'f' || gender.includes('female')) {
         gender = 'female';
-      } else {
+        foundGender = true;
+      } else if (gender && gender !== '') {
         gender = 'other';
+        foundGender = true;
       }
-      structuredData.patient.gender = gender;
-      console.log('Extracted gender:', structuredData.patient.gender);
-      break;
+      
+      if (foundGender) {
+        structuredData.patient.gender = gender;
+        console.log('Extracted gender from markdown pattern:', structuredData.patient.gender);
+        break;
+      }
     }
+  }
+  
+  // If we still don't have a gender, try one more approach
+  if (!foundGender) {
+    const inferredGender = inferGenderFromMarkdown(markdown);
+    if (inferredGender) {
+      structuredData.patient.gender = inferredGender;
+      console.log('Inferred gender from markdown context:', inferredGender);
+      foundGender = true;
+    }
+  }
+  
+  // Default to 'unknown' if gender still not found
+  if (!foundGender || !structuredData.patient.gender) {
+    structuredData.patient.gender = 'unknown';
+    console.log('Set default gender to "unknown" after extraction attempts failed');
   }
   
   return structuredData;
@@ -206,11 +236,21 @@ function inferGenderFromMarkdown(markdown: string): string | null {
   // Look for gender/sex indicators in the text
   if (markdown.match(/\bmale\b/i) && !markdown.match(/\bfemale\b/i)) {
     return 'male';
-  } else if (markdown.match(/\bfemale\b/i) && !markdown.match(/\bmale\b/i)) {
+  } else if (markdown.match(/\bfemale\b/i)) {
     return 'female';
   } else if (markdown.match(/\bsex:\s*m\b/i) || markdown.match(/\bgender:\s*m\b/i)) {
     return 'male';
   } else if (markdown.match(/\bsex:\s*f\b/i) || markdown.match(/\bgender:\s*f\b/i)) {
+    return 'female';
+  }
+  
+  // Look for male/female pronouns
+  const malePronouns = markdown.match(/\b(he|him|his)\b/gi);
+  const femalePronouns = markdown.match(/\b(she|her|hers)\b/gi);
+  
+  if (malePronouns && malePronouns.length > 3 && (!femalePronouns || malePronouns.length > femalePronouns.length * 2)) {
+    return 'male';
+  } else if (femalePronouns && femalePronouns.length > 3 && (!malePronouns || femalePronouns.length > malePronouns.length * 2)) {
     return 'female';
   }
   
