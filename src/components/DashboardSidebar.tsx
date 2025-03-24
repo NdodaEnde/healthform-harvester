@@ -31,7 +31,7 @@ type NavItem = {
 
 const DashboardSidebar = () => {
   const { pathname } = useLocation();
-  const { isMobile } = useIsMobile();
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
 
