@@ -14,9 +14,34 @@ interface PatientVisitsProps {
   organizationId: string;
 }
 
+// Define a type for the extracted data structure
+interface ExtractedData {
+  structured_data?: {
+    validated?: boolean;
+    [key: string]: any;
+  };
+  patient_info?: {
+    id?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+interface Document {
+  id: string;
+  file_name: string;
+  file_path: string;
+  status: string;
+  document_type: string | null;
+  processed_at: string | null;
+  created_at: string;
+  extracted_data: ExtractedData | null;
+  [key: string]: any;
+}
+
 // Group documents by date to represent visits
-const groupDocumentsByDate = (documents: any[]) => {
-  const visits = documents.reduce((acc: any, doc: any) => {
+const groupDocumentsByDate = (documents: Document[]) => {
+  const visits = documents.reduce((acc: any, doc: Document) => {
     // Use processed_at or created_at as visit date
     const visitDate = doc.processed_at || doc.created_at;
     const dateKey = visitDate.split('T')[0]; // Get just the date part
@@ -53,7 +78,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      return data as Document[] || [];
     },
     enabled: !!patientId && !!organizationId,
   });
