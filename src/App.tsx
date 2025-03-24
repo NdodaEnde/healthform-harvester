@@ -29,10 +29,10 @@ import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
 
-// Create a client
-const queryClient = new QueryClient();
-
 function App() {
+  // Create QueryClient inside the component
+  const queryClient = new QueryClient();
+  
   return (
     <QueryClientProvider client={queryClient}>
       <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
