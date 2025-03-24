@@ -83,12 +83,15 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
         category
       });
       
+      // Use the Supabase client directly instead of fetch
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
         {
           method: 'POST',
           body: formData,
           headers: {
+            // Make sure we're accepting JSON response
+            'Accept': 'application/json'
           }
         }
       );
@@ -99,23 +102,37 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
       console.log('Response status:', response.status);
       console.log('Response status text:', response.statusText);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response from process-document:', errorText);
-        throw new Error(`Error uploading document: ${response.statusText}. ${errorText}`);
-      }
+      // Check if response is JSON by looking at content-type header
+      const contentType = response.headers.get('content-type');
+      console.log('Response content type:', contentType);
       
-      setUploadProgress(95);
-      
+      let responseText;
       let result;
+      
       try {
-        const responseText = await response.text();
+        // First try to get the response as text
+        responseText = await response.text();
         console.log('Raw response:', responseText);
+        
+        // Check if the response text starts with HTML
+        if (responseText.trim().startsWith('<!DOCTYPE html>') || 
+            responseText.trim().startsWith('<html')) {
+          throw new Error('Received HTML instead of JSON. The function endpoint may be misconfigured.');
+        }
+        
+        // Try to parse as JSON
         result = JSON.parse(responseText);
       } catch (parseError) {
         console.error('Error parsing response JSON:', parseError);
-        throw new Error('Failed to parse server response. The response was not valid JSON.');
+        throw new Error(`Failed to parse server response. The response was not valid JSON. ${parseError.message}`);
       }
+      
+      if (!response.ok) {
+        const errorMessage = result?.error || response.statusText || 'Unknown error';
+        throw new Error(`Error uploading document: ${errorMessage}`);
+      }
+      
+      setUploadProgress(95);
       
       const newTemplate: FormTemplate = {
         id: uuidv4(),
@@ -133,7 +150,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
         console.log('Document ID received:', result.documentId);
         
         let attempts = 0;
-        const maxAttempts = 15; // Increased from 10 to allow more time for processing
+        const maxAttempts = 20; // Increased to allow more time for processing
         
         const checkProcessingStatus = async () => {
           try {
@@ -161,7 +178,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
               throw new Error('Document processing timed out');
             }
             
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Increased wait time between checks
             return false;
           } catch (statusError) {
             console.error('Error in checkProcessingStatus:', statusError);
@@ -329,3 +346,4 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
 };
 
 export default TemplateUploader;
+
