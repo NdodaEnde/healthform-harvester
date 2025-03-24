@@ -53,6 +53,8 @@ interface Document {
   [key: string]: any;
 }
 
+type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+
 // Function to determine the fitness status color
 const getFitnessStatusColor = (document: Document) => {
   const certification = document.extracted_data?.structured_data?.certification;
@@ -76,6 +78,11 @@ const getFitnessStatusText = (document: Document) => {
   
   // Fallback to examination_results if available
   return results?.fitness_status || "Unknown";
+};
+
+// Helper function to get document review status from localStorage
+const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
+  return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
 };
 
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
@@ -165,8 +172,14 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         return false;
       });
       
-      console.log('Certificates after filtering:', filteredDocs.length);
-      return filteredDocs as Document[];
+      // Add review status from localStorage to each document
+      const docsWithReviewStatus = filteredDocs.map(doc => ({
+        ...doc,
+        reviewStatus: getDocumentReviewStatus(doc.id)
+      }));
+      
+      console.log('Certificates after filtering:', docsWithReviewStatus.length);
+      return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
     },
     enabled: !!patientId && !!organizationId && !!patient,
   });
@@ -174,6 +187,10 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
   const handleViewCertificate = (documentId: string) => {
     navigate(`/documents/${documentId}`);
   };
+
+  // Filter for only reviewed certificates if needed
+  // Uncomment this to show only reviewed certificates
+  // const reviewedCertificates = certificates?.filter(cert => cert.reviewStatus === 'reviewed') || [];
 
   return (
     <Card>
@@ -213,10 +230,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                         </Badge>
                       )}
                       
-                      {cert.extracted_data?.structured_data?.validated 
-                        ? <Badge variant="success">Validated</Badge>
-                        : <Badge variant="warning">Not Validated</Badge>
-                      }
+                      {cert.reviewStatus === 'reviewed' ? (
+                        <Badge variant="success">Reviewed</Badge>
+                      ) : cert.reviewStatus === 'needs-correction' ? (
+                        <Badge variant="destructive">Needs Correction</Badge>
+                      ) : (
+                        <Badge variant="outline">Not Reviewed</Badge>
+                      )}
                     </div>
                   </div>
                   <Button
