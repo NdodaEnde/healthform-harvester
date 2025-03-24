@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { useQuery } from '@tanstack/react-query';
@@ -8,12 +8,14 @@ import FormBuilder from '@/components/FormBuilder/FormBuilder';
 import { FormTemplate } from '@/components/FormBuilder/FormFieldTypes';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Upload, FilePlus } from 'lucide-react';
+import TemplateUploader from '@/components/FormBuilder/TemplateUploader';
 
 const EditTemplatePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNewTemplate = id === 'new';
+  const [showUploader, setShowUploader] = useState(false);
   
   const { data: template, isLoading } = useQuery({
     queryKey: ['form-template', id],
@@ -61,10 +63,36 @@ const EditTemplatePage: React.FC = () => {
           </div>
         </div>
 
+        {isNewTemplate && (
+          <div className="flex gap-4 mb-6">
+            <Button 
+              variant={!showUploader ? "default" : "outline"} 
+              onClick={() => setShowUploader(false)}
+              className="flex-1"
+            >
+              <FilePlus className="mr-2 h-5 w-5" />
+              Build from Scratch
+            </Button>
+            <Button 
+              variant={showUploader ? "default" : "outline"} 
+              onClick={() => setShowUploader(true)}
+              className="flex-1"
+            >
+              <Upload className="mr-2 h-5 w-5" />
+              Upload Existing Form
+            </Button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
           </div>
+        ) : showUploader && isNewTemplate ? (
+          <TemplateUploader onTemplateCreated={(newTemplate) => {
+            toast.success('Template created from document successfully');
+            navigate(`/templates/edit/${newTemplate.id}`);
+          }} />
         ) : (
           <FormBuilder 
             initialTemplate={template as FormTemplate | undefined} 

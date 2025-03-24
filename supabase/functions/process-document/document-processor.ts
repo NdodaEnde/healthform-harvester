@@ -1,132 +1,168 @@
-
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
 
 // Process document with Landing AI API
-export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
+export async function processDocumentWithLandingAI(
+  file: File,
+  documentType: string | null,
+  documentId: string,
+  supabase: any
+): Promise<void> {
+  console.log(`Starting document processing for ${documentType}, ID: ${documentId}`);
+  
   try {
-    console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
-    
-    // Call Landing AI API
+    // Call LandingAI to process the document
     const result = await apiClient.callLandingAI(file);
-    console.log(`Landing AI API response received for document ID: ${documentId}`);
+    console.log("LandingAI processing completed");
     
-    // Log the full API response for debugging
-    console.log('Raw API Response:', JSON.stringify(result, null, 2));
+    // Process the result based on document type
+    let extractedData = null;
     
-    // Process and structure the data based on document type
-    let structuredData;
-    if (documentType === 'medical-questionnaire') {
-      structuredData = processMedicalQuestionnaireData(result);
+    if (documentType === 'template') {
+      extractedData = processTemplateDocument(result);
+    } else if (documentType === 'certificate-of-fitness') {
+      extractedData = processCertificateOfFitnessData(result);
+    } else if (documentType === 'medical-questionnaire') {
+      extractedData = processMedicalQuestionnaireData(result);
     } else {
-      structuredData = processCertificateOfFitnessData(result);
+      // Generic document processing
+      extractedData = {
+        raw: result,
+        text: result.text || result.document_text || ''
+      };
     }
     
-    console.log('Structured data extracted:', JSON.stringify(structuredData));
+    // Update the document record with the extracted data
+    const { error: updateError } = await supabase
+      .from('documents')
+      .update({
+        status: 'completed',
+        processed_at: new Date().toISOString(),
+        extracted_data: extractedData
+      })
+      .eq('id', documentId);
     
-    // Clean any problematic data in the structuredData
-    cleanStructuredData(structuredData);
+    if (updateError) {
+      throw updateError;
+    }
     
-    // Try to update the document record multiple times if needed
-    let updateSuccess = false;
-    let attempts = 0;
+    console.log(`Document processed successfully: ${documentId}`);
+  } catch (error) {
+    console.error(`Error processing document ${documentId}:`, error);
     
-    while (!updateSuccess && attempts < 3) {
-      attempts++;
-      
-      // Update the document record with the extracted data
-      const { data: updateData, error: updateError } = await supabase
+    // Update the document status to error
+    try {
+      await supabase
         .from('documents')
         .update({
-          extracted_data: {
-            structured_data: structuredData,
-            raw_response: result
-          },
-          status: 'processed',
+          status: 'error',
+          processing_error: error.message || 'Unknown error during processing',
           processed_at: new Date().toISOString()
         })
-        .eq('id', documentId)
-        .select();
-      
-      if (updateError) {
-        console.error(`Failed to update document with extracted data (attempt ${attempts}):`, updateError);
-        if (attempts < 3) {
-          console.log(`Retrying document update in 1 second...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } else {
-          throw updateError;
-        }
-      } else {
-        updateSuccess = true;
-        console.log(`Document processing completed for document ID: ${documentId}`);
-        console.log('Updated document record:', updateData);
-        
-        // Force another update to ensure the status is set to processed
-        await supabase
-          .from('documents')
-          .update({ status: 'processed' })
-          .eq('id', documentId);
-          
-        // Create or update patient record from the extracted data
-        await createOrUpdatePatientFromDocument(structuredData, documentType, updateData[0], supabase);
-      }
-    }
-    
-    // Additional verification step: explicitly verify the document is marked as processed
-    for (let i = 0; i < 3; i++) {
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .single();
-        
-      if (verifyError) {
-        console.error('Error verifying document update:', verifyError);
-      } else {
-        console.log(`Verified document status is now: ${verifyData.status}`);
-        
-        if (verifyData.status !== 'processed') {
-          console.log(`Document status is not 'processed', forcing update one more time...`);
-          await supabase
-            .from('documents')
-            .update({ 
-              status: 'processed',
-              processed_at: new Date().toISOString()
-            })
-            .eq('id', documentId);
-        } else {
-          break;
-        }
-      }
-      
-      // Wait before retrying verification
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-  } catch (error) {
-    console.error('Document processing error:', error);
-    
-    // Update document status to failed with error message
-    try {
-      const { data, error: updateError } = await supabase
-        .from('documents')
-        .update({
-          status: 'failed',
-          processing_error: error.message
-        })
-        .eq('id', documentId)
-        .select();
-        
-      if (updateError) {
-        console.error('Error updating document status to failed:', updateError);
-      } else {
-        console.log('Updated document status to failed:', data);
-      }
+        .eq('id', documentId);
     } catch (updateError) {
-      console.error('Error updating document status after processing failure:', updateError);
+      console.error('Error updating document status:', updateError);
     }
   }
+}
+
+// Add the new processor function for templates
+function processTemplateDocument(result: any): any {
+  console.log("Processing template document");
+  
+  const formFields = [];
+  
+  // Extract form fields from the AI result
+  // This will depend on the format returned by LandingAI for form documents
+  try {
+    const content = result.text || result.document_text || '';
+    const sections = result.sections || [];
+    const entityMentions = result.entity_mentions || [];
+    
+    // Process form fields from detected entities
+    entityMentions.forEach((entity: any, index: number) => {
+      if (entity.type === 'FORM_FIELD' || entity.label === 'FORM_FIELD') {
+        const fieldText = entity.text || '';
+        const isRequired = fieldText.includes('*') || false;
+        
+        // Try to determine field type based on context
+        let fieldType = 'text'; // Default type
+        
+        if (fieldText.toLowerCase().includes('email')) {
+          fieldType = 'email';
+        } else if (fieldText.toLowerCase().includes('phone') || fieldText.toLowerCase().includes('tel')) {
+          fieldType = 'tel';
+        } else if (fieldText.toLowerCase().includes('date') || fieldText.toLowerCase().includes('dob')) {
+          fieldType = 'date';
+        } else if (fieldText.toLowerCase().includes('number') || fieldText.toLowerCase().includes('age')) {
+          fieldType = 'number';
+        } else if (fieldText.toLowerCase().includes('checkbox') || fieldText.toLowerCase().includes('check box')) {
+          fieldType = 'checkbox';
+        } else if (fieldText.toLowerCase().includes('radio') || fieldText.toLowerCase().includes('select one')) {
+          fieldType = 'radio';
+        } else if (fieldText.toLowerCase().includes('dropdown') || fieldText.toLowerCase().includes('select')) {
+          fieldType = 'select';
+        } else if (fieldText.toLowerCase().includes('comment') || fieldText.toLowerCase().includes('description')) {
+          fieldType = 'textarea';
+        }
+        
+        // Create a field with ID generated from the index
+        formFields.push({
+          id: `field-${index}`,
+          type: fieldType,
+          label: fieldText.replace('*', '').trim(),
+          placeholder: `Enter ${fieldText.replace('*', '').trim().toLowerCase()}`,
+          required: isRequired
+        });
+      }
+    });
+    
+    // If no fields were detected but we have sections, try to create fields from sections
+    if (formFields.length === 0 && sections.length > 0) {
+      sections.forEach((section: any, index: number) => {
+        const sectionTitle = section.title || '';
+        const sectionText = section.text || '';
+        
+        if (sectionTitle && !sectionTitle.toLowerCase().includes('header') && 
+            !sectionTitle.toLowerCase().includes('footer')) {
+          formFields.push({
+            id: `section-${index}`,
+            type: 'text',
+            label: sectionTitle.trim(),
+            placeholder: `Enter ${sectionTitle.trim().toLowerCase()}`,
+            required: false
+          });
+        }
+      });
+    }
+    
+    // If still no fields, create a few basic fields based on document content
+    if (formFields.length === 0) {
+      const lines = content.split('\n').filter(line => line.trim().length > 0);
+      
+      lines.slice(0, 10).forEach((line, index) => {
+        if (line.length > 3 && line.length < 50 && 
+            !line.toLowerCase().includes('header') && 
+            !line.toLowerCase().includes('footer')) {
+          formFields.push({
+            id: `line-${index}`,
+            type: 'text',
+            label: line.trim(),
+            placeholder: `Enter ${line.trim().toLowerCase()}`,
+            required: false
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error parsing template fields:', error);
+  }
+  
+  return {
+    formFields,
+    rawResult: result
+  };
 }
 
 // Create or update patient record from document data
