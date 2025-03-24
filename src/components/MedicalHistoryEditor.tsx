@@ -9,42 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Save, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
-
-interface MedicalCondition {
-  name: string;
-  diagnosed_date?: string;
-  notes?: string;
-}
-
-interface Medication {
-  name: string;
-  dosage?: string;
-  frequency?: string;
-  start_date?: string;
-}
-
-interface Allergy {
-  allergen: string;
-  severity?: 'mild' | 'moderate' | 'severe';
-  reaction?: string;
-}
-
-interface MedicalHistoryData {
-  conditions?: MedicalCondition[];
-  medications?: Medication[];
-  allergies?: Allergy[];
-  has_hypertension?: boolean;
-  has_diabetes?: boolean;
-  has_heart_disease?: boolean;
-  has_allergies?: boolean;
-  notes?: string;
-  documents?: Array<{
-    document_id: string;
-    document_type: string;
-    processed_at: string;
-  }>;
-  [key: string]: any;
-}
+import { MedicalHistoryData, MedicalCondition, Medication, Allergy } from '@/types/patient';
 
 interface MedicalHistoryEditorProps {
   patientId: string;

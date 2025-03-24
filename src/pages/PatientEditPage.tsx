@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
+import { MedicalHistoryData } from '@/types/patient';
 
 interface ContactInfo {
   email: string;
@@ -121,7 +122,7 @@ const PatientEditPage = () => {
 
   // Medical history update mutation
   const { mutate: updateMedicalHistory, isPending: isSavingMedicalHistory } = useMutation({
-    mutationFn: async (medicalHistoryData: any) => {
+    mutationFn: async (medicalHistoryData: MedicalHistoryData) => {
       // Get current patient data to preserve existing medical_history.documents array
       const { data: currentPatient, error: fetchError } = await supabase
         .from('patients')
@@ -131,8 +132,22 @@ const PatientEditPage = () => {
       
       if (fetchError) throw fetchError;
       
+      // Parse the medical history to ensure we have proper object
+      let currentMedicalHistory: MedicalHistoryData = {};
+      if (currentPatient?.medical_history) {
+        if (typeof currentPatient.medical_history === 'object') {
+          currentMedicalHistory = currentPatient.medical_history as MedicalHistoryData;
+        } else if (typeof currentPatient.medical_history === 'string') {
+          try {
+            currentMedicalHistory = JSON.parse(currentPatient.medical_history);
+          } catch (e) {
+            console.error("Failed to parse medical_history", e);
+          }
+        }
+      }
+      
       // Preserve documents array if it exists
-      const documents = currentPatient?.medical_history?.documents || [];
+      const documents = currentMedicalHistory?.documents || [];
       const updatedMedicalHistory = {
         ...medicalHistoryData,
         documents
@@ -147,6 +162,8 @@ const PatientEditPage = () => {
         .eq('id', id);
       
       if (error) throw error;
+      
+      return; // Return void to satisfy Promise<void>
     },
     onSuccess: () => {
       toast({
@@ -163,6 +180,16 @@ const PatientEditPage = () => {
       });
     }
   });
+
+  // Wrapper function to make updateMedicalHistory return a Promise
+  const handleSaveMedicalHistory = async (data: MedicalHistoryData): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      updateMedicalHistory(data, {
+        onSuccess: () => resolve(),
+        onError: (error) => reject(error)
+      });
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -353,7 +380,7 @@ const PatientEditPage = () => {
           <MedicalHistoryEditor
             patientId={id!}
             initialData={queryClient.getQueryData<any>(['patient', id])?.medical_history || {}}
-            onSave={updateMedicalHistory}
+            onSave={handleSaveMedicalHistory}
           />
         </TabsContent>
       </Tabs>

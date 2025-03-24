@@ -12,34 +12,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import PatientVisits from '@/components/PatientVisits';
-
-interface ContactInfo {
-  email?: string;
-  phone?: string;
-  company?: string;
-  occupation?: string;
-  address?: string;
-  [key: string]: any;
-}
-
-interface MedicalCondition {
-  name: string;
-  diagnosed_date?: string;
-  notes?: string;
-}
-
-interface Medication {
-  name: string;
-  dosage?: string;
-  frequency?: string;
-  start_date?: string;
-}
-
-interface Allergy {
-  allergen: string;
-  severity?: 'mild' | 'moderate' | 'severe';
-  reaction?: string;
-}
+import { MedicalHistoryData, PatientInfo } from '@/types/patient';
 
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -58,7 +31,7 @@ const PatientDetailPage = () => {
         .single();
       
       if (error) throw error;
-      return data;
+      return data as PatientInfo;
     },
     enabled: !!id,
   });
@@ -155,25 +128,43 @@ const PatientDetailPage = () => {
   };
 
   // Type guard to ensure contact_info is an object with expected properties
-  const getContactInfo = (): ContactInfo => {
+  const getContactInfo = () => {
     if (patient.contact_info && typeof patient.contact_info === 'object') {
-      return patient.contact_info as ContactInfo;
+      return patient.contact_info;
     }
     return {};
   };
 
   const contactInfo = getContactInfo();
 
+  // Helper to safely access medical history data
+  const getMedicalHistory = (): MedicalHistoryData => {
+    if (!patient.medical_history) return {};
+    if (typeof patient.medical_history === 'object') {
+      return patient.medical_history as MedicalHistoryData;
+    }
+    try {
+      if (typeof patient.medical_history === 'string') {
+        return JSON.parse(patient.medical_history) as MedicalHistoryData;
+      }
+    } catch (e) {
+      console.error("Failed to parse medical_history", e);
+    }
+    return {};
+  };
+
+  const medicalHistory = getMedicalHistory();
+
   // Function to render medical condition list
   const renderConditions = () => {
-    const conditions = patient.medical_history?.conditions || [];
+    const conditions = medicalHistory.conditions || [];
     if (conditions.length === 0) {
       return <p className="text-muted-foreground">No conditions recorded</p>;
     }
     
     return (
       <div className="space-y-3">
-        {conditions.map((condition: MedicalCondition, index: number) => (
+        {conditions.map((condition, index) => (
           <div key={index} className="border p-3 rounded-lg">
             <h4 className="font-medium">{condition.name}</h4>
             {condition.diagnosed_date && (
@@ -190,14 +181,14 @@ const PatientDetailPage = () => {
 
   // Function to render medications list
   const renderMedications = () => {
-    const medications = patient.medical_history?.medications || [];
+    const medications = medicalHistory.medications || [];
     if (medications.length === 0) {
       return <p className="text-muted-foreground">No medications recorded</p>;
     }
     
     return (
       <div className="space-y-3">
-        {medications.map((medication: Medication, index: number) => (
+        {medications.map((medication, index) => (
           <div key={index} className="border p-3 rounded-lg">
             <h4 className="font-medium">{medication.name}</h4>
             <div className="grid grid-cols-2 gap-2 mt-1">
@@ -220,7 +211,7 @@ const PatientDetailPage = () => {
 
   // Function to render allergies list
   const renderAllergies = () => {
-    const allergies = patient.medical_history?.allergies || [];
+    const allergies = medicalHistory.allergies || [];
     if (allergies.length === 0) {
       return <p className="text-muted-foreground">No allergies recorded</p>;
     }
@@ -236,7 +227,7 @@ const PatientDetailPage = () => {
     
     return (
       <div className="space-y-3">
-        {allergies.map((allergy: Allergy, index: number) => (
+        {allergies.map((allergy, index) => (
           <div key={index} className="border p-3 rounded-lg">
             <div className="flex justify-between">
               <h4 className="font-medium">{allergy.allergen}</h4>
@@ -376,9 +367,9 @@ const PatientDetailPage = () => {
                 
                 <div>
                   <h3 className="text-sm font-medium mb-2">Recent Visits</h3>
-                  {patient.medical_history?.documents && patient.medical_history.documents.length > 0 ? (
+                  {medicalHistory.documents && medicalHistory.documents.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-sm">{patient.medical_history.documents.length} document(s) from visits</p>
+                      <p className="text-sm">{medicalHistory.documents.length} document(s) from visits</p>
                       <div>
                         <Button variant="link" size="sm" onClick={() => navigate(`/patients/${id}/records`)}>
                           View all visits
@@ -527,15 +518,15 @@ const PatientDetailPage = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p>Hypertension</p>
-                    <Badge variant={patient.medical_history?.has_hypertension ? 'success' : 'outline'}>
-                      {patient.medical_history?.has_hypertension ? 'Yes' : 'No'}
+                    <Badge variant={medicalHistory.has_hypertension ? 'success' : 'outline'}>
+                      {medicalHistory.has_hypertension ? 'Yes' : 'No'}
                     </Badge>
                   </div>
                   
                   <div className="flex items-center justify-between">
                     <p>Diabetes</p>
-                    <Badge variant={patient.medical_history?.has_diabetes ? 'success' : 'outline'}>
-                      {patient.medical_history?.has_diabetes ? 'Yes' : 'No'}
+                    <Badge variant={medicalHistory.has_diabetes ? 'success' : 'outline'}>
+                      {medicalHistory.has_diabetes ? 'Yes' : 'No'}
                     </Badge>
                   </div>
                 </div>
@@ -543,24 +534,24 @@ const PatientDetailPage = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p>Heart Disease</p>
-                    <Badge variant={patient.medical_history?.has_heart_disease ? 'success' : 'outline'}>
-                      {patient.medical_history?.has_heart_disease ? 'Yes' : 'No'}
+                    <Badge variant={medicalHistory.has_heart_disease ? 'success' : 'outline'}>
+                      {medicalHistory.has_heart_disease ? 'Yes' : 'No'}
                     </Badge>
                   </div>
                   
                   <div className="flex items-center justify-between">
                     <p>Allergies</p>
-                    <Badge variant={patient.medical_history?.has_allergies ? 'success' : 'outline'}>
-                      {patient.medical_history?.has_allergies ? 'Yes' : 'No'}
+                    <Badge variant={medicalHistory.has_allergies ? 'success' : 'outline'}>
+                      {medicalHistory.has_allergies ? 'Yes' : 'No'}
                     </Badge>
                   </div>
                 </div>
               </div>
               
-              {patient.medical_history?.notes && (
+              {medicalHistory.notes && (
                 <div className="mt-4 border-t pt-4">
                   <h3 className="font-medium mb-2">Additional Notes</h3>
-                  <p className="text-sm">{patient.medical_history.notes}</p>
+                  <p className="text-sm">{medicalHistory.notes}</p>
                 </div>
               )}
             </CardContent>
