@@ -58,6 +58,12 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     enabled: !!patientId && !!organizationId,
   });
 
+  // Filter documents to show only validated certificates if needed
+  const validatedDocuments = documents ? documents.filter(doc => 
+    doc.status === 'processed' && 
+    doc.extracted_data?.structured_data?.validated === true
+  ) : [];
+
   const visits = documents ? groupDocumentsByDate(documents) : [];
 
   const handleViewDocument = (documentId: string) => {
@@ -127,6 +133,9 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                             <Badge variant={doc.status === 'processed' ? 'success' : 'warning'} className="capitalize">
                               {doc.status}
                             </Badge>
+                            {doc.extracted_data?.structured_data?.validated && (
+                              <Badge variant="success">Validated</Badge>
+                            )}
                           </div>
                         </div>
                         <Button

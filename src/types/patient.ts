@@ -52,8 +52,8 @@ export interface PatientInfo {
   last_name: string;
   date_of_birth: string;
   gender: string | null;
-  contact_info?: ContactInfo | Json | null;
-  medical_history?: MedicalHistoryData | Json | null;
+  contact_info?: ContactInfo | null;
+  medical_history?: MedicalHistoryData | null;
   organization_id?: string;
   client_organization_id?: string | null;
   created_at: string;

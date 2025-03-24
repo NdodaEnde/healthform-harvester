@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,13 +12,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
-import { MedicalHistoryData } from '@/types/patient';
-
-interface ContactInfo {
-  email: string;
-  phone: string;
-  [key: string]: string;
-}
+import { MedicalHistoryData, ContactInfo } from '@/types/patient';
 
 interface PatientFormState {
   first_name: string;
@@ -156,14 +149,12 @@ const PatientEditPage = () => {
       const { error } = await supabase
         .from('patients')
         .update({
-          medical_history: updatedMedicalHistory,
+          medical_history: updatedMedicalHistory as any,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
       
       if (error) throw error;
-      
-      return; // Return void to satisfy Promise<void>
     },
     onSuccess: () => {
       toast({
