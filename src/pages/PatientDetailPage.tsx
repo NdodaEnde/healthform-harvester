@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { Loader2, Edit, ArrowLeft, FileText } from 'lucide-react';
+import { Loader2, Edit, ArrowLeft, FileText, Calendar } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import PatientVisits from '@/components/PatientVisits';
 
 interface ContactInfo {
   email?: string;
@@ -19,6 +20,25 @@ interface ContactInfo {
   occupation?: string;
   address?: string;
   [key: string]: any;
+}
+
+interface MedicalCondition {
+  name: string;
+  diagnosed_date?: string;
+  notes?: string;
+}
+
+interface Medication {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  start_date?: string;
+}
+
+interface Allergy {
+  allergen: string;
+  severity?: 'mild' | 'moderate' | 'severe';
+  reaction?: string;
 }
 
 const PatientDetailPage = () => {
@@ -52,6 +72,28 @@ const PatientDetailPage = () => {
         .from('documents')
         .select('*')
         .eq('document_type', 'certificate_of_fitness')
+        .eq('organization_id', organizationId)
+        .filter('extracted_data->patient_info->id', 'eq', id);
+      
+      if (docError) throw docError;
+      
+      if (!documents || documents.length === 0) {
+        return [];
+      }
+      
+      return documents;
+    },
+    enabled: !!id && !!organizationId,
+  });
+
+  // Query questionnaire data
+  const { data: questionnaires, isLoading: isLoadingQuestionnaires } = useQuery({
+    queryKey: ['patient-questionnaires', id],
+    queryFn: async () => {
+      const { data: documents, error: docError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('document_type', 'medical_questionnaire')
         .eq('organization_id', organizationId)
         .filter('extracted_data->patient_info->id', 'eq', id);
       
@@ -122,6 +164,95 @@ const PatientDetailPage = () => {
 
   const contactInfo = getContactInfo();
 
+  // Function to render medical condition list
+  const renderConditions = () => {
+    const conditions = patient.medical_history?.conditions || [];
+    if (conditions.length === 0) {
+      return <p className="text-muted-foreground">No conditions recorded</p>;
+    }
+    
+    return (
+      <div className="space-y-3">
+        {conditions.map((condition: MedicalCondition, index: number) => (
+          <div key={index} className="border p-3 rounded-lg">
+            <h4 className="font-medium">{condition.name}</h4>
+            {condition.diagnosed_date && (
+              <p className="text-sm text-muted-foreground">
+                Diagnosed: {format(new Date(condition.diagnosed_date), 'PP')}
+              </p>
+            )}
+            {condition.notes && <p className="text-sm mt-1">{condition.notes}</p>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Function to render medications list
+  const renderMedications = () => {
+    const medications = patient.medical_history?.medications || [];
+    if (medications.length === 0) {
+      return <p className="text-muted-foreground">No medications recorded</p>;
+    }
+    
+    return (
+      <div className="space-y-3">
+        {medications.map((medication: Medication, index: number) => (
+          <div key={index} className="border p-3 rounded-lg">
+            <h4 className="font-medium">{medication.name}</h4>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {medication.dosage && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Dosage:</span> {medication.dosage}
+                </p>
+              )}
+              {medication.frequency && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Frequency:</span> {medication.frequency}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Function to render allergies list
+  const renderAllergies = () => {
+    const allergies = patient.medical_history?.allergies || [];
+    if (allergies.length === 0) {
+      return <p className="text-muted-foreground">No allergies recorded</p>;
+    }
+    
+    const getSeverityColor = (severity?: string) => {
+      switch (severity) {
+        case 'severe': return 'text-red-500';
+        case 'moderate': return 'text-amber-500';
+        case 'mild': return 'text-yellow-500';
+        default: return '';
+      }
+    };
+    
+    return (
+      <div className="space-y-3">
+        {allergies.map((allergy: Allergy, index: number) => (
+          <div key={index} className="border p-3 rounded-lg">
+            <div className="flex justify-between">
+              <h4 className="font-medium">{allergy.allergen}</h4>
+              {allergy.severity && (
+                <span className={`text-sm font-medium ${getSeverityColor(allergy.severity)}`}>
+                  {allergy.severity.charAt(0).toUpperCase() + allergy.severity.slice(1)}
+                </span>
+              )}
+            </div>
+            {allergy.reaction && <p className="text-sm mt-1">{allergy.reaction}</p>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2 sm:flex-row sm:justify-between sm:items-center">
@@ -153,6 +284,7 @@ const PatientDetailPage = () => {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="visits">Visits</TabsTrigger>
           <TabsTrigger value="certificates">Certificates</TabsTrigger>
           <TabsTrigger value="questionnaires">Questionnaires</TabsTrigger>
           <TabsTrigger value="history">Medical History</TabsTrigger>
@@ -205,7 +337,7 @@ const PatientDetailPage = () => {
               <CardTitle>Medical Records Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <h3 className="text-sm font-medium mb-2">Certificates of Fitness</h3>
                   {isLoadingCertificates ? (
@@ -226,11 +358,44 @@ const PatientDetailPage = () => {
                 
                 <div>
                   <h3 className="text-sm font-medium mb-2">Medical Questionnaires</h3>
-                  <p className="text-sm text-muted-foreground">No questionnaires available</p>
+                  {isLoadingQuestionnaires ? (
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  ) : questionnaires && questionnaires.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-sm">{questionnaires.length} questionnaire(s) available</p>
+                      <div>
+                        <Button variant="link" size="sm" onClick={() => navigate(`/patients/${id}/records`)}>
+                          View all questionnaires
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No questionnaires available</p>
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Recent Visits</h3>
+                  {patient.medical_history?.documents && patient.medical_history.documents.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-sm">{patient.medical_history.documents.length} document(s) from visits</p>
+                      <div>
+                        <Button variant="link" size="sm" onClick={() => navigate(`/patients/${id}/records`)}>
+                          View all visits
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No visit records available</p>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="visits" className="space-y-4">
+          <PatientVisits patientId={id!} organizationId={organizationId} />
         </TabsContent>
 
         <TabsContent value="certificates" className="space-y-4">
@@ -285,32 +450,117 @@ const PatientDetailPage = () => {
               <CardTitle>Medical Questionnaires</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-6">
-                <p>Medical questionnaire support coming soon.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Medical History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {patient.medical_history ? (
+              {isLoadingQuestionnaires ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : questionnaires && questionnaires.length > 0 ? (
                 <div className="space-y-4">
-                  {Object.entries(patient.medical_history).map(([key, value]) => (
-                    <div key={key}>
-                      <h3 className="font-medium capitalize">{key.replace(/_/g, ' ')}</h3>
-                      <p className="text-sm text-muted-foreground">{String(value)}</p>
-                      <Separator className="my-2" />
+                  {questionnaires.map(doc => (
+                    <div key={doc.id} className="border rounded-lg p-4 hover:bg-accent transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">{doc.file_name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Completed: {format(new Date(doc.processed_at || doc.created_at), 'PP')}
+                          </p>
+                          <Badge variant="secondary" className="mt-2">
+                            Questionnaire
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/documents/${doc.id}`)}
+                        >
+                          View Document
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <p>No medical history information available.</p>
+                  <p>No questionnaires found for this patient.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Medical Conditions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderConditions()}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Medications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderMedications()}
+              </CardContent>
+            </Card>
+          </div>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Allergies</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderAllergies()}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Common Conditions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p>Hypertension</p>
+                    <Badge variant={patient.medical_history?.has_hypertension ? 'success' : 'outline'}>
+                      {patient.medical_history?.has_hypertension ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <p>Diabetes</p>
+                    <Badge variant={patient.medical_history?.has_diabetes ? 'success' : 'outline'}>
+                      {patient.medical_history?.has_diabetes ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p>Heart Disease</p>
+                    <Badge variant={patient.medical_history?.has_heart_disease ? 'success' : 'outline'}>
+                      {patient.medical_history?.has_heart_disease ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <p>Allergies</p>
+                    <Badge variant={patient.medical_history?.has_allergies ? 'success' : 'outline'}>
+                      {patient.medical_history?.has_allergies ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              
+              {patient.medical_history?.notes && (
+                <div className="mt-4 border-t pt-4">
+                  <h3 className="font-medium mb-2">Additional Notes</h3>
+                  <p className="text-sm">{patient.medical_history.notes}</p>
                 </div>
               )}
             </CardContent>

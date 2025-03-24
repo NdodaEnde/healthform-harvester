@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import PatientVisits from '@/components/PatientVisits';
 
 const PatientRecordsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -113,69 +115,85 @@ const PatientRecordsPage = () => {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Documents</CardTitle>
-          <div className="flex items-center gap-2">
-            <Select value={documentType} onValueChange={setDocumentType}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Documents</SelectItem>
-                <SelectItem value="certificate_of_fitness">Certificates of Fitness</SelectItem>
-                <SelectItem value="medical_questionnaire">Medical Questionnaires</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingDocuments ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-            </div>
-          ) : documents && documents.length > 0 ? (
-            <div className="space-y-4">
-              {documents.map(doc => (
-                <div key={doc.id} className="border rounded-lg p-4 hover:bg-accent transition-colors">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div>
-                      <h3 className="font-medium">{doc.file_name}</h3>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="outline">
-                          {format(new Date(doc.created_at), 'PP')}
-                        </Badge>
-                        {doc.document_type && (
-                          <Badge variant="secondary" className="capitalize">
-                            {doc.document_type.replace(/_/g, ' ')}
-                          </Badge>
-                        )}
-                        <Badge variant={doc.status === 'processed' ? 'success' : 'warning'} className="capitalize">
-                          {doc.status}
-                        </Badge>
+      <Tabs defaultValue="visits">
+        <TabsList>
+          <TabsTrigger value="visits">Visit History</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="visits" className="mt-4">
+          <PatientVisits patientId={id!} organizationId={organizationId} />
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Documents</CardTitle>
+              <div className="flex items-center gap-2">
+                <Select value={documentType} onValueChange={setDocumentType}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Documents</SelectItem>
+                    <SelectItem value="certificate_of_fitness">Certificates of Fitness</SelectItem>
+                    <SelectItem value="medical_questionnaire">Medical Questionnaires</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDocuments ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                </div>
+              ) : documents && documents.length > 0 ? (
+                <div className="space-y-4">
+                  {documents.map(doc => (
+                    <div key={doc.id} className="border rounded-lg p-4 hover:bg-accent transition-colors">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div>
+                          <h3 className="font-medium">{doc.file_name}</h3>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <Badge variant="outline">
+                              {format(new Date(doc.created_at), 'PP')}
+                            </Badge>
+                            {doc.document_type && (
+                              <Badge variant="secondary" className="capitalize">
+                                {doc.document_type.replace(/_/g, ' ')}
+                              </Badge>
+                            )}
+                            <Badge 
+                              variant={doc.status === 'processed' ? 'success' : 'warning'} 
+                              className="capitalize"
+                            >
+                              {doc.status}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleViewDocument(doc.id)}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          View Document
+                        </Button>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleViewDocument(doc.id)}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Document
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 border rounded-lg bg-background">
-              <h3 className="text-lg font-medium mb-2">No records found</h3>
-              <p className="text-muted-foreground">
-                This patient doesn't have any {documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records yet.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-background">
+                  <h3 className="text-lg font-medium mb-2">No records found</h3>
+                  <p className="text-muted-foreground">
+                    This patient doesn't have any {documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records yet.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

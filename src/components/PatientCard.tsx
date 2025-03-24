@@ -93,6 +93,14 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
 
   const contactInfo = getContactInfo();
 
+  // Calculate number of medical records from medical history if available
+  const getRecordsCount = () => {
+    if (patient.medical_history && patient.medical_history.documents) {
+      return patient.medical_history.documents.length;
+    }
+    return 0;
+  };
+
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b">
@@ -130,6 +138,12 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
             <span className="font-medium">Added:</span>
             <span>{format(new Date(patient.created_at), 'PP')}</span>
           </div>
+          {getRecordsCount() > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">Records:</span>
+              <Badge variant="secondary">{getRecordsCount()}</Badge>
+            </div>
+          )}
           
           {showActions && (
             <div className="flex items-center justify-between mt-4 pt-3 border-t">

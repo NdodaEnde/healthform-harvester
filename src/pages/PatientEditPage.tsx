@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 
 interface ContactInfo {
   email: string;
@@ -43,6 +45,8 @@ const PatientEditPage = () => {
       phone: ''
     }
   });
+
+  const [activeTab, setActiveTab] = useState('personal');
 
   // Query patient data
   const { isLoading, isError } = useQuery({
@@ -115,6 +119,51 @@ const PatientEditPage = () => {
     }
   });
 
+  // Medical history update mutation
+  const { mutate: updateMedicalHistory, isPending: isSavingMedicalHistory } = useMutation({
+    mutationFn: async (medicalHistoryData: any) => {
+      // Get current patient data to preserve existing medical_history.documents array
+      const { data: currentPatient, error: fetchError } = await supabase
+        .from('patients')
+        .select('medical_history')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Preserve documents array if it exists
+      const documents = currentPatient?.medical_history?.documents || [];
+      const updatedMedicalHistory = {
+        ...medicalHistoryData,
+        documents
+      };
+      
+      const { error } = await supabase
+        .from('patients')
+        .update({
+          medical_history: updatedMedicalHistory,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Medical history updated",
+        description: "The patient's medical history has been successfully updated."
+      });
+      queryClient.invalidateQueries({ queryKey: ['patient', id] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update medical history: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
@@ -181,116 +230,133 @@ const PatientEditPage = () => {
         <h1 className="text-2xl font-bold tracking-tight">Edit Patient</h1>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">First Name</Label>
-                <Input
-                  id="first_name"
-                  name="first_name"
-                  value={formState.first_name}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Last Name</Label>
-                <Input
-                  id="last_name"
-                  name="last_name"
-                  value={formState.last_name}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-            </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="personal">Personal Information</TabsTrigger>
+          <TabsTrigger value="medical">Medical History</TabsTrigger>
+        </TabsList>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="date_of_birth">Date of Birth</Label>
-                <Input
-                  id="date_of_birth"
-                  name="date_of_birth"
-                  type="date"
-                  value={formState.date_of_birth}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="gender">Gender</Label>
-                <Select value={formState.gender} onValueChange={handleGenderChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                    <SelectItem value="unknown">Unknown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TabsContent value="personal" className="mt-4">
+          <form onSubmit={handleSubmit}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Personal Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="first_name">First Name</Label>
+                    <Input
+                      id="first_name"
+                      name="first_name"
+                      value={formState.first_name}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">Last Name</Label>
+                    <Input
+                      id="last_name"
+                      name="last_name"
+                      value={formState.last_name}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                </div>
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="contact_info.email"
-                  type="email"
-                  value={formState.contact_info.email}
-                  onChange={handleInputChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  name="contact_info.phone"
-                  type="tel"
-                  value={formState.contact_info.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="date_of_birth">Date of Birth</Label>
+                    <Input
+                      id="date_of_birth"
+                      name="date_of_birth"
+                      type="date"
+                      value={formState.date_of_birth}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gender</Label>
+                    <Select value={formState.gender} onValueChange={handleGenderChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="unknown">Unknown</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="contact_info.email"
+                      type="email"
+                      value={formState.contact_info.email}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      name="contact_info.phone"
+                      type="tel"
+                      value={formState.contact_info.phone}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          </form>
+        </TabsContent>
+
+        <TabsContent value="medical" className="mt-4">
+          <MedicalHistoryEditor
+            patientId={id!}
+            initialData={queryClient.getQueryData<any>(['patient', id])?.medical_history || {}}
+            onSave={updateMedicalHistory}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
