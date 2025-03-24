@@ -1,5 +1,4 @@
-
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, Outlet } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -39,7 +38,7 @@ import OrganizationUsersPage from '@/pages/admin/OrganizationUsersPage';
 import OrganizationSettingsPage from '@/pages/settings/OrganizationSettingsPage';
 
 import OrganizationProtectedRoute from '@/components/OrganizationProtectedRoute';
-import DashboardLayout from '@/components/DashboardLayout';
+import { DashboardLayout } from '@/components/DashboardLayout';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -73,28 +72,32 @@ function App() {
                 <Route path="/organizations" element={<OrganizationsListPage />} />
 
                 {/* Protected Routes */}
-                <Route element={<OrganizationProtectedRoute />}>
-                  <Route element={<DashboardLayout />}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/patients" element={<PatientsPage />} />
-                    <Route path="/patients/:id" element={<PatientDetailPage />} />
-                    <Route path="/patients/:id/edit" element={<PatientEditPage />} />
-                    <Route path="/patients/:id/records" element={<PatientRecordsPage />} />
-                    <Route path="/documents/:id" element={<DocumentViewer />} />
-                    <Route path="/templates" element={<TemplatesListPage />} />
-                    <Route path="/templates/edit/:id" element={<EditTemplatePage />} />
-                    <Route path="/templates/view/:id" element={<ViewTemplatePage />} />
+                <Route element={
+                  <OrganizationProtectedRoute>
+                    <DashboardLayout>
+                      <Outlet />
+                    </DashboardLayout>
+                  </OrganizationProtectedRoute>
+                }>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/patients" element={<PatientsPage />} />
+                  <Route path="/patients/:id" element={<PatientDetailPage />} />
+                  <Route path="/patients/:id/edit" element={<PatientEditPage />} />
+                  <Route path="/patients/:id/records" element={<PatientRecordsPage />} />
+                  <Route path="/documents/:id" element={<DocumentViewer />} />
+                  <Route path="/templates" element={<TemplatesListPage />} />
+                  <Route path="/templates/edit/:id" element={<EditTemplatePage />} />
+                  <Route path="/templates/view/:id" element={<ViewTemplatePage />} />
 
-                    {/* Admin Routes */}
-                    <Route path="/admin/organizations" element={<OrganizationsPage />} />
-                    <Route path="/admin/organizations/new" element={<CreateOrganizationPage />} />
-                    <Route path="/admin/organizations/:id" element={<EditOrganizationPage />} />
-                    <Route path="/admin/organizations/:id/clients" element={<OrganizationClientsPage />} />
-                    <Route path="/admin/organizations/:id/users" element={<OrganizationUsersPage />} />
+                  {/* Admin Routes */}
+                  <Route path="/admin/organizations" element={<OrganizationsPage />} />
+                  <Route path="/admin/organizations/new" element={<CreateOrganizationPage />} />
+                  <Route path="/admin/organizations/:id" element={<EditOrganizationPage />} />
+                  <Route path="/admin/organizations/:id/clients" element={<OrganizationClientsPage />} />
+                  <Route path="/admin/organizations/:id/users" element={<OrganizationUsersPage />} />
 
-                    {/* Settings Routes */}
-                    <Route path="/settings" element={<OrganizationSettingsPage />} />
-                  </Route>
+                  {/* Settings Routes */}
+                  <Route path="/settings" element={<OrganizationSettingsPage />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

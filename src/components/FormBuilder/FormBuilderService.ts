@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FormTemplate } from './FormFieldTypes';
+import { FormTemplate, FormField } from './FormFieldTypes';
+import { Json } from '@/integrations/supabase/types';
 
 export const FormBuilderService = {
   async getFormTemplates(organizationId: string): Promise<FormTemplate[]> {
@@ -14,13 +15,13 @@ export const FormBuilderService = {
       throw error;
     }
     
-    // Map database field names to our model field names
+    // Map database field names to our model field names and parse fields JSON
     return (data || []).map(item => ({
       id: item.id,
       name: item.name,
       description: item.description || undefined,
       organizationId: item.organizationid,
-      fields: item.fields,
+      fields: item.fields as unknown as FormField[],
       createdAt: item.createdat,
       updatedAt: item.updatedat,
       isPublished: item.ispublished,
@@ -44,13 +45,13 @@ export const FormBuilderService = {
       throw error;
     }
     
-    // Map database field names to our model field names
+    // Map database field names to our model field names and parse fields JSON
     return {
       id: data.id,
       name: data.name,
       description: data.description || undefined,
       organizationId: data.organizationid,
-      fields: data.fields,
+      fields: data.fields as unknown as FormField[],
       createdAt: data.createdat,
       updatedAt: data.updatedat,
       isPublished: data.ispublished,
@@ -71,7 +72,7 @@ export const FormBuilderService = {
       name: updatedTemplate.name,
       description: updatedTemplate.description,
       organizationid: updatedTemplate.organizationId,
-      fields: updatedTemplate.fields,
+      fields: updatedTemplate.fields as unknown as Json,
       createdat: updatedTemplate.createdAt,
       updatedat: updatedTemplate.updatedAt,
       ispublished: updatedTemplate.isPublished,
@@ -95,7 +96,7 @@ export const FormBuilderService = {
       name: data.name,
       description: data.description || undefined,
       organizationId: data.organizationid,
-      fields: data.fields,
+      fields: data.fields as unknown as FormField[],
       createdAt: data.createdat,
       updatedAt: data.updatedat,
       isPublished: data.ispublished,
@@ -137,7 +138,7 @@ export const FormBuilderService = {
       name: data.name,
       description: data.description || undefined,
       organizationId: data.organizationid,
-      fields: data.fields,
+      fields: data.fields as unknown as FormField[],
       createdAt: data.createdat,
       updatedAt: data.updatedat,
       isPublished: data.ispublished,
