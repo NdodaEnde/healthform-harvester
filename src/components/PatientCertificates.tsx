@@ -102,8 +102,10 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       // Filter the documents post-query to find those related to this patient and validated
       const filteredDocs = (data || []).filter(doc => {
-        const patientInfoId = doc.extracted_data?.patient_info?.id;
-        const isValidated = doc.extracted_data?.structured_data?.validated === true;
+        // Type assertion to handle the JSON type correctly
+        const extractedData = doc.extracted_data as ExtractedData | null;
+        const patientInfoId = extractedData?.patient_info?.id;
+        const isValidated = extractedData?.structured_data?.validated === true;
         return patientInfoId === patientId && isValidated;
       });
       

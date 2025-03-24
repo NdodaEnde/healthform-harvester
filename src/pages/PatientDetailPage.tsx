@@ -291,7 +291,7 @@ const PatientDetailPage = () => {
           <MedicalHistoryEditor 
             patientId={id!}
             initialData={patient.medical_history || {}}
-            isNewPatient={false}
+            onSave={async () => {}}
           />
         </TabsContent>
         
@@ -308,4 +308,3 @@ const PatientDetailPage = () => {
 };
 
 export default PatientDetailPage;
-

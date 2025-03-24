@@ -87,7 +87,9 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       
       // Then filter them client-side for the patient ID
       const patientDocuments = (data || []).filter(doc => {
-        const patientInfoId = doc.extracted_data?.patient_info?.id;
+        // Type assertion to handle the JSON type correctly
+        const extractedData = doc.extracted_data as ExtractedData | null;
+        const patientInfoId = extractedData?.patient_info?.id;
         return patientInfoId === patientId;
       });
       
@@ -100,7 +102,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   const filteredDocuments = documents ? documents.filter(doc => {
     if (showOnlyValidated) {
       return doc.status === 'processed' && 
-             doc.extracted_data?.structured_data?.validated === true;
+             (doc.extracted_data as ExtractedData)?.structured_data?.validated === true;
     }
     return true;
   }) : [];
@@ -179,7 +181,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                             <Badge variant={doc.status === 'processed' ? 'success' : 'warning'} className="capitalize">
                               {doc.status}
                             </Badge>
-                            {doc.extracted_data?.structured_data?.validated && (
+                            {(doc.extracted_data as ExtractedData)?.structured_data?.validated && (
                               <Badge variant="success">Validated</Badge>
                             )}
                           </div>
