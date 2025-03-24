@@ -54,8 +54,15 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
     navigate(`/patients/${patient.id}/records`);
   };
 
+  const getGenderLabel = (gender: string | null) => {
+    if (!gender) return 'Unknown';
+    
+    // Capitalize first letter
+    return gender.charAt(0).toUpperCase() + gender.slice(1);
+  };
+
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -65,7 +72,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {patient.gender || 'Unknown'} • {calculateAge(patient.date_of_birth)} years old
+            {getGenderLabel(patient.gender)} • {calculateAge(patient.date_of_birth)} years old
           </p>
         </div>
       </CardHeader>
@@ -78,7 +85,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
           {patient.contact_info?.email && (
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Email:</span>
-              <span>{patient.contact_info.email}</span>
+              <span className="truncate max-w-[180px]">{patient.contact_info.email}</span>
             </div>
           )}
           {patient.contact_info?.phone && (

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import PatientCard from './PatientCard';
-import { Search, Plus, Filter } from 'lucide-react';
+import { Search, Plus, Filter, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Select,
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from '@/components/ui/use-toast';
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,7 +85,24 @@ const PatientList = () => {
   };
 
   const handleRefresh = () => {
+    toast({
+      title: "Refreshing patients list",
+      description: "The patients list is being updated."
+    });
     refetch();
+  };
+
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
   };
 
   return (
@@ -117,6 +135,7 @@ const PatientList = () => {
           </Select>
           
           <Button variant="outline" onClick={handleRefresh} className="mr-2">
+            <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
           

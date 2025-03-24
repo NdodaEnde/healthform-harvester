@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -24,6 +25,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
 import { DashboardLayout } from './components/DashboardLayout';
 import PatientsPage from './pages/PatientsPage';
+import PatientDetailPage from './pages/PatientDetailPage';
+import PatientRecordsPage from './pages/PatientRecordsPage';
+import PatientEditPage from './pages/PatientEditPage';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -118,6 +122,30 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <PatientsPage />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/patients/:id" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <PatientDetailPage />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/patients/:id/edit" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <PatientEditPage />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/patients/:id/records" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <PatientRecordsPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
