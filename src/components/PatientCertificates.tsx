@@ -123,14 +123,16 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       // Enhanced multi-strategy matching
       const filteredDocs = (data || []).filter(doc => {
         // First check if document is validated
-        const isValidated = doc.extracted_data?.structured_data?.validated === true;
+        const extractedData = doc.extracted_data as ExtractedData | null;
+        const isValidated = extractedData?.structured_data?.validated === true;
         
         if (!isValidated) {
+          console.log('Skipping non-validated document:', doc.id);
           return false; // Skip non-validated documents
         }
         
         // Strategy 1: Direct patient ID match in patient_info
-        if (doc.extracted_data?.patient_info?.id === patientId) {
+        if (extractedData?.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
           return true;
         }
@@ -139,8 +141,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         const patientName = patient ? 
           `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
         
-        const patientNameInData = doc.extracted_data?.structured_data?.patient?.name?.toLowerCase() || 
-                                doc.extracted_data?.patient_info?.name?.toLowerCase() || '';
+        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
+                                extractedData?.patient_info?.name?.toLowerCase() || '';
         
         if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
           console.log('Match by patient name in data:', doc.id);
