@@ -86,13 +86,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     queryFn: async () => {
       console.log('Fetching certificates for patient:', patientId);
       
-      // The key fix: Use a more compatible approach for filtering JSON data
+      // Get all processed documents
       const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('status', 'processed')
-        .or(`document_type.eq.certificate-fitness,document_type.eq.certificate_of_fitness`)
+        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'])
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -100,16 +100,26 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         throw error;
       }
       
-      // Filter the documents post-query to find those related to this patient and validated
+      console.log('Raw processed documents fetched:', data?.length);
+      
+      // Now filter the documents to find those related to this patient and validated
       const filteredDocs = (data || []).filter(doc => {
         // Type assertion to handle the JSON type correctly
         const extractedData = doc.extracted_data as ExtractedData | null;
+        
+        // Check if this document belongs to our patient
         const patientInfoId = extractedData?.patient_info?.id;
+        
+        // Check if this document is validated
         const isValidated = extractedData?.structured_data?.validated === true;
+        
+        // Debug log to help understand what's being filtered
+        console.log('Document:', doc.id, 'Patient ID:', patientInfoId, 'Is Validated:', isValidated, 'Document Type:', doc.document_type);
+        
         return patientInfoId === patientId && isValidated;
       });
       
-      console.log('Certificates fetched:', filteredDocs.length);
+      console.log('Certificates after filtering:', filteredDocs.length);
       return filteredDocs as Document[];
     },
     enabled: !!patientId && !!organizationId,
