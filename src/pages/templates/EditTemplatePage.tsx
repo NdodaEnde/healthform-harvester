@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
@@ -8,7 +7,7 @@ import FormBuilder from '@/components/FormBuilder/FormBuilder';
 import { FormTemplate } from '@/components/FormBuilder/FormFieldTypes';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Upload, FilePlus } from 'lucide-react';
+import { ArrowLeft, Upload, FileText } from 'lucide-react';
 import TemplateUploader from '@/components/FormBuilder/TemplateUploader';
 
 const EditTemplatePage: React.FC = () => {
@@ -70,7 +69,7 @@ const EditTemplatePage: React.FC = () => {
               onClick={() => setShowUploader(false)}
               className="flex-1"
             >
-              <FilePlus className="mr-2 h-5 w-5" />
+              <FileText className="mr-2 h-5 w-5" />
               Build from Scratch
             </Button>
             <Button 

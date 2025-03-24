@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { FilePdf, FileImage, Upload, Loader2 } from 'lucide-react';
+import { FileText, FileImage, Upload, Loader2 } from 'lucide-react';
 import { FormTemplate } from './FormFieldTypes';
 import { v4 as uuidv4 } from 'uuid';
 import { FormBuilderService } from './FormBuilderService';
@@ -30,13 +29,11 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
     const selectedFile = e.target.files?.[0] || null;
     setFile(selectedFile);
     
-    // Auto-generate template name from filename
     if (selectedFile && !templateName) {
-      // Remove extension and replace underscores/hyphens with spaces
       const nameFromFile = selectedFile.name
-        .replace(/\.[^/.]+$/, "") // Remove extension
-        .replace(/[_-]/g, " ") // Replace underscores and hyphens with spaces
-        .replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalize first letter of each word
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[_-]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
       
       setTemplateName(nameFromFile);
     }
@@ -57,7 +54,6 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
     setUploadProgress(10);
     
     try {
-      // Create FormData to send to the edge function
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', 'template');
@@ -65,7 +61,6 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
       formData.append('templateName', templateName);
       formData.append('category', category);
       
-      // Simulated progress updates
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
@@ -76,14 +71,12 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
         });
       }, 500);
       
-      // Call the process-document edge function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
         {
           method: 'POST',
           body: formData,
           headers: {
-            // The authorization header will be added automatically by the fetch API
           }
         }
       );
@@ -98,7 +91,6 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
       
       const result = await response.json();
       
-      // Create a new template from the document processing result
       const newTemplate: FormTemplate = {
         id: uuidv4(),
         name: templateName,
@@ -111,9 +103,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
         category,
       };
       
-      // If the document was processed successfully, use the extracted fields
       if (result?.documentId) {
-        // Poll for document processing completion
         let attempts = 0;
         const maxAttempts = 10;
         
@@ -125,7 +115,6 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
           }
           
           if (data?.status === 'completed' && data?.extracted_data?.formFields) {
-            // Extract form fields from the processed document
             newTemplate.fields = data.extracted_data.formFields;
             return true;
           } else if (data?.status === 'error') {
@@ -137,19 +126,16 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
             throw new Error('Document processing timed out');
           }
           
-          // Wait and try again
           await new Promise(resolve => setTimeout(resolve, 2000));
           return false;
         };
         
-        // Check processing status until completed or max attempts reached
         let completed = false;
         while (!completed && attempts < maxAttempts) {
           completed = await checkProcessingStatus();
         }
       }
       
-      // Save the template
       setUploadProgress(98);
       const savedTemplate = await FormBuilderService.saveFormTemplate(newTemplate);
       setUploadProgress(100);
@@ -209,7 +195,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
             {file ? (
               <div className="flex flex-col items-center">
                 {file.type.includes('pdf') ? (
-                  <FilePdf className="h-12 w-12 text-primary mb-2" />
+                  <FileText className="h-12 w-12 text-primary mb-2" />
                 ) : (
                   <FileImage className="h-12 w-12 text-primary mb-2" />
                 )}
