@@ -1,165 +1,158 @@
 
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import './App.css';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './contexts/AuthContext';
-import { OrganizationProvider } from './contexts/OrganizationContext';
-import Index from './pages/Index';
 import Auth from './pages/Auth';
+import Index from './pages/Index';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
-import HeaderComponent from './components/HeaderComponent';
-import OrganizationProtectedRoute from './components/OrganizationProtectedRoute';
-import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
-import DocumentViewer from './pages/DocumentViewer';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import UpdatePasswordPage from './pages/UpdatePasswordPage';
-import AcceptInvitePage from './pages/AcceptInvitePage';
-import { OrganizationsPage } from './pages/admin';
-import { CreateOrganizationPage } from './pages/admin';
-import { EditOrganizationPage } from './pages/admin';
-import { OrganizationUsersPage } from './pages/admin';
-import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
-import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
-import { Toaster } from "@/components/ui/toaster"
-import { Toaster as SonnerToaster } from "sonner";
-import { DashboardLayout } from './components/DashboardLayout';
+import { AuthProvider } from './contexts/AuthContext';
+import { OrganizationProvider } from './contexts/OrganizationContext';
+import { ThemeProvider } from 'next-themes';
+import { Toaster } from './components/ui/sonner';
 import PatientsPage from './pages/PatientsPage';
-import PatientDetailPage from './pages/PatientDetailPage';
+import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
+import UpdatePasswordPage from './pages/UpdatePasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
+import DocumentViewer from './pages/DocumentViewer';
+import OrganizationsListPage from './pages/OrganizationsListPage';
+import { Helmet } from 'react-helmet';
 import PatientRecordsPage from './pages/PatientRecordsPage';
+import PatientDetailPage from './pages/PatientDetailPage';
 import PatientEditPage from './pages/PatientEditPage';
+import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
+import OrganizationsPage from './pages/admin/OrganizationsPage';
+import OrganizationUsersPage from './pages/admin/OrganizationUsersPage';
+import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
+import CreateOrganizationPage from './pages/admin/CreateOrganizationPage';
+import EditOrganizationPage from './pages/admin/EditOrganizationPage';
+import TemplatesListPage from './pages/templates/TemplatesListPage';
+import EditTemplatePage from './pages/templates/EditTemplatePage';
+import ViewTemplatePage from './pages/templates/ViewTemplatePage';
 
-// Create a client
 const queryClient = new QueryClient();
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Index />,
+  },
+  {
+    path: '/login',
+    element: <Auth view="sign_in" />,
+  },
+  {
+    path: '/signup',
+    element: <Auth view="sign_up" />,
+  },
+  {
+    path: '/organizations',
+    element: <OrganizationsListPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: '/update-password',
+    element: <UpdatePasswordPage />,
+  },
+  {
+    path: '/invite/:token',
+    element: <AcceptInvitePage />,
+  },
+  {
+    path: '/first-time-setup',
+    element: <FirstTimeSetupPage />,
+  },
+  {
+    path: '/dashboard',
+    element: <Dashboard />,
+  },
+  {
+    path: '/patients',
+    element: <PatientsPage />,
+  },
+  {
+    path: '/patients/:patientId',
+    element: <PatientDetailPage />,
+  },
+  {
+    path: '/patients/:patientId/edit',
+    element: <PatientEditPage />,
+  },
+  {
+    path: '/patient-records',
+    element: <PatientRecordsPage />,
+  },
+  {
+    path: '/settings',
+    element: <OrganizationSettingsPage />,
+  },
+  // Templates routes
+  {
+    path: '/templates',
+    element: <TemplatesListPage />,
+  },
+  {
+    path: '/templates/new',
+    element: <EditTemplatePage />,
+  },
+  {
+    path: '/templates/edit/:id',
+    element: <EditTemplatePage />,
+  },
+  {
+    path: '/templates/view/:id',
+    element: <ViewTemplatePage />,
+  },
+  // Admin routes
+  {
+    path: '/admin/organizations',
+    element: <OrganizationsPage />,
+  },
+  {
+    path: '/admin/organizations/new',
+    element: <CreateOrganizationPage />,
+  },
+  {
+    path: '/admin/organizations/:organizationId/edit',
+    element: <EditOrganizationPage />,
+  },
+  {
+    path: '/admin/users',
+    element: <OrganizationUsersPage />,
+  },
+  {
+    path: '/admin/clients',
+    element: <OrganizationClientsPage />,
+  },
+  {
+    path: '/documents/:documentId',
+    element: <DocumentViewer />,
+  },
+  {
+    path: '*',
+    element: <NotFound />,
+  },
+]);
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
-        <BrowserRouter>
-          <AuthProvider>
-            <OrganizationProvider>
-              <HeaderComponent />
-              <main>
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/update-password" element={<UpdatePasswordPage />} />
-                  <Route path="/accept-invite" element={<AcceptInvitePage />} />
-                  <Route path="/setup" element={<FirstTimeSetupPage />} />
-                  
-                  {/* Protected Routes with Dashboard Layout */}
-                  <Route path="/dashboard" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <Dashboard />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/documents/:id" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <DocumentViewer />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* Organization Management */}
-                  <Route path="/admin/organizations" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <OrganizationsPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/admin/organizations/new" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <CreateOrganizationPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/admin/organizations/:id/edit" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <EditOrganizationPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/admin/organizations/:id/users" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <OrganizationUsersPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/admin/organizations/:id/clients" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <OrganizationClientsPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* Settings Pages */}
-                  <Route path="/settings/organization" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <OrganizationSettingsPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* Patient Management Routes */}
-                  <Route path="/patients" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <PatientsPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/patients/:id" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <PatientDetailPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/patients/:id/edit" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <PatientEditPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/patients/:id/records" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <PatientRecordsPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* 404 Route */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </OrganizationProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </div>
+      <ThemeProvider>
+        <Helmet
+          titleTemplate="%s | Health Portal"
+          defaultTitle="Health Portal"
+        />
+        <AuthProvider>
+          <OrganizationProvider>
+            <RouterProvider router={router} />
+            <Toaster closeButton />
+          </OrganizationProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
