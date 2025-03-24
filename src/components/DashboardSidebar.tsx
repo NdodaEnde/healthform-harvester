@@ -18,7 +18,7 @@ import {
   User,
   LayoutTemplate,
 } from 'lucide-react';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 
 // Add this type at the top of the file
@@ -31,9 +31,9 @@ type NavItem = {
 
 const DashboardSidebar = () => {
   const { pathname } = useLocation();
-  const { isMobile } = useMobile();
+  const { isMobile } = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
-  const { selectedOrganization, isAdmin } = useOrganization();
+  const { currentOrganization, isServiceProvider } = useOrganization();
 
   const navItems: NavItem[] = [
     {
@@ -89,7 +89,7 @@ const DashboardSidebar = () => {
     }
   };
 
-  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const filteredNavItems = navItems.filter(item => !item.adminOnly || isServiceProvider());
 
   return (
     <>
@@ -133,12 +133,12 @@ const DashboardSidebar = () => {
           )}
         </div>
 
-        {selectedOrganization && (
+        {currentOrganization && (
           <div className="px-4 py-2">
             <div className="rounded-lg bg-muted p-3">
               <div className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">{selectedOrganization.name}</span>
+                <span className="text-sm font-medium">{currentOrganization.name}</span>
               </div>
             </div>
           </div>

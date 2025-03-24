@@ -7,14 +7,25 @@ export const FormBuilderService = {
     const { data, error } = await supabase
       .from('form_templates')
       .select('*')
-      .eq('organizationId', organizationId);
+      .eq('organizationid', organizationId);
     
     if (error) {
       console.error('Error fetching form templates:', error);
       throw error;
     }
     
-    return data as FormTemplate[];
+    // Map database field names to our model field names
+    return (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || undefined,
+      organizationId: item.organizationid,
+      fields: item.fields,
+      createdAt: item.createdat,
+      updatedAt: item.updatedat,
+      isPublished: item.ispublished,
+      category: item.category || undefined
+    }));
   },
   
   async getFormTemplateById(id: string): Promise<FormTemplate | null> {
@@ -33,7 +44,18 @@ export const FormBuilderService = {
       throw error;
     }
     
-    return data as FormTemplate;
+    // Map database field names to our model field names
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || undefined,
+      organizationId: data.organizationid,
+      fields: data.fields,
+      createdAt: data.createdat,
+      updatedAt: data.updatedat,
+      isPublished: data.ispublished,
+      category: data.category || undefined
+    };
   },
   
   async saveFormTemplate(template: FormTemplate): Promise<FormTemplate> {
@@ -43,9 +65,22 @@ export const FormBuilderService = {
       updatedAt: new Date().toISOString()
     };
     
+    // Map our model field names to database field names
+    const dbTemplate = {
+      id: updatedTemplate.id,
+      name: updatedTemplate.name,
+      description: updatedTemplate.description,
+      organizationid: updatedTemplate.organizationId,
+      fields: updatedTemplate.fields,
+      createdat: updatedTemplate.createdAt,
+      updatedat: updatedTemplate.updatedAt,
+      ispublished: updatedTemplate.isPublished,
+      category: updatedTemplate.category
+    };
+    
     const { data, error } = await supabase
       .from('form_templates')
-      .upsert(updatedTemplate, { onConflict: 'id' })
+      .upsert(dbTemplate, { onConflict: 'id' })
       .select()
       .single();
     
@@ -54,7 +89,18 @@ export const FormBuilderService = {
       throw error;
     }
     
-    return data as FormTemplate;
+    // Map database field names back to our model field names
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || undefined,
+      organizationId: data.organizationid,
+      fields: data.fields,
+      createdAt: data.createdat,
+      updatedAt: data.updatedat,
+      isPublished: data.ispublished,
+      category: data.category || undefined
+    };
   },
   
   async deleteFormTemplate(id: string): Promise<void> {
@@ -72,7 +118,10 @@ export const FormBuilderService = {
   async publishFormTemplate(id: string, publish: boolean): Promise<FormTemplate> {
     const { data, error } = await supabase
       .from('form_templates')
-      .update({ isPublished: publish, updatedAt: new Date().toISOString() })
+      .update({ 
+        ispublished: publish, 
+        updatedat: new Date().toISOString() 
+      })
       .eq('id', id)
       .select()
       .single();
@@ -82,6 +131,17 @@ export const FormBuilderService = {
       throw error;
     }
     
-    return data as FormTemplate;
+    // Map database field names to our model field names
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || undefined,
+      organizationId: data.organizationid,
+      fields: data.fields,
+      createdAt: data.createdat,
+      updatedAt: data.updatedat,
+      isPublished: data.ispublished,
+      category: data.category || undefined
+    };
   }
 };

@@ -64,8 +64,8 @@ function App() {
             <OrganizationProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Auth view="sign_in" />} />
-                <Route path="/register" element={<Auth view="sign_up" />} />
+                <Route path="/login" element={<Auth />} />
+                <Route path="/register" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/update-password" element={<UpdatePasswordPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
