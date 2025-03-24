@@ -1,41 +1,17 @@
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard } from 'lucide-react';
 import { format } from 'date-fns';
-import { Loader2, Edit, ArrowLeft, FileText, Calendar } from 'lucide-react';
+import { PatientInfo } from '@/types/patient';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import PatientVisits from '@/components/PatientVisits';
-import { MedicalHistoryData, PatientInfo } from '@/types/patient';
-
-interface ExtractedData {
-  structured_data?: {
-    validated?: boolean;
-    [key: string]: any;
-  };
-  patient_info?: {
-    id?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-interface Document {
-  id: string;
-  file_name: string;
-  file_path: string;
-  status: string;
-  document_type: string | null;
-  processed_at: string | null;
-  created_at: string;
-  extracted_data: ExtractedData | null;
-  [key: string]: any;
-}
+import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
+import PatientCertificates from '@/components/PatientCertificates';
 
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -43,7 +19,7 @@ const PatientDetailPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
 
-  const { data: patient, isLoading: isLoadingPatient } = useQuery({
+  const { data: patient, isLoading } = useQuery({
     queryKey: ['patient', id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -53,53 +29,10 @@ const PatientDetailPage = () => {
         .single();
       
       if (error) throw error;
+      console.log('Patient data loaded:', data?.id, data?.first_name, data?.last_name);
       return data as PatientInfo;
     },
     enabled: !!id,
-  });
-
-  const { data: certificates, isLoading: isLoadingCertificates } = useQuery({
-    queryKey: ['patient-certificates', id],
-    queryFn: async () => {
-      const { data: documents, error: docError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('document_type', 'certificate_of_fitness')
-        .eq('organization_id', organizationId)
-        .eq('status', 'processed')
-        .filter('extracted_data->patient_info->id', 'eq', id)
-        .filter('extracted_data->structured_data->validated', 'eq', true);
-      
-      if (docError) throw docError;
-      
-      if (!documents || documents.length === 0) {
-        return [];
-      }
-      
-      return documents as Document[];
-    },
-    enabled: !!id && !!organizationId,
-  });
-
-  const { data: questionnaires, isLoading: isLoadingQuestionnaires } = useQuery({
-    queryKey: ['patient-questionnaires', id],
-    queryFn: async () => {
-      const { data: documents, error: docError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('document_type', 'medical_questionnaire')
-        .eq('organization_id', organizationId)
-        .filter('extracted_data->patient_info->id', 'eq', id);
-      
-      if (docError) throw docError;
-      
-      if (!documents || documents.length === 0) {
-        return [];
-      }
-      
-      return documents as Document[];
-    },
-    enabled: !!id && !!organizationId,
   });
 
   const handleBackToList = () => {
@@ -110,14 +43,27 @@ const PatientDetailPage = () => {
     navigate(`/patients/${id}/edit`);
   };
 
-  const handleViewRecords = () => {
+  const handleViewMedicalRecords = () => {
     navigate(`/patients/${id}/records`);
   };
 
-  if (isLoadingPatient) {
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin h-8 w-8 text-primary" />
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -135,130 +81,11 @@ const PatientDetailPage = () => {
     );
   }
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDifference = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const getContactInfo = () => {
-    if (patient.contact_info && typeof patient.contact_info === 'object') {
-      return patient.contact_info;
-    }
-    return {};
-  };
-
-  const contactInfo = getContactInfo();
-
-  const getMedicalHistory = (): MedicalHistoryData => {
-    if (!patient.medical_history) return {};
-    if (typeof patient.medical_history === 'object') {
-      return patient.medical_history as MedicalHistoryData;
-    }
-    try {
-      if (typeof patient.medical_history === 'string') {
-        return JSON.parse(patient.medical_history) as MedicalHistoryData;
-      }
-    } catch (e) {
-      console.error("Failed to parse medical_history", e);
-    }
-    return {};
-  };
-
-  const medicalHistory = getMedicalHistory();
-
-  const renderConditions = () => {
-    const conditions = medicalHistory.conditions || [];
-    if (conditions.length === 0) {
-      return <p className="text-muted-foreground">No conditions recorded</p>;
-    }
-    
-    return (
-      <div className="space-y-3">
-        {conditions.map((condition, index) => (
-          <div key={index} className="border p-3 rounded-lg">
-            <h4 className="font-medium">{condition.name}</h4>
-            {condition.diagnosed_date && (
-              <p className="text-sm text-muted-foreground">
-                Diagnosed: {format(new Date(condition.diagnosed_date), 'PP')}
-              </p>
-            )}
-            {condition.notes && <p className="text-sm mt-1">{condition.notes}</p>}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderMedications = () => {
-    const medications = medicalHistory.medications || [];
-    if (medications.length === 0) {
-      return <p className="text-muted-foreground">No medications recorded</p>;
-    }
-    
-    return (
-      <div className="space-y-3">
-        {medications.map((medication, index) => (
-          <div key={index} className="border p-3 rounded-lg">
-            <h4 className="font-medium">{medication.name}</h4>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              {medication.dosage && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Dosage:</span> {medication.dosage}
-                </p>
-              )}
-              {medication.frequency && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Frequency:</span> {medication.frequency}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderAllergies = () => {
-    const allergies = medicalHistory.allergies || [];
-    if (allergies.length === 0) {
-      return <p className="text-muted-foreground">No allergies recorded</p>;
-    }
-    
-    const getSeverityColor = (severity?: string) => {
-      switch (severity) {
-        case 'severe': return 'text-red-500';
-        case 'moderate': return 'text-amber-500';
-        case 'mild': return 'text-yellow-500';
-        default: return '';
-      }
-    };
-    
-    return (
-      <div className="space-y-3">
-        {allergies.map((allergy, index) => (
-          <div key={index} className="border p-3 rounded-lg">
-            <div className="flex justify-between">
-              <h4 className="font-medium">{allergy.allergen}</h4>
-              {allergy.severity && (
-                <span className={`text-sm font-medium ${getSeverityColor(allergy.severity)}`}>
-                  {allergy.severity.charAt(0).toUpperCase() + allergy.severity.slice(1)}
-                </span>
-              )}
-            </div>
-            {allergy.reaction && <p className="text-sm mt-1">{allergy.reaction}</p>}
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const hasContact = patient.contact_info && (
+    patient.contact_info.email || 
+    patient.contact_info.phone || 
+    patient.contact_info.address
+  );
 
   return (
     <div className="space-y-6">
@@ -273,13 +100,14 @@ const PatientDetailPage = () => {
             </h1>
           </div>
           <p className="text-muted-foreground">
-            Patient profile and medical records
+            {patient.gender ? `${patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1)}` : 'Unknown gender'}{' '}
+            • {patient.date_of_birth ? `${calculateAge(patient.date_of_birth)} years old` : 'Unknown age'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleViewRecords} variant="outline">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleViewMedicalRecords}>
             <FileText className="mr-2 h-4 w-4" />
-            View Records
+            Medical Records
           </Button>
           <Button onClick={handleEditPatient}>
             <Edit className="mr-2 h-4 w-4" />
@@ -287,291 +115,183 @@ const PatientDetailPage = () => {
           </Button>
         </div>
       </div>
-
-      <Tabs defaultValue="overview" className="space-y-6">
+      
+      <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="visits">Visits</TabsTrigger>
-          <TabsTrigger value="certificates">Certificates</TabsTrigger>
-          <TabsTrigger value="questionnaires">Questionnaires</TabsTrigger>
-          <TabsTrigger value="history">Medical History</TabsTrigger>
+          <TabsTrigger value="medical-history">Medical History</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Patient Information</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Full Name</p>
-                <p className="font-medium">{patient.first_name} {patient.last_name}</p>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Date of Birth</p>
-                <p className="font-medium">{format(new Date(patient.date_of_birth), 'PP')}</p>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Age</p>
-                <p className="font-medium">{calculateAge(patient.date_of_birth)} years</p>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Gender</p>
-                <p className="font-medium capitalize">{patient.gender || 'Unknown'}</p>
-              </div>
-              
-              {contactInfo.email && (
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{contactInfo.email}</p>
-                </div>
-              )}
-              
-              {contactInfo.phone && (
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{contactInfo.phone}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Medical Records Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Certificates of Fitness</h3>
-                  {isLoadingCertificates ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  ) : certificates && certificates.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm">{certificates.length} certificate(s) available</p>
-                      <div>
-                        <Button variant="link" size="sm" onClick={() => navigate(`/patients/${id}/records`)}>
-                          View all certificates
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No validated certificates available</p>
-                  )}
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Medical Questionnaires</h3>
-                  {isLoadingQuestionnaires ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  ) : questionnaires && questionnaires.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm">{questionnaires.length} questionnaire(s) available</p>
-                      <div>
-                        <Button variant="link" size="sm" onClick={() => navigate(`/patients/${id}/records`)}>
-                          View all questionnaires
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No questionnaires available</p>
-                  )}
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Recent Visits</h3>
-                  {medicalHistory.documents && medicalHistory.documents.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm">{medicalHistory.documents.length} document(s) from visits</p>
-                      <div>
-                        <Button variant="link" size="sm" onClick={() => navigate(`/patients/${id}/records`)}>
-                          View all visits
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No visit records available</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="visits" className="space-y-4">
-          <PatientVisits patientId={id!} organizationId={organizationId} />
-        </TabsContent>
-
-        <TabsContent value="certificates" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Certificates of Fitness</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingCertificates ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : certificates && certificates.length > 0 ? (
-                <div className="space-y-4">
-                  {certificates.map(doc => (
-                    <div key={doc.id} className="border rounded-lg p-4 hover:bg-accent transition-colors">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">{doc.file_name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Processed: {format(new Date(doc.processed_at || doc.created_at), 'PP')}
-                          </p>
-                          {doc.document_type && (
-                            <Badge variant="outline" className="mt-2">
-                              {doc.document_type.replace(/_/g, ' ')}
-                            </Badge>
-                          )}
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/documents/${doc.id}`)}
-                        >
-                          View Document
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p>No validated certificates found for this patient.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="questionnaires" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Medical Questionnaires</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingQuestionnaires ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : questionnaires && questionnaires.length > 0 ? (
-                <div className="space-y-4">
-                  {questionnaires.map(doc => (
-                    <div key={doc.id} className="border rounded-lg p-4 hover:bg-accent transition-colors">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">{doc.file_name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Completed: {format(new Date(doc.processed_at || doc.created_at), 'PP')}
-                          </p>
-                          <Badge variant="secondary" className="mt-2">
-                            Questionnaire
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/documents/${doc.id}`)}
-                        >
-                          View Document
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p>No questionnaires found for this patient.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
+        
+        <TabsContent value="overview" className="space-y-6 mt-6">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Medical Conditions</CardTitle>
+                <CardTitle>Patient Information</CardTitle>
               </CardHeader>
               <CardContent>
-                {renderConditions()}
+                <dl className="space-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Full Name</dt>
+                    <dd className="text-base flex items-center mt-1">
+                      <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                      {patient.first_name} {patient.last_name}
+                    </dd>
+                  </div>
+                  
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Date of Birth</dt>
+                    <dd className="text-base flex items-center mt-1">
+                      <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                      {patient.date_of_birth ? format(new Date(patient.date_of_birth), 'PPP') : 'Not available'}
+                      {patient.date_of_birth && ` (${calculateAge(patient.date_of_birth)} years old)`}
+                    </dd>
+                  </div>
+                  
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Gender</dt>
+                    <dd className="text-base capitalize mt-1">
+                      {patient.gender || 'Not specified'}
+                    </dd>
+                  </div>
+                </dl>
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader>
-                <CardTitle>Medications</CardTitle>
+                <CardTitle>Contact Information</CardTitle>
               </CardHeader>
               <CardContent>
-                {renderMedications()}
+                {hasContact ? (
+                  <dl className="space-y-4">
+                    {patient.contact_info?.phone && (
+                      <div>
+                        <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
+                        <dd className="text-base flex items-center mt-1">
+                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {patient.contact_info.phone}
+                        </dd>
+                      </div>
+                    )}
+                    
+                    {patient.contact_info?.email && (
+                      <div>
+                        <dt className="text-sm font-medium text-muted-foreground">Email</dt>
+                        <dd className="text-base flex items-center mt-1">
+                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {patient.contact_info.email}
+                        </dd>
+                      </div>
+                    )}
+                    
+                    {patient.contact_info?.address && (
+                      <div>
+                        <dt className="text-sm font-medium text-muted-foreground">Address</dt>
+                        <dd className="text-base mt-1">
+                          {patient.contact_info.address}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-muted-foreground">No contact information available</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Allergies</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderAllergies()}
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Common Conditions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p>Hypertension</p>
-                    <Badge variant={medicalHistory.has_hypertension ? 'success' : 'outline'}>
-                      {medicalHistory.has_hypertension ? 'Yes' : 'No'}
-                    </Badge>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Medical Records Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {patient.medical_history ? (
+                  <dl className="space-y-4">
+                    <div>
+                      <dt className="text-sm font-medium text-muted-foreground">Medical Conditions</dt>
+                      <dd className="text-base mt-1">
+                        {patient.medical_history.conditions && patient.medical_history.conditions.length > 0 ? (
+                          <ul className="list-disc pl-4">
+                            {patient.medical_history.conditions.map((condition, index) => (
+                              <li key={index}>
+                                {condition.name}
+                                {condition.diagnosed_date && ` (diagnosed: ${condition.diagnosed_date})`}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">None reported</span>
+                        )}
+                      </dd>
+                    </div>
+                    
+                    <div>
+                      <dt className="text-sm font-medium text-muted-foreground">Medications</dt>
+                      <dd className="text-base mt-1">
+                        {patient.medical_history.medications && patient.medical_history.medications.length > 0 ? (
+                          <ul className="list-disc pl-4">
+                            {patient.medical_history.medications.map((med, index) => (
+                              <li key={index}>
+                                {med.name}
+                                {med.dosage && ` (${med.dosage})`}
+                                {med.frequency && `, ${med.frequency}`}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">None reported</span>
+                        )}
+                      </dd>
+                    </div>
+                    
+                    <div>
+                      <dt className="text-sm font-medium text-muted-foreground">Allergies</dt>
+                      <dd className="text-base mt-1">
+                        {patient.medical_history.allergies && patient.medical_history.allergies.length > 0 ? (
+                          <ul className="list-disc pl-4">
+                            {patient.medical_history.allergies.map((allergy, index) => (
+                              <li key={index}>
+                                {allergy.allergen}
+                                {allergy.severity && ` (${allergy.severity})`}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">None reported</span>
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-muted-foreground">No medical history recorded</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={handleEditPatient}
+                    >
+                      <Clipboard className="mr-2 h-4 w-4" />
+                      Add Medical History
+                    </Button>
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <p>Diabetes</p>
-                    <Badge variant={medicalHistory.has_diabetes ? 'success' : 'outline'}>
-                      {medicalHistory.has_diabetes ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p>Heart Disease</p>
-                    <Badge variant={medicalHistory.has_heart_disease ? 'success' : 'outline'}>
-                      {medicalHistory.has_heart_disease ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <p>Allergies</p>
-                    <Badge variant={medicalHistory.has_allergies ? 'success' : 'outline'}>
-                      {medicalHistory.has_allergies ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-              
-              {medicalHistory.notes && (
-                <div className="mt-4 border-t pt-4">
-                  <h3 className="font-medium mb-2">Additional Notes</h3>
-                  <p className="text-sm">{medicalHistory.notes}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+            
+            <PatientCertificates patientId={id!} organizationId={organizationId} />
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="medical-history" className="mt-6">
+          <MedicalHistoryEditor 
+            patientId={id!}
+            medicalHistory={patient.medical_history || {}}
+            isNewPatient={false}
+          />
         </TabsContent>
       </Tabs>
     </div>

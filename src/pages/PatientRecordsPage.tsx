@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import PatientVisits from '@/components/PatientVisits';
+import { toast } from '@/components/ui/use-toast';
 
 interface ExtractedData {
   structured_data?: {
@@ -65,6 +65,12 @@ const PatientRecordsPage = () => {
   const { data: documents, isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['patient-documents', id, documentType, showOnlyValidated],
     queryFn: async () => {
+      console.log('Fetching documents in PatientRecordsPage with filters:', {
+        patientId: id,
+        documentType,
+        showOnlyValidated
+      });
+      
       let query = supabase
         .from('documents')
         .select('*')
@@ -89,7 +95,16 @@ const PatientRecordsPage = () => {
       
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching documents:', error);
+        throw error;
+      }
+      
+      console.log('Documents fetched in PatientRecordsPage:', data?.length, 'with filters:', {
+        documentType,
+        showOnlyValidated
+      });
+      
       return data as Document[] || [];
     },
     enabled: !!id && !!organizationId,
@@ -108,7 +123,14 @@ const PatientRecordsPage = () => {
   };
 
   const toggleValidationFilter = () => {
+    console.log('Toggling validation filter from', showOnlyValidated, 'to', !showOnlyValidated);
     setShowOnlyValidated(!showOnlyValidated);
+    toast({
+      title: showOnlyValidated ? "Showing all documents" : "Showing only validated documents",
+      description: showOnlyValidated 
+        ? "Now displaying all documents regardless of validation status" 
+        : "Now displaying only validated documents",
+    });
   };
 
   if (isLoadingPatient) {
@@ -157,7 +179,11 @@ const PatientRecordsPage = () => {
         </TabsList>
 
         <TabsContent value="visits" className="mt-4">
-          <PatientVisits patientId={id!} organizationId={organizationId} showOnlyValidated={showOnlyValidated} />
+          <PatientVisits 
+            patientId={id!} 
+            organizationId={organizationId} 
+            showOnlyValidated={showOnlyValidated} 
+          />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4">

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +42,6 @@ interface Document {
 // Group documents by date to represent visits
 const groupDocumentsByDate = (documents: Document[]) => {
   const visits = documents.reduce((acc: any, doc: Document) => {
-    // Use processed_at or created_at as visit date
     const visitDate = doc.processed_at || doc.created_at;
     const dateKey = visitDate.split('T')[0]; // Get just the date part
 
@@ -71,6 +69,8 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   const { data: documents, isLoading } = useQuery({
     queryKey: ['patient-documents', patientId, showOnlyValidated],
     queryFn: async () => {
+      console.log('Fetching documents for patient:', patientId, 'with showOnlyValidated:', showOnlyValidated);
+      
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -78,7 +78,12 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         .filter('extracted_data->patient_info->id', 'eq', patientId)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching documents:', error);
+        throw error;
+      }
+      
+      console.log('Raw documents fetched:', data?.length);
       return data as Document[] || [];
     },
     enabled: !!patientId && !!organizationId,
@@ -87,13 +92,18 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   // Filter documents based on validation status if needed
   const filteredDocuments = documents ? documents.filter(doc => {
     if (showOnlyValidated) {
-      return doc.status === 'processed' && 
-             doc.extracted_data?.structured_data?.validated === true;
+      const isValidated = doc.status === 'processed' && 
+                          doc.extracted_data?.structured_data?.validated === true;
+      console.log('Document validated check:', doc.id, doc.file_name, isValidated);
+      return isValidated;
     }
     return true;
   }) : [];
 
+  console.log('Filtered documents:', filteredDocuments.length, 'out of', documents?.length);
+  
   const visits = filteredDocuments ? groupDocumentsByDate(filteredDocuments) : [];
+  console.log('Grouped visits:', visits.length);
 
   const handleViewDocument = (documentId: string) => {
     navigate(`/documents/${documentId}`);
