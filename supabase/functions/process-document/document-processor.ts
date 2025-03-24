@@ -1,3 +1,4 @@
+
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
@@ -13,6 +14,7 @@ export async function processDocumentWithLandingAI(
   
   try {
     // Call LandingAI to process the document
+    console.log(`Sending file to LandingAI: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
     const result = await apiClient.callLandingAI(file);
     console.log("LandingAI processing completed");
     
@@ -20,6 +22,7 @@ export async function processDocumentWithLandingAI(
     let extractedData = null;
     
     if (documentType === 'template') {
+      console.log("Processing as template document");
       extractedData = processTemplateDocument(result);
     } else if (documentType === 'certificate-of-fitness') {
       extractedData = processCertificateOfFitnessData(result);
@@ -44,6 +47,7 @@ export async function processDocumentWithLandingAI(
       .eq('id', documentId);
     
     if (updateError) {
+      console.error("Error updating document record:", updateError);
       throw updateError;
     }
     
@@ -67,60 +71,74 @@ export async function processDocumentWithLandingAI(
   }
 }
 
-// Add the new processor function for templates
+// Improved template document processor with better error handling and field detection
 function processTemplateDocument(result: any): any {
   console.log("Processing template document");
   
   const formFields = [];
   
-  // Extract form fields from the AI result
-  // This will depend on the format returned by LandingAI for form documents
   try {
+    console.log("Extracted result structure:", Object.keys(result));
+    
     const content = result.text || result.document_text || '';
     const sections = result.sections || [];
     const entityMentions = result.entity_mentions || [];
+    const pageCount = result.page_count || 1;
     
-    // Process form fields from detected entities
-    entityMentions.forEach((entity: any, index: number) => {
-      if (entity.type === 'FORM_FIELD' || entity.label === 'FORM_FIELD') {
-        const fieldText = entity.text || '';
-        const isRequired = fieldText.includes('*') || false;
+    console.log(`Document has ${pageCount} pages, ${entityMentions.length} entity mentions, ${sections.length} sections`);
+    
+    // First attempt: Process form fields from detected entities
+    if (entityMentions && entityMentions.length > 0) {
+      console.log("Processing form fields from entity mentions");
+      
+      entityMentions.forEach((entity: any, index: number) => {
+        if (!entity) return;
         
-        // Try to determine field type based on context
-        let fieldType = 'text'; // Default type
-        
-        if (fieldText.toLowerCase().includes('email')) {
-          fieldType = 'email';
-        } else if (fieldText.toLowerCase().includes('phone') || fieldText.toLowerCase().includes('tel')) {
-          fieldType = 'tel';
-        } else if (fieldText.toLowerCase().includes('date') || fieldText.toLowerCase().includes('dob')) {
-          fieldType = 'date';
-        } else if (fieldText.toLowerCase().includes('number') || fieldText.toLowerCase().includes('age')) {
-          fieldType = 'number';
-        } else if (fieldText.toLowerCase().includes('checkbox') || fieldText.toLowerCase().includes('check box')) {
-          fieldType = 'checkbox';
-        } else if (fieldText.toLowerCase().includes('radio') || fieldText.toLowerCase().includes('select one')) {
-          fieldType = 'radio';
-        } else if (fieldText.toLowerCase().includes('dropdown') || fieldText.toLowerCase().includes('select')) {
-          fieldType = 'select';
-        } else if (fieldText.toLowerCase().includes('comment') || fieldText.toLowerCase().includes('description')) {
-          fieldType = 'textarea';
+        // Log entity structure for debugging
+        if (index < 3) {
+          console.log(`Entity ${index} example:`, JSON.stringify(entity).substring(0, 200) + "...");
         }
         
-        // Create a field with ID generated from the index
-        formFields.push({
-          id: `field-${index}`,
-          type: fieldType,
-          label: fieldText.replace('*', '').trim(),
-          placeholder: `Enter ${fieldText.replace('*', '').trim().toLowerCase()}`,
-          required: isRequired
-        });
-      }
-    });
+        if (entity.type === 'FORM_FIELD' || 
+            entity.label === 'FORM_FIELD' || 
+            (entity.text && (
+              entity.text.includes(':') || 
+              entity.text.includes('?') ||
+              /^\s*[A-Z][^.?!]*(:|\?)\s*$/.test(entity.text) // Text that looks like a form field
+            ))
+          ) {
+          const fieldText = entity.text || '';
+          const isRequired = fieldText.includes('*') || false;
+          
+          // Try to determine field type based on context
+          let fieldType = determineFieldType(fieldText);
+          
+          // Create a field with ID generated from the index
+          formFields.push({
+            id: `field-${index}`,
+            type: fieldType,
+            label: fieldText.replace('*', '').trim(),
+            placeholder: `Enter ${fieldText.replace('*', '').trim().toLowerCase()}`,
+            required: isRequired
+          });
+        }
+      });
+    }
     
-    // If no fields were detected but we have sections, try to create fields from sections
+    console.log(`Extracted ${formFields.length} fields from entity mentions`);
+    
+    // Second attempt: If no fields were detected from entities, try to create fields from sections
     if (formFields.length === 0 && sections.length > 0) {
+      console.log("No fields from entities, trying to extract from sections");
+      
       sections.forEach((section: any, index: number) => {
+        if (!section) return;
+        
+        // Log section structure for debugging
+        if (index < 3) {
+          console.log(`Section ${index} example:`, JSON.stringify(section).substring(0, 200) + "...");
+        }
+        
         const sectionTitle = section.title || '';
         const sectionText = section.text || '';
         
@@ -128,41 +146,190 @@ function processTemplateDocument(result: any): any {
             !sectionTitle.toLowerCase().includes('footer')) {
           formFields.push({
             id: `section-${index}`,
-            type: 'text',
+            type: determineFieldType(sectionTitle),
             label: sectionTitle.trim(),
             placeholder: `Enter ${sectionTitle.trim().toLowerCase()}`,
             required: false
           });
         }
-      });
-    }
-    
-    // If still no fields, create a few basic fields based on document content
-    if (formFields.length === 0) {
-      const lines = content.split('\n').filter(line => line.trim().length > 0);
-      
-      lines.slice(0, 10).forEach((line, index) => {
-        if (line.length > 3 && line.length < 50 && 
-            !line.toLowerCase().includes('header') && 
-            !line.toLowerCase().includes('footer')) {
-          formFields.push({
-            id: `line-${index}`,
-            type: 'text',
-            label: line.trim(),
-            placeholder: `Enter ${line.trim().toLowerCase()}`,
-            required: false
+        
+        // Also try to find potential form fields within section text
+        if (sectionText) {
+          const lines = sectionText.split('\n');
+          lines.forEach((line, lineIndex) => {
+            if (line.includes(':') || line.includes('?')) {
+              const cleanLine = line.trim();
+              if (cleanLine.length > 3 && cleanLine.length < 80) {
+                formFields.push({
+                  id: `section-${index}-line-${lineIndex}`,
+                  type: determineFieldType(cleanLine),
+                  label: cleanLine.replace(/[:?]$/, '').trim(),
+                  placeholder: `Enter information`,
+                  required: false
+                });
+              }
+            }
           });
         }
       });
     }
+    
+    console.log(`After sections processing: ${formFields.length} total fields`);
+    
+    // Third attempt: If still no fields, create from document text directly
+    if (formFields.length === 0 && content) {
+      console.log("No fields from entities or sections, trying raw text extraction");
+      
+      const lines = content.split('\n').filter(line => line.trim().length > 0);
+      let fieldsCreated = 0;
+      
+      // Limit to first 100 lines to prevent too many fields
+      lines.slice(0, 100).forEach((line, index) => {
+        // Only process lines that look like form fields (contain a colon or question mark)
+        // and aren't too short or too long
+        if ((line.includes(':') || line.includes('?')) && 
+            line.length > 3 && line.length < 80 && 
+            !line.toLowerCase().includes('header') && 
+            !line.toLowerCase().includes('footer')) {
+            
+          const cleanLine = line.trim().replace(/[:?]$/, '');
+          
+          formFields.push({
+            id: `line-${index}`,
+            type: determineFieldType(cleanLine),
+            label: cleanLine,
+            placeholder: `Enter ${cleanLine.toLowerCase()}`,
+            required: false
+          });
+          
+          fieldsCreated++;
+          
+          // Limit to a reasonable number of fields
+          if (fieldsCreated >= 30) {
+            return;
+          }
+        }
+      });
+    }
+    
+    console.log(`Final field count: ${formFields.length}`);
+    
+    // If we still don't have any fields, create a few placeholder fields
+    if (formFields.length === 0) {
+      console.log("No fields detected by any method, creating placeholder fields");
+      
+      // Add a few generic form fields as placeholders
+      formFields.push(
+        {
+          id: 'field-name',
+          type: 'text',
+          label: 'Name',
+          placeholder: 'Enter name',
+          required: true
+        },
+        {
+          id: 'field-email',
+          type: 'email',
+          label: 'Email',
+          placeholder: 'Enter email',
+          required: true
+        },
+        {
+          id: 'field-comments',
+          type: 'textarea',
+          label: 'Comments',
+          placeholder: 'Enter comments',
+          required: false
+        }
+      );
+    }
+    
+    // Ensure each field has a unique ID
+    const uniqueFields = formFields.reduce((acc: any[], field: any) => {
+      // Check if we already have a field with the same label
+      const existingField = acc.find(f => f.label === field.label);
+      if (!existingField) {
+        acc.push(field);
+      }
+      return acc;
+    }, []);
+    
+    console.log(`Returning ${uniqueFields.length} unique fields after deduplication`);
+    
+    return {
+      formFields: uniqueFields,
+      pageCount: pageCount,
+      rawResult: {
+        text: content,
+        entityCount: entityMentions.length,
+        sectionCount: sections.length
+      }
+    };
   } catch (error) {
     console.error('Error parsing template fields:', error);
+    // Return a minimal valid structure even on error
+    return {
+      formFields: formFields.length > 0 ? formFields : [
+        {
+          id: 'field-default',
+          type: 'text',
+          label: 'Default Field',
+          placeholder: 'Enter information',
+          required: false
+        }
+      ],
+      error: error.message
+    };
   }
+}
+
+// Helper function to determine the most likely field type based on the field text
+function determineFieldType(fieldText: string): string {
+  const text = fieldText.toLowerCase();
   
-  return {
-    formFields,
-    rawResult: result
-  };
+  // Email field
+  if (text.includes('email') || text.includes('e-mail')) {
+    return 'email';
+  }
+  // Phone/telephone field
+  else if (text.includes('phone') || text.includes('tel') || text.includes('mobile') || text.includes('contact number')) {
+    return 'tel';
+  }
+  // Date field
+  else if (text.includes('date') || text.includes('dob') || text.includes('birth') || 
+           text.includes('when') || text.match(/day|month|year/)) {
+    return 'date';
+  }
+  // Number field
+  else if (text.includes('number') || text.includes('age') || text.includes('quantity') || 
+           text.includes('amount') || text.includes('count') || text.includes('how many')) {
+    return 'number';
+  }
+  // Checkbox field (single)
+  else if (text.includes('checkbox') || text.includes('check box') || 
+           text.match(/\[\s*\]/) || text.includes('tick if')) {
+    return 'checkbox';
+  }
+  // Radio button field (multiple choice, single selection)
+  else if (text.includes('radio') || text.includes('select one') || 
+           text.includes('choose one') || text.includes('circle one')) {
+    return 'radio';
+  }
+  // Select/dropdown field
+  else if (text.includes('dropdown') || text.includes('select') || 
+           text.includes('choose from') || text.includes('pick from')) {
+    return 'select';
+  }
+  // Textarea for longer text
+  else if (text.includes('comment') || text.includes('description') || 
+           text.includes('details') || text.includes('explain') || 
+           text.includes('please provide') || text.includes('tell us')) {
+    return 'textarea';
+  }
+  // Default to text field
+  else {
+    return 'text';
+  }
 }
 
 // Create or update patient record from document data

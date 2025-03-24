@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,6 +72,17 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
         });
       }, 500);
       
+      // Log request details for debugging
+      console.log('Uploading document with params:', {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        documentType: 'template',
+        userId: organizationId,
+        templateName,
+        category
+      });
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
         {
@@ -83,13 +95,27 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
       
       clearInterval(progressInterval);
       
+      // Log the status and headers for debugging
+      console.log('Response status:', response.status);
+      console.log('Response status text:', response.statusText);
+      
       if (!response.ok) {
-        throw new Error(`Error uploading document: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Error response from process-document:', errorText);
+        throw new Error(`Error uploading document: ${response.statusText}. ${errorText}`);
       }
       
       setUploadProgress(95);
       
-      const result = await response.json();
+      let result;
+      try {
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Error parsing response JSON:', parseError);
+        throw new Error('Failed to parse server response. The response was not valid JSON.');
+      }
       
       const newTemplate: FormTemplate = {
         id: uuidv4(),
@@ -104,48 +130,74 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
       };
       
       if (result?.documentId) {
+        console.log('Document ID received:', result.documentId);
+        
         let attempts = 0;
-        const maxAttempts = 10;
+        const maxAttempts = 15; // Increased from 10 to allow more time for processing
         
         const checkProcessingStatus = async () => {
-          const { data, error } = await FormBuilderService.checkDocumentProcessingStatus(result.documentId);
-          
-          if (error) {
-            throw error;
+          try {
+            console.log(`Checking processing status (attempt ${attempts + 1}/${maxAttempts})...`);
+            const { data, error } = await FormBuilderService.checkDocumentProcessingStatus(result.documentId);
+            
+            if (error) {
+              console.error('Error checking document status:', error);
+              throw error;
+            }
+            
+            console.log('Processing status:', data?.status, 'Extracted data available:', !!data?.extracted_data);
+            
+            if (data?.status === 'completed' && data?.extracted_data?.formFields) {
+              console.log('Form fields found:', data.extracted_data.formFields.length);
+              newTemplate.fields = data.extracted_data.formFields;
+              return true;
+            } else if (data?.status === 'error') {
+              console.error('Processing error:', data?.processing_error);
+              throw new Error(`Document processing failed: ${data?.processing_error || 'Unknown error'}`);
+            }
+            
+            attempts++;
+            if (attempts >= maxAttempts) {
+              throw new Error('Document processing timed out');
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return false;
+          } catch (statusError) {
+            console.error('Error in checkProcessingStatus:', statusError);
+            throw statusError;
           }
-          
-          if (data?.status === 'completed' && data?.extracted_data?.formFields) {
-            newTemplate.fields = data.extracted_data.formFields;
-            return true;
-          } else if (data?.status === 'error') {
-            throw new Error('Document processing failed');
-          }
-          
-          attempts++;
-          if (attempts >= maxAttempts) {
-            throw new Error('Document processing timed out');
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return false;
         };
         
         let completed = false;
         while (!completed && attempts < maxAttempts) {
           completed = await checkProcessingStatus();
         }
+      } else {
+        console.warn('No document ID received in the response');
       }
       
       setUploadProgress(98);
-      const savedTemplate = await FormBuilderService.saveFormTemplate(newTemplate);
-      setUploadProgress(100);
       
-      onTemplateCreated(savedTemplate);
+      try {
+        console.log('Saving template with fields:', newTemplate.fields);
+        const savedTemplate = await FormBuilderService.saveFormTemplate(newTemplate);
+        console.log('Template saved successfully:', savedTemplate);
+        setUploadProgress(100);
+        onTemplateCreated(savedTemplate);
+      } catch (saveError) {
+        console.error('Error saving template:', saveError);
+        throw saveError;
+      }
     } catch (error) {
       console.error('Error creating template from document:', error);
       toast.error(error.message || 'Failed to create template from document');
+      setIsUploading(false); // Ensure uploading state is reset on error
     } finally {
-      setIsUploading(false);
+      // Reset upload state if still uploading
+      if (isUploading) {
+        setIsUploading(false);
+      }
     }
   };
   
