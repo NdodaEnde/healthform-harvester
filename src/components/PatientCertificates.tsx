@@ -80,7 +80,7 @@ const getFitnessStatusText = (document: Document) => {
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const navigate = useNavigate();
 
-  // Query validated certificates related to this patient
+  // Query certificates related to this patient - modified to include non-validated docs
   const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId],
     queryFn: async () => {
@@ -102,21 +102,30 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       console.log('Raw processed documents fetched:', data?.length);
       
-      // Now filter the documents to find those related to this patient and validated
+      // Filter based on patient name in filename to match with the patient
+      // This is a fallback method since extracted_data.patient_info.id is not populated
       const filteredDocs = (data || []).filter(doc => {
-        // Type assertion to handle the JSON type correctly
+        // First try to use the patient_info.id if available
         const extractedData = doc.extracted_data as ExtractedData | null;
-        
-        // Check if this document belongs to our patient
         const patientInfoId = extractedData?.patient_info?.id;
         
-        // Check if this document is validated
-        const isValidated = extractedData?.structured_data?.validated === true;
+        // Check if document is directly linked to patient through patient_info.id
+        if (patientInfoId === patientId) {
+          console.log('Document matched by patient_info.id:', doc.id);
+          return true;
+        }
         
-        // Debug log to help understand what's being filtered
-        console.log('Document:', doc.id, 'Patient ID:', patientInfoId, 'Is Validated:', isValidated, 'Document Type:', doc.document_type);
+        // Second approach: Try to match by patient name in the file_name
+        const patientMatch = matchPatientNameInFilename(doc.file_name, patientId);
+        if (patientMatch) {
+          console.log('Document matched by filename:', doc.id, doc.file_name);
+          return true;
+        }
+
+        // Debug log
+        console.log('Document not matched:', doc.id, 'Patient ID in doc:', patientInfoId, 'File name:', doc.file_name);
         
-        return patientInfoId === patientId && isValidated;
+        return false;
       });
       
       console.log('Certificates after filtering:', filteredDocs.length);
@@ -124,6 +133,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     },
     enabled: !!patientId && !!organizationId,
   });
+
+  // Helper function to match patient name in filename
+  const matchPatientNameInFilename = (filename: string, patientId: string): boolean => {
+    // This is a simplified approach - depending on your naming convention,
+    // you may need to adjust this logic
+    return filename.toLowerCase().includes(patientId.toLowerCase());
+  };
 
   const handleViewCertificate = (documentId: string) => {
     navigate(`/documents/${documentId}`);
@@ -161,6 +177,12 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                         {getFitnessStatusText(cert)}
                       </Badge>
                       
+                      {!cert.extracted_data?.structured_data?.validated && (
+                        <Badge variant="destructive">
+                          Not Validated
+                        </Badge>
+                      )}
+                      
                       {cert.extracted_data?.structured_data?.certification?.valid_until && (
                         <Badge variant="secondary">
                           Valid until: {cert.extracted_data.structured_data.certification.valid_until}
@@ -184,7 +206,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
             <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
             <h3 className="text-lg font-medium mb-2">No certificates found</h3>
             <p className="text-muted-foreground">
-              No validated certificates of fitness found for this patient.
+              No certificates of fitness found for this patient.
             </p>
           </div>
         )}
