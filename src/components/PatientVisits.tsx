@@ -86,11 +86,28 @@ const groupDocumentsByDate = (documents: Document[]) => {
 const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId, showOnlyValidated = false }) => {
   const navigate = useNavigate();
 
+  // Query to fetch patient details to assist with matching
+  const { data: patient } = useQuery({
+    queryKey: ['patient-details-for-visits', patientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', patientId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!patientId,
+  });
+
   // Query all documents related to this patient
   const { data: documents, isLoading } = useQuery({
-    queryKey: ['patient-visits-documents', patientId, showOnlyValidated],
+    queryKey: ['patient-visits-documents', patientId, showOnlyValidated, patient?.first_name, patient?.last_name],
     queryFn: async () => {
       console.log('Fetching documents for patient visits:', patientId);
+      console.log('Patient name for visits:', patient?.first_name, patient?.last_name);
       
       // Get all processed documents for this organization
       const { data, error } = await supabase
@@ -118,21 +135,37 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         }
         
         // Strategy 2: Patient name match in structured data
-        const patientName = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
-                          extractedData?.patient_info?.name?.toLowerCase() || '';
+        const patientName = patient ? 
+          `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
+          
+        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
+                              extractedData?.patient_info?.name?.toLowerCase() || '';
         
-        if (patientName && patientName.includes(patientId.toLowerCase())) {
+        if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
           console.log('Match by patient name in data:', doc.id);
           return true;
         }
         
-        // Strategy 3: Patient ID in filename
+        // Strategy 3: Patient name in filename (simplified)
         const fileName = doc.file_name.toLowerCase();
+        
+        if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
+          console.log('Match by first name in filename:', doc.id);
+          return true;
+        }
+        
+        if (patient?.last_name && fileName.includes(patient.last_name.toLowerCase())) {
+          console.log('Match by last name in filename:', doc.id);
+          return true;
+        }
+        
+        // Strategy 4: Patient ID in filename
         if (fileName.includes(patientId.toLowerCase())) {
           console.log('Match by patient ID in filename:', doc.id);
           return true;
         }
         
+        console.log('No match for document:', doc.id, doc.file_name);
         return false;
       });
       
@@ -145,7 +178,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       console.log('Visit documents after filtering:', docsWithReviewStatus.length);
       return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
     },
-    enabled: !!patientId && !!organizationId,
+    enabled: !!patientId && !!organizationId && !!patient,
   });
 
   // Filter documents based on review status if needed
@@ -156,9 +189,9 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     return true;
   }) : [];
 
-  console.log('Filtered visit documents:', filteredDocuments.length, 'out of', documents?.length);
+  console.log('Filtered visit documents:', filteredDocuments?.length, 'out of', documents?.length);
   
-  const visits = filteredDocuments ? groupDocumentsByDate(filteredDocuments) : [];
+  const visits = filteredDocuments?.length ? groupDocumentsByDate(filteredDocuments) : [];
   console.log('Grouped visits:', visits.length);
 
   const handleViewDocument = (documentId: string) => {
