@@ -144,16 +144,5 @@ export const FormBuilderService = {
       isPublished: data.ispublished,
       category: data.category || undefined
     };
-  },
-  
-  // New method to check document processing status
-  async checkDocumentProcessingStatus(documentId: string): Promise<{ data: any, error: any }> {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .single();
-    
-    return { data, error };
   }
 };

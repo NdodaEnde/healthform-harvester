@@ -4,339 +4,128 @@ import { processMedicalQuestionnaireData } from "./processors/medical-questionna
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
 
 // Process document with Landing AI API
-export async function processDocumentWithLandingAI(
-  file: File,
-  documentType: string | null,
-  documentId: string,
-  supabase: any,
-  templateName?: string,
-  category?: string
-): Promise<void> {
-  console.log(`Starting document processing for ${documentType}, ID: ${documentId}`);
-  
+export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
   try {
-    // Call LandingAI to process the document
-    console.log(`Sending file to LandingAI: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
+    console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
+    
+    // Call Landing AI API
     const result = await apiClient.callLandingAI(file);
-    console.log("LandingAI processing completed");
+    console.log(`Landing AI API response received for document ID: ${documentId}`);
     
-    // Process the result based on document type
-    let extractedData = null;
+    // Log the full API response for debugging
+    console.log('Raw API Response:', JSON.stringify(result, null, 2));
     
-    if (documentType === 'template') {
-      console.log("Processing as template document");
-      extractedData = processTemplateDocument(result, templateName, category);
-    } else if (documentType === 'certificate-of-fitness') {
-      extractedData = processCertificateOfFitnessData(result);
-    } else if (documentType === 'medical-questionnaire') {
-      extractedData = processMedicalQuestionnaireData(result);
+    // Process and structure the data based on document type
+    let structuredData;
+    if (documentType === 'medical-questionnaire') {
+      structuredData = processMedicalQuestionnaireData(result);
     } else {
-      // Generic document processing
-      extractedData = {
-        raw: result,
-        text: result.text || result.document_text || ''
-      };
+      structuredData = processCertificateOfFitnessData(result);
     }
     
-    // Update the document record with the extracted data
-    const { error: updateError } = await supabase
-      .from('documents')
-      .update({
-        status: 'completed',
-        processed_at: new Date().toISOString(),
-        extracted_data: extractedData
-      })
-      .eq('id', documentId);
+    console.log('Structured data extracted:', JSON.stringify(structuredData));
     
-    if (updateError) {
-      console.error("Error updating document record:", updateError);
-      throw updateError;
-    }
+    // Clean any problematic data in the structuredData
+    cleanStructuredData(structuredData);
     
-    console.log(`Document processed successfully: ${documentId}`);
-  } catch (error) {
-    console.error(`Error processing document ${documentId}:`, error);
+    // Try to update the document record multiple times if needed
+    let updateSuccess = false;
+    let attempts = 0;
     
-    // Update the document status to error
-    try {
-      await supabase
+    while (!updateSuccess && attempts < 3) {
+      attempts++;
+      
+      // Update the document record with the extracted data
+      const { data: updateData, error: updateError } = await supabase
         .from('documents')
         .update({
-          status: 'error',
-          processing_error: error.message || 'Unknown error during processing',
+          extracted_data: {
+            structured_data: structuredData,
+            raw_response: result
+          },
+          status: 'processed',
           processed_at: new Date().toISOString()
         })
-        .eq('id', documentId);
-    } catch (updateError) {
-      console.error('Error updating document status:', updateError);
-    }
-  }
-}
-
-// Improved template document processor with better error handling and field detection
-function processTemplateDocument(result: any, templateName?: string, category?: string): any {
-  console.log("Processing template document");
-  console.log("Template name:", templateName);
-  console.log("Category:", category);
-  
-  const formFields = [];
-  
-  try {
-    console.log("Extracted result structure:", Object.keys(result));
-    
-    const content = result.text || result.document_text || '';
-    const sections = result.sections || [];
-    const entityMentions = result.entity_mentions || [];
-    const pageCount = result.page_count || 1;
-    
-    console.log(`Document has ${pageCount} pages, ${entityMentions.length} entity mentions, ${sections.length} sections`);
-    
-    // First attempt: Process form fields from detected entities
-    if (entityMentions && entityMentions.length > 0) {
-      console.log("Processing form fields from entity mentions");
+        .eq('id', documentId)
+        .select();
       
-      entityMentions.forEach((entity: any, index: number) => {
-        if (!entity) return;
-        
-        // Log entity structure for debugging
-        if (index < 3) {
-          console.log(`Entity ${index} example:`, JSON.stringify(entity).substring(0, 200) + "...");
+      if (updateError) {
+        console.error(`Failed to update document with extracted data (attempt ${attempts}):`, updateError);
+        if (attempts < 3) {
+          console.log(`Retrying document update in 1 second...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          throw updateError;
         }
+      } else {
+        updateSuccess = true;
+        console.log(`Document processing completed for document ID: ${documentId}`);
+        console.log('Updated document record:', updateData);
         
-        if (entity.type === 'FORM_FIELD' || 
-            entity.label === 'FORM_FIELD' || 
-            (entity.text && (
-              entity.text.includes(':') || 
-              entity.text.includes('?') ||
-              /^\s*[A-Z][^.?!]*(:|\?)\s*$/.test(entity.text) // Text that looks like a form field
-            ))
-          ) {
-          const fieldText = entity.text || '';
-          const isRequired = fieldText.includes('*') || false;
+        // Force another update to ensure the status is set to processed
+        await supabase
+          .from('documents')
+          .update({ status: 'processed' })
+          .eq('id', documentId);
           
-          // Try to determine field type based on context
-          let fieldType = determineFieldType(fieldText);
-          
-          // Create a field with ID generated from the index
-          formFields.push({
-            id: `field-${index}`,
-            type: fieldType,
-            label: fieldText.replace('*', '').trim(),
-            placeholder: `Enter ${fieldText.replace('*', '').trim().toLowerCase()}`,
-            required: isRequired
-          });
-        }
-      });
-    }
-    
-    console.log(`Extracted ${formFields.length} fields from entity mentions`);
-    
-    // Second attempt: If no fields were detected from entities, try to create fields from sections
-    if (formFields.length === 0 && sections.length > 0) {
-      console.log("No fields from entities, trying to extract from sections");
-      
-      sections.forEach((section: any, index: number) => {
-        if (!section) return;
-        
-        // Log section structure for debugging
-        if (index < 3) {
-          console.log(`Section ${index} example:`, JSON.stringify(section).substring(0, 200) + "...");
-        }
-        
-        const sectionTitle = section.title || '';
-        const sectionText = section.text || '';
-        
-        if (sectionTitle && !sectionTitle.toLowerCase().includes('header') && 
-            !sectionTitle.toLowerCase().includes('footer')) {
-          formFields.push({
-            id: `section-${index}`,
-            type: determineFieldType(sectionTitle),
-            label: sectionTitle.trim(),
-            placeholder: `Enter ${sectionTitle.trim().toLowerCase()}`,
-            required: false
-          });
-        }
-        
-        // Also try to find potential form fields within section text
-        if (sectionText) {
-          const lines = sectionText.split('\n');
-          lines.forEach((line, lineIndex) => {
-            if (line.includes(':') || line.includes('?')) {
-              const cleanLine = line.trim();
-              if (cleanLine.length > 3 && cleanLine.length < 80) {
-                formFields.push({
-                  id: `section-${index}-line-${lineIndex}`,
-                  type: determineFieldType(cleanLine),
-                  label: cleanLine.replace(/[:?]$/, '').trim(),
-                  placeholder: `Enter information`,
-                  required: false
-                });
-              }
-            }
-          });
-        }
-      });
-    }
-    
-    console.log(`After sections processing: ${formFields.length} total fields`);
-    
-    // Third attempt: If still no fields, create from document text directly
-    if (formFields.length === 0 && content) {
-      console.log("No fields from entities or sections, trying raw text extraction");
-      
-      const lines = content.split('\n').filter(line => line.trim().length > 0);
-      let fieldsCreated = 0;
-      
-      // Limit to first 100 lines to prevent too many fields
-      lines.slice(0, 100).forEach((line, index) => {
-        // Only process lines that look like form fields (contain a colon or question mark)
-        // and aren't too short or too long
-        if ((line.includes(':') || line.includes('?')) && 
-            line.length > 3 && line.length < 80 && 
-            !line.toLowerCase().includes('header') && 
-            !line.toLowerCase().includes('footer')) {
-            
-          const cleanLine = line.trim().replace(/[:?]$/, '');
-          
-          formFields.push({
-            id: `line-${index}`,
-            type: determineFieldType(cleanLine),
-            label: cleanLine,
-            placeholder: `Enter ${cleanLine.toLowerCase()}`,
-            required: false
-          });
-          
-          fieldsCreated++;
-          
-          // Limit to a reasonable number of fields
-          if (fieldsCreated >= 30) {
-            return;
-          }
-        }
-      });
-    }
-    
-    console.log(`Final field count: ${formFields.length}`);
-    
-    // If we still don't have any fields, create a few placeholder fields
-    if (formFields.length === 0) {
-      console.log("No fields detected by any method, creating placeholder fields");
-      
-      // Add a few generic form fields as placeholders
-      formFields.push(
-        {
-          id: 'field-name',
-          type: 'text',
-          label: 'Name',
-          placeholder: 'Enter name',
-          required: true
-        },
-        {
-          id: 'field-email',
-          type: 'email',
-          label: 'Email',
-          placeholder: 'Enter email',
-          required: true
-        },
-        {
-          id: 'field-comments',
-          type: 'textarea',
-          label: 'Comments',
-          placeholder: 'Enter comments',
-          required: false
-        }
-      );
-    }
-    
-    // Ensure each field has a unique ID
-    const uniqueFields = formFields.reduce((acc: any[], field: any) => {
-      // Check if we already have a field with the same label
-      const existingField = acc.find(f => f.label === field.label);
-      if (!existingField) {
-        acc.push(field);
+        // Create or update patient record from the extracted data
+        await createOrUpdatePatientFromDocument(structuredData, documentType, updateData[0], supabase);
       }
-      return acc;
-    }, []);
+    }
     
-    console.log(`Returning ${uniqueFields.length} unique fields after deduplication`);
-    
-    return {
-      formFields: uniqueFields,
-      pageCount: pageCount,
-      templateName: templateName,
-      category: category,
-      rawResult: {
-        text: content,
-        entityCount: entityMentions.length,
-        sectionCount: sections.length
+    // Additional verification step: explicitly verify the document is marked as processed
+    for (let i = 0; i < 3; i++) {
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+        
+      if (verifyError) {
+        console.error('Error verifying document update:', verifyError);
+      } else {
+        console.log(`Verified document status is now: ${verifyData.status}`);
+        
+        if (verifyData.status !== 'processed') {
+          console.log(`Document status is not 'processed', forcing update one more time...`);
+          await supabase
+            .from('documents')
+            .update({ 
+              status: 'processed',
+              processed_at: new Date().toISOString()
+            })
+            .eq('id', documentId);
+        } else {
+          break;
+        }
       }
-    };
+      
+      // Wait before retrying verification
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
   } catch (error) {
-    console.error('Error parsing template fields:', error);
-    // Return a minimal valid structure even on error
-    return {
-      formFields: formFields.length > 0 ? formFields : [
-        {
-          id: 'field-default',
-          type: 'text',
-          label: 'Default Field',
-          placeholder: 'Enter information',
-          required: false
-        }
-      ],
-      templateName: templateName,
-      category: category,
-      error: error.message
-    };
-  }
-}
-
-// Helper function to determine the most likely field type based on the field text
-function determineFieldType(fieldText: string): string {
-  const text = fieldText.toLowerCase();
-  
-  // Email field
-  if (text.includes('email') || text.includes('e-mail')) {
-    return 'email';
-  }
-  // Phone/telephone field
-  else if (text.includes('phone') || text.includes('tel') || text.includes('mobile') || text.includes('contact number')) {
-    return 'tel';
-  }
-  // Date field
-  else if (text.includes('date') || text.includes('dob') || text.includes('birth') || 
-           text.includes('when') || text.match(/day|month|year/)) {
-    return 'date';
-  }
-  // Number field
-  else if (text.includes('number') || text.includes('age') || text.includes('quantity') || 
-           text.includes('amount') || text.includes('count') || text.includes('how many')) {
-    return 'number';
-  }
-  // Checkbox field (single)
-  else if (text.includes('checkbox') || text.includes('check box') || 
-           text.match(/\[\s*\]/) || text.includes('tick if')) {
-    return 'checkbox';
-  }
-  // Radio button field (multiple choice, single selection)
-  else if (text.includes('radio') || text.includes('select one') || 
-           text.includes('choose one') || text.includes('circle one')) {
-    return 'radio';
-  }
-  // Select/dropdown field
-  else if (text.includes('dropdown') || text.includes('select') || 
-           text.includes('choose from') || text.includes('pick from')) {
-    return 'select';
-  }
-  // Textarea for longer text
-  else if (text.includes('comment') || text.includes('description') || 
-           text.includes('details') || text.includes('explain') || 
-           text.includes('please provide') || text.includes('tell us')) {
-    return 'textarea';
-  }
-  // Default to text field
-  else {
-    return 'text';
+    console.error('Document processing error:', error);
+    
+    // Update document status to failed with error message
+    try {
+      const { data, error: updateError } = await supabase
+        .from('documents')
+        .update({
+          status: 'failed',
+          processing_error: error.message
+        })
+        .eq('id', documentId)
+        .select();
+        
+      if (updateError) {
+        console.error('Error updating document status to failed:', updateError);
+      } else {
+        console.log('Updated document status to failed:', data);
+      }
+    } catch (updateError) {
+      console.error('Error updating document status after processing failure:', updateError);
+    }
   }
 }
 
