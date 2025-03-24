@@ -1,296 +1,275 @@
 
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FormTemplate } from './FormFieldTypes';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FormBuilderService } from './FormBuilderService';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { FormTemplate } from './FormFieldTypes';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
-import { PlusCircle, FileEdit, Trash2, Eye, Calendar, Search } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { FileEdit, Eye, Plus, Trash2, Search, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 const FormTemplateList: React.FC = () => {
-  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
+  const { getEffectiveOrganizationId } = useOrganization();
+  const organizationId = getEffectiveOrganizationId();
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [templateToDelete, setTemplateToDelete] = useState<FormTemplate | null>(null);
-
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Fetch templates
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['form-templates', currentOrganization?.id],
-    queryFn: () => FormBuilderService.getFormTemplates(currentOrganization?.id || ''),
-    enabled: !!currentOrganization?.id,
+    queryKey: ['formTemplates', organizationId],
+    queryFn: () => FormBuilderService.getFormTemplates(organizationId),
+    enabled: !!organizationId,
   });
-
+  
+  // Delete template mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => FormBuilderService.deleteFormTemplate(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['form-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['formTemplates', organizationId] });
       toast.success('Template deleted successfully');
-      setTemplateToDelete(null);
     },
     onError: (error) => {
       console.error('Error deleting template:', error);
       toast.error('Failed to delete template');
     },
   });
-
+  
+  // Publish/Unpublish mutation
   const publishMutation = useMutation({
     mutationFn: ({ id, publish }: { id: string; publish: boolean }) => 
       FormBuilderService.publishFormTemplate(id, publish),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['form-templates'] });
-      toast.success('Template status updated');
+      queryClient.invalidateQueries({ queryKey: ['formTemplates', organizationId] });
+      toast.success('Template updated successfully');
     },
     onError: (error) => {
       console.error('Error updating template status:', error);
       toast.error('Failed to update template status');
     },
   });
-
+  
   const handleCreateTemplate = () => {
-    navigate('/templates/new');
+    navigate('/templates/edit/new');
   };
-
-  const handleEditTemplate = (templateId: string) => {
-    navigate(`/templates/edit/${templateId}`);
+  
+  const handleEditTemplate = (id: string) => {
+    navigate(`/templates/edit/${id}`);
   };
-
-  const handleViewTemplate = (templateId: string) => {
-    navigate(`/templates/view/${templateId}`);
+  
+  const handleViewTemplate = (id: string) => {
+    navigate(`/templates/view/${id}`);
   };
-
-  const handleDeleteConfirm = () => {
-    if (templateToDelete) {
-      deleteMutation.mutate(templateToDelete.id);
-    }
+  
+  const handleDeleteTemplate = async (id: string) => {
+    deleteMutation.mutate(id);
   };
-
-  const handlePublishToggle = (template: FormTemplate) => {
+  
+  const handlePublishToggle = async (id: string, currentStatus: boolean) => {
     publishMutation.mutate({
-      id: template.id,
-      publish: !template.isPublished
+      id,
+      publish: !currentStatus,
     });
   };
-
-  const filteredTemplates = templates.filter(template => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      template.name.toLowerCase().includes(searchLower) ||
-      (template.description || '').toLowerCase().includes(searchLower) ||
-      (template.category || '').toLowerCase().includes(searchLower)
+  
+  const filteredTemplates = templates
+    .filter(template => 
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    .filter(template => 
+      categoryFilter === 'all' || 
+      template.category === categoryFilter
+    )
+    .filter(template =>
+      statusFilter === 'all' ||
+      (statusFilter === 'published' && template.isPublished) ||
+      (statusFilter === 'draft' && !template.isPublished)
     );
-  });
 
+  // Get unique categories for filter dropdown
+  const uniqueCategories = Array.from(new Set(templates.map(t => t.category || 'Uncategorized')));
+  
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <CardTitle>Form Templates</CardTitle>
-            <CardDescription>
-              Create and manage custom form templates for your organization
-            </CardDescription>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4 sm:justify-between">
+        <div className="flex-1 max-w-md relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search templates..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+        
+        <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {uniqueCategories.map(category => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+          
           <Button onClick={handleCreateTemplate}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create Template
+            <Plus className="h-4 w-4 mr-2" />
+            New Template
           </Button>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-        ) : filteredTemplates.length > 0 ? (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTemplates.map((template) => (
-                  <TableRow key={template.id}>
-                    <TableCell className="font-medium">{template.name}</TableCell>
-                    <TableCell>{template.category || '-'}</TableCell>
-                    <TableCell>
+      ) : filteredTemplates.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTemplates.map((template) => (
+            <Card key={template.id}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg font-semibold">
+                      {template.name}
+                    </CardTitle>
+                    <div className="flex items-center mt-1 space-x-2">
                       <Badge variant={template.isPublished ? "success" : "secondary"}>
                         {template.isPublished ? 'Published' : 'Draft'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-                        {format(new Date(template.updatedAt), 'MMM d, yyyy')}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-4 w-4"
-                            >
-                              <circle cx="12" cy="12" r="1" />
-                              <circle cx="12" cy="5" r="1" />
-                              <circle cx="12" cy="19" r="1" />
-                            </svg>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleViewTemplate(template.id)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditTemplate(template.id)}>
-                            <FileEdit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePublishToggle(template)}>
-                            {template.isPublished ? (
-                              <>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="mr-2 h-4 w-4"
-                                >
-                                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                                  <path d="m9 14 2 2 4-4" />
-                                </svg>
-                                Unpublish
-                              </>
-                            ) : (
-                              <>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="mr-2 h-4 w-4"
-                                >
-                                  <path d="M9 12h6" />
-                                  <path d="M12 9v6" />
-                                  <path d="M5 12a7 7 0 0 1 7-7c3.866 0 7 3.13 7 7 0 3.866-3.134 7-7 7a7 7 0 0 1-7-7Z" />
-                                </svg>
-                                Publish
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => setTemplateToDelete(template)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="text-center py-8 border rounded-lg bg-muted/30">
-            <h3 className="text-lg font-medium mb-2">No templates found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm 
-                ? "No templates match your search criteria."
-                : "You haven't created any form templates yet."}
-            </p>
-            <Button onClick={handleCreateTemplate} variant="outline">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Your First Template
-            </Button>
-          </div>
-        )}
-      </CardContent>
-
-      <AlertDialog open={!!templateToDelete} onOpenChange={(isOpen) => !isOpen && setTemplateToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the "{templateToDelete?.name}" template and cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={handleDeleteConfirm}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
+                      {template.category && (
+                        <Badge variant="outline">
+                          {template.category}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="py-2">
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {template.description || 'No description provided'}
+                </p>
+                <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                  <span>
+                    Last updated: {format(new Date(template.updatedAt), 'PP')}
+                  </span>
+                  <span className="mx-2">•</span>
+                  <span>
+                    {template.fields.length} {template.fields.length === 1 ? 'field' : 'fields'}
+                  </span>
+                </div>
+              </CardContent>
+              <CardFooter className="pt-2 flex justify-between">
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handlePublishToggle(template.id, template.isPublished)}
+                  >
+                    {template.isPublished ? (
+                      <>
+                        <X className="h-4 w-4 mr-1" />
+                        Unpublish
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 mr-1" />
+                        Publish
+                      </>
+                    )}
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete the "{template.name}" template and cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteTemplate(template.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+                
+                <div className="flex space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewTemplate(template.id)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditTemplate(template.id)}
+                  >
+                    <FileEdit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-8 border rounded-lg bg-muted/30">
+          <h3 className="text-lg font-medium mb-2">No templates found</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchQuery || categoryFilter !== 'all' || statusFilter !== 'all'
+              ? 'Try changing your search or filters'
+              : 'Get started by creating your first form template'}
+          </p>
+          <Button onClick={handleCreateTemplate} variant="default">
+            <Plus className="mr-2 h-4 w-4" />
+            Create New Template
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 

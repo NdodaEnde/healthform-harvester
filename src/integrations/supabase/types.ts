@@ -125,6 +125,50 @@ export type Database = {
           },
         ]
       }
+      form_templates: {
+        Row: {
+          category: string | null
+          createdat: string
+          description: string | null
+          fields: Json
+          id: string
+          ispublished: boolean
+          name: string
+          organizationid: string
+          updatedat: string
+        }
+        Insert: {
+          category?: string | null
+          createdat?: string
+          description?: string | null
+          fields: Json
+          id?: string
+          ispublished?: boolean
+          name: string
+          organizationid: string
+          updatedat?: string
+        }
+        Update: {
+          category?: string | null
+          createdat?: string
+          description?: string | null
+          fields?: Json
+          id?: string
+          ispublished?: boolean
+          name?: string
+          organizationid?: string
+          updatedat?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_templates_organizationid_fkey"
+            columns: ["organizationid"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
