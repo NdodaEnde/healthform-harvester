@@ -97,7 +97,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId,
   });
 
-  // Query certificates related to this patient with enhanced matching, filtered for validated certificates only
+  // Query certificates related to this patient with enhanced matching, showing all certificates
   const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
     queryFn: async () => {
@@ -120,16 +120,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       console.log('Raw processed documents fetched:', data?.length);
       
-      // Enhanced multi-strategy matching
+      // Enhanced multi-strategy matching without validation filter
       const filteredDocs = (data || []).filter(doc => {
-        // First check if document is validated
         const extractedData = doc.extracted_data as ExtractedData | null;
-        const isValidated = extractedData?.structured_data?.validated === true;
-        
-        if (!isValidated) {
-          console.log('Skipping non-validated document:', doc.id);
-          return false; // Skip non-validated documents
-        }
         
         // Strategy 1: Direct patient ID match in patient_info
         if (extractedData?.patient_info?.id === patientId) {
@@ -219,6 +212,11 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                           Valid until: {cert.extracted_data.structured_data.certification.valid_until}
                         </Badge>
                       )}
+                      
+                      {cert.extracted_data?.structured_data?.validated 
+                        ? <Badge variant="success">Validated</Badge>
+                        : <Badge variant="warning">Not Validated</Badge>
+                      }
                     </div>
                   </div>
                   <Button
@@ -235,9 +233,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         ) : (
           <div className="text-center py-8 border rounded-lg bg-muted/30">
             <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium mb-2">No validated certificates found</h3>
+            <h3 className="text-lg font-medium mb-2">No certificates found</h3>
             <p className="text-muted-foreground">
-              No validated certificates of fitness found for this patient.
+              No certificates of fitness found for this patient.
             </p>
           </div>
         )}

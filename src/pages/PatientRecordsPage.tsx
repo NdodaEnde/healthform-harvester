@@ -237,8 +237,10 @@ const PatientRecordsPage = () => {
                             >
                               {doc.status}
                             </Badge>
-                            {doc.extracted_data?.structured_data?.validated && (
+                            {doc.extracted_data?.structured_data?.validated ? (
                               <Badge variant="success">Validated</Badge>
+                            ) : (
+                              <Badge variant="warning">Not Validated</Badge>
                             )}
                           </div>
                         </div>
