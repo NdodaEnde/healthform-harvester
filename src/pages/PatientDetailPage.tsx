@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +11,7 @@ import { PatientInfo } from '@/types/patient';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import PatientCertificates from '@/components/PatientCertificates';
+import PatientVisits from '@/components/PatientVisits';
 
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -120,6 +120,7 @@ const PatientDetailPage = () => {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="medical-history">Medical History</TabsTrigger>
+          <TabsTrigger value="visits">Visits</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -289,8 +290,16 @@ const PatientDetailPage = () => {
         <TabsContent value="medical-history" className="mt-6">
           <MedicalHistoryEditor 
             patientId={id!}
-            medicalHistory={patient.medical_history || {}}
+            initialData={patient.medical_history || {}}
             isNewPatient={false}
+          />
+        </TabsContent>
+        
+        <TabsContent value="visits" className="mt-6">
+          <PatientVisits 
+            patientId={id!} 
+            organizationId={organizationId}
+            showOnlyValidated={false} 
           />
         </TabsContent>
       </Tabs>
@@ -299,3 +308,4 @@ const PatientDetailPage = () => {
 };
 
 export default PatientDetailPage;
+

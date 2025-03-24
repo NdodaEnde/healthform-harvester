@@ -71,11 +71,11 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     queryFn: async () => {
       console.log('Fetching documents for patient:', patientId, 'with showOnlyValidated:', showOnlyValidated);
       
+      // First we get all documents for this organization
       const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('organization_id', organizationId)
-        .filter('extracted_data->patient_info->id', 'eq', patientId)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -84,7 +84,14 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       }
       
       console.log('Raw documents fetched:', data?.length);
-      return data as Document[] || [];
+      
+      // Then filter them client-side for the patient ID
+      const patientDocuments = (data || []).filter(doc => {
+        const patientInfoId = doc.extracted_data?.patient_info?.id;
+        return patientInfoId === patientId;
+      });
+      
+      return patientDocuments as Document[];
     },
     enabled: !!patientId && !!organizationId,
   });
@@ -92,10 +99,8 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   // Filter documents based on validation status if needed
   const filteredDocuments = documents ? documents.filter(doc => {
     if (showOnlyValidated) {
-      const isValidated = doc.status === 'processed' && 
-                          doc.extracted_data?.structured_data?.validated === true;
-      console.log('Document validated check:', doc.id, doc.file_name, isValidated);
-      return isValidated;
+      return doc.status === 'processed' && 
+             doc.extracted_data?.structured_data?.validated === true;
     }
     return true;
   }) : [];

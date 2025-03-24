@@ -81,19 +81,18 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
   const navigate = useNavigate();
 
   // Query validated certificates related to this patient
-  const { data: certificates, isLoading } = useQuery({
+  const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId],
     queryFn: async () => {
       console.log('Fetching certificates for patient:', patientId);
       
+      // The key fix: Use a more compatible approach for filtering JSON data
       const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('status', 'processed')
-        .filter('extracted_data->patient_info->id', 'eq', patientId)
-        .filter('extracted_data->structured_data->validated', 'eq', true)
-        .or('document_type.eq.certificate-fitness,document_type.eq.certificate_of_fitness')
+        .or(`document_type.eq.certificate-fitness,document_type.eq.certificate_of_fitness`)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -101,8 +100,15 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         throw error;
       }
       
-      console.log('Certificates fetched:', data?.length);
-      return data as Document[] || [];
+      // Filter the documents post-query to find those related to this patient and validated
+      const filteredDocs = (data || []).filter(doc => {
+        const patientInfoId = doc.extracted_data?.patient_info?.id;
+        const isValidated = doc.extracted_data?.structured_data?.validated === true;
+        return patientInfoId === patientId && isValidated;
+      });
+      
+      console.log('Certificates fetched:', filteredDocs.length);
+      return filteredDocs as Document[];
     },
     enabled: !!patientId && !!organizationId,
   });
@@ -120,6 +126,10 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         {isLoading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-4 text-destructive">
+            <p>Error loading certificates: {error instanceof Error ? error.message : 'Unknown error'}</p>
           </div>
         ) : certificates && certificates.length > 0 ? (
           <div className="space-y-4">
