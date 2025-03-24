@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, Edit, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { Json } from '@/integrations/supabase/types';
 
 interface ContactInfo {
   email?: string;
@@ -19,7 +20,7 @@ interface PatientInfo {
   last_name: string;
   date_of_birth: string;
   gender: string | null;
-  contact_info?: ContactInfo | null;
+  contact_info?: ContactInfo | Json | null;
   medical_history?: any;
   organization_id?: string;
   client_organization_id?: string | null;
@@ -67,11 +68,26 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
     return gender.charAt(0).toUpperCase() + gender.slice(1);
   };
 
-  // Get contact info with type safety
+  // Get contact info with better type safety
   const getContactInfo = (): ContactInfo => {
-    if (patient.contact_info && typeof patient.contact_info === 'object') {
+    if (!patient.contact_info) {
+      return {};
+    }
+    
+    if (typeof patient.contact_info === 'object' && patient.contact_info !== null) {
       return patient.contact_info as ContactInfo;
     }
+    
+    // If it's a string (JSON), try to parse it
+    if (typeof patient.contact_info === 'string') {
+      try {
+        return JSON.parse(patient.contact_info) as ContactInfo;
+      } catch (e) {
+        console.error("Failed to parse contact_info string:", e);
+        return {};
+      }
+    }
+    
     return {};
   };
 
