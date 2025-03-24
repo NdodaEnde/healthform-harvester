@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface PatientVisitsProps {
   patientId: string;
   organizationId: string;
+  showOnlyValidated?: boolean;
 }
 
 // Define a type for the extracted data structure
@@ -63,12 +64,12 @@ const groupDocumentsByDate = (documents: Document[]) => {
   );
 };
 
-const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId }) => {
+const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId, showOnlyValidated = false }) => {
   const navigate = useNavigate();
 
   // Query all documents related to this patient
   const { data: documents, isLoading } = useQuery({
-    queryKey: ['patient-documents', patientId],
+    queryKey: ['patient-documents', patientId, showOnlyValidated],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
@@ -83,13 +84,16 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     enabled: !!patientId && !!organizationId,
   });
 
-  // Filter documents to show only validated certificates if needed
-  const validatedDocuments = documents ? documents.filter(doc => 
-    doc.status === 'processed' && 
-    doc.extracted_data?.structured_data?.validated === true
-  ) : [];
+  // Filter documents based on validation status if needed
+  const filteredDocuments = documents ? documents.filter(doc => {
+    if (showOnlyValidated) {
+      return doc.status === 'processed' && 
+             doc.extracted_data?.structured_data?.validated === true;
+    }
+    return true;
+  }) : [];
 
-  const visits = documents ? groupDocumentsByDate(documents) : [];
+  const visits = filteredDocuments ? groupDocumentsByDate(filteredDocuments) : [];
 
   const handleViewDocument = (documentId: string) => {
     navigate(`/documents/${documentId}`);
@@ -123,7 +127,9 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
           <div className="text-center py-8 border rounded-lg bg-muted/30">
             <h3 className="text-lg font-medium mb-2">No visits recorded</h3>
             <p className="text-muted-foreground mb-4">
-              This patient doesn't have any recorded visits yet.
+              {showOnlyValidated 
+                ? "This patient doesn't have any validated visits yet."
+                : "This patient doesn't have any recorded visits yet."}
             </p>
             <Button onClick={handleCreateNewVisit} variant="outline">
               <Calendar className="mr-2 h-4 w-4" />

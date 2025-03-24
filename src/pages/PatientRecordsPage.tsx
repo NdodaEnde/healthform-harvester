@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -12,12 +13,37 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import PatientVisits from '@/components/PatientVisits';
 
+interface ExtractedData {
+  structured_data?: {
+    validated?: boolean;
+    [key: string]: any;
+  };
+  patient_info?: {
+    id?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+interface Document {
+  id: string;
+  file_name: string;
+  file_path: string;
+  status: string;
+  document_type: string | null;
+  processed_at: string | null;
+  created_at: string;
+  extracted_data: ExtractedData | null;
+  [key: string]: any;
+}
+
 const PatientRecordsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
   const [documentType, setDocumentType] = useState<string>("all");
+  const [showOnlyValidated, setShowOnlyValidated] = useState<boolean>(true);
 
   // Query patient information
   const { data: patient, isLoading: isLoadingPatient } = useQuery({
@@ -37,7 +63,7 @@ const PatientRecordsPage = () => {
 
   // Query patient documents
   const { data: documents, isLoading: isLoadingDocuments } = useQuery({
-    queryKey: ['patient-documents', id, documentType],
+    queryKey: ['patient-documents', id, documentType, showOnlyValidated],
     queryFn: async () => {
       let query = supabase
         .from('documents')
@@ -55,10 +81,16 @@ const PatientRecordsPage = () => {
         query = query.eq('document_type', documentType);
       }
       
+      // Apply validation filter if enabled
+      if (showOnlyValidated) {
+        query = query.eq('status', 'processed');
+        query = query.filter('extracted_data->structured_data->validated', 'eq', true);
+      }
+      
       const { data, error } = await query;
       
       if (error) throw error;
-      return data || [];
+      return data as Document[] || [];
     },
     enabled: !!id && !!organizationId,
   });
@@ -73,6 +105,10 @@ const PatientRecordsPage = () => {
 
   const handleViewDocument = (documentId: string) => {
     navigate(`/documents/${documentId}`);
+  };
+
+  const toggleValidationFilter = () => {
+    setShowOnlyValidated(!showOnlyValidated);
   };
 
   if (isLoadingPatient) {
@@ -121,7 +157,7 @@ const PatientRecordsPage = () => {
         </TabsList>
 
         <TabsContent value="visits" className="mt-4">
-          <PatientVisits patientId={id!} organizationId={organizationId} />
+          <PatientVisits patientId={id!} organizationId={organizationId} showOnlyValidated={showOnlyValidated} />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4">
@@ -139,6 +175,13 @@ const PatientRecordsPage = () => {
                     <SelectItem value="medical_questionnaire">Medical Questionnaires</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button 
+                  variant={showOnlyValidated ? "default" : "outline"} 
+                  size="sm"
+                  onClick={toggleValidationFilter}
+                >
+                  {showOnlyValidated ? "Showing Validated" : "Show All"}
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -168,6 +211,9 @@ const PatientRecordsPage = () => {
                             >
                               {doc.status}
                             </Badge>
+                            {doc.extracted_data?.structured_data?.validated && (
+                              <Badge variant="success">Validated</Badge>
+                            )}
                           </div>
                         </div>
                         <Button
@@ -185,7 +231,9 @@ const PatientRecordsPage = () => {
                 <div className="text-center py-8 border rounded-lg bg-background">
                   <h3 className="text-lg font-medium mb-2">No records found</h3>
                   <p className="text-muted-foreground">
-                    This patient doesn't have any {documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records yet.
+                    {showOnlyValidated 
+                      ? `No validated ${documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records found.`
+                      : `This patient doesn't have any ${documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records yet.`}
                   </p>
                 </div>
               )}

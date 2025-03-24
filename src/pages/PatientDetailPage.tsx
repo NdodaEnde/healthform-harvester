@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -14,13 +13,36 @@ import { Badge } from '@/components/ui/badge';
 import PatientVisits from '@/components/PatientVisits';
 import { MedicalHistoryData, PatientInfo } from '@/types/patient';
 
+interface ExtractedData {
+  structured_data?: {
+    validated?: boolean;
+    [key: string]: any;
+  };
+  patient_info?: {
+    id?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+interface Document {
+  id: string;
+  file_name: string;
+  file_path: string;
+  status: string;
+  document_type: string | null;
+  processed_at: string | null;
+  created_at: string;
+  extracted_data: ExtractedData | null;
+  [key: string]: any;
+}
+
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
 
-  // Query patient data
   const { data: patient, isLoading: isLoadingPatient } = useQuery({
     queryKey: ['patient', id],
     queryFn: async () => {
@@ -36,17 +58,17 @@ const PatientDetailPage = () => {
     enabled: !!id,
   });
 
-  // Query certificate data linked to this patient
   const { data: certificates, isLoading: isLoadingCertificates } = useQuery({
     queryKey: ['patient-certificates', id],
     queryFn: async () => {
-      // First get documents linked to the patient
       const { data: documents, error: docError } = await supabase
         .from('documents')
         .select('*')
         .eq('document_type', 'certificate_of_fitness')
         .eq('organization_id', organizationId)
-        .filter('extracted_data->patient_info->id', 'eq', id);
+        .eq('status', 'processed')
+        .filter('extracted_data->patient_info->id', 'eq', id)
+        .filter('extracted_data->structured_data->validated', 'eq', true);
       
       if (docError) throw docError;
       
@@ -54,12 +76,11 @@ const PatientDetailPage = () => {
         return [];
       }
       
-      return documents;
+      return documents as Document[];
     },
     enabled: !!id && !!organizationId,
   });
 
-  // Query questionnaire data
   const { data: questionnaires, isLoading: isLoadingQuestionnaires } = useQuery({
     queryKey: ['patient-questionnaires', id],
     queryFn: async () => {
@@ -76,7 +97,7 @@ const PatientDetailPage = () => {
         return [];
       }
       
-      return documents;
+      return documents as Document[];
     },
     enabled: !!id && !!organizationId,
   });
@@ -127,7 +148,6 @@ const PatientDetailPage = () => {
     return age;
   };
 
-  // Type guard to ensure contact_info is an object with expected properties
   const getContactInfo = () => {
     if (patient.contact_info && typeof patient.contact_info === 'object') {
       return patient.contact_info;
@@ -137,7 +157,6 @@ const PatientDetailPage = () => {
 
   const contactInfo = getContactInfo();
 
-  // Helper to safely access medical history data
   const getMedicalHistory = (): MedicalHistoryData => {
     if (!patient.medical_history) return {};
     if (typeof patient.medical_history === 'object') {
@@ -155,7 +174,6 @@ const PatientDetailPage = () => {
 
   const medicalHistory = getMedicalHistory();
 
-  // Function to render medical condition list
   const renderConditions = () => {
     const conditions = medicalHistory.conditions || [];
     if (conditions.length === 0) {
@@ -179,7 +197,6 @@ const PatientDetailPage = () => {
     );
   };
 
-  // Function to render medications list
   const renderMedications = () => {
     const medications = medicalHistory.medications || [];
     if (medications.length === 0) {
@@ -209,7 +226,6 @@ const PatientDetailPage = () => {
     );
   };
 
-  // Function to render allergies list
   const renderAllergies = () => {
     const allergies = medicalHistory.allergies || [];
     if (allergies.length === 0) {
@@ -343,7 +359,7 @@ const PatientDetailPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No certificates available</p>
+                    <p className="text-sm text-muted-foreground">No validated certificates available</p>
                   )}
                 </div>
                 
@@ -428,7 +444,7 @@ const PatientDetailPage = () => {
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <p>No certificates found for this patient.</p>
+                  <p>No validated certificates found for this patient.</p>
                 </div>
               )}
             </CardContent>
