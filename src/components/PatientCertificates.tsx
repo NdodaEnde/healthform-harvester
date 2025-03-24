@@ -97,7 +97,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId,
   });
 
-  // Query certificates related to this patient with enhanced matching
+  // Query certificates related to this patient with enhanced matching, filtered for validated certificates only
   const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
     queryFn: async () => {
@@ -122,10 +122,15 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       // Enhanced multi-strategy matching
       const filteredDocs = (data || []).filter(doc => {
-        const extractedData = doc.extracted_data as ExtractedData | null;
+        // First check if document is validated
+        const isValidated = doc.extracted_data?.structured_data?.validated === true;
+        
+        if (!isValidated) {
+          return false; // Skip non-validated documents
+        }
         
         // Strategy 1: Direct patient ID match in patient_info
-        if (extractedData?.patient_info?.id === patientId) {
+        if (doc.extracted_data?.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
           return true;
         }
@@ -134,8 +139,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         const patientName = patient ? 
           `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
         
-        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
-                                extractedData?.patient_info?.name?.toLowerCase() || '';
+        const patientNameInData = doc.extracted_data?.structured_data?.patient?.name?.toLowerCase() || 
+                                doc.extracted_data?.patient_info?.name?.toLowerCase() || '';
         
         if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
           console.log('Match by patient name in data:', doc.id);
@@ -207,12 +212,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                         {getFitnessStatusText(cert)}
                       </Badge>
                       
-                      {!cert.extracted_data?.structured_data?.validated && (
-                        <Badge variant="destructive">
-                          Not Validated
-                        </Badge>
-                      )}
-                      
                       {cert.extracted_data?.structured_data?.certification?.valid_until && (
                         <Badge variant="secondary">
                           Valid until: {cert.extracted_data.structured_data.certification.valid_until}
@@ -234,9 +233,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         ) : (
           <div className="text-center py-8 border rounded-lg bg-muted/30">
             <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium mb-2">No certificates found</h3>
+            <h3 className="text-lg font-medium mb-2">No validated certificates found</h3>
             <p className="text-muted-foreground">
-              No certificates of fitness found for this patient.
+              No validated certificates of fitness found for this patient.
             </p>
           </div>
         )}
