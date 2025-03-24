@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,10 @@ interface PatientVisitsProps {
 interface ExtractedData {
   structured_data?: {
     validated?: boolean;
+    certification?: {
+      examination_date?: string;
+      [key: string]: any;
+    };
     [key: string]: any;
   };
   patient_info?: {
@@ -39,10 +44,26 @@ interface Document {
   [key: string]: any;
 }
 
+type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+
+// Helper function to get document review status from localStorage
+const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
+  return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
+};
+
 // Group documents by date to represent visits
 const groupDocumentsByDate = (documents: Document[]) => {
   const visits = documents.reduce((acc: any, doc: Document) => {
-    const visitDate = doc.processed_at || doc.created_at;
+    // Try to get examination date from certificate first
+    let visitDate = null;
+    
+    if (doc.extracted_data?.structured_data?.certification?.examination_date) {
+      visitDate = doc.extracted_data.structured_data.certification.examination_date;
+    } else {
+      // Fall back to processed or created date
+      visitDate = doc.processed_at || doc.created_at;
+    }
+    
     const dateKey = visitDate.split('T')[0]; // Get just the date part
 
     if (!acc[dateKey]) {
@@ -67,47 +88,75 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
 
   // Query all documents related to this patient
   const { data: documents, isLoading } = useQuery({
-    queryKey: ['patient-documents', patientId, showOnlyValidated],
+    queryKey: ['patient-visits-documents', patientId, showOnlyValidated],
     queryFn: async () => {
-      console.log('Fetching documents for patient:', patientId, 'with showOnlyValidated:', showOnlyValidated);
+      console.log('Fetching documents for patient visits:', patientId);
       
-      // First we get all documents for this organization
+      // Get all processed documents for this organization
       const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('organization_id', organizationId)
+        .eq('status', 'processed')
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching documents:', error);
+        console.error('Error fetching visit documents:', error);
         throw error;
       }
       
-      console.log('Raw documents fetched:', data?.length);
+      console.log('Raw documents fetched for visits:', data?.length);
       
-      // Then filter them client-side for the patient ID
-      const patientDocuments = (data || []).filter(doc => {
-        // Type assertion to handle the JSON type correctly
+      // Enhanced multi-strategy matching like in PatientCertificates
+      const filteredDocs = (data || []).filter(doc => {
         const extractedData = doc.extracted_data as ExtractedData | null;
-        const patientInfoId = extractedData?.patient_info?.id;
-        return patientInfoId === patientId;
+        
+        // Strategy 1: Direct patient ID match in patient_info
+        if (extractedData?.patient_info?.id === patientId) {
+          console.log('Match by patient_info.id:', doc.id);
+          return true;
+        }
+        
+        // Strategy 2: Patient name match in structured data
+        const patientName = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
+                          extractedData?.patient_info?.name?.toLowerCase() || '';
+        
+        if (patientName && patientName.includes(patientId.toLowerCase())) {
+          console.log('Match by patient name in data:', doc.id);
+          return true;
+        }
+        
+        // Strategy 3: Patient ID in filename
+        const fileName = doc.file_name.toLowerCase();
+        if (fileName.includes(patientId.toLowerCase())) {
+          console.log('Match by patient ID in filename:', doc.id);
+          return true;
+        }
+        
+        return false;
       });
       
-      return patientDocuments as Document[];
+      // Add review status from localStorage to each document
+      const docsWithReviewStatus = filteredDocs.map(doc => ({
+        ...doc,
+        reviewStatus: getDocumentReviewStatus(doc.id)
+      }));
+      
+      console.log('Visit documents after filtering:', docsWithReviewStatus.length);
+      return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
     },
     enabled: !!patientId && !!organizationId,
   });
 
-  // Filter documents based on validation status if needed
+  // Filter documents based on review status if needed
   const filteredDocuments = documents ? documents.filter(doc => {
     if (showOnlyValidated) {
-      return doc.status === 'processed' && 
-             (doc.extracted_data as ExtractedData)?.structured_data?.validated === true;
+      return doc.reviewStatus === 'reviewed';
     }
     return true;
   }) : [];
 
-  console.log('Filtered documents:', filteredDocuments.length, 'out of', documents?.length);
+  console.log('Filtered visit documents:', filteredDocuments.length, 'out of', documents?.length);
   
   const visits = filteredDocuments ? groupDocumentsByDate(filteredDocuments) : [];
   console.log('Grouped visits:', visits.length);
@@ -145,7 +194,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
             <h3 className="text-lg font-medium mb-2">No visits recorded</h3>
             <p className="text-muted-foreground mb-4">
               {showOnlyValidated 
-                ? "This patient doesn't have any validated visits yet."
+                ? "This patient doesn't have any reviewed visits yet."
                 : "This patient doesn't have any recorded visits yet."}
             </p>
             <Button onClick={handleCreateNewVisit} variant="outline">
@@ -181,8 +230,12 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                             <Badge variant={doc.status === 'processed' ? 'success' : 'warning'} className="capitalize">
                               {doc.status}
                             </Badge>
-                            {(doc.extracted_data as ExtractedData)?.structured_data?.validated && (
-                              <Badge variant="success">Validated</Badge>
+                            {doc.reviewStatus === 'reviewed' ? (
+                              <Badge variant="success">Reviewed</Badge>
+                            ) : doc.reviewStatus === 'needs-correction' ? (
+                              <Badge variant="destructive">Needs Correction</Badge>
+                            ) : (
+                              <Badge variant="outline">Not Reviewed</Badge>
                             )}
                           </div>
                         </div>
