@@ -8,7 +8,9 @@ export async function processDocumentWithLandingAI(
   file: File,
   documentType: string | null,
   documentId: string,
-  supabase: any
+  supabase: any,
+  templateName?: string,
+  category?: string
 ): Promise<void> {
   console.log(`Starting document processing for ${documentType}, ID: ${documentId}`);
   
@@ -23,7 +25,7 @@ export async function processDocumentWithLandingAI(
     
     if (documentType === 'template') {
       console.log("Processing as template document");
-      extractedData = processTemplateDocument(result);
+      extractedData = processTemplateDocument(result, templateName, category);
     } else if (documentType === 'certificate-of-fitness') {
       extractedData = processCertificateOfFitnessData(result);
     } else if (documentType === 'medical-questionnaire') {
@@ -72,8 +74,10 @@ export async function processDocumentWithLandingAI(
 }
 
 // Improved template document processor with better error handling and field detection
-function processTemplateDocument(result: any): any {
+function processTemplateDocument(result: any, templateName?: string, category?: string): any {
   console.log("Processing template document");
+  console.log("Template name:", templateName);
+  console.log("Category:", category);
   
   const formFields = [];
   
@@ -259,6 +263,8 @@ function processTemplateDocument(result: any): any {
     return {
       formFields: uniqueFields,
       pageCount: pageCount,
+      templateName: templateName,
+      category: category,
       rawResult: {
         text: content,
         entityCount: entityMentions.length,
@@ -278,6 +284,8 @@ function processTemplateDocument(result: any): any {
           required: false
         }
       ],
+      templateName: templateName,
+      category: category,
       error: error.message
     };
   }

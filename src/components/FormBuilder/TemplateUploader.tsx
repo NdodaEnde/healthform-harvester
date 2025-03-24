@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { FileText, FileImage, Upload, Loader2 } from 'lucide-react';
-import { FormTemplate } from './FormFieldTypes';
+import { FormTemplate, FormField, FieldType } from './FormFieldTypes';
 import { v4 as uuidv4 } from 'uuid';
 import { FormBuilderService } from './FormBuilderService';
 
@@ -185,7 +186,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
             
             if (data?.status === 'completed' && data?.extracted_data?.formFields) {
               console.log('Form fields found:', data.extracted_data.formFields.length);
-              newTemplate.fields = data.extracted_data.formFields;
+              newTemplate.fields = ensureValidFieldTypes(data.extracted_data.formFields);
               return true;
             } else if (data?.status === 'error') {
               console.error('Processing error:', data?.processing_error);
@@ -249,7 +250,34 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ onTemplateCreated }
     }
   };
   
-  const generateBasicFields = () => {
+  // Helper function to ensure field types match the FieldType union
+  const ensureValidFieldTypes = (fields: any[]): FormField[] => {
+    const validTypes: FieldType[] = [
+      'text', 'textarea', 'number', 'select', 'multiselect', 
+      'checkbox', 'date', 'email', 'tel', 'radio'
+    ];
+    
+    return fields.map(field => {
+      // Create a new field object with validated type
+      const validField: FormField = {
+        id: field.id || `field-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        // Check if the type is valid, if not default to 'text'
+        type: validTypes.includes(field.type as FieldType) ? field.type as FieldType : 'text',
+        label: field.label || 'Unnamed Field',
+        placeholder: field.placeholder || `Enter ${field.label || 'information'}`,
+        required: !!field.required,
+      };
+      
+      // Copy other properties if they exist
+      if (field.defaultValue !== undefined) validField.defaultValue = field.defaultValue;
+      if (field.options) validField.options = field.options;
+      if (field.validation) validField.validation = field.validation;
+      
+      return validField;
+    });
+  };
+  
+  const generateBasicFields = (): FormField[] => {
     return [
       {
         id: `field-name-${Date.now()}`,

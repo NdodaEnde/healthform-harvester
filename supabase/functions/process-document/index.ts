@@ -30,7 +30,7 @@ serve(async (req) => {
     const templateName = formData.get('templateName');
     const category = formData.get('category');
 
-    console.log(`Received request: file=${file ? (file as File).name : 'none'}, type=${documentType}, userId=${userId}`);
+    console.log(`Received request: file=${file ? (file as File).name : 'none'}, type=${documentType}, userId=${userId}, templateName=${templateName}, category=${category}`);
 
     if (!file) {
       console.error("No file uploaded");
@@ -106,8 +106,15 @@ serve(async (req) => {
     const documentId = documentData.id;
     console.log(`Starting background processing for document ID: ${documentId}`);
     
-    // Start background task for document processing without modifying any of its functionality
-    const processingPromise = processDocumentWithLandingAI(file as File, documentType as string, documentId, supabase);
+    // Start background task for document processing with the new parameters
+    const processingPromise = processDocumentWithLandingAI(
+      file as File, 
+      documentType as string, 
+      documentId, 
+      supabase,
+      templateName as string,
+      category as string
+    );
     
     try {
       // @ts-ignore - Deno specific API
