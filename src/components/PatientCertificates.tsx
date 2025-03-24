@@ -35,6 +35,7 @@ interface ExtractedData {
   };
   patient_info?: {
     id?: string;
+    name?: string;
     [key: string]: any;
   };
   [key: string]: any;
@@ -80,13 +81,30 @@ const getFitnessStatusText = (document: Document) => {
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const navigate = useNavigate();
 
-  // Query certificates related to this patient - modified to include non-validated docs
+  // Query to fetch patient details to assist with matching
+  const { data: patient } = useQuery({
+    queryKey: ['patient-details', patientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', patientId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!patientId,
+  });
+
+  // Query certificates related to this patient with enhanced matching
   const { data: certificates, isLoading, error } = useQuery({
-    queryKey: ['patient-certificates', patientId],
+    queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
     queryFn: async () => {
       console.log('Fetching certificates for patient:', patientId);
+      console.log('Patient name:', patient?.first_name, patient?.last_name);
       
-      // Get all processed documents
+      // Get all processed documents of certificate types
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -102,44 +120,56 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       console.log('Raw processed documents fetched:', data?.length);
       
-      // Filter based on patient name in filename to match with the patient
-      // This is a fallback method since extracted_data.patient_info.id is not populated
+      // Enhanced multi-strategy matching
       const filteredDocs = (data || []).filter(doc => {
-        // First try to use the patient_info.id if available
         const extractedData = doc.extracted_data as ExtractedData | null;
-        const patientInfoId = extractedData?.patient_info?.id;
         
-        // Check if document is directly linked to patient through patient_info.id
-        if (patientInfoId === patientId) {
-          console.log('Document matched by patient_info.id:', doc.id);
+        // Strategy 1: Direct patient ID match in patient_info
+        if (extractedData?.patient_info?.id === patientId) {
+          console.log('Match by patient_info.id:', doc.id);
           return true;
         }
         
-        // Second approach: Try to match by patient name in the file_name
-        const patientMatch = matchPatientNameInFilename(doc.file_name, patientId);
-        if (patientMatch) {
-          console.log('Document matched by filename:', doc.id, doc.file_name);
+        // Strategy 2: Patient name match in structured data
+        const patientName = patient ? 
+          `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
+        
+        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
+                                extractedData?.patient_info?.name?.toLowerCase() || '';
+        
+        if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
+          console.log('Match by patient name in data:', doc.id);
           return true;
         }
-
-        // Debug log
-        console.log('Document not matched:', doc.id, 'Patient ID in doc:', patientInfoId, 'File name:', doc.file_name);
         
+        // Strategy 3: Patient name in filename (simplified)
+        const fileName = doc.file_name.toLowerCase();
+        
+        if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
+          console.log('Match by first name in filename:', doc.id);
+          return true;
+        }
+        
+        if (patient?.last_name && fileName.includes(patient.last_name.toLowerCase())) {
+          console.log('Match by last name in filename:', doc.id);
+          return true;
+        }
+        
+        // Strategy 4: Patient ID in filename
+        if (fileName.includes(patientId.toLowerCase())) {
+          console.log('Match by patient ID in filename:', doc.id);
+          return true;
+        }
+        
+        console.log('No match for document:', doc.id, doc.file_name);
         return false;
       });
       
       console.log('Certificates after filtering:', filteredDocs.length);
       return filteredDocs as Document[];
     },
-    enabled: !!patientId && !!organizationId,
+    enabled: !!patientId && !!organizationId && !!patient,
   });
-
-  // Helper function to match patient name in filename
-  const matchPatientNameInFilename = (filename: string, patientId: string): boolean => {
-    // This is a simplified approach - depending on your naming convention,
-    // you may need to adjust this logic
-    return filename.toLowerCase().includes(patientId.toLowerCase());
-  };
 
   const handleViewCertificate = (documentId: string) => {
     navigate(`/documents/${documentId}`);
