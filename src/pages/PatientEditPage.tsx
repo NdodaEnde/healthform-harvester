@@ -12,6 +12,20 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
+interface ContactInfo {
+  email: string;
+  phone: string;
+  [key: string]: string;
+}
+
+interface PatientFormState {
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  contact_info: ContactInfo;
+}
+
 const PatientEditPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -19,7 +33,7 @@ const PatientEditPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
 
-  const [formState, setFormState] = useState({
+  const [formState, setFormState] = useState<PatientFormState>({
     first_name: '',
     last_name: '',
     date_of_birth: '',
@@ -42,6 +56,12 @@ const PatientEditPage = () => {
       
       if (error) throw error;
       
+      // Initialize default contact_info if it doesn't exist
+      const contactInfo: ContactInfo = 
+        (data.contact_info && typeof data.contact_info === 'object') 
+          ? data.contact_info as ContactInfo 
+          : { email: '', phone: '' };
+      
       // Update form state with existing patient data
       setFormState({
         first_name: data.first_name || '',
@@ -49,8 +69,8 @@ const PatientEditPage = () => {
         date_of_birth: data.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : '',
         gender: data.gender || '',
         contact_info: {
-          email: data.contact_info?.email || '',
-          phone: data.contact_info?.phone || ''
+          email: contactInfo.email || '',
+          phone: contactInfo.phone || ''
         }
       });
       
@@ -61,7 +81,7 @@ const PatientEditPage = () => {
 
   // Update patient mutation
   const { mutate, isPending } = useMutation({
-    mutationFn: async (patientData: typeof formState) => {
+    mutationFn: async (patientData: PatientFormState) => {
       const { error } = await supabase
         .from('patients')
         .update({

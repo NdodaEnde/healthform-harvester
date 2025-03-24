@@ -7,13 +7,19 @@ import { Eye, Edit, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
+interface ContactInfo {
+  email?: string;
+  phone?: string;
+  [key: string]: any;
+}
+
 interface PatientInfo {
   id: string;
   first_name: string;
   last_name: string;
   date_of_birth: string;
   gender: string | null;
-  contact_info?: any;
+  contact_info?: ContactInfo | null;
   medical_history?: any;
   organization_id?: string;
   client_organization_id?: string | null;
@@ -61,6 +67,16 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
     return gender.charAt(0).toUpperCase() + gender.slice(1);
   };
 
+  // Get contact info with type safety
+  const getContactInfo = (): ContactInfo => {
+    if (patient.contact_info && typeof patient.contact_info === 'object') {
+      return patient.contact_info as ContactInfo;
+    }
+    return {};
+  };
+
+  const contactInfo = getContactInfo();
+
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b">
@@ -82,16 +98,16 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
             <span className="font-medium">Date of Birth:</span>
             <span>{format(new Date(patient.date_of_birth), 'PP')}</span>
           </div>
-          {patient.contact_info?.email && (
+          {contactInfo.email && (
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Email:</span>
-              <span className="truncate max-w-[180px]">{patient.contact_info.email}</span>
+              <span className="truncate max-w-[180px]">{contactInfo.email}</span>
             </div>
           )}
-          {patient.contact_info?.phone && (
+          {contactInfo.phone && (
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Phone:</span>
-              <span>{patient.contact_info.phone}</span>
+              <span>{contactInfo.phone}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">

@@ -12,6 +12,15 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
+interface ContactInfo {
+  email?: string;
+  phone?: string;
+  company?: string;
+  occupation?: string;
+  address?: string;
+  [key: string]: any;
+}
+
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -103,6 +112,16 @@ const PatientDetailPage = () => {
     return age;
   };
 
+  // Type guard to ensure contact_info is an object with expected properties
+  const getContactInfo = (): ContactInfo => {
+    if (patient.contact_info && typeof patient.contact_info === 'object') {
+      return patient.contact_info as ContactInfo;
+    }
+    return {};
+  };
+
+  const contactInfo = getContactInfo();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2 sm:flex-row sm:justify-between sm:items-center">
@@ -165,17 +184,17 @@ const PatientDetailPage = () => {
                 <p className="font-medium capitalize">{patient.gender || 'Unknown'}</p>
               </div>
               
-              {patient.contact_info?.email && (
+              {contactInfo.email && (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{patient.contact_info.email}</p>
+                  <p className="font-medium">{contactInfo.email}</p>
                 </div>
               )}
               
-              {patient.contact_info?.phone && (
+              {contactInfo.phone && (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{patient.contact_info.phone}</p>
+                  <p className="font-medium">{contactInfo.phone}</p>
                 </div>
               )}
             </CardContent>
