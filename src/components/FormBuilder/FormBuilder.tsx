@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { FormField, FormTemplate, FieldType } from './FormFieldTypes';
