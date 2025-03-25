@@ -1,825 +1,519 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/components/ui/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { 
   fetchCertificateTemplates, 
   createCertificateTemplate, 
-  updateCertificateTemplate,
+  updateCertificateTemplate, 
   deleteCertificateTemplate,
   setDefaultTemplate,
   CertificateTemplate
 } from '@/services/certificateTemplateService';
-import { PlusCircle, Edit, Trash2, CheckCircle } from 'lucide-react';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from '@/components/ui/use-toast';
+import { Trash, Edit, Plus, Star, StarOff } from 'lucide-react';
 
-// Schema for template form
-const templateSchema = z.object({
-  name: z.string().min(1, "Template name is required"),
-  template_data: z.object({
-    header: z.string().optional(),
-    footer: z.string().optional(),
-    logo_position: z.enum(["left", "center", "right"]).default("left"),
-    primary_color: z.string().default("#0f172a"),
-    secondary_color: z.string().default("#64748b"),
-    font: z.enum(["default", "serif", "sans-serif", "monospace"]).default("default"),
-    include_signature: z.boolean().default(true),
-    include_date: z.boolean().default(true),
-    include_organization_details: z.boolean().default(true),
-    custom_css: z.string().optional(),
-  }),
-  is_default: z.boolean().default(false)
-});
-
-type TemplateFormValues = z.infer<typeof templateSchema>;
-
-export default function CertificateTemplatesPage() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+const CertificateTemplatesPage = () => {
   const { currentOrganization } = useOrganization();
-  const organizationId = currentOrganization?.id;
+  const queryClient = useQueryClient();
+  const orgId = currentOrganization?.id || '';
   
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
-
-  const form = useForm<TemplateFormValues>({
-    resolver: zodResolver(templateSchema),
-    defaultValues: {
-      name: "",
-      template_data: {
-        header: "",
-        footer: "",
-        logo_position: "left",
-        primary_color: "#0f172a",
-        secondary_color: "#64748b",
-        font: "default",
-        include_signature: true,
-        include_date: true,
-        include_organization_details: true,
-        custom_css: ""
-      },
-      is_default: false
-    }
+  // Template form state
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [currentTemplate, setCurrentTemplate] = useState<CertificateTemplate | null>(null);
+  const [templateName, setTemplateName] = useState('');
+  const [headerText, setHeaderText] = useState('Medical Certificate');
+  const [footerText, setFooterText] = useState('');
+  const [logoPosition, setLogoPosition] = useState<'left' | 'center' | 'right'>('center');
+  const [primaryColor, setPrimaryColor] = useState('#0f172a');
+  const [secondaryColor, setSecondaryColor] = useState('#64748b');
+  const [includeSignature, setIncludeSignature] = useState(true);
+  const [includeOrgDetails, setIncludeOrgDetails] = useState(true);
+  const [font, setFont] = useState('default');
+  const [isDefault, setIsDefault] = useState(false);
+  
+  // Query templates
+  const { data: templates, isLoading } = useQuery({
+    queryKey: ['certificate-templates', orgId],
+    queryFn: () => fetchCertificateTemplates(orgId),
+    enabled: !!orgId,
   });
-
-  // Query to fetch templates
-  const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['certificateTemplates', organizationId],
-    queryFn: () => fetchCertificateTemplates(organizationId || ''),
-    enabled: !!organizationId,
-  });
-
-  // Mutation to create template
+  
+  // Mutations
   const createMutation = useMutation({
-    mutationFn: (template: Omit<CertificateTemplate, "id" | "created_at" | "updated_at">) => 
-      createCertificateTemplate(template),
+    mutationFn: createCertificateTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['certificateTemplates', organizationId] });
-      setIsCreateOpen(false);
-      form.reset();
-    }
+      queryClient.invalidateQueries({ queryKey: ['certificate-templates', orgId] });
+      resetForm();
+      setIsCreateDialogOpen(false);
+    },
   });
-
-  // Mutation to update template
+  
   const updateMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string, updates: Partial<Omit<CertificateTemplate, "id" | "created_at" | "updated_at">> }) =>
-      updateCertificateTemplate(id, updates),
+    mutationFn: updateCertificateTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['certificateTemplates', organizationId] });
-      setEditingTemplate(null);
-      form.reset();
-    }
+      queryClient.invalidateQueries({ queryKey: ['certificate-templates', orgId] });
+      resetForm();
+      setIsEditDialogOpen(false);
+    },
   });
-
-  // Mutation to delete template
+  
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteCertificateTemplate(id),
+    mutationFn: deleteCertificateTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['certificateTemplates', organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['certificate-templates', orgId] });
       toast({
-        title: "Template deleted",
-        description: "The certificate template has been deleted."
+        title: "Template Deleted",
+        description: "Certificate template has been deleted.",
       });
-    }
+    },
   });
-
-  // Mutation to set default template
+  
   const setDefaultMutation = useMutation({
-    mutationFn: (templateId: string) => setDefaultTemplate(templateId, organizationId || ''),
+    mutationFn: ({ templateId, orgId }: { templateId: string; orgId: string }) => 
+      setDefaultTemplate(templateId, orgId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['certificateTemplates', organizationId] });
-      toast({
-        title: "Default template updated",
-        description: "The default certificate template has been updated."
-      });
-    }
+      queryClient.invalidateQueries({ queryKey: ['certificate-templates', orgId] });
+    },
   });
-
-  const handleCreateSubmit = (data: TemplateFormValues) => {
-    if (!organizationId) return;
-    
-    createMutation.mutate({
-      ...data,
-      organization_id: organizationId
-    });
+  
+  // Form handlers
+  const resetForm = () => {
+    setTemplateName('');
+    setHeaderText('Medical Certificate');
+    setFooterText('');
+    setLogoPosition('center');
+    setPrimaryColor('#0f172a');
+    setSecondaryColor('#64748b');
+    setIncludeSignature(true);
+    setIncludeOrgDetails(true);
+    setFont('default');
+    setIsDefault(false);
+    setCurrentTemplate(null);
   };
-
-  const handleUpdateSubmit = (data: TemplateFormValues) => {
-    if (!editingTemplate) return;
+  
+  const handleEditTemplate = (template: CertificateTemplate) => {
+    setCurrentTemplate(template);
+    setTemplateName(template.name);
+    setHeaderText(template.template_data.header || 'Medical Certificate');
+    setFooterText(template.template_data.footer || '');
+    setLogoPosition(template.template_data.logo_position || 'center');
+    setPrimaryColor(template.template_data.primary_color || '#0f172a');
+    setSecondaryColor(template.template_data.secondary_color || '#64748b');
+    setIncludeSignature(template.template_data.include_signature !== false);
+    setIncludeOrgDetails(template.template_data.include_organization_details !== false);
+    setFont(template.template_data.font || 'default');
+    setIsDefault(template.is_default || false);
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleCreateTemplate = () => {
+    if (!orgId) return;
+    
+    const templateData = {
+      name: templateName,
+      organization_id: orgId,
+      is_default: isDefault,
+      template_data: {
+        header: headerText,
+        footer: footerText,
+        logo_position: logoPosition,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        include_signature: includeSignature,
+        include_organization_details: includeOrgDetails,
+        font: font,
+      },
+    };
+    
+    createMutation.mutate(templateData as CertificateTemplate);
+  };
+  
+  const handleUpdateTemplate = () => {
+    if (!currentTemplate) return;
+    
+    const templateData = {
+      name: templateName,
+      is_default: isDefault,
+      template_data: {
+        header: headerText,
+        footer: footerText,
+        logo_position: logoPosition,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        include_signature: includeSignature,
+        include_organization_details: includeOrgDetails,
+        font: font,
+      },
+    };
     
     updateMutation.mutate({
-      id: editingTemplate.id,
-      updates: data
+      id: currentTemplate.id,
+      ...templateData,
     });
   };
-
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this template?")) {
+  
+  const handleDeleteTemplate = (id: string) => {
+    if (confirm('Are you sure you want to delete this template?')) {
       deleteMutation.mutate(id);
     }
   };
-
-  const handleSetDefault = (id: string) => {
-    setDefaultMutation.mutate(id);
+  
+  const handleSetDefault = (templateId: string) => {
+    if (!orgId) return;
+    setDefaultMutation.mutate({ templateId, orgId });
   };
-
-  const openEditDialog = (template: CertificateTemplate) => {
-    setEditingTemplate(template);
-    form.reset({
-      name: template.name,
-      template_data: template.template_data,
-      is_default: template.is_default
-    });
-  };
-
-  const closeDialogs = () => {
-    setIsCreateOpen(false);
-    setEditingTemplate(null);
-    form.reset();
-  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container py-8">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Certificate Templates</h1>
-          <p className="text-muted-foreground">
-            Create and manage your organization's certificate templates.
-          </p>
+          <h1 className="text-3xl font-bold">Certificate Templates</h1>
+          <p className="text-muted-foreground">Create and manage certificate templates for your organization.</p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Template
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      ) : templates.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <h3 className="text-lg font-medium mb-2">No templates found</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              You haven't created any certificate templates yet. Create your first template to start generating branded certificates.
-            </p>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
               Create Template
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {templates.map((template) => (
-            <Card key={template.id} className={template.is_default ? "border-primary" : ""}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="truncate">{template.name}</span>
-                  {template.is_default && (
-                    <span className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">Default</span>
-                  )}
-                </CardTitle>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create Certificate Template</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div>
+                <label htmlFor="name" className="text-sm font-medium">Template Name</label>
+                <input
+                  id="name"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="header" className="text-sm font-medium">Header Text</label>
+                <input
+                  id="header"
+                  value={headerText}
+                  onChange={(e) => setHeaderText(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label htmlFor="footer" className="text-sm font-medium">Footer Text</label>
+                <input
+                  id="footer"
+                  value={footerText}
+                  onChange={(e) => setFooterText(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="primaryColor" className="text-sm font-medium">Primary Color</label>
+                  <input
+                    id="primaryColor"
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-full mt-1 h-10"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="secondaryColor" className="text-sm font-medium">Secondary Color</label>
+                  <input
+                    id="secondaryColor"
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="w-full mt-1 h-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="logoPosition" className="text-sm font-medium">Logo Position</label>
+                <select
+                  id="logoPosition"
+                  value={logoPosition}
+                  onChange={(e) => setLogoPosition(e.target.value as 'left' | 'center' | 'right')}
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="font" className="text-sm font-medium">Font</label>
+                <select
+                  id="font"
+                  value={font}
+                  onChange={(e) => setFont(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="default">Default (System Font)</option>
+                  <option value="serif">Serif</option>
+                  <option value="sans-serif">Sans Serif</option>
+                  <option value="monospace">Monospace</option>
+                </select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  id="includeSignature"
+                  type="checkbox"
+                  checked={includeSignature}
+                  onChange={(e) => setIncludeSignature(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="includeSignature" className="text-sm font-medium">Include Signature Line</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  id="includeOrgDetails"
+                  type="checkbox"
+                  checked={includeOrgDetails}
+                  onChange={(e) => setIncludeOrgDetails(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="includeOrgDetails" className="text-sm font-medium">Include Organization Details</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isDefault"
+                  type="checkbox"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="isDefault" className="text-sm font-medium">Set as Default Template</label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateTemplate} disabled={!templateName}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Certificate Template</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div>
+                <label htmlFor="edit-name" className="text-sm font-medium">Template Name</label>
+                <input
+                  id="edit-name"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-header" className="text-sm font-medium">Header Text</label>
+                <input
+                  id="edit-header"
+                  value={headerText}
+                  onChange={(e) => setHeaderText(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-footer" className="text-sm font-medium">Footer Text</label>
+                <input
+                  id="edit-footer"
+                  value={footerText}
+                  onChange={(e) => setFooterText(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-primaryColor" className="text-sm font-medium">Primary Color</label>
+                  <input
+                    id="edit-primaryColor"
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-full mt-1 h-10"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-secondaryColor" className="text-sm font-medium">Secondary Color</label>
+                  <input
+                    id="edit-secondaryColor"
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="w-full mt-1 h-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="edit-logoPosition" className="text-sm font-medium">Logo Position</label>
+                <select
+                  id="edit-logoPosition"
+                  value={logoPosition}
+                  onChange={(e) => setLogoPosition(e.target.value as 'left' | 'center' | 'right')}
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="edit-font" className="text-sm font-medium">Font</label>
+                <select
+                  id="edit-font"
+                  value={font}
+                  onChange={(e) => setFont(e.target.value)}
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="default">Default (System Font)</option>
+                  <option value="serif">Serif</option>
+                  <option value="sans-serif">Sans Serif</option>
+                  <option value="monospace">Monospace</option>
+                </select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  id="edit-includeSignature"
+                  type="checkbox"
+                  checked={includeSignature}
+                  onChange={(e) => setIncludeSignature(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="edit-includeSignature" className="text-sm font-medium">Include Signature Line</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  id="edit-includeOrgDetails"
+                  type="checkbox"
+                  checked={includeOrgDetails}
+                  onChange={(e) => setIncludeOrgDetails(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="edit-includeOrgDetails" className="text-sm font-medium">Include Organization Details</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  id="edit-isDefault"
+                  type="checkbox"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="edit-isDefault" className="text-sm font-medium">Set as Default Template</label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateTemplate} disabled={!templateName}>Update</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {templates && templates.length > 0 ? (
+          templates.map((template) => (
+            <Card key={template.id} className={template.is_default ? 'border-primary' : ''}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg">{template.name}</CardTitle>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditTemplate(template)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">Edit</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                      className="h-8 w-8 p-0 text-destructive"
+                    >
+                      <Trash className="h-4 w-4" />
+                      <span className="sr-only">Delete</span>
+                    </Button>
+                    {!template.is_default && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSetDefault(template.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <StarOff className="h-4 w-4" />
+                        <span className="sr-only">Set as Default</span>
+                      </Button>
+                    )}
+                    {template.is_default && (
+                      <div className="h-8 w-8 flex items-center justify-center">
+                        <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <CardDescription>
-                  Created: {new Date(template.created_at).toLocaleDateString()}
+                  {template.is_default && <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full mr-2">Default</span>}
+                  Last updated: {new Date(template.updated_at).toLocaleDateString()}
                 </CardDescription>
               </CardHeader>
-              <CardFooter className="flex justify-between">
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="icon" onClick={() => openEditDialog(template)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => handleDelete(template.id)}
-                    disabled={template.is_default}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+              <CardContent className="pb-4">
+                <div className="text-sm">
+                  <div className="mb-2">
+                    <span className="font-medium">Header:</span> {template.template_data.header || 'Medical Certificate'}
+                  </div>
+                  <div className="flex space-x-2 mb-2">
+                    <div className="h-4 w-4 rounded-full" style={{ backgroundColor: template.template_data.primary_color || '#0f172a' }} />
+                    <div className="h-4 w-4 rounded-full" style={{ backgroundColor: template.template_data.secondary_color || '#64748b' }} />
+                    <span className="text-xs">Colors</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 text-xs">
+                    <span className="bg-gray-100 px-2 py-1 rounded-full">
+                      Logo: {template.template_data.logo_position || 'center'}
+                    </span>
+                    <span className="bg-gray-100 px-2 py-1 rounded-full">
+                      Font: {template.template_data.font || 'default'}
+                    </span>
+                  </div>
                 </div>
-                {!template.is_default && (
-                  <Button 
-                    variant="secondary" 
-                    onClick={() => handleSetDefault(template.id)}
-                    className="ml-auto"
-                  >
-                    Set as Default
-                  </Button>
-                )}
-              </CardFooter>
+              </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Create Template Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Create Certificate Template</DialogTitle>
-            <DialogDescription>
-              Create a new template for your certificates. This will determine how your certificates look when generated.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleCreateSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Template Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="E.g., Standard Certificate" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <Tabs defaultValue="design">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="design">Design</TabsTrigger>
-                  <TabsTrigger value="content">Content</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="design" className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="template_data.logo_position"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Logo Position</FormLabel>
-                        <select
-                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          {...field}
-                        >
-                          <option value="left">Left</option>
-                          <option value="center">Center</option>
-                          <option value="right">Right</option>
-                        </select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="template_data.primary_color"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Primary Color</FormLabel>
-                          <div className="flex">
-                            <FormControl>
-                              <Input type="color" {...field} />
-                            </FormControl>
-                            <Input 
-                              type="text" 
-                              value={field.value} 
-                              onChange={field.onChange}
-                              className="ml-2 flex-1"
-                            />
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="template_data.secondary_color"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Secondary Color</FormLabel>
-                          <div className="flex">
-                            <FormControl>
-                              <Input type="color" {...field} />
-                            </FormControl>
-                            <Input 
-                              type="text" 
-                              value={field.value} 
-                              onChange={field.onChange}
-                              className="ml-2 flex-1"
-                            />
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="template_data.font"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Font</FormLabel>
-                        <select
-                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          {...field}
-                        >
-                          <option value="default">Default</option>
-                          <option value="serif">Serif</option>
-                          <option value="sans-serif">Sans Serif</option>
-                          <option value="monospace">Monospace</option>
-                        </select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="template_data.custom_css"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Custom CSS (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder=".certificate { ... }"
-                            className="h-20 font-mono"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Add custom CSS for advanced styling.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="content" className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="template_data.header"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Text (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Certificate of Achievement"
-                            className="h-20"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Text to display at the top of the certificate.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="template_data.footer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Footer Text (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Valid for one year from date of issue."
-                            className="h-20"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Text to display at the bottom of the certificate.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="template_data.include_signature"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel>Include Signature</FormLabel>
-                            <FormDescription>
-                              Display a signature line on the certificate.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="template_data.include_date"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel>Include Date</FormLabel>
-                            <FormDescription>
-                              Display the issue date on the certificate.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="template_data.include_organization_details"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel>Include Organization Details</FormLabel>
-                            <FormDescription>
-                              Display your organization's details on the certificate.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
-              
-              <FormField
-                control={form.control}
-                name="is_default"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Set as Default Template
-                      </FormLabel>
-                      <FormDescription>
-                        This template will be used by default when generating certificates.
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={closeDialogs}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Creating..." : "Create Template"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Template Dialog */}
-      <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Edit Certificate Template</DialogTitle>
-            <DialogDescription>
-              Update your certificate template settings.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleUpdateSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Template Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="E.g., Standard Certificate" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <Tabs defaultValue="design">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="design">Design</TabsTrigger>
-                  <TabsTrigger value="content">Content</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="design" className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="template_data.logo_position"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Logo Position</FormLabel>
-                        <select
-                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          {...field}
-                        >
-                          <option value="left">Left</option>
-                          <option value="center">Center</option>
-                          <option value="right">Right</option>
-                        </select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="template_data.primary_color"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Primary Color</FormLabel>
-                          <div className="flex">
-                            <FormControl>
-                              <Input type="color" {...field} />
-                            </FormControl>
-                            <Input 
-                              type="text" 
-                              value={field.value} 
-                              onChange={field.onChange}
-                              className="ml-2 flex-1"
-                            />
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="template_data.secondary_color"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Secondary Color</FormLabel>
-                          <div className="flex">
-                            <FormControl>
-                              <Input type="color" {...field} />
-                            </FormControl>
-                            <Input 
-                              type="text" 
-                              value={field.value} 
-                              onChange={field.onChange}
-                              className="ml-2 flex-1"
-                            />
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="template_data.font"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Font</FormLabel>
-                        <select
-                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          {...field}
-                        >
-                          <option value="default">Default</option>
-                          <option value="serif">Serif</option>
-                          <option value="sans-serif">Sans Serif</option>
-                          <option value="monospace">Monospace</option>
-                        </select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="template_data.custom_css"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Custom CSS (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder=".certificate { ... }"
-                            className="h-20 font-mono"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Add custom CSS for advanced styling.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="content" className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="template_data.header"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Text (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Certificate of Achievement"
-                            className="h-20"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Text to display at the top of the certificate.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="template_data.footer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Footer Text (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Valid for one year from date of issue."
-                            className="h-20"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Text to display at the bottom of the certificate.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="template_data.include_signature"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel>Include Signature</FormLabel>
-                            <FormDescription>
-                              Display a signature line on the certificate.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="template_data.include_date"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel>Include Date</FormLabel>
-                            <FormDescription>
-                              Display the issue date on the certificate.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="template_data.include_organization_details"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel>Include Organization Details</FormLabel>
-                            <FormDescription>
-                              Display your organization's details on the certificate.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
-              
-              <FormField
-                control={form.control}
-                name="is_default"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={editingTemplate?.is_default}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Set as Default Template
-                      </FormLabel>
-                      <FormDescription>
-                        {editingTemplate?.is_default 
-                          ? "This is already set as the default template."
-                          : "This template will be used by default when generating certificates."}
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={closeDialogs}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? "Updating..." : "Update Template"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+          ))
+        ) : (
+          <div className="col-span-3 text-center py-12">
+            <p className="text-muted-foreground mb-4">No certificate templates found. Create your first template to get started.</p>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Template
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default CertificateTemplatesPage;

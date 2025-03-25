@@ -1,136 +1,99 @@
 
 import React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { Menu } from 'lucide-react';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import ClientSwitcher from './ClientSwitcher';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { NotificationsDropdown } from './NotificationsDropdown';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMobileMenu } from '@/hooks/use-mobile';
+import NotificationsDropdown from './NotificationsDropdown';
 
 const HeaderComponent = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user, profile, isAuthenticated, isLoading, signOut } = useAuth();
+  const auth = useAuth();
+  const { isOpen, toggle } = useMobileMenu();
   const { 
-    currentOrganization, 
-    isServiceProvider, 
-    loading: orgLoading 
+    currentOrganization,
+    isServiceProvider
   } = useOrganization();
+  
+  // Extract these from the auth context with proper fallbacks
+  const isAuthenticated = !!auth.session;
+  const isLoading = auth.isLoading || false;
+  const profile = auth.user || null;
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      navigate('/auth');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const userInitials = profile?.full_name
-    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
-    : user?.email
-      ? user.email.charAt(0).toUpperCase()
-      : '?';
-
-  const isPublicRoute = ['/auth', '/', '/reset-password', '/update-password', '/accept-invite'].includes(location.pathname);
-
-  if (isLoading || orgLoading) {
+  if (isLoading) {
     return (
-      <header className="border-b h-16 flex items-center px-6 sticky top-0 z-50 w-full bg-white dark:bg-gray-950">
-        <div className="h-5 w-5 rounded-full animate-pulse bg-gray-200 dark:bg-gray-800" />
-      </header>
-    );
-  }
-
-  // For public routes, show a simplified header
-  if (isPublicRoute) {
-    return (
-      <header className="border-b h-16 flex items-center justify-between px-6 sticky top-0 z-50 w-full bg-white dark:bg-gray-950">
-        <div className="flex-1">
-          <Link to="/" className="font-semibold text-lg">MediCert</Link>
-        </div>
-        <div>
-          {isAuthenticated ? (
-            <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-              Dashboard
-            </Button>
-          ) : (
-            <Button variant="ghost" onClick={() => navigate('/auth')}>
-              Sign In
-            </Button>
-          )}
+      <header className="border-b bg-background">
+        <div className="container mx-auto p-4 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <Link to="/" className="text-xl font-bold">Medical Portal</Link>
+          </div>
+          <div className="animate-pulse h-10 w-24 bg-gray-200 rounded"></div>
         </div>
       </header>
     );
   }
 
   return (
-    <header className="border-b h-16 flex items-center justify-between px-6 sticky top-0 z-50 w-full bg-white dark:bg-gray-950">
-      <div className="flex flex-1 items-center">
-        <Link to="/" className="font-semibold text-lg mr-6">MediCert</Link>
-        
-        {isAuthenticated && currentOrganization && (
-          <div className="hidden md:flex items-center space-x-4">
-            <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
-              Dashboard
-            </Link>
-            <Link to="/patients" className="text-sm font-medium transition-colors hover:text-primary">
-              Patients
-            </Link>
-          </div>
-        )}
-      </div>
-      
-      {isAuthenticated && (
+    <header className="border-b bg-background">
+      <div className="container mx-auto p-4 flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          {isServiceProvider() && <ClientSwitcher />}
-          <OrganizationSwitcher />
-          <NotificationsDropdown />
+          {isAuthenticated && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden mr-2" 
+              onClick={toggle}
+            >
+              <Menu />
+              <span className="sr-only">Toggle menu</span>
+            </Button>
+          )}
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name || 'User'} />
-                  <AvatarFallback>{userInitials}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{profile?.full_name || 'User'}</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => navigate('/settings/organization')}>
-                Organization Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate('/settings/certificate-templates')}>
-                Certificate Templates
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleSignOut}>
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Link to="/" className="text-xl font-bold">Medical Portal</Link>
+          
+          {isAuthenticated && currentOrganization && (
+            <div className="hidden md:flex items-center space-x-2">
+              <OrganizationSwitcher />
+              {isServiceProvider() && <ClientSwitcher />}
+            </div>
+          )}
         </div>
-      )}
+        
+        <div className="flex items-center space-x-2">
+          {isAuthenticated ? (
+            <>
+              <div className="hidden md:block">
+                <NotificationsDropdown />
+              </div>
+              
+              <div className="flex items-center space-x-1">
+                <span className="text-sm font-medium hidden md:inline-block">
+                  {profile?.email ? profile.email.split('@')[0] : 'User'}
+                </span>
+                
+                <Link to="/dashboard">
+                  <Button variant="outline" size="sm">Dashboard</Button>
+                </Link>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => auth.signOut()}
+                >
+                  Sign Out
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Link to="/auth">
+              <Button>Sign In</Button>
+            </Link>
+          )}
+        </div>
+      </div>
     </header>
   );
 };

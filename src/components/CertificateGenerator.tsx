@@ -1,182 +1,147 @@
 
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { CalendarIcon, Download, Mail } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useToast } from '@/components/ui/use-toast';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { fetchCertificateTemplates, CertificateTemplate } from '@/services/certificateTemplateService';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchCertificateTemplates } from '@/services/certificateTemplateService';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/use-toast';
 
-interface CertificateGeneratorProps {
-  patientId: string;
-  initialData?: any;
+interface PatientData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  birthdate: string;
+  email?: string;
+  // Add other patient fields as needed
 }
 
-export default function CertificateGenerator({ patientId, initialData }: CertificateGeneratorProps) {
-  const { toast } = useToast();
+interface CertificateGeneratorProps {
+  patient: PatientData;
+  onClose?: () => void;
+}
+
+const CertificateGenerator: React.FC<CertificateGeneratorProps> = ({ patient, onClose }) => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { currentOrganization } = useOrganization();
-  const organizationId = currentOrganization?.id;
+  const orgId = currentOrganization?.id || '';
   
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
-  const [templateData, setTemplateData] = useState<CertificateTemplate | null>(null);
-  const [expirationDate, setExpirationDate] = useState<Date | undefined>(
-    initialData?.expiration_date ? new Date(initialData.expiration_date) : undefined
-  );
-  const [certificateId, setCertificateId] = useState<string | null>(null);
-  const [certificateData, setCertificateData] = useState<any>(initialData || {});
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [fitnessStatement, setFitnessStatement] = useState('Patient is fit for all activities with no restrictions.');
+  const [restrictions, setRestrictions] = useState<string[]>([]);
+  const [newRestriction, setNewRestriction] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const [emailData, setEmailData] = useState({
-    recipientEmail: '',
-    subject: 'Your Medical Certificate',
-    message: 'Please find your medical certificate attached.',
-    ccMe: false
-  });
-  const [isSending, setIsSending] = useState(false);
-  
-  // Query patient data
-  const { data: patient } = useQuery({
-    queryKey: ['patient', patientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('id', patientId)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!patientId,
-  });
   
   // Query templates
-  const { data: templates = [] } = useQuery({
-    queryKey: ['certificateTemplates', organizationId],
-    queryFn: () => fetchCertificateTemplates(organizationId || ''),
-    enabled: !!organizationId,
+  const { data: templates, isLoading: templatesLoading } = useQuery({
+    queryKey: ['certificate-templates', orgId],
+    queryFn: () => fetchCertificateTemplates(orgId),
+    enabled: !!orgId,
   });
   
-  // Set default template when templates load
-  useEffect(() => {
-    if (templates.length > 0) {
+  // Get default template
+  React.useEffect(() => {
+    if (templates && templates.length > 0) {
       const defaultTemplate = templates.find(t => t.is_default);
       if (defaultTemplate) {
-        setSelectedTemplate(defaultTemplate.id);
-        setTemplateData(defaultTemplate);
+        setSelectedTemplateId(defaultTemplate.id);
       } else {
-        setSelectedTemplate(templates[0].id);
-        setTemplateData(templates[0]);
+        setSelectedTemplateId(templates[0].id);
       }
     }
   }, [templates]);
   
-  // Update template data when selection changes
-  useEffect(() => {
-    if (selectedTemplate && templates.length > 0) {
-      const template = templates.find(t => t.id === selectedTemplate);
-      if (template) {
-        setTemplateData(template);
+  // Handle adding restrictions
+  const addRestriction = () => {
+    if (newRestriction.trim()) {
+      setRestrictions([...restrictions, newRestriction.trim()]);
+      setNewRestriction('');
+    }
+  };
+  
+  const removeRestriction = (index: number) => {
+    setRestrictions(restrictions.filter((_, i) => i !== index));
+  };
+  
+  // Create certificate mutation
+  const createCertificateMutation = useMutation({
+    mutationFn: async (certificateData: any) => {
+      const { data, error } = await supabase
+        .from('certificates')
+        .insert(certificateData)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['patient-certificates', patient.id] });
+      toast({
+        title: "Certificate Created",
+        description: "Medical certificate has been successfully generated.",
+      });
+      
+      // If patient has an email, suggest sending the certificate
+      if (patient.email) {
+        if (confirm(`Would you like to email this certificate to ${patient.email}?`)) {
+          navigate(`/certificates/${data.id}`);
+        }
       }
-    }
-  }, [selectedTemplate, templates]);
-  
-  // Update email data when patient data changes
-  useEffect(() => {
-    if (patient?.contact_info?.email) {
-      setEmailData(prev => ({ ...prev, recipientEmail: patient.contact_info.email }));
-    }
-  }, [patient]);
-  
-  const handleGenerateCertificate = async () => {
-    if (!organizationId || !patientId || !selectedTemplate) {
+      
+      if (onClose) {
+        onClose();
+      } else {
+        navigate(`/certificates/${data.id}`);
+      }
+    },
+    onError: (error) => {
+      console.error("Error creating certificate:", error);
       toast({
         title: "Error",
-        description: "Missing required information to generate certificate",
+        description: "Failed to generate certificate. Please try again.",
         variant: "destructive",
       });
-      return;
-    }
+    },
+  });
+  
+  const generateCertificate = async () => {
+    if (!currentOrganization || !patient) return;
     
     setIsGenerating(true);
     
     try {
-      // Create certificate data combining patient info, template, and other details
-      const newCertificateData = {
+      const certificateData = {
+        template_id: selectedTemplateId || null,
         patient_info: {
-          id: patientId,
-          first_name: patient?.first_name,
-          last_name: patient?.last_name,
-          birthdate: patient?.date_of_birth,
-          // Include other patient data as needed
+          id: patient.id,
+          first_name: patient.first_name,
+          last_name: patient.last_name,
+          birthdate: patient.birthdate,
         },
-        organization_id: organizationId,
-        template_id: selectedTemplate,
-        expiration_date: expirationDate?.toISOString(),
-        // Add other certificate fields
-        ...certificateData
+        company_info: {
+          name: currentOrganization.name,
+          logo_url: currentOrganization.logo_url,
+        },
+        fitness_declaration: {
+          statement: fitnessStatement,
+        },
+        restrictions: restrictions.length > 0 ? restrictions : null,
+        expiration_date: expirationDate ? new Date(expirationDate).toISOString() : null,
+        created_by: (await supabase.auth.getUser()).data.user?.id,
+        organization_id: orgId,
       };
       
-      // Save certificate to database
-      const { data, error } = await supabase
-        .from('certificates')
-        .upsert({
-          id: certificateId || undefined,
-          patient_info: newCertificateData.patient_info,
-          company_info: {
-            organization_id: organizationId,
-            name: currentOrganization?.name,
-            logo_url: currentOrganization?.logo_url,
-          },
-          document_id: certificateData.document_id || null,
-          expiration_date: expirationDate?.toISOString(),
-          updated_at: new Date().toISOString(),
-          validated: true,
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Store the certificate ID
-      setCertificateId(data.id);
-      
-      // If expiration date is set, also create an expiration record
-      if (expirationDate) {
-        await supabase
-          .from('certificate_expirations')
-          .upsert({
-            certificate_id: data.id,
-            patient_id: patientId,
-            organization_id: organizationId,
-            expires_at: expirationDate.toISOString(),
-          }, {
-            onConflict: 'certificate_id'
-          });
-      }
-      
-      toast({
-        title: "Success",
-        description: certificateId ? "Certificate updated successfully" : "Certificate generated successfully",
-      });
-      
-    } catch (error: any) {
-      console.error("Error generating certificate:", error);
+      createCertificateMutation.mutate(certificateData);
+    } catch (error) {
+      console.error("Error in certificate generation:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to generate certificate",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -184,246 +149,122 @@ export default function CertificateGenerator({ patientId, initialData }: Certifi
     }
   };
   
-  const handleSendEmail = async () => {
-    if (!certificateId || !emailData.recipientEmail) {
-      toast({
-        title: "Error",
-        description: "Please generate a certificate first and provide a recipient email",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSending(true);
-    
-    try {
-      // Send email using the Edge Function
-      const { data, error } = await supabase.functions.invoke("send-certificate", {
-        body: {
-          certificateId,
-          recipientEmail: emailData.recipientEmail,
-          organizationId,
-          subject: emailData.subject,
-          message: emailData.message,
-          ccSender: emailData.ccMe,
-        },
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Certificate sent successfully",
-      });
-      
-      setIsEmailDialogOpen(false);
-    } catch (error: any) {
-      console.error("Error sending certificate:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send certificate",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
+  if (templatesLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
   
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>Generate Certificate</CardTitle>
+        <CardTitle>Generate Medical Certificate</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="template">Certificate Template</Label>
-            <Select
-              value={selectedTemplate}
-              onValueChange={setSelectedTemplate}
-              disabled={templates.length === 0}
+            <label htmlFor="template" className="block text-sm font-medium mb-1">Certificate Template</label>
+            <select
+              id="template"
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="w-full p-2 border rounded-md"
+              disabled={!templates || templates.length === 0}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a template" />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name} {template.is_default && " (Default)"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {templates.length === 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                No templates available. Please create a template first.
+              {!templates || templates.length === 0 ? (
+                <option value="">No templates available</option>
+              ) : (
+                templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} {template.is_default ? '(Default)' : ''}
+                  </option>
+                ))
+              )}
+            </select>
+            {(!templates || templates.length === 0) && (
+              <p className="text-sm text-amber-600 mt-1">
+                No certificate templates found. Consider creating templates in settings.
               </p>
             )}
           </div>
           
           <div>
-            <Label htmlFor="expiration">Expiration Date (Optional)</Label>
-            <div className="flex w-full max-w-sm items-center space-x-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !expirationDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {expirationDate ? format(expirationDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={expirationDate}
-                    onSelect={setExpirationDate}
-                    initialFocus
-                    disabled={(date) => date < new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
-              {expirationDate && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setExpirationDate(undefined)}
-                >
-                  ✕
-                </Button>
-              )}
-            </div>
+            <label htmlFor="fitnessStatement" className="block text-sm font-medium mb-1">Fitness Declaration</label>
+            <textarea
+              id="fitnessStatement"
+              value={fitnessStatement}
+              onChange={(e) => setFitnessStatement(e.target.value)}
+              className="w-full p-2 border rounded-md min-h-[100px]"
+              placeholder="Enter fitness declaration statement"
+            />
           </div>
-        </div>
-        
-        <div className="flex flex-col space-y-2">
-          <Button 
-            onClick={handleGenerateCertificate} 
-            disabled={!selectedTemplate || isGenerating}
-            className="w-full"
-          >
-            {isGenerating ? "Generating..." : (certificateId ? "Update Certificate" : "Generate Certificate")}
-          </Button>
           
-          {certificateId && (
-            <div className="flex space-x-2 pt-2">
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => window.open(`/certificates/${certificateId}`, '_blank')}
+          <div>
+            <label htmlFor="restrictions" className="block text-sm font-medium mb-1">Restrictions (if any)</label>
+            <div className="flex mb-2">
+              <input
+                id="restrictions"
+                type="text"
+                value={newRestriction}
+                onChange={(e) => setNewRestriction(e.target.value)}
+                className="flex-1 p-2 border rounded-l-md"
+                placeholder="Add a restriction"
+                onKeyPress={(e) => e.key === 'Enter' && addRestriction()}
+              />
+              <button
+                type="button"
+                onClick={addRestriction}
+                className="px-4 bg-primary text-white rounded-r-md"
+                disabled={!newRestriction.trim()}
               >
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-              
-              <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1">
-                    <Mail className="mr-2 h-4 w-4" />
-                    Email Certificate
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Send Certificate</DialogTitle>
-                    <DialogDescription>
-                      Send the certificate to the patient or other recipients.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Recipient Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={emailData.recipientEmail}
-                        onChange={(e) => setEmailData({ ...emailData, recipientEmail: e.target.value })}
-                        placeholder="patient@example.com"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="subject">Subject</Label>
-                      <Input
-                        id="subject"
-                        value={emailData.subject}
-                        onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="message">Message</Label>
-                      <Textarea
-                        id="message"
-                        value={emailData.message}
-                        onChange={(e) => setEmailData({ ...emailData, message: e.target.value })}
-                        rows={4}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="ccMe"
-                        checked={emailData.ccMe}
-                        onCheckedChange={(checked) => 
-                          setEmailData({ ...emailData, ccMe: checked === true })
-                        }
-                      />
-                      <label
-                        htmlFor="ccMe"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Send me a copy
-                      </label>
-                    </div>
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setIsEmailDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      type="button" 
-                      onClick={handleSendEmail}
-                      disabled={!emailData.recipientEmail || isSending}
-                    >
-                      {isSending ? "Sending..." : "Send Certificate"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                Add
+              </button>
             </div>
-          )}
-        </div>
-        
-        {templates.length === 0 && (
-          <div className="rounded-md bg-yellow-50 p-4 mt-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <span className="h-5 w-5 text-yellow-400">⚠️</span>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">No templates available</h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>
-                    You need to create at least one certificate template to generate certificates.
-                    Visit the Certificate Templates page in Settings to create one.
-                  </p>
-                </div>
-              </div>
-            </div>
+            {restrictions.length > 0 && (
+              <ul className="space-y-1 mt-2">
+                {restrictions.map((restriction, index) => (
+                  <li key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <span>{restriction}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeRestriction(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      &times;
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        )}
+          
+          <div>
+            <label htmlFor="expirationDate" className="block text-sm font-medium mb-1">Expiration Date (optional)</label>
+            <input
+              id="expirationDate"
+              type="date"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              className="w-full p-2 border rounded-md"
+              min={new Date().toISOString().split('T')[0]}
+            />
+          </div>
+        </div>
       </CardContent>
+      <CardFooter className="flex justify-end space-x-2">
+        {onClose && (
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        )}
+        <Button onClick={generateCertificate} disabled={isGenerating || !fitnessStatement.trim()}>
+          {isGenerating ? 'Generating...' : 'Generate Certificate'}
+        </Button>
+      </CardFooter>
     </Card>
   );
-}
+};
+
+export default CertificateGenerator;

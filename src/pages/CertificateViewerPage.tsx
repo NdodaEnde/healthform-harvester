@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,15 +71,15 @@ const CertificateViewerPage = () => {
   
   // Handle printing
   const handlePrint = useReactToPrint({
-    content: () => printRef.current,
     documentTitle: `Certificate-${certificate?.id?.substring(0, 8)}`,
+    content: () => printRef.current,
   });
 
   // Email certificate handling
-  const [recipientEmail, setRecipientEmail] = React.useState('');
-  const [emailSubject, setEmailSubject] = React.useState('Your Medical Certificate');
-  const [emailMessage, setEmailMessage] = React.useState('Please find your medical certificate attached.');
-  const [isSending, setIsSending] = React.useState(false);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [emailSubject, setEmailSubject] = useState('Your Medical Certificate');
+  const [emailMessage, setEmailMessage] = useState('Please find your medical certificate attached.');
+  const [isSending, setIsSending] = useState(false);
 
   const sendCertificate = async () => {
     if (!certificate || !id || !currentOrganization?.id) return;
@@ -87,7 +87,7 @@ const CertificateViewerPage = () => {
     setIsSending(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('send-certificate', {
+      const { error } = await supabase.functions.invoke('send-certificate', {
         body: {
           certificateId: id,
           recipientEmail,
@@ -162,7 +162,7 @@ const CertificateViewerPage = () => {
         </Button>
         
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handlePrint}>
+          <Button variant="outline" onClick={() => handlePrint()}>
             <Download className="mr-2 h-4 w-4" />
             Download
           </Button>
