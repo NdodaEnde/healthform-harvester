@@ -9,6 +9,36 @@ import { ArrowLeft, Download, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 import { useReactToPrint } from 'react-to-print';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter, 
+  DialogTrigger 
+} from '@/components/ui/dialog';
+import { toast } from '@/components/ui/use-toast';
+
+// Define proper types for our certificate data
+interface Certificate {
+  id: string;
+  created_at: string;
+  expiration_date?: string;
+  template_id?: string;
+  company_info: {
+    name?: string;
+    logo_url?: string;
+  };
+  patient_info: {
+    first_name?: string;
+    last_name?: string;
+    birthdate?: string;
+  };
+  fitness_declaration?: {
+    statement?: string;
+  };
+  restrictions?: string[];
+}
 
 const CertificateViewerPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +57,7 @@ const CertificateViewerPage = () => {
         .single();
       
       if (error) throw error;
-      return data;
+      return data as Certificate;
     },
     enabled: !!id,
   });
@@ -35,7 +65,7 @@ const CertificateViewerPage = () => {
   // Query template data if available
   const { data: template } = useQuery({
     queryKey: ['certificate-template', certificate?.template_id],
-    queryFn: () => fetchCertificateTemplate(certificate?.template_id),
+    queryFn: () => fetchCertificateTemplate(certificate?.template_id || ''),
     enabled: !!certificate?.template_id,
   });
   
@@ -44,6 +74,47 @@ const CertificateViewerPage = () => {
     content: () => printRef.current,
     documentTitle: `Certificate-${certificate?.id?.substring(0, 8)}`,
   });
+
+  // Email certificate handling
+  const [recipientEmail, setRecipientEmail] = React.useState('');
+  const [emailSubject, setEmailSubject] = React.useState('Your Medical Certificate');
+  const [emailMessage, setEmailMessage] = React.useState('Please find your medical certificate attached.');
+  const [isSending, setIsSending] = React.useState(false);
+
+  const sendCertificate = async () => {
+    if (!certificate || !id || !currentOrganization?.id) return;
+    
+    setIsSending(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('send-certificate', {
+        body: {
+          certificateId: id,
+          recipientEmail,
+          organizationId: currentOrganization.id,
+          subject: emailSubject,
+          message: emailMessage
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Certificate sent",
+        description: "The certificate has been sent successfully."
+      });
+      
+    } catch (error) {
+      console.error("Error sending certificate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send certificate. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
   
   if (isLoadingCertificate) {
     return (
@@ -79,7 +150,7 @@ const CertificateViewerPage = () => {
       '--primary-color': template_data.primary_color,
       '--secondary-color': template_data.secondary_color,
       // Add other styling based on template
-    };
+    } as React.CSSProperties;
   };
   
   return (
@@ -95,17 +166,73 @@ const CertificateViewerPage = () => {
             <Download className="mr-2 h-4 w-4" />
             Download
           </Button>
-          <Button variant="outline">
-            <Mail className="mr-2 h-4 w-4" />
-            Email
-          </Button>
+          
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Mail className="mr-2 h-4 w-4" />
+                Email
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Send Certificate via Email</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label htmlFor="recipient" className="text-sm font-medium">
+                    Recipient Email
+                  </label>
+                  <input
+                    id="recipient"
+                    type="email"
+                    className="w-full border rounded-md p-2"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    placeholder="Enter email address"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="subject" className="text-sm font-medium">
+                    Subject
+                  </label>
+                  <input
+                    id="subject"
+                    type="text"
+                    className="w-full border rounded-md p-2"
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="message" className="text-sm font-medium">
+                    Message
+                  </label>
+                  <textarea
+                    id="message"
+                    className="w-full border rounded-md p-2 min-h-[100px]"
+                    value={emailMessage}
+                    onChange={(e) => setEmailMessage(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={sendCertificate}
+                  disabled={!recipientEmail || isSending}
+                >
+                  {isSending ? 'Sending...' : 'Send Certificate'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       
       <div 
         className="border rounded-lg p-8 shadow-lg bg-white" 
         ref={printRef}
-        style={getTemplateStyles() as React.CSSProperties}
+        style={getTemplateStyles()}
       >
         <div className="certificate-content">
           {/* Header with organization logo */}
