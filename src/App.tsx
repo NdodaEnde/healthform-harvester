@@ -21,6 +21,8 @@ import { EditOrganizationPage } from './pages/admin';
 import { OrganizationUsersPage } from './pages/admin';
 import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
+import CertificateTemplatesPage from './pages/settings/CertificateTemplatesPage';
+import CertificateViewerPage from './pages/CertificateViewerPage';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
 import { DashboardLayout } from './components/DashboardLayout';
@@ -63,6 +65,14 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <DocumentViewer />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/certificates/:id" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <CertificateViewerPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
@@ -113,6 +123,14 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <OrganizationSettingsPage />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+
+                  <Route path="/settings/certificate-templates" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <CertificateTemplatesPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
