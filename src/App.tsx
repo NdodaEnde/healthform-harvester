@@ -1,19 +1,15 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
-import HeaderComponent from './components/HeaderComponent';
-import { DashboardLayout } from './components/DashboardLayout';
-import OrganizationProtectedRoute from './components/OrganizationProtectedRoute';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
-
-// Pages
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
+import HeaderComponent from './components/HeaderComponent';
+import OrganizationProtectedRoute from './components/OrganizationProtectedRoute';
 import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
 import DocumentViewer from './pages/DocumentViewer';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -25,6 +21,9 @@ import { EditOrganizationPage } from './pages/admin';
 import { OrganizationUsersPage } from './pages/admin';
 import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
+import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner";
+import { DashboardLayout } from './components/DashboardLayout';
 import PatientsPage from './pages/PatientsPage';
 import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
@@ -60,7 +59,6 @@ function App() {
                     </OrganizationProtectedRoute>
                   } />
                   
-                  {/* Document Viewer Route */}
                   <Route path="/documents/:id" element={
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
@@ -152,7 +150,7 @@ function App() {
                     </OrganizationProtectedRoute>
                   } />
                   
-                  {/* 404 Route - Must be last */}
+                  {/* 404 Route */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
