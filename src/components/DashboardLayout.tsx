@@ -1,6 +1,6 @@
 
 import { ReactNode } from "react";
-import DashboardSidebar from "./DashboardSidebar";
+import { DashboardSidebar } from "./DashboardSidebar";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -16,5 +16,3 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     </div>
   );
 }
-
-export default DashboardLayout;
