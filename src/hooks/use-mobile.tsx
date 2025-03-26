@@ -1,4 +1,3 @@
-
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
@@ -17,19 +16,4 @@ export function useIsMobile() {
   }, [])
 
   return !!isMobile
-}
-
-// Add the mobile menu hook
-export function useMobileMenu() {
-  const [isOpen, setIsOpen] = React.useState(false)
-  
-  const toggle = React.useCallback(() => {
-    setIsOpen(prev => !prev)
-  }, [])
-  
-  const close = React.useCallback(() => {
-    setIsOpen(false)
-  }, [])
-  
-  return { isOpen, toggle, close }
 }
