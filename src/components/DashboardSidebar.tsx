@@ -19,6 +19,7 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
   
+  // Safe navItems that handle null organization
   const navItems = [
     { 
       name: "Dashboard", 
@@ -30,6 +31,7 @@ export function DashboardSidebar() {
       href: "/patients",
       icon: UserRound
     },
+    // Only show these items if user is a service provider
     ...(isServiceProvider() ? [
       { 
         name: "Organizations", 

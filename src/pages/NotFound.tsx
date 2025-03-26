@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ChevronLeft, Home, FileText } from "lucide-react";
+import { AlertCircle, ChevronLeft, Home } from "lucide-react";
 import { toast } from "sonner";
 
 const NotFound = () => {
@@ -14,33 +14,35 @@ const NotFound = () => {
   const documentId = isDocumentUrlMismatch ? pathname.split('/').pop() : null;
   const correctedPath = documentId ? `/documents/${documentId}` : null;
   
-  // Handle preview routes
-  const isPreview = pathname.includes('index.html') || pathname === '/';
+  // Handle preview routes - look specifically for index.html to avoid matching everything
+  const isPreview = pathname === '/index.html' || pathname === '/';
 
   useEffect(() => {
     console.log("NotFound component mounted for path:", pathname);
     
     if (isPreview) {
       // In preview mode, navigate to dashboard
-      navigate("/dashboard");
+      console.log("Preview mode detected, redirecting to dashboard");
+      navigate("/dashboard", { replace: true });
       return;
     }
     
-    // Immediately redirect if this is a document URL mismatch
+    // Handle document URL mismatch
     if (isDocumentUrlMismatch && correctedPath) {
+      console.log("Detected document URL mismatch, redirecting to:", correctedPath);
       toast.info("Redirecting to correct document URL", {
         description: "Using '/documents/' format instead of '/document/'",
       });
-      navigate(correctedPath);
-    } else {
+      navigate(correctedPath, { replace: true });
+    } else if (pathname !== '/404') { // Prevent toast on the 404 page itself
       toast.error("Page not found", {
         description: `The page "${pathname}" does not exist or is not accessible.`,
       });
     }
   }, [pathname, navigate, isDocumentUrlMismatch, correctedPath, isPreview]);
 
-  // If we're about to redirect, we can show a simpler loading state
-  if (isDocumentUrlMismatch && correctedPath || isPreview) {
+  // If we're about to redirect, show a loading state
+  if ((isDocumentUrlMismatch && correctedPath) || isPreview) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <div className="text-center">
