@@ -15,15 +15,15 @@ const NotFound = () => {
         <h1 className="text-5xl font-bold mb-2 text-gray-900 dark:text-gray-100">404</h1>
         <p className="text-xl text-gray-700 dark:text-gray-300 mb-2">Page Not Found</p>
         <p className="text-gray-500 dark:text-gray-400 mb-8">
-          The page you're looking for doesn't exist or you don't have permission to access it.
+          The page you're looking for doesn't exist or has been moved.
         </p>
         <div className="flex justify-center">
           <Button 
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/")}
             className="flex items-center"
           >
             <Home className="mr-2 h-4 w-4" />
-            Go to Dashboard
+            Go to Home
           </Button>
         </div>
       </div>
