@@ -19,15 +19,24 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
   
+  // Ensure we have a safe dashboard path
+  const getDashboardPath = () => "/dashboard";
+  
+  // Ensure we have a safe organization path even if organization ID is missing
+  const getOrganizationPath = (path: string) => {
+    if (!currentOrganization?.id) return "/dashboard";
+    return path.replace(":id", currentOrganization.id);
+  };
+  
   const navItems = [
     { 
       name: "Dashboard", 
-      href: "/dashboard", 
+      href: getDashboardPath(), 
       icon: LayoutDashboard 
     },
     { 
       name: "Documents", 
-      href: "/dashboard", 
+      href: getDashboardPath(), 
       icon: FileText 
     },
     {
@@ -43,12 +52,12 @@ export function DashboardSidebar() {
       },
       { 
         name: "Clients", 
-        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/clients` : "/dashboard", 
+        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/clients` : getDashboardPath(), 
         icon: Building 
       },
       { 
         name: "Users", 
-        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/users` : "/dashboard", 
+        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/users` : getDashboardPath(), 
         icon: Users 
       }
     ] : []),
