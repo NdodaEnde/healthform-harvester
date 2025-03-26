@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -57,14 +56,6 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <Dashboard />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/documents/:id" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <DocumentViewer />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
