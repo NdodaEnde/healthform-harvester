@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -24,48 +23,68 @@ export function useAuth() {
   return context;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ 
+  children,
+  previewMode = false 
+}: { 
+  children: ReactNode,
+  previewMode?: boolean
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up listener FIRST, then get session
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("Auth state changed:", event);
-        setSession(session);
-        setUser(session?.user ?? null);
+    if (previewMode) {
+      console.log("Running in preview mode, using mock auth session");
+      const timer = setTimeout(() => {
+        const mockUser = {
+          id: 'preview-user-id',
+          email: 'preview@example.com',
+          app_metadata: { provider: 'email' },
+          user_metadata: { name: 'Preview User' },
+          aud: 'authenticated',
+          role: 'authenticated',
+        } as User;
+        
+        const mockSession = {
+          user: mockUser,
+          access_token: 'mock-access-token',
+          refresh_token: 'mock-refresh-token',
+          expires_at: Date.now() + 3600,
+        } as Session;
+        
+        setSession(mockSession);
+        setUser(mockUser);
         setLoading(false);
-      }
-    );
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Regular auth initialization for non-preview mode
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
     // Get initial session
-    const getInitialSession = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Error getting initial session:", error);
-          throw error;
-        }
-        
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
-      } catch (error) {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
         console.error("Error getting initial session:", error);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    getInitialSession();
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [previewMode]);
 
-  // Auth functions
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
