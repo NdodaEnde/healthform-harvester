@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ChevronLeft, Home, FileText } from "lucide-react";
+import { AlertCircle, ChevronLeft, Home } from "lucide-react";
 import { toast } from "sonner";
 
 const NotFound = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check if this is a document URL with incorrect format
   const isDocumentUrlMismatch = pathname.startsWith('/document/');
@@ -16,11 +17,21 @@ const NotFound = () => {
   const correctedPath = documentId ? `/documents/${documentId}` : null;
 
   useEffect(() => {
+    // Simple initialization delay to prevent flash of UI
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 300);
+    
     // Check if we're in preview mode
     const url = window.location.href;
     const inPreviewMode = url.includes('/preview') || url.includes('preview=true');
     setIsPreviewMode(inPreviewMode);
 
+    // Log diagnostic information
+    console.log("NotFound component mounted");
+    console.log("Current pathname:", pathname);
+    console.log("Preview mode:", inPreviewMode ? "Yes" : "No");
+    
     // Only log and toast if not in preview mode
     if (!inPreviewMode) {
       console.error(
@@ -40,7 +51,18 @@ const NotFound = () => {
         });
       }
     }
+    
+    return () => clearTimeout(timer);
   }, [pathname, navigate, isDocumentUrlMismatch, correctedPath]);
+
+  // Show loading spinner while initializing
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   // If in preview mode, show a more helpful message
   if (isPreviewMode) {
@@ -54,6 +76,9 @@ const NotFound = () => {
           <p className="text-gray-700 dark:text-gray-300 mb-6">
             You're viewing this app in preview mode. Some features like authentication 
             are simulated, and this may cause some routes to show as not found.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Current URL: {pathname}
           </p>
           <Button 
             onClick={() => navigate("/")}

@@ -21,20 +21,25 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   
   // Add a brief initialization delay to prevent flash of redirect
   useEffect(() => {
+    console.log("OrganizationProtectedRoute initializing for path:", location.pathname);
+    console.log("Preview mode:", isInPreviewMode() ? "Yes" : "No");
+    
     const timer = setTimeout(() => {
       setIsInitializing(false);
     }, 300);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [location.pathname]);
   
   // Don't enforce organization context on public routes
   if (isPublicRoute(location.pathname)) {
+    console.log("Public route detected, allowing access:", location.pathname);
     return <>{children}</>;
   }
   
   // In preview mode, bypass auth checks
   if (isInPreviewMode()) {
+    console.log("Preview mode detected, bypassing organization checks");
     return <>{children}</>;
   }
   
@@ -46,11 +51,13 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   
   // If there's no organization context, the useOrganizationEnforcer hook will handle the redirect
   if (!currentOrganization) {
+    console.log("No organization context, loading fallback while redirect happens");
     // Return a loading state while the redirection is happening
     return <LoadingFallback />;
   }
   
   // User is authenticated and has organization context
+  console.log("Organization context verified, rendering protected content");
   return <>{children}</>;
 };
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
@@ -52,6 +52,13 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
   
+  // Log information about the current environment
+  useEffect(() => {
+    console.log(`App initializing. Preview mode: ${inPreviewMode ? 'Yes' : 'No'}`);
+    console.log(`Current URL: ${window.location.href}`);
+    console.log(`Current pathname: ${window.location.pathname}`);
+  }, [inPreviewMode]);
+  
   // Show loading state during initial render to prevent flash of 404
   if (isInitializing) {
     return <LoadingFallback />;
@@ -60,15 +67,18 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
-        <BrowserRouter>
+        <BrowserRouter basename={process.env.NODE_ENV === 'production' ? '/' : '/'}>
           <AuthProvider>
             <OrganizationProvider>
               <HeaderComponent />
-              <main>
+              <main className="relative">
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
+                  <Route path="/auth/accept-invite" element={<AcceptInvitePage />} />
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/update-password" element={<UpdatePasswordPage />} />
                   <Route path="/accept-invite" element={<AcceptInvitePage />} />
@@ -172,6 +182,11 @@ function App() {
                         <PatientRecordsPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
+                  } />
+
+                  {/* Document URL format correction */}
+                  <Route path="/document/:id" element={
+                    <Navigate to={`/documents/${window.location.pathname.split('/').pop()}`} replace />
                   } />
                   
                   {/* 404 Route - needs to be last */}
