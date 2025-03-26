@@ -2,7 +2,6 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useOrganizationEnforcer, isPublicRoute } from "@/utils/organizationContextEnforcer";
-import { useAuth } from "@/contexts/AuthContext";
 import LoadingFallback from "./LoadingFallback";
 
 interface OrganizationProtectedRouteProps {
@@ -11,28 +10,25 @@ interface OrganizationProtectedRouteProps {
 
 const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProps) => {
   const location = useLocation();
-  const { currentOrganization, loading: orgLoading } = useOrganizationEnforcer();
-  const { session, loading: authLoading } = useAuth();
+  const { currentOrganization, loading } = useOrganizationEnforcer();
   
-  const inPreviewMode = window.location.href.includes('/preview') || 
-                       window.location.href.includes('preview=true');
-  
-  if (isPublicRoute(location.pathname) || inPreviewMode) {
+  // Don't enforce organization context on public routes
+  if (isPublicRoute(location.pathname)) {
     return <>{children}</>;
   }
   
-  if (authLoading || orgLoading) {
+  // Show loading state while checking auth and organization context
+  if (loading) {
     return <LoadingFallback />;
   }
   
-  if (!session) {
-    return <Navigate to="/auth" />;
-  }
-  
+  // If there's no organization context, the useOrganizationEnforcer hook will handle the redirect
   if (!currentOrganization) {
+    // Return a loading state while the redirection is happening
     return <LoadingFallback />;
   }
   
+  // User is authenticated and has organization context
   return <>{children}</>;
 };
 

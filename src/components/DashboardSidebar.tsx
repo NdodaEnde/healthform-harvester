@@ -43,12 +43,12 @@ export function DashboardSidebar() {
       },
       { 
         name: "Clients", 
-        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/clients` : "/dashboard", 
+        href: `/admin/organizations/${currentOrganization?.id}/clients`, 
         icon: Building 
       },
       { 
         name: "Users", 
-        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/users` : "/dashboard", 
+        href: `/admin/organizations/${currentOrganization?.id}/users`, 
         icon: Users 
       }
     ] : []),
