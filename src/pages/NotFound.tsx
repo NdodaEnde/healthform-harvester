@@ -2,17 +2,12 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ChevronLeft, Home, FileText } from "lucide-react";
+import { AlertCircle, ChevronLeft, Home } from "lucide-react";
 import { toast } from "sonner";
 
 const NotFound = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-
-  // Check if this is a document URL with incorrect format
-  const isDocumentUrlMismatch = pathname.startsWith('/document/');
-  const documentId = isDocumentUrlMismatch ? pathname.split('/').pop() : null;
-  const correctedPath = documentId ? `/documents/${documentId}` : null;
 
   useEffect(() => {
     console.error(
@@ -20,30 +15,10 @@ const NotFound = () => {
       pathname
     );
     
-    // Immediately redirect if this is a document URL mismatch
-    if (isDocumentUrlMismatch && correctedPath) {
-      toast.info("Redirecting to correct document URL", {
-        description: "Using '/documents/' format instead of '/document/'",
-      });
-      navigate(correctedPath);
-    } else {
-      toast.error("Page not found", {
-        description: `The page "${pathname}" does not exist or is not accessible.`,
-      });
-    }
-  }, [pathname, navigate, isDocumentUrlMismatch, correctedPath]);
-
-  // If we're about to redirect, we can show a simpler loading state
-  if (isDocumentUrlMismatch && correctedPath) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-        <div className="text-center">
-          <div className="animate-spin mb-4 h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-xl text-gray-700 dark:text-gray-300">Redirecting to document...</p>
-        </div>
-      </div>
-    );
-  }
+    toast.error("Page not found", {
+      description: `The page "${pathname}" does not exist or is not accessible.`,
+    });
+  }, [pathname]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">

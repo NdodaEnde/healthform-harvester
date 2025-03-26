@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUploader from "@/components/DocumentUploader";
@@ -32,11 +31,9 @@ const Dashboard = () => {
     getEffectiveOrganizationId
   } = useOrganization();
 
-  // Get the effective organization ID (either client organization if selected, or current organization)
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Check for documents without organization context
   const { data: orphanedDocsCount } = useQuery({
     queryKey: ['orphaned-documents-count'],
     queryFn: async () => {
@@ -62,11 +59,9 @@ const Dashboard = () => {
         .from('documents')
         .select('*');
       
-      // If viewing as service provider with a client selected
       if (currentClient && isServiceProvider()) {
         query = query.eq('client_organization_id', currentClient.id);
       } 
-      // If viewing own organization
       else if (organizationId) {
         query = query.eq('organization_id', organizationId);
       }
@@ -92,7 +87,6 @@ const Dashboard = () => {
   });
 
   const handleUploadComplete = () => {
-    // Refresh the documents list after upload completes
     refetch();
     setShowUploadDialog(false);
     toast({
@@ -106,13 +100,11 @@ const Dashboard = () => {
   };
 
   const updateDocumentReviewStatus = (documentId: string, reviewStatus: ReviewStatus, reviewNote?: string) => {
-    // Store review status in localStorage
     localStorage.setItem(`doc-review-${documentId}`, reviewStatus);
     if (reviewNote) {
       localStorage.setItem(`doc-review-note-${documentId}`, reviewNote);
     }
     
-    // Update the UI by refetching the documents
     refetch();
     
     toast({
@@ -131,10 +123,8 @@ const Dashboard = () => {
     }
   };
 
-  // Only show upload button if we have an organization context
   const canUpload = !!organizationId;
 
-  // Calculate review statistics
   const notReviewedCount = documents?.filter(doc => 
     !doc.reviewStatus || doc.reviewStatus === 'not-reviewed'
   ).length || 0;
@@ -152,9 +142,11 @@ const Dashboard = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            {contextLabel ? `Viewing documents for ${contextLabel}` : "Manage your documents and organization"}
-          </p>
+          {contextLabel && (
+            <p className="text-muted-foreground mt-1">
+              Viewing documents for {contextLabel}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-4 z-10 relative">
           <Button 
@@ -184,7 +176,6 @@ const Dashboard = () => {
         </div>
       </div>
       
-      {/* Document Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -202,14 +193,12 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Show orphaned document fixer if needed */}
       {orphanedDocsCount && orphanedDocsCount > 0 && (
         <div className="mb-6">
           <OrphanedDocumentFixer />
         </div>
       )}
 
-      {/* Show cleanup tools if enabled */}
       {showCleanupTools && (
         <div className="mb-6">
           <StorageCleanupUtility />
@@ -240,7 +229,6 @@ const Dashboard = () => {
             </div>
           ) : documents && documents.length > 0 ? (
             <>
-              {/* Review status summary */}
               {documents.length > 0 && (
                 <div className="mb-6 flex items-center gap-4 text-sm">
                   <span className="font-medium">Review Status:</span>

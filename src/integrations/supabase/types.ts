@@ -9,11 +9,102 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      certificate_expirations: {
+        Row: {
+          certificate_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          notification_sent: boolean | null
+          organization_id: string | null
+          patient_id: string | null
+        }
+        Insert: {
+          certificate_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          notification_sent?: boolean | null
+          organization_id?: string | null
+          patient_id?: string | null
+        }
+        Update: {
+          certificate_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          notification_sent?: boolean | null
+          organization_id?: string | null
+          patient_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificate_expirations_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_expirations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_expirations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certificate_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          organization_id: string
+          template_data: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          organization_id: string
+          template_data: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          organization_id?: string
+          template_data?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificate_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificates: {
         Row: {
           company_info: Json | null
           created_at: string
           document_id: string | null
+          expiration_date: string | null
           fitness_declaration: Json | null
           followup_actions: Json | null
           id: string
@@ -28,6 +119,7 @@ export type Database = {
           company_info?: Json | null
           created_at?: string
           document_id?: string | null
+          expiration_date?: string | null
           fitness_declaration?: Json | null
           followup_actions?: Json | null
           id?: string
@@ -42,6 +134,7 @@ export type Database = {
           company_info?: Json | null
           created_at?: string
           document_id?: string | null
+          expiration_date?: string | null
           fitness_declaration?: Json | null
           followup_actions?: Json | null
           id?: string
@@ -125,6 +218,50 @@ export type Database = {
           },
         ]
       }
+      form_templates: {
+        Row: {
+          category: string | null
+          createdat: string
+          description: string | null
+          fields: Json
+          id: string
+          ispublished: boolean
+          name: string
+          organizationid: string
+          updatedat: string
+        }
+        Insert: {
+          category?: string | null
+          createdat?: string
+          description?: string | null
+          fields: Json
+          id?: string
+          ispublished?: boolean
+          name: string
+          organizationid: string
+          updatedat?: string
+        }
+        Update: {
+          category?: string | null
+          createdat?: string
+          description?: string | null
+          fields?: Json
+          id?: string
+          ispublished?: boolean
+          name?: string
+          organizationid?: string
+          updatedat?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_templates_organizationid_fkey"
+            columns: ["organizationid"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -162,6 +299,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: string
+          is_read: boolean | null
+          message: string
+          organization_id: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          organization_id?: string | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          organization_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
