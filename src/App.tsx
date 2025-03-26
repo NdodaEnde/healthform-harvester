@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
@@ -28,11 +28,35 @@ import PatientsPage from './pages/PatientsPage';
 import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
+import LoadingFallback from './components/LoadingFallback';
 
 // Create a client
 const queryClient = new QueryClient();
 
+// Helper to detect preview mode
+const isInPreviewMode = () => {
+  const url = window.location.href;
+  return url.includes('/preview') || url.includes('preview=true');
+};
+
 function App() {
+  const [isInitializing, setIsInitializing] = useState(true);
+  const inPreviewMode = isInPreviewMode();
+
+  // Simulate a brief initialization to prevent flash of 404
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Show loading state during initial render to prevent flash of 404
+  if (isInitializing) {
+    return <LoadingFallback />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
@@ -150,7 +174,7 @@ function App() {
                     </OrganizationProtectedRoute>
                   } />
                   
-                  {/* 404 Route */}
+                  {/* 404 Route - needs to be last */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>

@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, ChevronLeft, Home, FileText } from "lucide-react";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 const NotFound = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   // Check if this is a document URL with incorrect format
   const isDocumentUrlMismatch = pathname.startsWith('/document/');
@@ -15,23 +16,56 @@ const NotFound = () => {
   const correctedPath = documentId ? `/documents/${documentId}` : null;
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      pathname
-    );
-    
-    // Immediately redirect if this is a document URL mismatch
-    if (isDocumentUrlMismatch && correctedPath) {
-      toast.info("Redirecting to correct document URL", {
-        description: "Using '/documents/' format instead of '/document/'",
-      });
-      navigate(correctedPath);
-    } else {
-      toast.error("Page not found", {
-        description: `The page "${pathname}" does not exist or is not accessible.`,
-      });
+    // Check if we're in preview mode
+    const url = window.location.href;
+    const inPreviewMode = url.includes('/preview') || url.includes('preview=true');
+    setIsPreviewMode(inPreviewMode);
+
+    // Only log and toast if not in preview mode
+    if (!inPreviewMode) {
+      console.error(
+        "404 Error: User attempted to access non-existent route:",
+        pathname
+      );
+      
+      // Immediately redirect if this is a document URL mismatch
+      if (isDocumentUrlMismatch && correctedPath) {
+        toast.info("Redirecting to correct document URL", {
+          description: "Using '/documents/' format instead of '/document/'",
+        });
+        navigate(correctedPath);
+      } else {
+        toast.error("Page not found", {
+          description: `The page "${pathname}" does not exist or is not accessible.`,
+        });
+      }
     }
   }, [pathname, navigate, isDocumentUrlMismatch, correctedPath]);
+
+  // If in preview mode, show a more helpful message
+  if (isPreviewMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <div className="text-center max-w-md w-full">
+          <div className="flex justify-center mb-6">
+            <AlertCircle className="h-16 w-16 text-amber-500" />
+          </div>
+          <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">Preview Mode Active</h1>
+          <p className="text-gray-700 dark:text-gray-300 mb-6">
+            You're viewing this app in preview mode. Some features like authentication 
+            are simulated, and this may cause some routes to show as not found.
+          </p>
+          <Button 
+            onClick={() => navigate("/")}
+            className="flex items-center"
+          >
+            <Home className="mr-2 h-4 w-4" />
+            Go to Home Page
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // If we're about to redirect, we can show a simpler loading state
   if (isDocumentUrlMismatch && correctedPath) {
