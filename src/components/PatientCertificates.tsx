@@ -13,6 +13,19 @@ export interface PatientCertificatesProps {
   organizationId?: string;
 }
 
+// Define type for certificate data
+interface Certificate {
+  id: string;
+  created_at: string;
+  expiration_date?: string;
+  fitness_declaration?: {
+    statement?: string;
+  };
+  patient_info?: {
+    id?: string;
+  };
+}
+
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const { data: certificates, isLoading } = useQuery({
     queryKey: ['patient-certificates', patientId],
@@ -24,7 +37,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      return data;
+      return data as Certificate[];
     },
     enabled: !!patientId,
   });
@@ -62,7 +75,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
               <CardTitle className="text-base flex justify-between items-center">
                 <span>
                   <FileText className="inline-block mr-2 h-4 w-4" /> 
-                  {certificate.fitness_declaration?.statement?.substring(0, 50)}...
+                  {certificate.fitness_declaration?.statement?.substring(0, 50) || 'Medical Certificate'}...
                 </span>
                 {isExpired && (
                   <span className="text-xs font-normal px-2 py-1 bg-red-100 text-red-600 rounded">

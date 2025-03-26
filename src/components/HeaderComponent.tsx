@@ -20,10 +20,10 @@ const HeaderComponent = () => {
   
   // Extract these from the auth context with proper fallbacks
   const isAuthenticated = !!auth.session;
-  const isLoading = auth.isLoading || false;
+  const loading = auth.loading || false; // Changed isLoading to loading
   const profile = auth.user || null;
 
-  if (isLoading) {
+  if (loading) {
     return (
       <header className="border-b bg-background">
         <div className="container mx-auto p-4 flex justify-between items-center">

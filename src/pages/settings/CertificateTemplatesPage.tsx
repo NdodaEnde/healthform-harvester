@@ -15,12 +15,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { toast } from '@/components/ui/use-toast';
 import { Trash, Edit, Plus, Star, StarOff } from 'lucide-react';
 
+type UpdateTemplateVariables = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  template_data: {
+    header: string;
+    footer: string;
+    logo_position: 'left' | 'center' | 'right';
+    primary_color: string;
+    secondary_color: string;
+    include_signature: boolean;
+    include_organization_details: boolean;
+    font: string;
+  };
+};
+
 const CertificateTemplatesPage = () => {
   const { currentOrganization } = useOrganization();
   const queryClient = useQueryClient();
   const orgId = currentOrganization?.id || '';
   
-  // Template form state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState<CertificateTemplate | null>(null);
@@ -35,14 +50,12 @@ const CertificateTemplatesPage = () => {
   const [font, setFont] = useState('default');
   const [isDefault, setIsDefault] = useState(false);
   
-  // Query templates
   const { data: templates, isLoading } = useQuery({
     queryKey: ['certificate-templates', orgId],
     queryFn: () => fetchCertificateTemplates(orgId),
     enabled: !!orgId,
   });
   
-  // Mutations
   const createMutation = useMutation({
     mutationFn: createCertificateTemplate,
     onSuccess: () => {
@@ -53,7 +66,13 @@ const CertificateTemplatesPage = () => {
   });
   
   const updateMutation = useMutation({
-    mutationFn: updateCertificateTemplate,
+    mutationFn: (variables: UpdateTemplateVariables) => {
+      return updateCertificateTemplate(variables.id, {
+        name: variables.name,
+        is_default: variables.is_default,
+        template_data: variables.template_data
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['certificate-templates', orgId] });
       resetForm();
@@ -80,7 +99,6 @@ const CertificateTemplatesPage = () => {
     },
   });
   
-  // Form handlers
   const resetForm = () => {
     setTemplateName('');
     setHeaderText('Medical Certificate');
@@ -135,7 +153,8 @@ const CertificateTemplatesPage = () => {
   const handleUpdateTemplate = () => {
     if (!currentTemplate) return;
     
-    const templateData = {
+    const updateData: UpdateTemplateVariables = {
+      id: currentTemplate.id,
       name: templateName,
       is_default: isDefault,
       template_data: {
@@ -147,13 +166,10 @@ const CertificateTemplatesPage = () => {
         include_signature: includeSignature,
         include_organization_details: includeOrgDetails,
         font: font,
-      },
+      }
     };
     
-    updateMutation.mutate({
-      id: currentTemplate.id,
-      ...templateData,
-    });
+    updateMutation.mutate(updateData);
   };
   
   const handleDeleteTemplate = (id: string) => {

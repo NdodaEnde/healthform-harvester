@@ -40,6 +40,23 @@ interface Certificate {
   restrictions?: string[];
 }
 
+// Define template type
+interface CertificateTemplate {
+  id: string;
+  name: string;
+  is_default: boolean;
+  template_data: {
+    header?: string;
+    footer?: string;
+    logo_position?: 'left' | 'center' | 'right';
+    primary_color?: string;
+    secondary_color?: string;
+    include_signature?: boolean;
+    include_organization_details?: boolean;
+    font?: string;
+  };
+}
+
 const CertificateViewerPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -69,9 +86,10 @@ const CertificateViewerPage = () => {
     enabled: !!certificate?.template_id,
   });
   
-  // Handle printing
+  // Handle printing - fixed to use documentTitle and content correctly
   const handlePrint = useReactToPrint({
     documentTitle: `Certificate-${certificate?.id?.substring(0, 8)}`,
+    // Using content getter function properly
     content: () => printRef.current,
   });
 
