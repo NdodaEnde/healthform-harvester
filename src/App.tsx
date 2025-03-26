@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
@@ -150,7 +150,10 @@ function App() {
                     </OrganizationProtectedRoute>
                   } />
                   
-                  {/* 404 Route */}
+                  {/* Redirect for root preview */}
+                  <Route path="index.html" element={<Navigate to="/" replace />} />
+                  
+                  {/* 404 Route - Should be the last route */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>

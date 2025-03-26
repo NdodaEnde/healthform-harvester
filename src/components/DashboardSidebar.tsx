@@ -26,11 +26,6 @@ export function DashboardSidebar() {
       icon: LayoutDashboard 
     },
     { 
-      name: "Documents", 
-      href: "/dashboard", 
-      icon: FileText 
-    },
-    {
       name: "Patients",
       href: "/patients",
       icon: UserRound
@@ -43,12 +38,12 @@ export function DashboardSidebar() {
       },
       { 
         name: "Clients", 
-        href: `/admin/organizations/${currentOrganization?.id}/clients`, 
+        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/clients` : '/dashboard', 
         icon: Building 
       },
       { 
         name: "Users", 
-        href: `/admin/organizations/${currentOrganization?.id}/users`, 
+        href: currentOrganization?.id ? `/admin/organizations/${currentOrganization.id}/users` : '/dashboard', 
         icon: Users 
       }
     ] : []),

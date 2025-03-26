@@ -13,12 +13,18 @@ const NotFound = () => {
   const isDocumentUrlMismatch = pathname.startsWith('/document/');
   const documentId = isDocumentUrlMismatch ? pathname.split('/').pop() : null;
   const correctedPath = documentId ? `/documents/${documentId}` : null;
+  
+  // Handle preview routes
+  const isPreview = pathname.includes('index.html') || pathname === '/';
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      pathname
-    );
+    console.log("NotFound component mounted for path:", pathname);
+    
+    if (isPreview) {
+      // In preview mode, navigate to dashboard
+      navigate("/dashboard");
+      return;
+    }
     
     // Immediately redirect if this is a document URL mismatch
     if (isDocumentUrlMismatch && correctedPath) {
@@ -31,15 +37,15 @@ const NotFound = () => {
         description: `The page "${pathname}" does not exist or is not accessible.`,
       });
     }
-  }, [pathname, navigate, isDocumentUrlMismatch, correctedPath]);
+  }, [pathname, navigate, isDocumentUrlMismatch, correctedPath, isPreview]);
 
   // If we're about to redirect, we can show a simpler loading state
-  if (isDocumentUrlMismatch && correctedPath) {
+  if (isDocumentUrlMismatch && correctedPath || isPreview) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <div className="text-center">
           <div className="animate-spin mb-4 h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-xl text-gray-700 dark:text-gray-300">Redirecting to document...</p>
+          <p className="text-xl text-gray-700 dark:text-gray-300">Redirecting...</p>
         </div>
       </div>
     );
@@ -70,11 +76,11 @@ const NotFound = () => {
             Go Back
           </Button>
           <Button 
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             className="flex items-center"
           >
             <Home className="mr-2 h-4 w-4" />
-            Return to Home
+            Go to Dashboard
           </Button>
         </div>
       </div>
