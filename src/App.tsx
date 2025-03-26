@@ -60,6 +60,15 @@ function App() {
                     </OrganizationProtectedRoute>
                   } />
                   
+                  {/* Document Viewer Route */}
+                  <Route path="/documents/:id" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <DocumentViewer />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
                   {/* Organization Management */}
                   <Route path="/admin/organizations" element={
                     <OrganizationProtectedRoute>
