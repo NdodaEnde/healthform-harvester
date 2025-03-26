@@ -19,11 +19,11 @@ const NotFound = () => {
         </p>
         <div className="flex justify-center">
           <Button 
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             className="flex items-center"
           >
             <Home className="mr-2 h-4 w-4" />
-            Go to Home
+            Go to Dashboard
           </Button>
         </div>
       </div>
