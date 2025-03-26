@@ -6,11 +6,6 @@ import { AlertCircle, Home } from "lucide-react";
 const NotFound = () => {
   const navigate = useNavigate();
 
-  // Simple function to go to home or dashboard
-  const goToSafePage = () => {
-    navigate("/dashboard");
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
       <div className="text-center max-w-md w-full">
@@ -24,7 +19,7 @@ const NotFound = () => {
         </p>
         <div className="flex justify-center">
           <Button 
-            onClick={goToSafePage}
+            onClick={() => navigate("/dashboard")}
             className="flex items-center"
           >
             <Home className="mr-2 h-4 w-4" />
