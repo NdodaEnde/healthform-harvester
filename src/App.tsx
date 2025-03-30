@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
@@ -27,58 +28,23 @@ import PatientsPage from './pages/PatientsPage';
 import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
-import LoadingFallback from './components/LoadingFallback';
-import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
 
 // Create a client
 const queryClient = new QueryClient();
 
-// Helper to detect preview mode
-const isInPreviewMode = () => {
-  const url = window.location.href;
-  return url.includes('/preview') || url.includes('preview=true');
-};
-
 function App() {
-  const [isInitializing, setIsInitializing] = useState(true);
-  const inPreviewMode = isInPreviewMode();
-
-  // Simulate a brief initialization to prevent flash of 404
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitializing(false);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  // Log information about the current environment
-  useEffect(() => {
-    console.log(`App initializing. Preview mode: ${inPreviewMode ? 'Yes' : 'No'}`);
-    console.log(`Current URL: ${window.location.href}`);
-    console.log(`Current pathname: ${window.location.pathname}`);
-  }, [inPreviewMode]);
-  
-  // Show loading state during initial render to prevent flash of 404
-  if (isInitializing) {
-    return <LoadingFallback />;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
-        <BrowserRouter basename={process.env.NODE_ENV === 'production' ? '/' : '/'}>
+        <BrowserRouter>
           <AuthProvider>
             <OrganizationProvider>
               <HeaderComponent />
-              <main className="relative">
+              <main>
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
-                  <Route path="/auth/accept-invite" element={<AcceptInvitePage />} />
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/update-password" element={<UpdatePasswordPage />} />
                   <Route path="/accept-invite" element={<AcceptInvitePage />} />
@@ -89,15 +55,6 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <Dashboard />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* Analytics Dashboard */}
-                  <Route path="/analytics" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <AnalyticsDashboardPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
@@ -192,13 +149,8 @@ function App() {
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
-
-                  {/* Document URL format correction */}
-                  <Route path="/document/:id" element={
-                    <Navigate to={`/documents/${window.location.pathname.split('/').pop()}`} replace />
-                  } />
                   
-                  {/* 404 Route - needs to be last */}
+                  {/* 404 Route */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
