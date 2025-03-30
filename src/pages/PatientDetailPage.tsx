@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import PatientCertificates from '@/components/PatientCertificates';
 import PatientVisits from '@/components/PatientVisits';
+import { Separator } from '@/components/ui/separator';
 
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -87,6 +89,67 @@ const PatientDetailPage = () => {
     patient.contact_info.address
   );
 
+  // Mock data for EHR tabs - would be replaced with real data from API
+  const ehrData = {
+    personal: {
+      fullName: `${patient.first_name} ${patient.last_name}`,
+      dateOfBirth: patient.date_of_birth ? format(new Date(patient.date_of_birth), 'PPP') : 'Not available',
+      gender: patient.gender || 'Not specified',
+      employeeId: patient.contact_info?.employee_id || 'N/A',
+      address: patient.contact_info?.address || 'N/A',
+      phoneNumber: patient.contact_info?.phone || 'N/A',
+      email: patient.contact_info?.email || 'N/A',
+      occupation: patient.contact_info?.occupation || 'N/A',
+      employer: patient.contact_info?.company || 'N/A'
+    },
+    medical: {
+      allergies: (patient.medical_history?.allergies && patient.medical_history.allergies.length > 0) 
+        ? patient.medical_history.allergies.map(a => a.allergen).join(", ") 
+        : 'None reported',
+      currentMedications: (patient.medical_history?.medications && patient.medical_history.medications.length > 0) 
+        ? patient.medical_history.medications.map(m => `${m.name}${m.dosage ? ` (${m.dosage})` : ''}`).join(", ") 
+        : 'None reported',
+      chronicConditions: (patient.medical_history?.conditions && patient.medical_history.conditions.length > 0) 
+        ? patient.medical_history.conditions.map(c => c.name).join(", ") 
+        : 'None reported',
+      previousSurgeries: patient.medical_history?.surgeries || 'None reported',
+      familyHistory: patient.medical_history?.family_history || 'Not available',
+      smoker: patient.medical_history?.smoker ? 'Yes' : 'No',
+      alcoholConsumption: patient.medical_history?.alcohol_consumption || 'Not reported',
+      exerciseFrequency: patient.medical_history?.exercise_frequency || 'Not reported'
+    },
+    vitals: {
+      height: patient.medical_history?.vitals?.height || 'N/A',
+      weight: patient.medical_history?.vitals?.weight || 'N/A',
+      bmi: patient.medical_history?.vitals?.bmi || 'N/A',
+      bloodPressure: patient.medical_history?.vitals?.blood_pressure || 'N/A',
+      heartRate: patient.medical_history?.vitals?.heart_rate || 'N/A',
+      respiratoryRate: patient.medical_history?.vitals?.respiratory_rate || 'N/A',
+      temperature: patient.medical_history?.vitals?.temperature || 'N/A',
+      oxygenSaturation: patient.medical_history?.vitals?.oxygen_saturation || 'N/A'
+    },
+    examResults: {
+      vision: patient.medical_history?.exam_results?.vision || 'N/A',
+      hearing: patient.medical_history?.exam_results?.hearing || 'N/A',
+      lungFunction: patient.medical_history?.exam_results?.lung_function || 'N/A',
+      chestXRay: patient.medical_history?.exam_results?.chest_xray || 'N/A',
+      laboratory: patient.medical_history?.exam_results?.laboratory || 'N/A'
+    },
+    assessment: {
+      diagnosis: patient.medical_history?.assessment?.diagnosis || 'N/A',
+      recommendations: patient.medical_history?.assessment?.recommendations || 'N/A',
+      restrictions: patient.medical_history?.assessment?.restrictions || 'N/A',
+      fitnessConclusion: patient.medical_history?.assessment?.fitness_conclusion || 'N/A'
+    }
+  };
+
+  const renderSectionItem = (label: string, value: string) => (
+    <div className="mb-4">
+      <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
+      <dd className="text-base mt-1">{value}</dd>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2 sm:flex-row sm:justify-between sm:items-center">
@@ -119,7 +182,8 @@ const PatientDetailPage = () => {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="medical-history">Medical History</TabsTrigger>
+          <TabsTrigger value="ehr">EHR</TabsTrigger>
+          <TabsTrigger value="certificates">Certificates</TabsTrigger>
           <TabsTrigger value="visits">Visits</TabsTrigger>
         </TabsList>
         
@@ -285,6 +349,105 @@ const PatientDetailPage = () => {
             
             <PatientCertificates patientId={id!} organizationId={organizationId} />
           </div>
+        </TabsContent>
+        
+        <TabsContent value="ehr" className="mt-6">
+          <Card>
+            <CardContent className="pt-6">
+              <Tabs defaultValue="personal">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="personal">Personal</TabsTrigger>
+                  <TabsTrigger value="medical">Medical</TabsTrigger>
+                  <TabsTrigger value="vitals">Vitals</TabsTrigger>
+                  <TabsTrigger value="examResults">Exam Results</TabsTrigger>
+                  <TabsTrigger value="assessment">Assessment</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="personal">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Personal Information</h3>
+                    <Separator />
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {renderSectionItem("Full Name", ehrData.personal.fullName)}
+                      {renderSectionItem("Date of Birth", ehrData.personal.dateOfBirth)}
+                      {renderSectionItem("Gender", ehrData.personal.gender)}
+                      {renderSectionItem("Employee ID", ehrData.personal.employeeId)}
+                      {renderSectionItem("Address", ehrData.personal.address)}
+                      {renderSectionItem("Phone Number", ehrData.personal.phoneNumber)}
+                      {renderSectionItem("Email", ehrData.personal.email)}
+                      {renderSectionItem("Occupation", ehrData.personal.occupation)}
+                      {renderSectionItem("Employer", ehrData.personal.employer)}
+                    </dl>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="medical">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Medical Information</h3>
+                    <Separator />
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {renderSectionItem("Allergies", ehrData.medical.allergies)}
+                      {renderSectionItem("Current Medications", ehrData.medical.currentMedications)}
+                      {renderSectionItem("Chronic Conditions", ehrData.medical.chronicConditions)}
+                      {renderSectionItem("Previous Surgeries", ehrData.medical.previousSurgeries)}
+                      {renderSectionItem("Family History", ehrData.medical.familyHistory)}
+                      {renderSectionItem("Smoker", ehrData.medical.smoker)}
+                      {renderSectionItem("Alcohol Consumption", ehrData.medical.alcoholConsumption)}
+                      {renderSectionItem("Exercise Frequency", ehrData.medical.exerciseFrequency)}
+                    </dl>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="vitals">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Vitals</h3>
+                    <Separator />
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {renderSectionItem("Height", ehrData.vitals.height)}
+                      {renderSectionItem("Weight", ehrData.vitals.weight)}
+                      {renderSectionItem("BMI", ehrData.vitals.bmi)}
+                      {renderSectionItem("Blood Pressure", ehrData.vitals.bloodPressure)}
+                      {renderSectionItem("Heart Rate", ehrData.vitals.heartRate)}
+                      {renderSectionItem("Respiratory Rate", ehrData.vitals.respiratoryRate)}
+                      {renderSectionItem("Temperature", ehrData.vitals.temperature)}
+                      {renderSectionItem("Oxygen Saturation", ehrData.vitals.oxygenSaturation)}
+                    </dl>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="examResults">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Exam Results</h3>
+                    <Separator />
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {renderSectionItem("Vision", ehrData.examResults.vision)}
+                      {renderSectionItem("Hearing", ehrData.examResults.hearing)}
+                      {renderSectionItem("Lung Function", ehrData.examResults.lungFunction)}
+                      {renderSectionItem("Chest X-Ray", ehrData.examResults.chestXRay)}
+                      {renderSectionItem("Laboratory", ehrData.examResults.laboratory)}
+                    </dl>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="assessment">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Assessment</h3>
+                    <Separator />
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {renderSectionItem("Diagnosis", ehrData.assessment.diagnosis)}
+                      {renderSectionItem("Recommendations", ehrData.assessment.recommendations)}
+                      {renderSectionItem("Restrictions", ehrData.assessment.restrictions)}
+                      {renderSectionItem("Fitness Conclusion", ehrData.assessment.fitnessConclusion)}
+                    </dl>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="certificates" className="mt-6">
+          <PatientCertificates patientId={id!} organizationId={organizationId} />
         </TabsContent>
         
         <TabsContent value="medical-history" className="mt-6">
