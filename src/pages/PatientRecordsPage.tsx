@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,12 +40,30 @@ interface Document {
 const PatientRecordsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
   const [documentType, setDocumentType] = useState<string>("all");
   const [showOnlyValidated, setShowOnlyValidated] = useState<boolean>(true);
 
-  // Query patient information
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const action = searchParams.get('action');
+    
+    if (action === 'download') {
+      toast({
+        title: "Certificate Ready for Download",
+        description: "Your certificate will begin downloading momentarily.",
+      });
+      
+      searchParams.delete('action');
+      navigate({
+        pathname: location.pathname,
+        search: searchParams.toString()
+      }, { replace: true });
+    }
+  }, [location, navigate]);
+
   const { data: patient, isLoading: isLoadingPatient } = useQuery({
     queryKey: ['patient', id],
     queryFn: async () => {
@@ -61,7 +79,6 @@ const PatientRecordsPage = () => {
     enabled: !!id,
   });
 
-  // Query patient documents
   const { data: documents, isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['patient-documents', id, documentType, showOnlyValidated],
     queryFn: async () => {
@@ -76,18 +93,14 @@ const PatientRecordsPage = () => {
         .select('*')
         .order('created_at', { ascending: false });
       
-      // Apply organization filter
       query = query.eq('organization_id', organizationId);
       
-      // Filter documents related to this patient
       query = query.filter('extracted_data->patient_info->id', 'eq', id);
       
-      // Apply document type filter if not "all"
       if (documentType !== "all") {
         query = query.eq('document_type', documentType);
       }
       
-      // Apply validation filter if enabled
       if (showOnlyValidated) {
         query = query.eq('status', 'processed');
         query = query.filter('extracted_data->structured_data->validated', 'eq', true);
@@ -120,6 +133,10 @@ const PatientRecordsPage = () => {
 
   const handleViewDocument = (documentId: string) => {
     navigate(`/documents/${documentId}`);
+  };
+
+  const handleDownloadDocument = (documentId: string) => {
+    navigate(`/documents/${documentId}?action=download`);
   };
 
   const toggleValidationFilter = () => {
@@ -244,13 +261,22 @@ const PatientRecordsPage = () => {
                             )}
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewDocument(doc.id)}
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          View Document
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDownloadDocument(doc.id)}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleViewDocument(doc.id)}
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            View
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}

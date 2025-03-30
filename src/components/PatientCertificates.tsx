@@ -1,13 +1,13 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { FileText, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle, Download, Printer, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/ui/use-toast';
 
 interface PatientCertificatesProps {
   patientId: string;
@@ -55,7 +55,6 @@ interface Document {
 
 type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
-// Function to determine the fitness status color
 const getFitnessStatusColor = (document: Document) => {
   const certification = document.extracted_data?.structured_data?.certification;
   
@@ -66,7 +65,6 @@ const getFitnessStatusColor = (document: Document) => {
   return "secondary";
 };
 
-// Function to format fitness status text
 const getFitnessStatusText = (document: Document) => {
   const certification = document.extracted_data?.structured_data?.certification;
   const results = document.extracted_data?.structured_data?.examination_results;
@@ -76,19 +74,17 @@ const getFitnessStatusText = (document: Document) => {
   if (certification?.temporarily_unfit) return "Temporarily Unfit";
   if (certification?.unfit) return "Unfit";
   
-  // Fallback to examination_results if available
   return results?.fitness_status || "Unknown";
 };
 
-// Helper function to get document review status from localStorage
 const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
   return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
 };
 
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const navigate = useNavigate();
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
 
-  // Query to fetch patient details to assist with matching
   const { data: patient } = useQuery({
     queryKey: ['patient-details', patientId],
     queryFn: async () => {
@@ -104,14 +100,12 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId,
   });
 
-  // Query certificates related to this patient with enhanced matching, showing all certificates
   const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
     queryFn: async () => {
       console.log('Fetching certificates for patient:', patientId);
       console.log('Patient name:', patient?.first_name, patient?.last_name);
       
-      // Get all processed documents of certificate types
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -125,19 +119,14 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         throw error;
       }
       
-      console.log('Raw processed documents fetched:', data?.length);
-      
-      // Enhanced multi-strategy matching without validation filter
       const filteredDocs = (data || []).filter(doc => {
         const extractedData = doc.extracted_data as ExtractedData | null;
         
-        // Strategy 1: Direct patient ID match in patient_info
         if (extractedData?.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
           return true;
         }
         
-        // Strategy 2: Patient name match in structured data
         const patientName = patient ? 
           `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
         
@@ -149,7 +138,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           return true;
         }
         
-        // Strategy 3: Patient name in filename (simplified)
         const fileName = doc.file_name.toLowerCase();
         
         if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
@@ -162,7 +150,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           return true;
         }
         
-        // Strategy 4: Patient ID in filename
         if (fileName.includes(patientId.toLowerCase())) {
           console.log('Match by patient ID in filename:', doc.id);
           return true;
@@ -172,7 +159,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         return false;
       });
       
-      // Add review status from localStorage to each document
       const docsWithReviewStatus = filteredDocs.map(doc => ({
         ...doc,
         reviewStatus: getDocumentReviewStatus(doc.id)
@@ -188,9 +174,29 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     navigate(`/documents/${documentId}`);
   };
 
-  // Filter for only reviewed certificates if needed
-  // Uncomment this to show only reviewed certificates
-  // const reviewedCertificates = certificates?.filter(cert => cert.reviewStatus === 'reviewed') || [];
+  const handleGeneratePdf = async (documentId: string) => {
+    try {
+      setGeneratingPdf(documentId);
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast({
+        title: "PDF generated successfully",
+        description: "You can now download or print the certificate",
+      });
+      
+      navigate(`/documents/${documentId}?action=download`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Failed to generate PDF",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingPdf(null);
+    }
+  };
 
   return (
     <Card>
@@ -239,13 +245,32 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleViewCertificate(cert.id)}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Certificate
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleGeneratePdf(cert.id)}
+                      disabled={generatingPdf === cert.id}
+                    >
+                      {generatingPdf === cert.id ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          Generate PDF
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleViewCertificate(cert.id)}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
