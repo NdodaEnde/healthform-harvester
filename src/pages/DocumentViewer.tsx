@@ -59,34 +59,58 @@ const DocumentViewer = () => {
     const fetchDocument = async () => {
       setIsLoading(true);
       try {
-        // Simulate fetching document data
-        // Replace this with your actual data fetching logic
-        // const { data, error } = await supabase
-        //   .from('documents')
-        //   .select('*')
-        //   .eq('id', id)
-        //   .single();
+        if (id) {
+          // Fetch actual document data if we have an ID
+          const { data, error } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        // if (error) {
-        //   console.error("Error fetching document:", error);
-        //   toast("Error fetching document");
-        //   return;
-        // }
-
-        // setDocument(data);
-        setDocument(mockDocumentData);
-
-        // Simulate processing delay
-        const timeoutId = setTimeout(() => {
+          if (error) {
+            console.error("Error fetching document:", error);
+            toast("Error fetching document");
+            // Fall back to mock data if fetch fails
+            setDocument(mockDocumentData);
+            setImageUrl(mockDocumentData.imageUrl);
+            setValidatorData(mapExtractedDataToValidatorFormat(mockDocumentData.extractedData));
+          } else {
+            console.log("Fetched document:", data);
+            setDocument(data);
+            
+            // Get the file URL if we have a path
+            if (data.file_path) {
+              const { data: fileData, error: fileError } = await supabase
+                .storage
+                .from('documents')
+                .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
+                
+              if (fileError) {
+                console.error("Error getting file URL:", fileError);
+              } else if (fileData) {
+                setImageUrl(fileData.signedUrl);
+              }
+            }
+            
+            // Set extracted data for validator if available
+            if (data.extracted_data) {
+              setValidatorData(mapExtractedDataToValidatorFormat(data.extracted_data));
+            }
+          }
+        } else {
+          // Use mock data if no ID is provided
+          setDocument(mockDocumentData);
           setImageUrl(mockDocumentData.imageUrl);
-          setIsLoading(false);
           setValidatorData(mapExtractedDataToValidatorFormat(mockDocumentData.extractedData));
-        }, 1500);
-
-        setProcessingTimeout(timeoutId);
+        }
       } catch (error) {
         console.error("Failed to load document:", error);
         toast("Failed to load document");
+        
+        // Fall back to mock data
+        setDocument(mockDocumentData);
+        setImageUrl(mockDocumentData.imageUrl);
+        setValidatorData(mapExtractedDataToValidatorFormat(mockDocumentData.extractedData));
       } finally {
         setIsLoading(false);
       }
@@ -142,6 +166,15 @@ const DocumentViewer = () => {
           console.error("Could not copy text: ", err);
           toast("Copy Failed");
         });
+    } else if (document && document.extracted_data) {
+      navigator.clipboard.writeText(JSON.stringify(document.extracted_data, null, 2))
+        .then(() => {
+          toast("Data Copied");
+        })
+        .catch(err => {
+          console.error("Could not copy text: ", err);
+          toast("Copy Failed");
+        });
     } else {
       toast("No Data");
     }
@@ -169,7 +202,11 @@ const DocumentViewer = () => {
   };
 
   const handleCancelEdit = () => {
-    setEditableData(document.extractedData);
+    if (document && document.extractedData) {
+      setEditableData(document.extractedData);
+    } else if (document && document.extracted_data) {
+      setEditableData(document.extracted_data);
+    }
     setIsEditing(false);
   };
 
@@ -230,12 +267,17 @@ const DocumentViewer = () => {
     setSendingEmail(true);
     try {
       const pdfBlob = await generatePdfBlobFromElement(certificateRef.current);
+      const patientName = document?.extractedData?.personal?.fullName || 
+                         document?.extracted_data?.personal?.fullName || 
+                         "Patient";
+      const certificateType = document?.type || "Medical Certificate";
+      
       const result = await sendCertificateEmail(
         emailAddress,
         "Medical Certificate",
         pdfBlob,
-        document.patientName,
-        document.type
+        patientName,
+        certificateType
       );
   
       if (result.success) {
@@ -251,6 +293,19 @@ const DocumentViewer = () => {
       setShowEmailDialog(false);
     }
   };
+
+  // Get the correct data to display, either from the mock data or the actual document
+  const getDocumentData = () => {
+    if (document?.extractedData) {
+      return document.extractedData;
+    } else if (document?.extracted_data) {
+      return document.extracted_data;
+    } else {
+      return null;
+    }
+  };
+
+  const documentData = getDocumentData();
 
   return (
     <motion.div
@@ -407,7 +462,16 @@ const DocumentViewer = () => {
             <TabsTrigger value="certificate">Certificate</TabsTrigger>
           </TabsList>
           <div className="flex flex-grow overflow-hidden">
-            <ScrollArea className="w-full h-full">
+            {showOriginal && imageUrl && (
+              <div className="w-1/2 border-r overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="p-4">
+                    <img src={imageUrl} alt="Original Document" className="w-full h-auto" />
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+            <ScrollArea className={`${showOriginal && imageUrl ? 'w-1/2' : 'w-full'} h-full`}>
               <div className="p-4 md:grid md:grid-cols-2 md:gap-4">
                 <TabsContent value="personal" className="space-y-4">
                   <Card>
@@ -805,7 +869,7 @@ const DocumentViewer = () => {
                       <Separator />
                       {validatorData ? (
                         <CertificateValidator 
-                          validatorData={validatorData} 
+                          validator={validatorData} 
                           isValidating={isValidating} 
                           onValidate={handleValidation} 
                         />
@@ -821,7 +885,7 @@ const DocumentViewer = () => {
                     <CardContent>
                       <div ref={certificateRef} className="print:p-0">
                         <DocumentHeader title="Certificate of Medical Examination" />
-                        <CertificateTemplate extractedData={document?.extractedData} />
+                        <CertificateTemplate extractedData={documentData} />
                       </div>
                     </CardContent>
                   </Card>
@@ -836,4 +900,3 @@ const DocumentViewer = () => {
 };
 
 export default DocumentViewer;
-

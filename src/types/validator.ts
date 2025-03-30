@@ -1,6 +1,6 @@
 
 export interface CertificateValidatorProps {
-  validatorData: any;
+  validator: any;
   isValidating: boolean;
   onValidate: () => Promise<void>;
 }
