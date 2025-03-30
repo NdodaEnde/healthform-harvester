@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -37,13 +36,11 @@ const PatientDetailPage = () => {
     enabled: !!id,
   });
 
-  // Fetch certificates summary data for the patient
-  const { data: certificatesSummary } = useQuery({
-    queryKey: ['patient-certificates-summary', id, organizationId],
+  // Fetch certificates for the patient
+  const { data: patientCertificates } = useQuery({
+    queryKey: ['patient-certificates-data', id, organizationId],
     queryFn: async () => {
-      console.log('Fetching certificates summary for patient:', id);
-      
-      if (!id || !organizationId) return null;
+      if (!id || !organizationId) return [];
       
       // Get all processed documents of certificate types
       const { data, error } = await supabase
@@ -55,12 +52,12 @@ const PatientDetailPage = () => {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching certificates summary:', error);
+        console.error('Error fetching certificates:', error);
         throw error;
       }
       
-      // Filter for this patient (simplified matching)
-      const patientCertificates = (data || []).filter(doc => {
+      // Enhanced multi-strategy matching for this patient
+      return (data || []).filter(doc => {
         const extractedData = doc.extracted_data;
         
         // Simple patient matching
@@ -97,37 +94,45 @@ const PatientDetailPage = () => {
         
         return false;
       });
-      
-      // Find latest expiration date
-      let latestExpiration = null;
-      for (const cert of patientCertificates) {
-        if (cert.extracted_data && typeof cert.extracted_data === 'object' && 
-            'structured_data' in cert.extracted_data && 
-            cert.extracted_data.structured_data && 
-            typeof cert.extracted_data.structured_data === 'object' &&
-            'certification' in cert.extracted_data.structured_data &&
-            cert.extracted_data.structured_data.certification && 
-            typeof cert.extracted_data.structured_data.certification === 'object' &&
-            'valid_until' in cert.extracted_data.structured_data.certification) {
-          try {
-            const expiryDate = cert.extracted_data.structured_data.certification.valid_until;
-            const expiryDateObj = new Date(String(expiryDate));
-            if (!latestExpiration || expiryDateObj > latestExpiration) {
-              latestExpiration = expiryDateObj;
-            }
-          } catch (e) {
-            console.log('Invalid date format:', cert.extracted_data.structured_data.certification.valid_until);
-          }
-        }
-      }
-      
-      return {
-        count: patientCertificates.length,
-        latestExpiration: latestExpiration ? format(latestExpiration, 'PPP') : null
-      };
     },
     enabled: !!id && !!organizationId && !!patient,
   });
+
+  // Calculate latest expiration date from certificates
+  const certificateSummary = React.useMemo(() => {
+    if (!patientCertificates || patientCertificates.length === 0) {
+      return { count: 0, latestExpiration: null };
+    }
+
+    let latestExpiration = null;
+    
+    for (const cert of patientCertificates) {
+      if (cert.extracted_data && typeof cert.extracted_data === 'object' && 
+          'structured_data' in cert.extracted_data && 
+          cert.extracted_data.structured_data && 
+          typeof cert.extracted_data.structured_data === 'object' &&
+          'certification' in cert.extracted_data.structured_data &&
+          cert.extracted_data.structured_data.certification && 
+          typeof cert.extracted_data.structured_data.certification === 'object' &&
+          'valid_until' in cert.extracted_data.structured_data.certification) {
+        try {
+          const expiryDate = cert.extracted_data.structured_data.certification.valid_until;
+          const expiryDateObj = new Date(String(expiryDate));
+          
+          if (!isNaN(expiryDateObj.getTime()) && (!latestExpiration || expiryDateObj > latestExpiration)) {
+            latestExpiration = expiryDateObj;
+          }
+        } catch (e) {
+          console.log('Invalid date format:', cert.extracted_data.structured_data.certification.valid_until);
+        }
+      }
+    }
+    
+    return {
+      count: patientCertificates.length,
+      latestExpiration: latestExpiration ? format(latestExpiration, 'PPP') : null
+    };
+  }, [patientCertificates]);
 
   const handleBackToList = () => {
     navigate('/patients');
@@ -448,7 +453,7 @@ const PatientDetailPage = () => {
                   <div className="flex items-center gap-6">
                     <div className="text-center flex-1 py-2 px-4 bg-muted/30 rounded-lg">
                       <h3 className="text-3xl font-semibold text-primary mb-1">
-                        {certificatesSummary?.count ?? 0}
+                        {certificateSummary.count}
                       </h3>
                       <p className="text-muted-foreground text-sm">Total Certificates</p>
                     </div>
@@ -457,7 +462,7 @@ const PatientDetailPage = () => {
                       <div className="flex items-center justify-center gap-2 text-amber-500 mb-1">
                         <Calendar className="h-5 w-5" />
                         <h3 className="text-lg font-medium leading-none">
-                          {certificatesSummary?.latestExpiration ?? 'N/A'}
+                          {certificateSummary.latestExpiration ?? 'N/A'}
                         </h3>
                       </div>
                       <p className="text-muted-foreground text-sm">Latest Expiration</p>
