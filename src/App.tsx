@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -29,6 +28,7 @@ import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
 import LoadingFallback from './components/LoadingFallback';
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -89,6 +89,15 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <Dashboard />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  {/* Analytics Dashboard */}
+                  <Route path="/analytics" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <AnalyticsDashboardPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
