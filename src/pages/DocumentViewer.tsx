@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -33,6 +34,7 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import DocumentHeader from "@/components/DocumentHeader";
+import { mockDocumentData } from "@/utils/mock-data";
 
 const DocumentViewer = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,11 +69,7 @@ const DocumentViewer = () => {
 
         // if (error) {
         //   console.error("Error fetching document:", error);
-        //   toast({
-        //     title: "Error fetching document",
-        //     description: "Failed to load document details.",
-        //     variant: "destructive",
-        //   });
+        //   toast("Error fetching document");
         //   return;
         // }
 
@@ -88,11 +86,7 @@ const DocumentViewer = () => {
         setProcessingTimeout(timeoutId);
       } catch (error) {
         console.error("Failed to load document:", error);
-        toast({
-          title: "Failed to load document",
-          description: "There was an error loading the document.",
-          variant: "destructive",
-        });
+        toast("Failed to load document");
       } finally {
         setIsLoading(false);
       }
@@ -114,18 +108,12 @@ const DocumentViewer = () => {
   }, [document]);
 
   const handleRescan = () => {
-    toast({
-      title: "Rescanning Document",
-      description: "The document is being rescanned. Please wait.",
-    });
+    toast("Rescanning Document");
     setIsLoading(true);
     // Simulate rescanning
     setTimeout(() => {
       setIsLoading(false);
-      toast({
-        title: "Rescan Complete",
-        description: "The document has been rescanned.",
-      });
+      toast("Rescan Complete");
       setRefreshKey(prevKey => prevKey + 1);
     }, 2000);
   };
@@ -135,17 +123,10 @@ const DocumentViewer = () => {
     try {
       // Simulate validation process
       await new Promise(resolve => setTimeout(resolve, 1500));
-      toast({
-        title: "Validation Complete",
-        description: "The document has been validated successfully.",
-      });
+      toast("Validation Complete");
     } catch (error) {
       console.error("Validation Error:", error);
-      toast({
-        title: "Validation Error",
-        description: "There was an error validating the document.",
-        variant: "destructive",
-      });
+      toast("Validation Error");
     } finally {
       setIsValidating(false);
     }
@@ -155,25 +136,14 @@ const DocumentViewer = () => {
     if (document && document.jsonData) {
       navigator.clipboard.writeText(JSON.stringify(document.jsonData, null, 2))
         .then(() => {
-          toast({
-            title: "Data Copied",
-            description: "JSON data copied to clipboard.",
-          });
+          toast("Data Copied");
         })
         .catch(err => {
           console.error("Could not copy text: ", err);
-          toast({
-            title: "Copy Failed",
-            description: "Failed to copy JSON data to clipboard.",
-            variant: "destructive",
-          });
+          toast("Copy Failed");
         });
     } else {
-      toast({
-        title: "No Data",
-        description: "No JSON data available to copy.",
-        variant: "destructive",
-      });
+      toast("No Data");
     }
   };
 
@@ -188,18 +158,11 @@ const DocumentViewer = () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       // Here you would typically send the updated data to your backend
       console.log("Saving data:", editableData);
-      toast({
-        title: "Save Successful",
-        description: "The document data has been saved.",
-      });
+      toast("Save Successful");
       setIsEditing(false);
     } catch (error) {
       console.error("Save Error:", error);
-      toast({
-        title: "Save Error",
-        description: "There was an error saving the document data.",
-        variant: "destructive",
-      });
+      toast("Save Error");
     } finally {
       setIsLoading(false);
     }
@@ -222,28 +185,17 @@ const DocumentViewer = () => {
 
   const handleGeneratePdf = async () => {
     if (!certificateRef.current) {
-      toast({
-        title: "Error",
-        description: "Certificate template not found.",
-        variant: "destructive",
-      });
+      toast("Error: Certificate template not found");
       return;
     }
 
     setGeneratingPdf('download');
     try {
       await generatePdfFromElement(certificateRef.current, 'certificate.pdf');
-      toast({
-        title: "PDF Generated",
-        description: "Certificate PDF has been generated and downloaded.",
-      });
+      toast("PDF Generated");
     } catch (error) {
       console.error("PDF Generation Error:", error);
-      toast({
-        title: "PDF Generation Error",
-        description: "Failed to generate the certificate PDF.",
-        variant: "destructive",
-      });
+      toast("PDF Generation Error");
     } finally {
       setGeneratingPdf(null);
     }
@@ -251,11 +203,7 @@ const DocumentViewer = () => {
 
   const handleGeneratePdfBlob = async () => {
     if (!certificateRef.current) {
-      toast({
-        title: "Error",
-        description: "Certificate template not found.",
-        variant: "destructive",
-      });
+      toast("Error: Certificate template not found");
       return;
     }
   
@@ -264,17 +212,10 @@ const DocumentViewer = () => {
       const pdfBlob = await generatePdfBlobFromElement(certificateRef.current);
       // You can now use this blob for sending via email or other purposes
       console.log("PDF Blob generated successfully", pdfBlob);
-      toast({
-        title: "PDF Blob Generated",
-        description: "Certificate PDF blob has been generated.",
-      });
+      toast("PDF Blob Generated");
     } catch (error) {
       console.error("PDF Blob Generation Error:", error);
-      toast({
-        title: "PDF Blob Generation Error",
-        description: "Failed to generate the certificate PDF blob.",
-        variant: "destructive",
-      });
+      toast("PDF Blob Generation Error");
     } finally {
       setGeneratingPdf(null);
     }
@@ -282,11 +223,7 @@ const DocumentViewer = () => {
 
   const handleSendEmail = async () => {
     if (!certificateRef.current) {
-      toast({
-        title: "Error",
-        description: "Certificate template not found.",
-        variant: "destructive",
-      });
+      toast("Error: Certificate template not found");
       return;
     }
   
@@ -302,24 +239,13 @@ const DocumentViewer = () => {
       );
   
       if (result.success) {
-        toast({
-          title: "Email Sent",
-          description: "Certificate has been sent via email.",
-        });
+        toast("Email Sent");
       } else {
-        toast({
-          title: "Email Failed",
-          description: result.error || "Failed to send the email.",
-          variant: "destructive",
-        });
+        toast("Email Failed");
       }
     } catch (error) {
       console.error("Email Sending Error:", error);
-      toast({
-        title: "Email Sending Error",
-        description: "Failed to send the certificate via email.",
-        variant: "destructive",
-      });
+      toast("Email Sending Error");
     } finally {
       setSendingEmail(false);
       setShowEmailDialog(false);
@@ -878,7 +804,11 @@ const DocumentViewer = () => {
                       <div className="text-sm font-medium">Validation</div>
                       <Separator />
                       {validatorData ? (
-                        <CertificateValidator data={validatorData} isValidating={isValidating} onValidate={handleValidation} />
+                        <CertificateValidator 
+                          validatorData={validatorData} 
+                          isValidating={isValidating} 
+                          onValidate={handleValidation} 
+                        />
                       ) : (
                         <div className="text-center">No data to validate.</div>
                       )}
@@ -891,7 +821,7 @@ const DocumentViewer = () => {
                     <CardContent>
                       <div ref={certificateRef} className="print:p-0">
                         <DocumentHeader title="Certificate of Medical Examination" />
-                        <CertificateTemplate document={document} />
+                        <CertificateTemplate extractedData={document?.extractedData} />
                       </div>
                     </CardContent>
                   </Card>
@@ -906,3 +836,4 @@ const DocumentViewer = () => {
 };
 
 export default DocumentViewer;
+
