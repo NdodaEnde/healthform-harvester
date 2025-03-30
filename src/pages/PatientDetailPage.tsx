@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -5,9 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
-import { PatientInfo } from '@/types/patient';
+import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar, Clock } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
+import { PatientInfo, CertificateData } from '@/types/patient';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import PatientCertificates from '@/components/PatientCertificates';
@@ -98,39 +99,66 @@ const PatientDetailPage = () => {
     enabled: !!id && !!organizationId && !!patient,
   });
 
-  // Calculate latest expiration date from certificates
+  // Calculate certificate summary including last examination date and days to expiration
   const certificateSummary = React.useMemo(() => {
     if (!patientCertificates || patientCertificates.length === 0) {
-      return { count: 0, latestExpiration: null };
+      return { 
+        count: 0, 
+        latestExpiration: null, 
+        daysToExpiration: null,
+        lastExaminationDate: null 
+      };
     }
 
     let latestExpiration = null;
+    let latestExpirationDate = null;
+    let lastExaminationDate = null;
+    let daysToExpiration = null;
     
     for (const cert of patientCertificates) {
-      if (cert.extracted_data && typeof cert.extracted_data === 'object' && 
-          'structured_data' in cert.extracted_data && 
-          cert.extracted_data.structured_data && 
-          typeof cert.extracted_data.structured_data === 'object' &&
-          'certification' in cert.extracted_data.structured_data &&
-          cert.extracted_data.structured_data.certification && 
-          typeof cert.extracted_data.structured_data.certification === 'object' &&
-          'valid_until' in cert.extracted_data.structured_data.certification) {
+      if (!cert.extracted_data) continue;
+      
+      const certData = cert.extracted_data as CertificateData;
+      
+      // Check for expiration date
+      if (certData.structured_data?.certification?.valid_until) {
         try {
-          const expiryDate = cert.extracted_data.structured_data.certification.valid_until;
+          const expiryDate = certData.structured_data.certification.valid_until;
           const expiryDateObj = new Date(String(expiryDate));
           
-          if (!isNaN(expiryDateObj.getTime()) && (!latestExpiration || expiryDateObj > latestExpiration)) {
-            latestExpiration = expiryDateObj;
+          if (!isNaN(expiryDateObj.getTime()) && (!latestExpirationDate || expiryDateObj > latestExpirationDate)) {
+            latestExpirationDate = expiryDateObj;
+            latestExpiration = expiryDate;
+            
+            // Calculate days to expiration
+            const today = new Date();
+            daysToExpiration = differenceInDays(expiryDateObj, today);
           }
         } catch (e) {
-          console.log('Invalid date format:', cert.extracted_data.structured_data.certification.valid_until);
+          console.log('Invalid expiry date format:', certData.structured_data.certification.valid_until);
+        }
+      }
+      
+      // Check for examination date
+      if (certData.structured_data?.certification?.examination_date) {
+        try {
+          const examDate = certData.structured_data.certification.examination_date;
+          const examDateObj = new Date(String(examDate));
+          
+          if (!isNaN(examDateObj.getTime()) && (!lastExaminationDate || examDateObj > new Date(String(lastExaminationDate)))) {
+            lastExaminationDate = examDate;
+          }
+        } catch (e) {
+          console.log('Invalid examination date format:', certData.structured_data.certification.examination_date);
         }
       }
     }
     
     return {
       count: patientCertificates.length,
-      latestExpiration: latestExpiration ? format(latestExpiration, 'PPP') : null
+      latestExpiration: latestExpiration ? String(latestExpiration) : null,
+      lastExaminationDate: lastExaminationDate ? String(lastExaminationDate) : null,
+      daysToExpiration
     };
   }, [patientCertificates]);
 
@@ -450,22 +478,36 @@ const PatientDetailPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-6">
-                    <div className="text-center flex-1 py-2 px-4 bg-muted/30 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center py-2 px-4 bg-muted/30 rounded-lg">
                       <h3 className="text-3xl font-semibold text-primary mb-1">
                         {certificateSummary.count}
                       </h3>
                       <p className="text-muted-foreground text-sm">Total Certificates</p>
                     </div>
                     
-                    <div className="text-center flex-1 py-2 px-4 bg-muted/30 rounded-lg">
+                    <div className="text-center py-2 px-4 bg-muted/30 rounded-lg">
                       <div className="flex items-center justify-center gap-2 text-amber-500 mb-1">
                         <Calendar className="h-5 w-5" />
                         <h3 className="text-lg font-medium leading-none">
-                          {certificateSummary.latestExpiration ?? 'N/A'}
+                          {certificateSummary.lastExaminationDate ? 
+                            format(new Date(certificateSummary.lastExaminationDate), 'PP') : 
+                            'N/A'}
                         </h3>
                       </div>
-                      <p className="text-muted-foreground text-sm">Latest Expiration</p>
+                      <p className="text-muted-foreground text-sm">Last Examination</p>
+                    </div>
+                    
+                    <div className="text-center py-2 px-4 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 text-green-500 mb-1">
+                        <Clock className="h-5 w-5" />
+                        <h3 className="text-lg font-medium leading-none">
+                          {certificateSummary.daysToExpiration !== null ? 
+                            `${certificateSummary.daysToExpiration} days` : 
+                            'N/A'}
+                        </h3>
+                      </div>
+                      <p className="text-muted-foreground text-sm">Until Expiry</p>
                     </div>
                   </div>
                   

@@ -94,3 +94,19 @@ export interface PatientInfo {
   created_at: string;
   updated_at: string;
 }
+
+export interface CertificateData {
+  structured_data?: {
+    validation?: {
+      date?: string;
+    };
+    certification?: {
+      valid_until?: string;
+      issue_date?: string;
+      examination_date?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
