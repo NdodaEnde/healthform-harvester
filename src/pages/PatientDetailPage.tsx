@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard } from 'lucide-react';
+import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { PatientInfo } from '@/types/patient';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -35,6 +35,81 @@ const PatientDetailPage = () => {
       return data as PatientInfo;
     },
     enabled: !!id,
+  });
+
+  // Fetch certificates summary data for the patient
+  const { data: certificatesSummary } = useQuery({
+    queryKey: ['patient-certificates-summary', id, organizationId],
+    queryFn: async () => {
+      console.log('Fetching certificates summary for patient:', id);
+      
+      if (!id || !organizationId) return null;
+      
+      // Get all processed documents of certificate types
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('status', 'processed')
+        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'])
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching certificates summary:', error);
+        throw error;
+      }
+      
+      // Filter for this patient (simplified matching)
+      const patientCertificates = (data || []).filter(doc => {
+        const extractedData = doc.extracted_data;
+        
+        // Simple patient matching
+        if (extractedData?.patient_info?.id === id) return true;
+        
+        // Name-based matching
+        if (patient && extractedData?.structured_data?.patient?.name) {
+          const patientName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+          const nameInData = extractedData.structured_data.patient.name.toLowerCase();
+          if (nameInData.includes(patientName)) return true;
+        }
+        
+        // File name matching
+        if (patient && doc.file_name) {
+          const fileName = doc.file_name.toLowerCase();
+          if (
+            (patient.first_name && fileName.includes(patient.first_name.toLowerCase())) ||
+            (patient.last_name && fileName.includes(patient.last_name.toLowerCase())) ||
+            fileName.includes(id.toLowerCase())
+          ) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
+      
+      // Find latest expiration date
+      let latestExpiration = null;
+      for (const cert of patientCertificates) {
+        const expiryDate = cert.extracted_data?.structured_data?.certification?.valid_until;
+        if (expiryDate) {
+          try {
+            const expiryDateObj = new Date(expiryDate);
+            if (!latestExpiration || expiryDateObj > latestExpiration) {
+              latestExpiration = expiryDateObj;
+            }
+          } catch (e) {
+            console.log('Invalid date format:', expiryDate);
+          }
+        }
+      }
+      
+      return {
+        count: patientCertificates.length,
+        latestExpiration: latestExpiration ? format(latestExpiration, 'PPP') : null
+      };
+    },
+    enabled: !!id && !!organizationId && !!patient,
   });
 
   const handleBackToList = () => {
@@ -347,7 +422,45 @@ const PatientDetailPage = () => {
               </CardContent>
             </Card>
             
-            <PatientCertificates patientId={id!} organizationId={organizationId} />
+            <Card>
+              <CardHeader>
+                <CardTitle>Certificates Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-6">
+                    <div className="text-center flex-1 py-2 px-4 bg-muted/30 rounded-lg">
+                      <h3 className="text-3xl font-semibold text-primary mb-1">
+                        {certificatesSummary?.count ?? 0}
+                      </h3>
+                      <p className="text-muted-foreground text-sm">Total Certificates</p>
+                    </div>
+                    
+                    <div className="text-center flex-1 py-2 px-4 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 text-amber-500 mb-1">
+                        <Calendar className="h-5 w-5" />
+                        <h3 className="text-lg font-medium leading-none">
+                          {certificatesSummary?.latestExpiration ?? 'N/A'}
+                        </h3>
+                      </div>
+                      <p className="text-muted-foreground text-sm">Latest Expiration</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => document.querySelector('[data-state="inactive"][data-value="certificates"]')?.click()}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View All Certificates
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
         
