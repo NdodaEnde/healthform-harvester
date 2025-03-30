@@ -390,7 +390,8 @@ export default function CertificateTemplatePreview({
       </Card>
       
       {/* Print-specific styles */}
-      <style jsx>{`
+      <style>
+        {`
         @media print {
           body * {
             visibility: hidden;
@@ -406,7 +407,8 @@ export default function CertificateTemplatePreview({
             height: auto;
           }
         }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 }

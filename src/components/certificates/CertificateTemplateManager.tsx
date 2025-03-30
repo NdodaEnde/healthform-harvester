@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +29,7 @@ import { z } from "zod";
 import { Loader2, Plus, Edit, Copy, Trash } from "lucide-react";
 import CertificateTemplateEditor from "./CertificateTemplateEditor";
 import CertificateTemplatePreview from "./CertificateTemplatePreview";
+import { getOrganizationBranding } from "@/types/organization";
 
 const templateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
@@ -337,6 +337,9 @@ export default function CertificateTemplateManager() {
     },
   };
 
+  // Get organization branding using the helper function
+  const organizationBranding = currentOrganization ? getOrganizationBranding(currentOrganization) : null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -428,7 +431,7 @@ export default function CertificateTemplateManager() {
           <h3 className="text-lg font-medium mb-4">Preview Template: {selectedTemplate.name}</h3>
           <CertificateTemplatePreview 
             template={selectedTemplate} 
-            organizationBranding={currentOrganization?.settings?.branding}
+            organizationBranding={organizationBranding}
           />
         </div>
       )}

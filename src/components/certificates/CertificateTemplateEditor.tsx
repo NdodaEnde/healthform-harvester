@@ -36,6 +36,7 @@ import {
   ArrowRight 
 } from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { getOrganizationBranding } from "@/types/organization";
 
 interface SectionConfig {
   title: string;
@@ -165,7 +166,8 @@ export default function CertificateTemplateEditor({
     }
   };
 
-  const organizationBranding = currentOrganization?.settings?.branding;
+  // Get organization branding using the helper function
+  const organizationBranding = currentOrganization ? getOrganizationBranding(currentOrganization) : null;
 
   return (
     <div className="space-y-4">
