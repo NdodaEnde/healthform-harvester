@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check, Pencil, Save, X
+  Check, Pencil, Save, X, Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { generatePdfFromElement, generatePdfBlobFromElement, sendCertificateEmail } from "@/lib/pdf";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -166,6 +167,11 @@ const DocumentViewer = () => {
   const [validatorData, setValidatorData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<boolean>(false);
+  const [emailAddress, setEmailAddress] = useState<string>("");
+  const [showEmailDialog, setShowEmailDialog] = useState<boolean>(false);
+  const certificateRef = React.useRef<HTMLDivElement>(null);
 
   const toggleEditMode = () => {
     if (!isEditing) {
@@ -884,7 +890,7 @@ const DocumentViewer = () => {
       
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
-        <div className="certificate-container pb-6">
+        <div className="certificate-container pb-6" ref={certificateRef}>
           <CertificateTemplate extractedData={extractedData} />
         </div>
       );
@@ -973,6 +979,140 @@ const DocumentViewer = () => {
         </div>
       </div>
     );
+  };
+
+  const EmailDialog = () => (
+    <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center ${showEmailDialog ? '' : 'hidden'}`}>
+      <div className="bg-background rounded-lg shadow-lg w-full max-w-md p-6">
+        <h2 className="text-xl font-bold mb-4">Send Certificate by Email</h2>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="email">Recipient Email Address</Label>
+            <Input 
+              id="email" 
+              type="email" 
+              value={emailAddress} 
+              onChange={(e) => setEmailAddress(e.target.value)}
+              placeholder="recipient@example.com"
+              className="w-full mt-1"
+            />
+          </div>
+          <div className="text-sm text-muted-foreground">
+            The certificate will be sent as a PDF attachment to this email address.
+          </div>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowEmailDialog(false);
+                setEmailAddress("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSendEmail}
+              disabled={sendingEmail || !emailAddress}
+            >
+              {sendingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleGeneratePdf = async () => {
+    if (!document) return;
+    
+    try {
+      setGeneratingPdf('generating');
+      
+      // Wait for next render cycle to ensure the certificate is fully rendered
+      setTimeout(async () => {
+        try {
+          if (!certificateRef.current) {
+            throw new Error("Certificate container not found");
+          }
+          
+          const patientName = document.patientName || "patient";
+          const sanitizedName = patientName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+          const filename = `certificate-${sanitizedName}-${new Date().toISOString().split('T')[0]}.pdf`;
+          
+          await generatePdfFromElement(certificateRef.current, filename);
+          
+          toast.success("Certificate PDF Generated", {
+            description: `PDF has been downloaded as ${filename}`,
+          });
+        } catch (error) {
+          console.error('Error during PDF generation:', error);
+          toast.error("Failed to generate PDF", {
+            description: error instanceof Error ? error.message : "Unknown error occurred",
+          });
+        } finally {
+          setGeneratingPdf(null);
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error preparing PDF:', error);
+      toast.error("Failed to generate PDF", {
+        description: "Please try again later",
+      });
+      setGeneratingPdf(null);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!document || !emailAddress || !certificateRef.current) {
+      toast.error("Cannot send email", {
+        description: "Missing required information",
+      });
+      return;
+    }
+    
+    try {
+      setSendingEmail(true);
+      
+      // Generate PDF blob for email attachment
+      const pdfBlob = await generatePdfBlobFromElement(certificateRef.current);
+      
+      // Send email with certificate
+      const response = await sendCertificateEmail(
+        emailAddress,
+        `Medical Certificate for ${document.patientName}`,
+        pdfBlob,
+        document.patientName || "Patient",
+        document.type || "Certificate of Fitness"
+      );
+      
+      if (response.success) {
+        toast.success("Email Sent Successfully", {
+          description: `The certificate has been emailed to ${emailAddress}`,
+        });
+        setShowEmailDialog(false);
+        setEmailAddress("");
+      } else {
+        throw new Error(response.error || "Failed to send email");
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error("Failed to send email", {
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   useEffect(() => {
@@ -1242,6 +1382,36 @@ const DocumentViewer = () => {
                 </>
               )}
             </Button>
+            {document?.status === 'processed' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeneratePdf}
+                  disabled={generatingPdf !== null}
+                >
+                  {generatingPdf ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEmailDialog(true)}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email
+                </Button>
+              </>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -1479,9 +1649,10 @@ const DocumentViewer = () => {
           </motion.div>
         </motion.div>
       </main>
+      
+      <EmailDialog />
     </div>
   );
 };
 
 export default DocumentViewer;
-

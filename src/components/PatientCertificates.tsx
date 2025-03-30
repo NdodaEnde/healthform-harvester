@@ -1,13 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { FileText, AlertCircle, Download, Printer, Loader2 } from 'lucide-react';
+import { FileText, AlertCircle, Download, Printer, Loader2, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
+import { generatePdfFromElement, generatePdfBlobFromElement } from '@/utils/pdf-generator';
+import { sendCertificateEmail } from '@/utils/email-utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import CertificateTemplate from '@/components/CertificateTemplate';
 
 interface PatientCertificatesProps {
   patientId: string;
@@ -84,6 +90,11 @@ const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const navigate = useNavigate();
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [selectedCertificate, setSelectedCertificate] = useState<Document | null>(null);
+  const [showEmailDialog, setShowEmailDialog] = useState<boolean>(false);
+  const [emailAddress, setEmailAddress] = useState<string>("");
+  const [sendingEmail, setSendingEmail] = useState<boolean>(false);
+  const certificateRef = useRef<HTMLDivElement>(null);
 
   const { data: patient } = useQuery({
     queryKey: ['patient-details', patientId],
@@ -174,21 +185,106 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     navigate(`/documents/${documentId}`);
   };
 
-  const handleGeneratePdf = async (documentId: string) => {
+  const handleGeneratePdf = async (cert: Document) => {
     try {
-      setGeneratingPdf(documentId);
+      setGeneratingPdf(cert.id);
+      setSelectedCertificate(cert);
       
-      navigate(`/documents/${documentId}?action=download`);
+      setTimeout(async () => {
+        try {
+          if (!certificateRef.current) {
+            throw new Error("Certificate container not found");
+          }
+          
+          const patientName = cert.extracted_data?.structured_data?.patient?.name || patient?.first_name || "patient";
+          const sanitizedName = patientName.toString().replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+          const filename = `certificate-${sanitizedName}-${new Date().toISOString().split('T')[0]}.pdf`;
+          
+          await generatePdfFromElement(certificateRef.current, filename);
+          
+          toast({
+            title: "Certificate PDF Generated",
+            description: `PDF has been downloaded as ${filename}`,
+            variant: "success"
+          });
+        } catch (error) {
+          console.error('Error during PDF generation:', error);
+          toast({
+            title: "Failed to generate PDF",
+            description: error instanceof Error ? error.message : "Unknown error occurred",
+            variant: "destructive"
+          });
+        } finally {
+          setGeneratingPdf(null);
+          setSelectedCertificate(null);
+        }
+      }, 100);
       
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Error preparing PDF:', error);
       toast({
         title: "Failed to generate PDF",
         description: "Please try again later",
         variant: "destructive"
       });
-    } finally {
       setGeneratingPdf(null);
+      setSelectedCertificate(null);
+    }
+  };
+
+  const handleShowEmailDialog = (cert: Document) => {
+    setSelectedCertificate(cert);
+    setShowEmailDialog(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedCertificate || !emailAddress || !certificateRef.current) {
+      toast({
+        title: "Cannot send email",
+        description: "Missing required information",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setSendingEmail(true);
+      
+      const pdfBlob = await generatePdfBlobFromElement(certificateRef.current);
+      
+      const patientName = selectedCertificate.extracted_data?.structured_data?.patient?.name || 
+                          patient?.first_name + ' ' + patient?.last_name || 
+                          "Patient";
+      
+      const response = await sendCertificateEmail(
+        emailAddress,
+        `Medical Certificate for ${patientName}`,
+        pdfBlob,
+        patientName.toString(),
+        "Certificate of Fitness"
+      );
+      
+      if (response.success) {
+        toast({
+          title: "Email Sent Successfully",
+          description: `The certificate has been emailed to ${emailAddress}`,
+          variant: "success"
+        });
+        setShowEmailDialog(false);
+        setEmailAddress("");
+        setSelectedCertificate(null);
+      } else {
+        throw new Error(response.error || "Failed to send email");
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast({
+        title: "Failed to send email",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -242,7 +338,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      onClick={() => handleGeneratePdf(cert.id)}
+                      onClick={() => handleGeneratePdf(cert)}
                       disabled={generatingPdf === cert.id}
                     >
                       {generatingPdf === cert.id ? (
@@ -256,6 +352,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                           Generate PDF
                         </>
                       )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleShowEmailDialog(cert)}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      Email
                     </Button>
                     <Button
                       variant="outline"
@@ -279,6 +382,65 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           </div>
         )}
       </CardContent>
+
+      <div className="hidden">
+        {selectedCertificate && (
+          <div ref={certificateRef} className="certificate-container p-8 bg-white">
+            <CertificateTemplate extractedData={selectedCertificate.extracted_data} />
+          </div>
+        )}
+      </div>
+
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Certificate by Email</DialogTitle>
+            <DialogDescription>
+              The certificate will be sent as a PDF attachment to the recipient.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Recipient Email Address</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                value={emailAddress} 
+                onChange={(e) => setEmailAddress(e.target.value)}
+                placeholder="recipient@example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowEmailDialog(false);
+                setEmailAddress("");
+                setSelectedCertificate(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSendEmail}
+              disabled={sendingEmail || !emailAddress}
+            >
+              {sendingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
