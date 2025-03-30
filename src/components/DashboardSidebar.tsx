@@ -9,6 +9,13 @@ import { BarChart2, FileBox, FileText, Home, Settings, Users, Building2, FolderC
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLDivElement> {}
 
+// Define the item interface with optional condition
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ReactNode;
+}
+
 export function DashboardSidebar({ className }: SidebarNavProps) {
   const { pathname } = useLocation();
   const { currentOrganization } = useOrganization();
@@ -48,29 +55,26 @@ export function DashboardSidebar({ className }: SidebarNavProps) {
     }
   ];
   
-  // Admin section items
+  // Admin section items - removing the condition property which caused the type error
   const adminItems = isAdmin ? [
     {
       title: "Organizations",
       href: "/admin/organizations",
       icon: <Building2 className="mr-2 h-4 w-4" />,
-      condition: isAdmin,
     },
     {
       title: "Settings",
       href: "/settings/organization",
       icon: <Settings className="mr-2 h-4 w-4" />,
-      condition: isAdmin,
     }
   ] : [];
   
-  // For service providers, add client management
+  // For service providers, add client management - without the condition property
   if (isServiceProvider && isAdmin) {
     adminItems.splice(1, 0, {
       title: "Client Management",
       href: `/admin/organizations/${currentOrganization?.id}/clients`,
       icon: <FolderCog className="mr-2 h-4 w-4" />,
-      condition: isServiceProvider && isAdmin,
     });
   }
 
