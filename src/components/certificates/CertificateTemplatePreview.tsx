@@ -1,11 +1,10 @@
-import { useRef, useEffect, useState } from "react";
+
+import { useRef, useEffect } from "react";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Printer, Download, Eye, Loader2 } from "lucide-react";
+import { Printer, Download, Eye } from "lucide-react";
 import { BrandingSettings } from "@/types/organization";
-import { toast } from "@/components/ui/use-toast";
-import { generatePdfFromElement } from "@/utils/pdf-generator";
 
 interface CertificateTemplatePreviewProps {
   template: {
@@ -16,8 +15,6 @@ interface CertificateTemplatePreviewProps {
   organizationBranding?: BrandingSettings;
   patientData?: any;
   certificateData?: any;
-  onDownloadPdf?: () => void;
-  downloadMode?: boolean;
 }
 
 export default function CertificateTemplatePreview({
@@ -25,12 +22,9 @@ export default function CertificateTemplatePreview({
   organizationBranding,
   patientData,
   certificateData,
-  onDownloadPdf,
-  downloadMode = false,
 }: CertificateTemplatePreviewProps) {
   const { currentOrganization } = useOrganization();
   const previewRef = useRef<HTMLDivElement>(null);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const branding = organizationBranding || {
     primary_color: "#0f172a",
@@ -38,6 +32,7 @@ export default function CertificateTemplatePreview({
     text_color: "#ffffff"
   };
 
+  // Use template data or default values
   const templateData = template.template_data || {
     sections: [],
     branding: { 
@@ -52,6 +47,7 @@ export default function CertificateTemplatePreview({
     }
   };
 
+  // Mock patient data for preview if not provided
   const patient = patientData || {
     first_name: "Jane",
     last_name: "Doe",
@@ -60,6 +56,7 @@ export default function CertificateTemplatePreview({
     id: "mock-patient-id"
   };
 
+  // Mock certificate data for preview if not provided
   const certificate = certificateData || {
     id: "mock-certificate-id",
     expiration_date: new Date(Date.now() + 31536000000).toISOString().split('T')[0],
@@ -90,53 +87,15 @@ export default function CertificateTemplatePreview({
     window.print();
   };
 
-  const handleDownload = async () => {
-    try {
-      if (!previewRef.current) {
-        toast({
-          title: "Error",
-          description: "Cannot find certificate template to generate PDF",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setGeneratingPdf(true);
-      
-      await generatePdfFromElement(
-        previewRef.current, 
-        `certificate-${template.name.toLowerCase().replace(/\s+/g, '-')}.pdf`
-      );
-      
-      toast({
-        title: "PDF Generated Successfully",
-        description: "The certificate has been downloaded to your device.",
-      });
-      
-      if (onDownloadPdf) {
-        onDownloadPdf();
-      }
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        title: "Failed to generate PDF",
-        description: "Please try again later",
-        variant: "destructive"
-      });
-    } finally {
-      setGeneratingPdf(false);
-    }
+  const handleDownload = () => {
+    // In a real implementation, this would generate a PDF
+    alert("This would download the certificate as a PDF");
   };
 
   const handleFullScreen = () => {
+    // In a real implementation, this would show a full screen preview
     alert("This would show a full screen preview");
   };
-
-  useEffect(() => {
-    if (downloadMode) {
-      handleDownload();
-    }
-  }, [downloadMode]);
 
   return (
     <div className="space-y-4">
@@ -156,23 +115,9 @@ export default function CertificateTemplatePreview({
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleDownload} 
-            disabled={generatingPdf}
-          >
-            {generatingPdf ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-              </>
-            )}
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
           </Button>
         </div>
       </div>
@@ -181,10 +126,11 @@ export default function CertificateTemplatePreview({
         <div 
           ref={previewRef}
           className={`certificate-preview ${
-            template.template_data.layout?.orientation === "landscape" ? "aspect-[1.414/1]" : "aspect-[0.707/1]"
+            templateData.layout.orientation === "landscape" ? "aspect-[1.414/1]" : "aspect-[0.707/1]"
           } bg-white`}
           style={{ maxWidth: "100%", margin: "0 auto" }}
         >
+          {/* Certificate Header */}
           {templateData.branding.showHeader && (
             <div 
               className="p-6 border-b"
@@ -225,7 +171,9 @@ export default function CertificateTemplatePreview({
             </div>
           )}
 
+          {/* Certificate Body */}
           <div className="p-6 space-y-6">
+            {/* Patient Information Section */}
             {templateData.sections.find(s => s.title === "Patient Information")?.enabled && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -260,6 +208,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
+            {/* Medical Tests Section */}
             {templateData.sections.find(s => s.title === "Medical Tests")?.enabled && certificate.medical_tests && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -298,6 +247,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
+            {/* Vision Tests Section */}
             {templateData.sections.find(s => s.title === "Vision Tests")?.enabled && certificate.vision_tests && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -328,6 +278,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
+            {/* Fitness Declaration Section */}
             {templateData.sections.find(s => s.title === "Fitness Declaration")?.enabled && certificate.fitness_declaration && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -353,6 +304,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
+            {/* Restrictions Section */}
             {templateData.sections.find(s => s.title === "Restrictions")?.enabled && certificate.restrictions && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -374,6 +326,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
+            {/* Follow-up Actions Section */}
             {templateData.sections.find(s => s.title === "Follow-up Actions")?.enabled && certificate.followup_actions && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -395,6 +348,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
+            {/* Signature Area */}
             <div className="mt-12 pt-8 border-t">
               <div className="grid grid-cols-2 gap-8">
                 <div>
@@ -409,6 +363,7 @@ export default function CertificateTemplatePreview({
             </div>
           </div>
 
+          {/* Certificate Footer */}
           {templateData.branding.showFooter && (
             <div 
               className="p-4 text-center text-sm border-t"
@@ -434,6 +389,7 @@ export default function CertificateTemplatePreview({
         </div>
       </Card>
       
+      {/* Print-specific styles */}
       <style>
         {`
         @media print {
