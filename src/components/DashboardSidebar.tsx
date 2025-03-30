@@ -8,7 +8,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  UserRound
+  UserRound,
+  ScrollText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,11 @@ export function DashboardSidebar() {
       name: "Patients",
       href: "/patients",
       icon: UserRound
+    },
+    {
+      name: "Certificate Templates",
+      href: "/certificates/templates",
+      icon: ScrollText
     },
     ...(isServiceProvider() ? [
       { 

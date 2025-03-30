@@ -28,6 +28,8 @@ import PatientsPage from './pages/PatientsPage';
 import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
+import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
+import { Helmet } from 'react-helmet';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -39,6 +41,7 @@ function App() {
         <BrowserRouter>
           <AuthProvider>
             <OrganizationProvider>
+              <Helmet defaultTitle="Medical Certificates" titleTemplate="%s | Medical Certificates" />
               <HeaderComponent />
               <main>
                 <Routes>
@@ -63,6 +66,15 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <DocumentViewer />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  {/* Certificate Management */}
+                  <Route path="/certificates/templates" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <CertificateTemplatesPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
