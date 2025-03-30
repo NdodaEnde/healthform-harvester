@@ -1,4 +1,3 @@
-
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
@@ -27,6 +26,11 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     
     // Clean any problematic data in the structuredData
     cleanStructuredData(structuredData);
+    
+    // Ensure certificate dates are properly processed
+    if (documentType.includes('fitness') || documentType.includes('certificate')) {
+      ensureCertificateDates(structuredData);
+    }
     
     // Try to update the document record multiple times if needed
     let updateSuccess = false;
@@ -392,5 +396,61 @@ function cleanStructuredData(data: any) {
         }
       }
     });
+  }
+}
+
+// Helper function to ensure certificate dates are properly set
+function ensureCertificateDates(structuredData: any) {
+  if (!structuredData) return;
+  
+  try {
+    // If we have a certification section
+    if (structuredData.certification) {
+      // If we have valid_until but no examination_date, calculate it based on valid_until (typically one year before)
+      if (structuredData.certification.valid_until && 
+          (!structuredData.certification.examination_date && 
+           !structuredData.examination_results?.date)) {
+        
+        const expiryDate = new Date(structuredData.certification.valid_until);
+        if (!isNaN(expiryDate.getTime())) {
+          const examDate = new Date(expiryDate);
+          examDate.setFullYear(examDate.getFullYear() - 1);
+          const formattedExamDate = examDate.toISOString().split('T')[0];
+          
+          // Set examination date in multiple places to ensure it's captured
+          structuredData.certification.examination_date = formattedExamDate;
+          
+          if (!structuredData.examination_results) {
+            structuredData.examination_results = { date: formattedExamDate };
+          } else {
+            structuredData.examination_results.date = formattedExamDate;
+          }
+          
+          console.log('Derived examination date from expiry date:', formattedExamDate);
+        }
+      }
+      
+      // If we have examination_date but no valid_until, calculate it based on examination_date (typically one year after)
+      if (!structuredData.certification.valid_until && 
+          (structuredData.certification.examination_date || 
+           structuredData.examination_results?.date)) {
+        
+        const examDate = new Date(
+          structuredData.certification.examination_date || 
+          structuredData.examination_results.date
+        );
+        
+        if (!isNaN(examDate.getTime())) {
+          const expiryDate = new Date(examDate);
+          expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+          const formattedExpiryDate = expiryDate.toISOString().split('T')[0];
+          
+          structuredData.certification.valid_until = formattedExpiryDate;
+          console.log('Derived expiry date from examination date:', formattedExpiryDate);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error ensuring certificate dates:', e);
   }
 }

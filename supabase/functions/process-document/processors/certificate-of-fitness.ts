@@ -60,6 +60,8 @@ export function processCertificateOfFitnessData(apiResponse: any) {
         follow_up: '',
         review_date: '',
         comments: '',
+        examination_date: cleanValue(extractPath(extractedData, 'examination.date')) || 
+                        cleanValue(extractPath(extractedData, 'date_of_examination')) || '',
         valid_until: cleanValue(extractPath(extractedData, 'examination.next_date')) || 
                     cleanValue(extractPath(extractedData, 'valid_until')) || 
                     cleanValue(extractPath(extractedData, 'expiry_date')) || ''
@@ -86,6 +88,25 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       
       // Extract Restrictions
       structuredData.restrictions = extractRestrictionsFromMarkdown(markdown);
+    }
+    
+    // If we have valid_until but no examination_date, calculate it based on valid_until (typically one year before)
+    if (structuredData.certification.valid_until && !structuredData.certification.examination_date && !structuredData.examination_results.date) {
+      try {
+        const expiryDate = new Date(structuredData.certification.valid_until);
+        if (!isNaN(expiryDate.getTime())) {
+          const examDate = new Date(expiryDate);
+          examDate.setFullYear(examDate.getFullYear() - 1);
+          const formattedExamDate = examDate.toISOString().split('T')[0];
+          
+          structuredData.certification.examination_date = formattedExamDate;
+          structuredData.examination_results.date = formattedExamDate;
+          
+          console.log('Calculated examination date from expiry date:', formattedExamDate);
+        }
+      } catch (e) {
+        console.error('Error calculating examination date from valid_until:', e);
+      }
     }
     
     // Ensure patient always has a gender value
@@ -144,20 +165,43 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
     console.log('Extracted company:', structuredData.patient.company);
   }
   
-  // Exam date extraction
-  const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
-                       markdown.match(/Date of Examination:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-  if (examDateMatch && examDateMatch[1]) {
-    structuredData.examination_results.date = cleanValue(examDateMatch[1].trim());
-    console.log('Extracted exam date:', structuredData.examination_results.date);
+  // Exam date extraction - improved with additional patterns
+  const examDatePatterns = [
+    /\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Date of Examination:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*Examination Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Examination Date:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i
+  ];
+  
+  for (const pattern of examDatePatterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      const examDate = cleanValue(match[1].trim());
+      structuredData.examination_results.date = examDate;
+      structuredData.certification.examination_date = examDate;
+      console.log('Extracted exam date:', examDate);
+      break;
+    }
   }
   
-  // Expiry date extraction
-  const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
-                         markdown.match(/Expiry Date:\s*(.*?)(?=\n|\r|$|\*\*)/i);
-  if (expiryDateMatch && expiryDateMatch[1]) {
-    structuredData.certification.valid_until = cleanValue(expiryDateMatch[1].trim());
-    console.log('Extracted expiry date:', structuredData.certification.valid_until);
+  // Expiry date extraction - improved with additional patterns
+  const expiryDatePatterns = [
+    /\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Expiry Date:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*Valid Until\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Valid Until:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /Certificate Valid Until:\s*(.*?)(?=\n|\r|$|\*\*)/i
+  ];
+  
+  for (const pattern of expiryDatePatterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      const expiryDate = cleanValue(match[1].trim());
+      structuredData.certification.valid_until = expiryDate;
+      console.log('Extracted expiry date:', expiryDate);
+      break;
+    }
   }
   
   // Job Title extraction - try multiple patterns

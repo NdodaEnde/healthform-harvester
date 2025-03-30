@@ -19,6 +19,7 @@ interface ExtractedData {
     validated?: boolean;
     certification?: {
       valid_until?: string;
+      examination_date?: string;
       fit?: boolean;
       fit_with_restrictions?: boolean;
       [key: string]: any;
@@ -29,6 +30,7 @@ interface ExtractedData {
     };
     examination_results?: {
       fitness_status?: string;
+      date?: string;
       [key: string]: any;
     };
     [key: string]: any;
@@ -83,6 +85,25 @@ const getFitnessStatusText = (document: Document) => {
 // Helper function to get document review status from localStorage
 const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
   return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
+};
+
+// Helper function to get examination date based on valid_until date
+// Assuming examination date is typically one year before expiry date
+export const getExaminationDate = (validUntil: string | undefined): string | null => {
+  if (!validUntil) return null;
+  
+  try {
+    const expiryDate = new Date(validUntil);
+    if (isNaN(expiryDate.getTime())) return null;
+    
+    // Get date one year before expiry
+    const examDate = new Date(expiryDate);
+    examDate.setFullYear(examDate.getFullYear() - 1);
+    return examDate.toISOString().split('T')[0];
+  } catch (e) {
+    console.error('Error calculating examination date:', e);
+    return null;
+  }
 };
 
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
@@ -173,10 +194,24 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       });
       
       // Add review status from localStorage to each document
-      const docsWithReviewStatus = filteredDocs.map(doc => ({
-        ...doc,
-        reviewStatus: getDocumentReviewStatus(doc.id)
-      }));
+      const docsWithReviewStatus = filteredDocs.map(doc => {
+        // Add calculated examination date if missing but has valid_until
+        const extractedData = doc.extracted_data as ExtractedData | null;
+        if (extractedData?.structured_data?.certification?.valid_until && 
+            !extractedData?.structured_data?.certification?.examination_date && 
+            !extractedData?.structured_data?.examination_results?.date) {
+          
+          const examDate = getExaminationDate(extractedData.structured_data.certification.valid_until);
+          if (examDate && extractedData.structured_data.certification) {
+            extractedData.structured_data.certification.examination_date = examDate;
+          }
+        }
+        
+        return {
+          ...doc,
+          reviewStatus: getDocumentReviewStatus(doc.id)
+        };
+      });
       
       console.log('Certificates after filtering:', docsWithReviewStatus.length);
       return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
