@@ -89,7 +89,7 @@ const PatientDetailPage = () => {
     patient.contact_info.address
   );
 
-  // Mock data for EHR tabs - would be replaced with real data from API
+  // Use real data from patient object for EHR tabs
   const ehrData = {
     personal: {
       fullName: `${patient.first_name} ${patient.last_name}`,
