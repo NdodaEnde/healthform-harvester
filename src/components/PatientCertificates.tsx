@@ -205,7 +205,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           toast({
             title: "Certificate PDF Generated",
             description: `PDF has been downloaded as ${filename}`,
-            variant: "success"
+            variant: "default"
           });
         } catch (error) {
           console.error('Error during PDF generation:', error);
@@ -268,7 +268,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         toast({
           title: "Email Sent Successfully",
           description: `The certificate has been emailed to ${emailAddress}`,
-          variant: "success"
+          variant: "default"
         });
         setShowEmailDialog(false);
         setEmailAddress("");
