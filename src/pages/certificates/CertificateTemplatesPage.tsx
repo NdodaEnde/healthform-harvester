@@ -19,11 +19,12 @@ export default function CertificateTemplatesPage() {
   };
   
   const handleGenerateCertificate = () => {
-    // In a real implementation, this would navigate to a certificate generation page
+    // Navigate to patient selection page
     toast({
       title: "Generate Certificate",
-      description: "This would allow you to select a patient and template to generate a certificate."
+      description: "Select a patient to generate a certificate."
     });
+    navigate('/patients');
   };
 
   return (

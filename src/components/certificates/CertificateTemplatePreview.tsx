@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Printer, Download, Eye, Loader2 } from "lucide-react";
 import { BrandingSettings } from "@/types/organization";
 import { toast } from "@/components/ui/use-toast";
+import { generatePdfFromElement } from "@/utils/pdf-generator";
 
 interface CertificateTemplatePreviewProps {
   template: {
@@ -91,9 +92,21 @@ export default function CertificateTemplatePreview({
 
   const handleDownload = async () => {
     try {
+      if (!previewRef.current) {
+        toast({
+          title: "Error",
+          description: "Cannot find certificate template to generate PDF",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       setGeneratingPdf(true);
       
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await generatePdfFromElement(
+        previewRef.current, 
+        `certificate-${template.name.toLowerCase().replace(/\s+/g, '-')}.pdf`
+      );
       
       toast({
         title: "PDF Generated Successfully",
@@ -168,7 +181,7 @@ export default function CertificateTemplatePreview({
         <div 
           ref={previewRef}
           className={`certificate-preview ${
-            templateData.layout.orientation === "landscape" ? "aspect-[1.414/1]" : "aspect-[0.707/1]"
+            template.template_data.layout?.orientation === "landscape" ? "aspect-[1.414/1]" : "aspect-[0.707/1]"
           } bg-white`}
           style={{ maxWidth: "100%", margin: "0 auto" }}
         >

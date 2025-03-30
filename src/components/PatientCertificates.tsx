@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -178,14 +178,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     try {
       setGeneratingPdf(documentId);
       
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "PDF generated successfully",
-        description: "You can now download or print the certificate",
-      });
-      
       navigate(`/documents/${documentId}?action=download`);
+      
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
