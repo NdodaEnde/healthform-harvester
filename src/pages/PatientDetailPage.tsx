@@ -64,12 +64,22 @@ const PatientDetailPage = () => {
         const extractedData = doc.extracted_data;
         
         // Simple patient matching
-        if (extractedData?.patient_info?.id === id) return true;
+        if (extractedData && typeof extractedData === 'object' && 'patient_info' in extractedData) {
+          const patientInfo = extractedData.patient_info;
+          if (patientInfo && typeof patientInfo === 'object' && 'id' in patientInfo && patientInfo.id === id) return true;
+        }
         
         // Name-based matching
-        if (patient && extractedData?.structured_data?.patient?.name) {
+        if (patient && extractedData && typeof extractedData === 'object' && 
+            'structured_data' in extractedData && 
+            extractedData.structured_data && 
+            typeof extractedData.structured_data === 'object' &&
+            'patient' in extractedData.structured_data &&
+            extractedData.structured_data.patient && 
+            typeof extractedData.structured_data.patient === 'object' &&
+            'name' in extractedData.structured_data.patient) {
           const patientName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-          const nameInData = extractedData.structured_data.patient.name.toLowerCase();
+          const nameInData = String(extractedData.structured_data.patient.name).toLowerCase();
           if (nameInData.includes(patientName)) return true;
         }
         
@@ -91,15 +101,22 @@ const PatientDetailPage = () => {
       // Find latest expiration date
       let latestExpiration = null;
       for (const cert of patientCertificates) {
-        const expiryDate = cert.extracted_data?.structured_data?.certification?.valid_until;
-        if (expiryDate) {
+        if (cert.extracted_data && typeof cert.extracted_data === 'object' && 
+            'structured_data' in cert.extracted_data && 
+            cert.extracted_data.structured_data && 
+            typeof cert.extracted_data.structured_data === 'object' &&
+            'certification' in cert.extracted_data.structured_data &&
+            cert.extracted_data.structured_data.certification && 
+            typeof cert.extracted_data.structured_data.certification === 'object' &&
+            'valid_until' in cert.extracted_data.structured_data.certification) {
           try {
-            const expiryDateObj = new Date(expiryDate);
+            const expiryDate = cert.extracted_data.structured_data.certification.valid_until;
+            const expiryDateObj = new Date(String(expiryDate));
             if (!latestExpiration || expiryDateObj > latestExpiration) {
               latestExpiration = expiryDateObj;
             }
           } catch (e) {
-            console.log('Invalid date format:', expiryDate);
+            console.log('Invalid date format:', cert.extracted_data.structured_data.certification.valid_until);
           }
         }
       }
@@ -452,7 +469,12 @@ const PatientDetailPage = () => {
                       variant="outline" 
                       size="sm" 
                       className="w-full"
-                      onClick={() => document.querySelector('[data-state="inactive"][data-value="certificates"]')?.click()}
+                      onClick={() => {
+                        const certificatesTab = document.querySelector('[data-value="certificates"]');
+                        if (certificatesTab) {
+                          (certificatesTab as HTMLElement).click();
+                        }
+                      }}
                     >
                       <FileText className="mr-2 h-4 w-4" />
                       View All Certificates

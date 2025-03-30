@@ -7,6 +7,7 @@ export interface ContactInfo {
   company?: string;
   occupation?: string;
   address?: string;
+  employee_id?: string;
   [key: string]: any;
 }
 
@@ -29,6 +30,32 @@ export interface Allergy {
   reaction?: string;
 }
 
+export interface Vitals {
+  height?: string;
+  weight?: string;
+  bmi?: string;
+  blood_pressure?: string;
+  heart_rate?: string;
+  respiratory_rate?: string;
+  temperature?: string;
+  oxygen_saturation?: string;
+}
+
+export interface ExamResults {
+  vision?: string;
+  hearing?: string;
+  lung_function?: string;
+  chest_xray?: string;
+  laboratory?: string;
+}
+
+export interface Assessment {
+  diagnosis?: string;
+  recommendations?: string;
+  restrictions?: string;
+  fitness_conclusion?: string;
+}
+
 export interface MedicalHistoryData {
   conditions?: MedicalCondition[];
   medications?: Medication[];
@@ -43,6 +70,14 @@ export interface MedicalHistoryData {
     document_type: string;
     processed_at: string;
   }>;
+  surgeries?: string;
+  family_history?: string;
+  smoker?: boolean;
+  alcohol_consumption?: string;
+  exercise_frequency?: string;
+  vitals?: Vitals;
+  exam_results?: ExamResults;
+  assessment?: Assessment;
   [key: string]: any;
 }
 
