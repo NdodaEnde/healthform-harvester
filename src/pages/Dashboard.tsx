@@ -132,8 +132,8 @@ const Dashboard = () => {
     enabled: !!organizationId
   });
 
-  // Fetch work queue items
-  const { data: workQueueItems, isLoading: isLoadingWorkQueue } = useQuery({
+  // Fetch work queue items - fix by properly destructuring the query result
+  const { data: workQueueItems, isLoading: isLoadingWorkQueue, refetch: refetchWorkQueue } = useQuery({
     queryKey: ['work-queue', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -210,8 +210,8 @@ const Dashboard = () => {
         
       if (error) throw error;
       
-      // Refetch work queue items
-      await workQueueItems.refetch();
+      // Refetch work queue items - using the properly destructured refetch function
+      await refetchWorkQueue();
       
       toast({
         title: "Status updated",
