@@ -7,6 +7,7 @@ import { OrganizationProvider } from './contexts/OrganizationContext';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
+import DocumentsPage from './pages/DocumentsPage';
 import NotFound from './pages/NotFound';
 import HeaderComponent from './components/HeaderComponent';
 import OrganizationProtectedRoute from './components/OrganizationProtectedRoute';
@@ -59,6 +60,15 @@ function App() {
                       <OrganizationProtectedRoute>
                         <DashboardLayout>
                           <Dashboard />
+                        </DashboardLayout>
+                      </OrganizationProtectedRoute>
+                    } />
+                    
+                    {/* New Documents Page */}
+                    <Route path="/documents" element={
+                      <OrganizationProtectedRoute>
+                        <DashboardLayout>
+                          <DocumentsPage />
                         </DashboardLayout>
                       </OrganizationProtectedRoute>
                     } />
