@@ -19,6 +19,7 @@ serve(async (req) => {
     const file = formData.get('file');
     const documentType = formData.get('documentType');
     const userId = formData.get('userId');
+    const isBatch = formData.get('isBatch') === 'true';
 
     if (!file) {
       return new Response(
@@ -79,6 +80,9 @@ serve(async (req) => {
 
     // 3. Start document processing in the background
     const documentId = documentData.id;
+    
+    // Log processing start
+    console.log(`Starting document processing for ID: ${documentId}, File: ${fileName}, Batch mode: ${isBatch}`);
     
     // Start background task for document processing
     const processingPromise = processDocumentWithLandingAI(file, documentType, documentId, supabase);

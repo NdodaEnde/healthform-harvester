@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -74,6 +73,7 @@ const DocumentUploader = ({
       formData.append('file', file);
       formData.append('documentType', documentType);
       formData.append('userId', user.id);
+      formData.append('isBatch', 'false'); // Add batch flag set to false for single uploads
 
       // Simulate progress
       const progressInterval = setInterval(() => {

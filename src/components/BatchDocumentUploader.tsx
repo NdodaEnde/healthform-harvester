@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -77,7 +76,6 @@ const BatchDocumentUploader = ({
   const [hasSavedBatch, setHasSavedBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check for saved batch on load
   useEffect(() => {
     if (!organizationId) return;
     
@@ -183,6 +181,7 @@ const BatchDocumentUploader = ({
       formData.append('file', fileItem.file);
       formData.append('documentType', fileItem.documentType);
       formData.append('userId', user.id);
+      formData.append('isBatch', 'true');
 
       const progressInterval = setInterval(() => {
         const currentProgress = queuedFiles[index].progress;
@@ -366,8 +365,6 @@ const BatchDocumentUploader = ({
       const savedBatch: SavedBatch = JSON.parse(savedBatchJson);
       setDefaultDocumentType(savedBatch.defaultDocumentType);
       
-      // Keep only files that have been uploaded and have document IDs
-      // since we can't restore the actual File objects
       const loadableFiles = savedBatch.files.filter(file => 
         (file.status === 'complete' || file.status === 'processing') && file.documentId
       );
@@ -383,7 +380,6 @@ const BatchDocumentUploader = ({
         return;
       }
       
-      // Create placeholder File objects (with limited functionality)
       const restoredFiles: QueuedFile[] = loadableFiles.map(file => ({
         file: new File([], file.fileName, { type: file.fileType }),
         documentType: file.documentType,
@@ -402,7 +398,6 @@ const BatchDocumentUploader = ({
         description: `Restored ${restoredFiles.length} document(s) from your saved batch`,
       });
       
-      // Fetch latest document statuses from database
       restoredFiles.forEach(async (file, index) => {
         if (file.documentId) {
           const { data, error } = await supabase
@@ -412,7 +407,6 @@ const BatchDocumentUploader = ({
             .single();
             
           if (!error && data) {
-            // Update the file status based on latest database info
             const updatedStatus = data.status === 'completed' 
               ? 'complete' as FileStatus 
               : data.status === 'processing' 
@@ -492,7 +486,6 @@ const BatchDocumentUploader = ({
     }
   };
   
-  // Card actions for save/load functionality
   const cardActions = (
     <>
       {queuedFiles.length > 0 && !uploading && !processing && (
