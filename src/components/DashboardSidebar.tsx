@@ -25,44 +25,52 @@ export function DashboardSidebar() {
     { 
       name: "Dashboard", 
       href: "/dashboard", 
-      icon: LayoutDashboard 
+      icon: LayoutDashboard,
+      exact: true
     },
     { 
       name: "Documents", 
       href: "/documents", 
-      icon: FileText 
+      icon: FileText,
+      exact: false
     },
     {
       name: "Patients",
       href: "/patients",
-      icon: UserRound
+      icon: UserRound,
+      exact: false
     },
     {
       name: "Certificate Templates",
       href: "/certificates/templates",
-      icon: ScrollText
+      icon: ScrollText,
+      exact: false
     },
     ...(isServiceProvider() ? [
       { 
         name: "Organizations", 
         href: "/admin/organizations", 
-        icon: Building
+        icon: Building,
+        exact: false
       },
       { 
         name: "Clients", 
         href: `/admin/organizations/${currentOrganization?.id}/clients`, 
-        icon: Building 
+        icon: Building,
+        exact: false
       },
       { 
         name: "Users", 
         href: `/admin/organizations/${currentOrganization?.id}/users`, 
-        icon: Users 
+        icon: Users,
+        exact: false
       }
     ] : []),
     { 
       name: "Settings", 
       href: "/settings/organization", 
-      icon: Settings 
+      icon: Settings,
+      exact: false
     }
   ];
 
@@ -100,7 +108,7 @@ export function DashboardSidebar() {
                     collapsed && "justify-center px-0"
                   )
                 }
-                end={true}
+                end={item.exact}
               >
                 <item.icon size={20} />
                 {!collapsed && <span>{item.name}</span>}
