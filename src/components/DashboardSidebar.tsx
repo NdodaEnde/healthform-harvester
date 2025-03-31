@@ -28,7 +28,7 @@ export function DashboardSidebar() {
     },
     { 
       name: "Documents", 
-      href: "/documents", 
+      href: "/dashboard", 
       icon: FileText 
     },
     {
@@ -99,7 +99,6 @@ export function DashboardSidebar() {
                     collapsed && "justify-center px-0"
                   )
                 }
-                end
               >
                 <item.icon size={20} />
                 {!collapsed && <span>{item.name}</span>}
