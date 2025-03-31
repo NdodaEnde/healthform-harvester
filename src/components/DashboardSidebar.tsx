@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   UserRound,
-  ScrollText
+  ScrollText,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ export function DashboardSidebar() {
     },
     { 
       name: "Documents", 
-      href: "/dashboard", 
+      href: "/documents", 
       icon: FileText 
     },
     {
@@ -99,6 +100,7 @@ export function DashboardSidebar() {
                     collapsed && "justify-center px-0"
                   )
                 }
+                end={true}
               >
                 <item.icon size={20} />
                 {!collapsed && <span>{item.name}</span>}

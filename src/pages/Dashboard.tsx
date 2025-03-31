@@ -1,29 +1,34 @@
 
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import DocumentUploader from "@/components/DocumentUploader";
-import BatchDocumentUploader from "@/components/BatchDocumentUploader";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
 import { motion } from "framer-motion";
-import RlsTester from "@/components/RlsTester";
 import { useNavigate } from "react-router-dom";
-import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  FileText, 
+  User, 
+  CheckCircle, 
+  Clock, 
+  Upload, 
+  AlertCircle, 
+  FolderCheck, 
+  BarChart3,
+  UserRound,
+  ArrowRight,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw
+} from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { format, subDays } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
-import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
-import { StorageCleanupUtility } from "@/components/StorageCleanupUtility";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import DocumentUploader from "@/components/DocumentUploader";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showCleanupTools, setShowCleanupTools] = useState(false);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -32,68 +37,128 @@ const Dashboard = () => {
     getEffectiveOrganizationId
   } = useOrganization();
 
-  // Get the effective organization ID (either client organization if selected, or current organization)
+  // Get the effective organization ID
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Check for documents without organization context
-  const { data: orphanedDocsCount } = useQuery({
-    queryKey: ['orphaned-documents-count'],
+  // Fetch dashboard metrics
+  const { data: metrics, isLoading: loadingMetrics, refetch: refetchMetrics } = useQuery({
+    queryKey: ['dashboard-metrics', organizationId],
     queryFn: async () => {
-      const { count, error } = await supabase
+      if (!organizationId) return null;
+      
+      // Get total document count
+      const { count: totalDocuments, error: docError } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true })
-        .is('organization_id', null);
+        .eq('organization_id', organizationId);
+      
+      if (docError) throw new Error(docError.message);
 
-      if (error) {
-        console.error('Error checking for orphaned documents:', error);
-        return 0;
-      }
+      // Get patients count
+      const { count: totalPatients, error: patientError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+      
+      if (patientError) throw new Error(patientError.message);
 
-      return count || 0;
+      // Get pending documents count
+      const { count: pendingDocuments, error: pendingError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('status', 'pending');
+      
+      if (pendingError) throw new Error(pendingError.message);
+
+      // Get processed documents count
+      const { count: processedDocuments, error: processedError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('status', 'processed');
+      
+      if (processedError) throw new Error(processedError.message);
+      
+      // Get recent documents (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { count: recentDocuments, error: recentError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gte('created_at', thirtyDaysAgo.toISOString());
+      
+      if (recentError) throw new Error(recentError.message);
+      
+      // Get certificate templates count
+      const { count: certificateTemplates, error: templateError } = await supabase
+        .from('certificate_templates')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+      
+      if (templateError) throw new Error(templateError.message);
+      
+      return {
+        totalDocuments: totalDocuments || 0,
+        totalPatients: totalPatients || 0,
+        pendingDocuments: pendingDocuments || 0,
+        processedDocuments: processedDocuments || 0,
+        recentDocuments: recentDocuments || 0,
+        certificateTemplates: certificateTemplates || 0
+      };
     },
-    enabled: !!currentOrganization
+    enabled: !!organizationId
   });
 
-  const { data: documents, isLoading, error, refetch } = useQuery({
-    queryKey: ['documents', organizationId],
+  // Fetch recent activities (last 5 documents)
+  const { data: recentActivities, isLoading: loadingActivities, refetch: refetchActivities } = useQuery({
+    queryKey: ['recent-activities', organizationId],
     queryFn: async () => {
-      let query = supabase
+      if (!organizationId) return [];
+      
+      const { data, error } = await supabase
         .from('documents')
-        .select('*');
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(5);
       
-      // If viewing as service provider with a client selected
-      if (currentClient && isServiceProvider()) {
-        query = query.eq('client_organization_id', currentClient.id);
-      } 
-      // If viewing own organization
-      else if (organizationId) {
-        query = query.eq('organization_id', organizationId);
-      }
+      if (error) throw new Error(error.message);
       
-      const { data, error } = await query.order('created_at', { ascending: false });
+      return data || [];
+    },
+    enabled: !!organizationId
+  });
 
-      if (error) {
-        toast({
-          title: "Error fetching documents",
-          description: error.message,
-          variant: "destructive"
-        });
-        throw new Error(error.message);
-      }
-
-      return data?.map(doc => ({
-        ...doc, 
-        reviewStatus: localStorage.getItem(`doc-review-${doc.id}`) as ReviewStatus || 'not-reviewed',
-        reviewNote: localStorage.getItem(`doc-review-note-${doc.id}`) || ''
-      })) || [];
+  // Fetch work queue items
+  const { data: workQueue, isLoading: loadingWorkQueue, refetch: refetchWorkQueue } = useQuery({
+    queryKey: ['work-queue', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+      
+      const { data, error } = await supabase
+        .from('work_queue')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('status', 'pending')
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) throw new Error(error.message);
+      
+      return data || [];
     },
     enabled: !!organizationId
   });
 
   const handleUploadComplete = () => {
-    // Refresh the documents list after upload completes
-    refetch();
+    refetchMetrics();
+    refetchActivities();
+    refetchWorkQueue();
     setShowUploadDialog(false);
     toast({
       title: "Document uploaded successfully",
@@ -101,51 +166,42 @@ const Dashboard = () => {
     });
   };
 
-  const handleViewDocument = (documentId: string) => {
-    navigate(`/documents/${documentId}`);
-  };
-
-  const updateDocumentReviewStatus = (documentId: string, reviewStatus: ReviewStatus, reviewNote?: string) => {
-    // Store review status in localStorage
-    localStorage.setItem(`doc-review-${documentId}`, reviewStatus);
-    if (reviewNote) {
-      localStorage.setItem(`doc-review-note-${documentId}`, reviewNote);
-    }
-    
-    // Update the UI by refetching the documents
-    refetch();
-    
-    toast({
-      title: "Review status updated",
-      description: `Document has been marked as ${reviewStatus.replace('-', ' ')}`
-    });
-  };
-
-  const getReviewStatusBadge = (reviewStatus: ReviewStatus | undefined) => {
-    if (!reviewStatus || reviewStatus === 'not-reviewed') {
-      return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
-    } else if (reviewStatus === 'reviewed') {
-      return <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600 text-white">Reviewed</Badge>;
-    } else if (reviewStatus === 'needs-correction') {
-      return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
+  // Function to get status badge color
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'processed':
+        return "bg-green-100 text-green-800";
+      case 'processing':
+        return "bg-blue-100 text-blue-800";
+      case 'error':
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  // Only show upload button if we have an organization context
-  const canUpload = !!organizationId;
+  const getPriorityBadge = (priority) => {
+    switch (priority) {
+      case 'high':
+        return "bg-red-100 text-red-800";
+      case 'medium':
+        return "bg-yellow-100 text-yellow-800";
+      case 'low':
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
-  // Calculate review statistics
-  const notReviewedCount = documents?.filter(doc => 
-    !doc.reviewStatus || doc.reviewStatus === 'not-reviewed'
-  ).length || 0;
-  
-  const reviewedCount = documents?.filter(doc => 
-    doc.reviewStatus === 'reviewed'
-  ).length || 0;
-  
-  const needsCorrectionCount = documents?.filter(doc => 
-    doc.reviewStatus === 'needs-correction'
-  ).length || 0;
+  if (!organizationId) {
+    return (
+      <div className="text-center py-10 border rounded-lg bg-background mt-4">
+        <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+        <p className="text-muted-foreground mb-4">Please select an organization to view the dashboard</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4">
@@ -153,30 +209,29 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            {contextLabel ? `Viewing documents for ${contextLabel}` : "Manage your documents and organization"}
+            {contextLabel ? `Viewing dashboard for ${contextLabel}` : "Overview of your organization"}
           </p>
         </div>
-        <div className="flex items-center gap-4 z-10 relative">
+        <div className="flex items-center gap-4">
           <Button 
             variant="outline" 
-            onClick={() => setShowCleanupTools(prev => !prev)} 
+            onClick={() => {
+              refetchMetrics();
+              refetchActivities();
+              refetchWorkQueue();
+              toast({
+                title: "Dashboard refreshed",
+                description: "The dashboard data has been refreshed.",
+              });
+            }} 
             className="flex items-center gap-2"
           >
-            <Trash2 size={16} />
-            <span>Cleanup Tools</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/admin/organizations/new')} 
-            className="flex items-center gap-2"
-          >
-            <Plus size={16} />
-            <span>Add Organization</span>
+            <RefreshCw size={16} />
+            <span>Refresh</span>
           </Button>
           <Button 
             className="flex items-center gap-2" 
             onClick={() => setShowUploadDialog(true)}
-            disabled={!canUpload}
           >
             <Upload size={16} />
             <span>Upload Document</span>
@@ -202,229 +257,269 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Show orphaned document fixer if needed */}
-      {orphanedDocsCount && orphanedDocsCount > 0 && (
-        <div className="mb-6">
-          <OrphanedDocumentFixer />
-        </div>
-      )}
-
-      {/* Show cleanup tools if enabled */}
-      {showCleanupTools && (
-        <div className="mb-6">
-          <StorageCleanupUtility />
-        </div>
-      )}
-      
-      <Tabs defaultValue="documents" className="w-full">
-        <TabsList className="mb-8">
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="uploads">Upload Documents</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="documents">
-          {!organizationId ? (
-            <div className="text-center py-10 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
-              <p className="text-muted-foreground mb-4">Please select an organization to view documents</p>
-            </div>
-          ) : isLoading ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          ) : error ? (
-            <div className="py-10 text-center">
-              <p className="text-destructive">Error: {(error as Error).message}</p>
-            </div>
-          ) : documents && documents.length > 0 ? (
-            <>
-              {/* Review status summary */}
-              {documents.length > 0 && (
-                <div className="mb-6 flex items-center gap-4 text-sm">
-                  <span className="font-medium">Review Status:</span>
-                  {notReviewedCount > 0 && <span className="text-muted-foreground">{notReviewedCount} not reviewed</span>}
-                  {reviewedCount > 0 && <span className="text-green-500">{reviewedCount} reviewed</span>}
-                  {needsCorrectionCount > 0 && <span className="text-red-500">{needsCorrectionCount} needs correction</span>}
-                </div>
-              )}
-            
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-              >
-                {documents.map((document) => (
-                  <Card key={document.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <CardTitle className="text-lg">{document.file_name}</CardTitle>
-                        </div>
-                        <div>
-                          {getReviewStatusBadge(document.reviewStatus)}
-                        </div>
-                      </div>
-                      <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Status:</span>
-                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                            document.status === 'processed' 
-                              ? 'bg-green-100 text-green-800' 
-                              : document.status === 'processing' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-red-100 text-red-800'
-                          }`}>
-                            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Type:</span>
-                          <span className="text-sm">{document.document_type || 'Unknown'}</span>
-                        </div>
-                        {document.client_organization_id && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Client:</span>
-                            <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                              For client
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleViewDocument(document.id)} variant="default">
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </div>
-                      <div className="flex gap-1">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
-                              >
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Mark as reviewed</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
-                              >
-                                <AlertCircle className="h-5 w-5 text-red-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Mark as needs correction</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </motion.div>
-            </>
-          ) : (
-            <div className="text-center py-10 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No documents found</h3>
-              <p className="text-muted-foreground mb-4">Upload your first document to get started</p>
-              <Button 
-                variant="outline" 
-                className="mx-auto"
-                onClick={() => setShowUploadDialog(true)}
-                disabled={!canUpload}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Document
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="uploads">
-          {!organizationId ? (
-            <div className="text-center py-10 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
-              <p className="text-muted-foreground mb-4">Please select an organization to upload documents</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              <BatchDocumentUploader 
-                onUploadComplete={handleUploadComplete}
-                organizationId={currentOrganization?.id}
-                clientOrganizationId={currentClient?.id}
-              />
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="security">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="grid gap-6 md:grid-cols-2"
-          >
-            <RlsTester />
-            
+      {/* Main Dashboard Content */}
+      <div className="space-y-8">
+        {/* Key Metrics */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Total Documents */}
             <Card>
-              <CardHeader>
-                <CardTitle>RLS Testing Guide</CardTitle>
-                <CardDescription>
-                  How to verify multi-tenant security in your application
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="font-medium">Testing Checklist:</h3>
-                  <ul className="list-disc pl-5 pt-2 space-y-1">
-                    <li>Create test users in different organizations</li>
-                    <li>Verify users can only see their organization's data</li>
-                    <li>Test document uploads with different user accounts</li>
-                    <li>Validate cross-organization access is prevented</li>
-                    <li>Test different roles within organizations</li>
-                  </ul>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {loadingMetrics ? (
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                  ) : (
+                    metrics?.totalDocuments || 0
+                  )}
                 </div>
-                
-                <div>
-                  <h3 className="font-medium">Common Issues:</h3>
-                  <ul className="list-disc pl-5 pt-2 space-y-1">
-                    <li>Missing RLS policies on tables</li>
-                    <li>Incorrectly configured policies</li>
-                    <li>Missing automatic organization ID assignment</li>
-                    <li>Recursive RLS policy issues</li>
-                  </ul>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {metrics?.recentDocuments || 0} new in the last 30 days
+                </p>
               </CardContent>
             </Card>
-          </motion.div>
-        </TabsContent>
-      </Tabs>
+            
+            {/* Total Patients */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Patients</CardTitle>
+                <UserRound className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {loadingMetrics ? (
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                  ) : (
+                    metrics?.totalPatients || 0
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => navigate('/patients')}
+                  >
+                    View all patients
+                  </Button>
+                </p>
+              </CardContent>
+            </Card>
+            
+            {/* Document Status */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Document Status</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {loadingMetrics ? (
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                  ) : (
+                    `${metrics?.processedDocuments || 0}/${metrics?.totalDocuments || 0}`
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {metrics?.pendingDocuments || 0} pending documents
+                </p>
+              </CardContent>
+            </Card>
+            
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/documents')}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  <span>View Documents</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/patients')}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Manage Patients</span>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
+        
+        {/* Recent Activity and Work Queue */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Recent Activity */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>
+                Latest documents uploaded to your organization
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingActivities ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 bg-muted animate-pulse rounded w-3/4"></div>
+                        <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : recentActivities && recentActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-4">
+                      <div className="rounded-full bg-primary/10 p-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {activity.file_name}
+                        </p>
+                        <div className="flex items-center">
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(activity.created_at), 'MMM d, yyyy')}
+                          </p>
+                          <span className="mx-2 text-muted-foreground">•</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(activity.status)}`}>
+                            {activity.status}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/documents/${activity.id}`)}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm">No recent activity found</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/documents')}
+              >
+                View All Documents
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          {/* Work Queue */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle>Work Queue</CardTitle>
+              <CardDescription>
+                Tasks that need your attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingWorkQueue ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 bg-muted animate-pulse rounded w-3/4"></div>
+                        <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : workQueue && workQueue.length > 0 ? (
+                <div className="space-y-4">
+                  {workQueue.map((item) => (
+                    <div key={item.id} className="flex items-center space-x-4">
+                      <div className="rounded-full bg-primary/10 p-2">
+                        <FolderCheck className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {item.title}
+                        </p>
+                        <div className="flex items-center">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityBadge(item.priority)}`}>
+                            {item.priority}
+                          </span>
+                          {item.due_date && (
+                            <>
+                              <span className="mx-2 text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                Due: {format(new Date(item.due_date), 'MMM d, yyyy')}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          // Handle work item action
+                          if (item.related_entity_type === 'document' && item.related_entity_id) {
+                            navigate(`/documents/${item.related_entity_id}`);
+                          } else if (item.related_entity_type === 'patient' && item.related_entity_id) {
+                            navigate(`/patients/${item.related_entity_id}`);
+                          }
+                        }}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm">No work queue items found</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  // Add an action for viewing all work queue items
+                  toast({
+                    title: "Coming soon",
+                    description: "Full work queue management is coming soon.",
+                  });
+                }}
+              >
+                View All Tasks
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
