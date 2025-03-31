@@ -78,7 +78,7 @@ const Dashboard = () => {
       // Get document counts by status
       const { data: statusCounts, error: statusError } = await supabase
         .from('documents')
-        .select('status')
+        .select('status, created_at')
         .eq('organization_id', organizationId);
       
       if (statusError) throw statusError;
@@ -112,6 +112,9 @@ const Dashboard = () => {
       const documentsNeedsCorrectionCount = recentDocuments?.filter(doc => 
         localStorage.getItem(`doc-review-${doc.id}`) === 'needs-correction'
       ).length || 0;
+
+      // Calculate monthly document counts
+      const monthlyDocumentsData = calculateMonthlyDocumentData(statusCounts || []);
       
       return {
         documentsCount: documentsCount || 0,
@@ -121,32 +124,39 @@ const Dashboard = () => {
         error,
         recentDocuments: recentDocuments || [],
         documentsReviewedCount,
-        documentsNeedsCorrectionCount
+        documentsNeedsCorrectionCount,
+        monthlyDocumentsData
       };
     },
     enabled: !!organizationId
   });
 
-  // Mock data for the charts
+  // Helper function to calculate monthly document data
+  const calculateMonthlyDocumentData = (documents) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
+    
+    // Initialize counts for each month
+    const monthlyData = months.map(month => ({ month, count: 0 }));
+    
+    // Count documents by month
+    documents.forEach(doc => {
+      const createdAt = new Date(doc.created_at);
+      // Only count documents from the current year
+      if (createdAt.getFullYear() === currentYear) {
+        const monthIndex = createdAt.getMonth();
+        monthlyData[monthIndex].count += 1;
+      }
+    });
+    
+    return monthlyData;
+  };
+
+  // Prepare data for the status chart using real data
   const statusChartData = [
     { name: 'Processed', value: stats?.processed || 0, color: '#10b981' },
     { name: 'Processing', value: stats?.processing || 0, color: '#3b82f6' },
     { name: 'Error', value: stats?.error || 0, color: '#ef4444' }
-  ];
-
-  const monthlyDocumentsData = [
-    { month: 'Jan', count: 12 },
-    { month: 'Feb', count: 19 },
-    { month: 'Mar', count: 15 },
-    { month: 'Apr', count: 25 },
-    { month: 'May', count: 32 },
-    { month: 'Jun', count: 28 },
-    { month: 'Jul', count: 30 },
-    { month: 'Aug', count: 35 },
-    { month: 'Sep', count: 40 },
-    { month: 'Oct', count: 38 },
-    { month: 'Nov', count: 42 },
-    { month: 'Dec', count: 48 }
   ];
 
   // Placeholder array for quick-action work queue
@@ -230,7 +240,10 @@ const Dashboard = () => {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              +12% from last month
+              {stats?.monthlyDocumentsData && 
+               stats.monthlyDocumentsData[new Date().getMonth()].count > 0 ? 
+                `+${stats.monthlyDocumentsData[new Date().getMonth()].count} this month` : 
+                "No new documents this month"}
             </p>
           </CardContent>
         </Card>
@@ -251,7 +264,7 @@ const Dashboard = () => {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              +5% from last month
+              Registered patients in your system
             </p>
           </CardContent>
         </Card>
@@ -312,7 +325,7 @@ const Dashboard = () => {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={monthlyDocumentsData}
+                  data={stats?.monthlyDocumentsData || []}
                   margin={{
                     top: 5,
                     right: 30,
