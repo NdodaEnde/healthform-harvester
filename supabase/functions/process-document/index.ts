@@ -28,6 +28,9 @@ serve(async (req) => {
       );
     }
 
+    // Log batch status
+    console.log(`Processing document in ${isBatch ? 'batch' : 'single'} mode`);
+
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -86,6 +89,7 @@ serve(async (req) => {
     
     // Start background task for document processing
     const processingPromise = processDocumentWithLandingAI(file, documentType, documentId, supabase);
+    
     // @ts-ignore - Deno specific API
     EdgeRuntime.waitUntil(processingPromise);
 
@@ -94,7 +98,8 @@ serve(async (req) => {
       JSON.stringify({ 
         message: 'Document upload started', 
         documentId: documentId,
-        status: 'processing'
+        status: 'processing',
+        isBatch: isBatch
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
