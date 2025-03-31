@@ -20,12 +20,13 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, Eye, Filter, Search, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, Upload, Eye, Filter, Search, CheckCircle, AlertCircle, UploadCloud } from "lucide-react";
 import DocumentUploader from "@/components/DocumentUploader";
+import BatchDocumentUploader from "@/components/BatchDocumentUploader";
 import { Helmet } from "react-helmet";
 import {
   Pagination,
@@ -44,11 +45,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ITEMS_PER_PAGE = 10;
 
 const DocumentsPage = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadTab, setUploadTab] = useState<"single" | "batch">("single");
   const [searchTerm, setSearchTerm] = useState("");
   const [documentType, setDocumentType] = useState("all");
   const [documentStatus, setDocumentStatus] = useState("all");
@@ -269,10 +272,25 @@ const DocumentsPage = () => {
             {contextLabel ? `Manage documents for ${contextLabel}` : "Manage your documents"}
           </p>
         </div>
-        <div>
+        <div className="flex gap-2">
           <Button 
             className="flex items-center gap-2" 
-            onClick={() => setShowUploadDialog(true)}
+            variant="outline"
+            onClick={() => {
+              setUploadTab("batch");
+              setShowUploadDialog(true);
+            }}
+            disabled={!canUpload}
+          >
+            <UploadCloud size={16} />
+            <span>Batch Upload</span>
+          </Button>
+          <Button 
+            className="flex items-center gap-2" 
+            onClick={() => {
+              setUploadTab("single");
+              setShowUploadDialog(true);
+            }}
             disabled={!canUpload}
           >
             <Upload size={16} />
@@ -286,16 +304,32 @@ const DocumentsPage = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {currentClient 
-                ? `Upload Document for ${currentClient.name}` 
-                : "Upload Document"}
+              {uploadTab === "batch" ? "Batch Upload Documents" : 
+                (currentClient 
+                  ? `Upload Document for ${currentClient.name}` 
+                  : "Upload Document")}
             </DialogTitle>
           </DialogHeader>
-          <DocumentUploader 
-            onUploadComplete={handleUploadComplete} 
-            organizationId={currentOrganization?.id}
-            clientOrganizationId={currentClient?.id}
-          />
+          <Tabs value={uploadTab} onValueChange={(val) => setUploadTab(val as "single" | "batch")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="single">Single Upload</TabsTrigger>
+              <TabsTrigger value="batch">Batch Upload</TabsTrigger>
+            </TabsList>
+            <TabsContent value="single">
+              <DocumentUploader 
+                onUploadComplete={handleUploadComplete} 
+                organizationId={currentOrganization?.id}
+                clientOrganizationId={currentClient?.id}
+              />
+            </TabsContent>
+            <TabsContent value="batch">
+              <BatchDocumentUploader 
+                onUploadComplete={handleUploadComplete}
+                organizationId={currentOrganization?.id}
+                clientOrganizationId={currentClient?.id}
+              />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
       
