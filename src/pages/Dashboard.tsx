@@ -17,8 +17,6 @@ import {
   BarChart3,
   UserRound,
   ArrowRight,
-  TrendingUp,
-  TrendingDown,
   RefreshCw
 } from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -27,6 +25,9 @@ import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import DocumentUploader from "@/components/DocumentUploader";
 import { Helmet } from 'react-helmet';
+import { TotalDocumentsCard } from '@/components/dashboard/TotalDocumentsCard';
+import { DocumentActivityChart } from '@/components/dashboard/DocumentActivityChart';
+import { DocumentStatusChart } from '@/components/dashboard/DocumentStatusChart';
 
 // Define a type for the work queue items
 interface WorkQueueItem {
@@ -157,7 +158,7 @@ const Dashboard = () => {
     queryFn: async () => {
       if (!organizationId) return [];
       
-      // Create mock data for work queue since it doesn't exist in the database yet
+      // Mock data for work queue since the table doesn't exist yet
       const mockWorkQueue: WorkQueueItem[] = [
         {
           id: '1',
@@ -312,24 +313,7 @@ const Dashboard = () => {
         >
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Total Documents */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {loadingMetrics ? (
-                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
-                  ) : (
-                    metrics?.totalDocuments || 0
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics?.recentDocuments || 0} new in the last 30 days
-                </p>
-              </CardContent>
-            </Card>
+            <TotalDocumentsCard organizationId={organizationId} />
             
             {/* Total Patients */}
             <Card>
@@ -404,6 +388,18 @@ const Dashboard = () => {
                 </Button>
               </CardContent>
             </Card>
+          </div>
+        </motion.div>
+        
+        {/* Document Activity and Status Charts */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <div className="grid gap-4 grid-cols-12">
+            <DocumentActivityChart organizationId={organizationId} />
+            <DocumentStatusChart organizationId={organizationId} />
           </div>
         </motion.div>
         

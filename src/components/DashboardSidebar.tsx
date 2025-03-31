@@ -1,5 +1,5 @@
 
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   FileText, 
@@ -20,6 +20,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
+  const location = useLocation();
   
   const navItems = [
     { 
@@ -95,25 +96,30 @@ export function DashboardSidebar() {
           </div>
           
           <nav className="space-y-1 px-2">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                className={({ isActive }) =>
-                  cn(
+            {navItems.map((item) => {
+              // Check if the current path matches this nav item
+              const isActive = item.exact 
+                ? location.pathname === item.href 
+                : location.pathname.startsWith(item.href);
+              
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                     isActive 
                       ? "bg-primary/10 text-primary" 
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     collapsed && "justify-center px-0"
-                  )
-                }
-                end={item.exact}
-              >
-                <item.icon size={20} />
-                {!collapsed && <span>{item.name}</span>}
-              </NavLink>
-            ))}
+                  )}
+                  end={item.exact}
+                >
+                  <item.icon size={20} />
+                  {!collapsed && <span>{item.name}</span>}
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
       </div>
