@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -17,8 +17,6 @@ import {
   BarChart3,
   UserRound,
   ArrowRight,
-  TrendingUp,
-  TrendingDown,
   RefreshCw
 } from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -26,6 +24,27 @@ import { format, subDays } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import DocumentUploader from "@/components/DocumentUploader";
+import { Helmet } from 'react-helmet';
+import { TotalDocumentsCard } from '@/components/dashboard/TotalDocumentsCard';
+import { DocumentActivityChart } from '@/components/dashboard/DocumentActivityChart';
+import { DocumentStatusChart } from '@/components/dashboard/DocumentStatusChart';
+
+// Define a type for the work queue items
+interface WorkQueueItem {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  status: string;
+  type: string;
+  organization_id: string | null;
+  assigned_to: string | null;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  due_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -133,26 +152,49 @@ const Dashboard = () => {
     enabled: !!organizationId
   });
 
-  // Fetch work queue items
+  // Mock work queue items instead of fetching from the database
   const { data: workQueue, isLoading: loadingWorkQueue, refetch: refetchWorkQueue } = useQuery({
     queryKey: ['work-queue', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
       
-      const { data, error } = await supabase
-        .from('work_queue')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('status', 'pending')
-        .order('priority', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(5);
+      // Mock data for work queue since the table doesn't exist yet
+      const mockWorkQueue: WorkQueueItem[] = [
+        {
+          id: '1',
+          title: 'Review Document',
+          description: 'Review the uploaded medical certificate',
+          priority: 'high',
+          status: 'pending',
+          type: 'document_review',
+          organization_id: organizationId,
+          assigned_to: null,
+          related_entity_type: 'document',
+          related_entity_id: recentActivities && recentActivities.length > 0 ? recentActivities[0].id : null,
+          due_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          title: 'Patient Follow-up',
+          description: 'Follow up with patient about their latest visit',
+          priority: 'medium',
+          status: 'pending',
+          type: 'patient_followup',
+          organization_id: organizationId,
+          assigned_to: null,
+          related_entity_type: 'patient',
+          related_entity_id: null,
+          due_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
       
-      if (error) throw new Error(error.message);
-      
-      return data || [];
+      return mockWorkQueue;
     },
-    enabled: !!organizationId
+    enabled: !!organizationId && !!recentActivities
   });
 
   const handleUploadComplete = () => {
@@ -205,6 +247,10 @@ const Dashboard = () => {
 
   return (
     <div className="mt-4">
+      <Helmet>
+        <title>Dashboard</title>
+      </Helmet>
+      
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -267,24 +313,7 @@ const Dashboard = () => {
         >
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Total Documents */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {loadingMetrics ? (
-                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
-                  ) : (
-                    metrics?.totalDocuments || 0
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics?.recentDocuments || 0} new in the last 30 days
-                </p>
-              </CardContent>
-            </Card>
+            <TotalDocumentsCard organizationId={organizationId} />
             
             {/* Total Patients */}
             <Card>
@@ -359,6 +388,18 @@ const Dashboard = () => {
                 </Button>
               </CardContent>
             </Card>
+          </div>
+        </motion.div>
+        
+        {/* Document Activity and Status Charts */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <div className="grid gap-4 grid-cols-12">
+            <DocumentActivityChart organizationId={organizationId} />
+            <DocumentStatusChart organizationId={organizationId} />
           </div>
         </motion.div>
         
