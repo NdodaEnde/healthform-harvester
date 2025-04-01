@@ -77,13 +77,41 @@ serve(async (req) => {
       );
     }
 
-    // 3. Start document processing in the background
+    // 3. Start document processing as a background task
     const documentId = documentData.id;
     
-    // Start background task for document processing
-    const processingPromise = processDocumentWithLandingAI(file, documentType, documentId, supabase);
+    // Use a try/catch block within the background task to ensure errors are logged
+    const processingPromise = (async () => {
+      try {
+        await processDocumentWithLandingAI(file, documentType, documentId, supabase);
+        console.log(`Background processing completed for document ID: ${documentId}`);
+      } catch (processingError) {
+        console.error(`Background processing failed for document ID: ${documentId}:`, processingError);
+        
+        // Update document status to failed if there's an error
+        try {
+          await supabase
+            .from('documents')
+            .update({
+              status: 'failed',
+              processing_error: processingError.message || 'Unknown processing error'
+            })
+            .eq('id', documentId);
+        } catch (updateError) {
+          console.error('Failed to update document status after processing error:', updateError);
+        }
+      }
+    })();
+    
+    // Use waitUntil for background processing if available
     // @ts-ignore - Deno specific API
-    EdgeRuntime.waitUntil(processingPromise);
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      // @ts-ignore - Deno specific API
+      EdgeRuntime.waitUntil(processingPromise);
+    } else {
+      // Fallback - immediately invoke without waiting
+      processingPromise.catch(err => console.error('Background processing error:', err));
+    }
 
     // 4. Return immediate success response with document ID
     return new Response(
