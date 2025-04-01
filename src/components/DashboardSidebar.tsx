@@ -1,3 +1,4 @@
+
 import { NavLink, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -25,6 +26,15 @@ import { useUserRole } from "@/utils/roleUtils";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Define the navigation item type with optional badge
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<any>;
+  exact: boolean;
+  badge?: string;
+}
+
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
@@ -32,7 +42,7 @@ export function DashboardSidebar() {
   const { role, loading: roleLoading } = useUserRole();
   const { user } = useAuth();
   
-  const commonNavItems = [
+  const commonNavItems: NavItem[] = [
     { 
       name: "Dashboard", 
       href: "/dashboard", 
@@ -41,7 +51,7 @@ export function DashboardSidebar() {
     }
   ];
   
-  const getRoleNavItems = () => {
+  const getRoleNavItems = (): NavItem[] => {
     if (roleLoading) return [];
     
     if (role === 'admin') {
@@ -224,7 +234,7 @@ export function DashboardSidebar() {
     ];
   };
   
-  const footerNavItems = [
+  const footerNavItems: NavItem[] = [
     { 
       name: "Help & Support", 
       href: "/support", 
