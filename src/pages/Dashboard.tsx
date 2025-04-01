@@ -1,210 +1,237 @@
 
-import React from "react";
+import React from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useOrganization } from "@/contexts/OrganizationContext";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Helmet } from "react-helmet";
 import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription,
-  CardFooter
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  FileText,
-  Users,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  Calendar,
-  Upload,
-  Plus,
+  FileText, 
+  User, 
+  CheckCircle, 
+  Clock, 
+  Upload, 
+  AlertCircle, 
+  FolderCheck, 
+  BarChart3,
+  UserRound,
   ArrowRight,
-  Activity
+  TrendingUp,
+  TrendingDown,
+  RefreshCw
 } from "lucide-react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger
-} from "@/components/ui/tabs";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { format, subDays } from 'date-fns';
+import { toast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import DocumentUploader from "@/components/DocumentUploader";
 
 const Dashboard = () => {
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
     currentClient,
+    isServiceProvider,
     getEffectiveOrganizationId
   } = useOrganization();
 
+  // Get the effective organization ID
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Fetch summary statistics
-  const { data: stats, isLoading: isLoadingStats } = useQuery({
-    queryKey: ['dashboard-stats', organizationId],
+  // Fetch dashboard metrics
+  const { data: metrics, isLoading: loadingMetrics, refetch: refetchMetrics } = useQuery({
+    queryKey: ['dashboard-metrics', organizationId],
     queryFn: async () => {
-      // Get document count by status
-      let query = supabase
+      if (!organizationId) return null;
+      
+      // Get total document count
+      const { count: totalDocuments, error: docError } = await supabase
         .from('documents')
-        .select('status', { count: 'exact' });
-      
-      if (currentClient) {
-        query = query.eq('client_organization_id', currentClient.id);
-      } else if (organizationId) {
-        query = query.eq('organization_id', organizationId);
-      }
-      
-      const { count: documentsCount, error: docsError } = await query;
-      
-      if (docsError) throw docsError;
-      
-      // Get document counts by status
-      const { data: statusCounts, error: statusError } = await supabase
-        .from('documents')
-        .select('status')
+        .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId);
       
-      if (statusError) throw statusError;
-      
-      const processed = statusCounts?.filter(doc => doc.status === 'processed').length || 0;
-      const processing = statusCounts?.filter(doc => doc.status === 'processing').length || 0;
-      const error = statusCounts?.filter(doc => doc.status === 'error').length || 0;
-      
-      // Get patient count
-      const { count: patientsCount, error: patientsError } = await supabase
+      if (docError) throw new Error(docError.message);
+
+      // Get patients count
+      const { count: totalPatients, error: patientError } = await supabase
         .from('patients')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId);
       
-      if (patientsError) throw patientsError;
+      if (patientError) throw new Error(patientError.message);
+
+      // Get pending documents count
+      const { count: pendingDocuments, error: pendingError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('status', 'pending');
       
-      // Get recent documents
-      const { data: recentDocuments, error: recentError } = await supabase
+      if (pendingError) throw new Error(pendingError.message);
+
+      // Get processed documents count
+      const { count: processedDocuments, error: processedError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('status', 'processed');
+      
+      if (processedError) throw new Error(processedError.message);
+      
+      // Get recent documents (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { count: recentDocuments, error: recentError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gte('created_at', thirtyDaysAgo.toISOString());
+      
+      if (recentError) throw new Error(recentError.message);
+      
+      // Get certificate templates count
+      const { count: certificateTemplates, error: templateError } = await supabase
+        .from('certificate_templates')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+      
+      if (templateError) throw new Error(templateError.message);
+      
+      return {
+        totalDocuments: totalDocuments || 0,
+        totalPatients: totalPatients || 0,
+        pendingDocuments: pendingDocuments || 0,
+        processedDocuments: processedDocuments || 0,
+        recentDocuments: recentDocuments || 0,
+        certificateTemplates: certificateTemplates || 0
+      };
+    },
+    enabled: !!organizationId
+  });
+
+  // Fetch recent activities (last 5 documents)
+  const { data: recentActivities, isLoading: loadingActivities, refetch: refetchActivities } = useQuery({
+    queryKey: ['recent-activities', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+      
+      const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(5);
       
-      if (recentError) throw recentError;
-
-      const documentsReviewedCount = recentDocuments?.filter(doc => 
-        localStorage.getItem(`doc-review-${doc.id}`) === 'reviewed'
-      ).length || 0;
+      if (error) throw new Error(error.message);
       
-      const documentsNeedsCorrectionCount = recentDocuments?.filter(doc => 
-        localStorage.getItem(`doc-review-${doc.id}`) === 'needs-correction'
-      ).length || 0;
-      
-      return {
-        documentsCount: documentsCount || 0,
-        patientsCount: patientsCount || 0,
-        processed,
-        processing,
-        error,
-        recentDocuments: recentDocuments || [],
-        documentsReviewedCount,
-        documentsNeedsCorrectionCount
-      };
+      return data || [];
     },
     enabled: !!organizationId
   });
 
-  // Mock data for the charts
-  const statusChartData = [
-    { name: 'Processed', value: stats?.processed || 0, color: '#10b981' },
-    { name: 'Processing', value: stats?.processing || 0, color: '#3b82f6' },
-    { name: 'Error', value: stats?.error || 0, color: '#ef4444' }
-  ];
+  // Fetch work queue items
+  const { data: workQueue, isLoading: loadingWorkQueue, refetch: refetchWorkQueue } = useQuery({
+    queryKey: ['work-queue', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+      
+      const { data, error } = await supabase
+        .from('work_queue')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('status', 'pending')
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) throw new Error(error.message);
+      
+      return data || [];
+    },
+    enabled: !!organizationId
+  });
 
-  const monthlyDocumentsData = [
-    { month: 'Jan', count: 12 },
-    { month: 'Feb', count: 19 },
-    { month: 'Mar', count: 15 },
-    { month: 'Apr', count: 25 },
-    { month: 'May', count: 32 },
-    { month: 'Jun', count: 28 },
-    { month: 'Jul', count: 30 },
-    { month: 'Aug', count: 35 },
-    { month: 'Sep', count: 40 },
-    { month: 'Oct', count: 38 },
-    { month: 'Nov', count: 42 },
-    { month: 'Dec', count: 48 }
-  ];
+  const handleUploadComplete = () => {
+    refetchMetrics();
+    refetchActivities();
+    refetchWorkQueue();
+    setShowUploadDialog(false);
+    toast({
+      title: "Document uploaded successfully",
+      description: "Your document has been uploaded and will be processed shortly.",
+    });
+  };
 
-  // Placeholder array for quick-action work queue
-  const workQueue = [
-    { id: 1, title: 'Review pending Certificate of Fitness', type: 'certificate', priority: 'high' },
-    { id: 2, title: 'Validate Medical Questionnaire data', type: 'questionnaire', priority: 'medium' },
-    { id: 3, title: 'Update patient records', type: 'patient', priority: 'medium' },
-    { id: 4, title: 'Schedule upcoming medical examinations', type: 'schedule', priority: 'low' }
-  ];
+  // Function to get status badge color
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'processed':
+        return "bg-green-100 text-green-800";
+      case 'processing':
+        return "bg-blue-100 text-blue-800";
+      case 'error':
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getPriorityBadge = (priority) => {
+    switch (priority) {
+      case 'high':
+        return "bg-red-100 text-red-800";
+      case 'medium':
+        return "bg-yellow-100 text-yellow-800";
+      case 'low':
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
   if (!organizationId) {
     return (
-      <div className="mt-4">
-        <h1 className="text-3xl font-bold tracking-tight mb-6">Dashboard</h1>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center pt-6 pb-6">
-            <div className="text-center py-10">
-              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
-              <p className="text-muted-foreground mb-4">Please select an organization to view your dashboard</p>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/admin/organizations')}
-              >
-                View Organizations
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="text-center py-10 border rounded-lg bg-background mt-4">
+        <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+        <p className="text-muted-foreground mb-4">Please select an organization to view the dashboard</p>
       </div>
     );
   }
 
   return (
     <div className="mt-4">
-      <Helmet>
-        <title>Dashboard</title>
-      </Helmet>
-      
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            {contextLabel ? `Overview for ${contextLabel}` : "Overview of your organization"}
+            {contextLabel ? `Viewing dashboard for ${contextLabel}` : "Overview of your organization"}
           </p>
         </div>
         <div className="flex items-center gap-4">
           <Button 
-            variant="outline"
-            onClick={() => navigate('/patients/new')}
+            variant="outline" 
+            onClick={() => {
+              refetchMetrics();
+              refetchActivities();
+              refetchWorkQueue();
+              toast({
+                title: "Dashboard refreshed",
+                description: "The dashboard data has been refreshed.",
+              });
+            }} 
             className="flex items-center gap-2"
           >
-            <Plus size={16} />
-            <span>Add Patient</span>
+            <RefreshCw size={16} />
+            <span>Refresh</span>
           </Button>
-          
           <Button 
             className="flex items-center gap-2" 
-            onClick={() => navigate('/documents')}
+            onClick={() => setShowUploadDialog(true)}
           >
             <Upload size={16} />
             <span>Upload Document</span>
@@ -212,259 +239,286 @@ const Dashboard = () => {
         </div>
       </div>
       
-      {/* Summary Statistics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Documents
-            </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="h-8 w-16 bg-muted rounded animate-pulse" />
-              ) : (
-                stats?.documentsCount || 0
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              +12% from last month
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Patients
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="h-8 w-16 bg-muted rounded animate-pulse" />
-              ) : (
-                stats?.patientsCount || 0
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              +5% from last month
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Processing
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="h-8 w-16 bg-muted rounded animate-pulse" />
-              ) : (
-                stats?.processing || 0
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Documents currently processing
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Needs Attention
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="h-8 w-16 bg-muted rounded animate-pulse" />
-              ) : (
-                (stats?.error || 0) + (stats?.documentsNeedsCorrectionCount || 0)
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Documents requiring your attention
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Document Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {currentClient 
+                ? `Upload Document for ${currentClient.name}` 
+                : "Upload Document"}
+            </DialogTitle>
+          </DialogHeader>
+          <DocumentUploader 
+            onUploadComplete={handleUploadComplete} 
+            organizationId={currentOrganization?.id}
+            clientOrganizationId={currentClient?.id}
+          />
+        </DialogContent>
+      </Dialog>
       
-      <div className="grid gap-4 md:grid-cols-7 mb-8">
-        {/* Charts */}
-        <Card className="md:col-span-4">
-          <CardHeader>
-            <CardTitle>Document Activity</CardTitle>
-            <CardDescription>
-              Monthly document upload activity
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={monthlyDocumentsData}
-                  margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="md:col-span-3">
-          <CardHeader>
-            <CardTitle>Document Status</CardTitle>
-            <CardDescription>
-              Current status of all documents
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+      {/* Main Dashboard Content */}
+      <div className="space-y-8">
+        {/* Key Metrics */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Total Documents */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {loadingMetrics ? (
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                  ) : (
+                    metrics?.totalDocuments || 0
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {metrics?.recentDocuments || 0} new in the last 30 days
+                </p>
+              </CardContent>
+            </Card>
+            
+            {/* Total Patients */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Patients</CardTitle>
+                <UserRound className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {loadingMetrics ? (
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                  ) : (
+                    metrics?.totalPatients || 0
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => navigate('/patients')}
                   >
-                    {statusChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Recent Activity */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Documents</CardTitle>
-            <CardDescription>
-              The latest documents added to your system
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingStats ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex justify-between border-b pb-2">
-                    <div className="w-1/2 h-5 bg-muted rounded animate-pulse" />
-                    <div className="w-1/4 h-5 bg-muted rounded animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            ) : stats?.recentDocuments && stats.recentDocuments.length > 0 ? (
-              <div className="space-y-4">
-                {stats.recentDocuments.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between border-b pb-4">
-                    <div className="flex items-center">
-                      <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{doc.file_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(doc.created_at).toLocaleDateString()}
-                        </p>
+                    View all patients
+                  </Button>
+                </p>
+              </CardContent>
+            </Card>
+            
+            {/* Document Status */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Document Status</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {loadingMetrics ? (
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
+                  ) : (
+                    `${metrics?.processedDocuments || 0}/${metrics?.totalDocuments || 0}`
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {metrics?.pendingDocuments || 0} pending documents
+                </p>
+              </CardContent>
+            </Card>
+            
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/documents')}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  <span>View Documents</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/patients')}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Manage Patients</span>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
+        
+        {/* Recent Activity and Work Queue */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Recent Activity */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>
+                Latest documents uploaded to your organization
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingActivities ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 bg-muted animate-pulse rounded w-3/4"></div>
+                        <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => navigate(`/documents/${doc.id}`)}
-                    >
-                      View
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">
-                No recent documents found
-              </p>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => navigate('/documents')}
-            >
-              View All Documents
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        {/* Work Queue */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Work Queue</CardTitle>
-            <CardDescription>
-              Tasks requiring your attention
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {workQueue.map(item => (
-                <div key={item.id} className="border-b pb-4">
-                  <div className="flex items-center justify-between">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      item.priority === 'high' ? 'bg-red-100 text-red-800' :
-                      item.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {item.priority}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.type}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium mt-2">{item.title}</p>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => navigate('/documents')}
-            >
-              Process Queue
-              <Activity className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
+              ) : recentActivities && recentActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-4">
+                      <div className="rounded-full bg-primary/10 p-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {activity.file_name}
+                        </p>
+                        <div className="flex items-center">
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(activity.created_at), 'MMM d, yyyy')}
+                          </p>
+                          <span className="mx-2 text-muted-foreground">•</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(activity.status)}`}>
+                            {activity.status}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/documents/${activity.id}`)}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm">No recent activity found</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/documents')}
+              >
+                View All Documents
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          {/* Work Queue */}
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle>Work Queue</CardTitle>
+              <CardDescription>
+                Tasks that need your attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingWorkQueue ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 bg-muted animate-pulse rounded w-3/4"></div>
+                        <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : workQueue && workQueue.length > 0 ? (
+                <div className="space-y-4">
+                  {workQueue.map((item) => (
+                    <div key={item.id} className="flex items-center space-x-4">
+                      <div className="rounded-full bg-primary/10 p-2">
+                        <FolderCheck className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {item.title}
+                        </p>
+                        <div className="flex items-center">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityBadge(item.priority)}`}>
+                            {item.priority}
+                          </span>
+                          {item.due_date && (
+                            <>
+                              <span className="mx-2 text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                Due: {format(new Date(item.due_date), 'MMM d, yyyy')}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          // Handle work item action
+                          if (item.related_entity_type === 'document' && item.related_entity_id) {
+                            navigate(`/documents/${item.related_entity_id}`);
+                          } else if (item.related_entity_type === 'patient' && item.related_entity_id) {
+                            navigate(`/patients/${item.related_entity_id}`);
+                          }
+                        }}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm">No work queue items found</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  // Add an action for viewing all work queue items
+                  toast({
+                    title: "Coming soon",
+                    description: "Full work queue management is coming soon.",
+                  });
+                }}
+              >
+                View All Tasks
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </div>
   );

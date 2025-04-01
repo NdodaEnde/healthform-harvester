@@ -1,59 +1,59 @@
 
-import React, { useState } from "react";
+import React, { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import DocumentUploader from "@/components/DocumentUploader";
+import BatchDocumentUploader from "@/components/BatchDocumentUploader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useOrganization } from "@/contexts/OrganizationContext";
-import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
-} from "@/components/ui/card";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, SortDesc, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { toast } from "@/components/ui/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, Eye, Filter, Search, CheckCircle, AlertCircle } from "lucide-react";
-import DocumentUploader from "@/components/DocumentUploader";
-import { Helmet } from "react-helmet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { format } from 'date-fns';
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const ITEMS_PER_PAGE = 10;
+type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+
+interface Document {
+  id: string;
+  file_name: string;
+  file_path: string;
+  document_type: string | null;
+  status: string;
+  created_at: string;
+  organization_id: string | null;
+  client_organization_id: string | null;
+  processed_at: string | null;
+  extracted_data: any;
+  reviewStatus?: ReviewStatus;
+  reviewNote?: string;
+}
 
 const DocumentsPage = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [documentType, setDocumentType] = useState("all");
-  const [documentStatus, setDocumentStatus] = useState("all");
-  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [documentTypeFilter, setDocumentTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortField, setSortField] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
   
   const navigate = useNavigate();
   const { 
@@ -67,38 +67,57 @@ const DocumentsPage = () => {
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Fetch documents
-  const { data: allDocuments, isLoading, error, refetch } = useQuery({
-    queryKey: ['documents', organizationId, documentType, documentStatus, searchTerm],
+  // Fetch documents with filters and pagination
+  const { data: documents, isLoading, error, refetch } = useQuery({
+    queryKey: ['documents', organizationId, currentPage, itemsPerPage, searchTerm, documentTypeFilter, statusFilter, sortField, sortOrder],
     queryFn: async () => {
+      console.log('Fetching documents with filters:', {
+        organizationId,
+        page: currentPage,
+        itemsPerPage,
+        searchTerm,
+        documentTypeFilter,
+        statusFilter,
+        sortField,
+        sortOrder
+      });
+      
       let query = supabase
         .from('documents')
-        .select('*');
+        .select('*', { count: 'exact' });
       
-      // Filter by organization
+      // Filter by organization context
       if (currentClient && isServiceProvider()) {
         query = query.eq('client_organization_id', currentClient.id);
       } else if (organizationId) {
         query = query.eq('organization_id', organizationId);
       }
       
-      // Filter by document type
-      if (documentType !== "all") {
-        query = query.eq('document_type', documentType);
+      // Apply document type filter
+      if (documentTypeFilter !== 'all') {
+        query = query.eq('document_type', documentTypeFilter);
       }
       
-      // Filter by status
-      if (documentStatus !== "all") {
-        query = query.eq('status', documentStatus);
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
       }
       
-      // Search by filename
+      // Apply search filter
       if (searchTerm) {
         query = query.ilike('file_name', `%${searchTerm}%`);
       }
       
-      const { data, error } = await query.order('created_at', { ascending: false });
-
+      // Apply sorting
+      query = query.order(sortField, { ascending: sortOrder === 'asc' });
+      
+      // Apply pagination
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+      query = query.range(from, to);
+      
+      const { data, error, count } = await query;
+      
       if (error) {
         toast({
           title: "Error fetching documents",
@@ -107,32 +126,30 @@ const DocumentsPage = () => {
         });
         throw new Error(error.message);
       }
-
-      return data?.map(doc => ({
-        ...doc, 
-        reviewStatus: localStorage.getItem(`doc-review-${doc.id}`) || 'not-reviewed',
+      
+      // Enhance with review status from localStorage
+      const enhancedData = data?.map(doc => ({
+        ...doc,
+        reviewStatus: localStorage.getItem(`doc-review-${doc.id}`) as ReviewStatus || 'not-reviewed',
         reviewNote: localStorage.getItem(`doc-review-note-${doc.id}`) || ''
       })) || [];
+      
+      return {
+        documents: enhancedData,
+        totalCount: count || 0
+      };
     },
     enabled: !!organizationId
   });
 
-  // Calculate pagination
-  const totalDocuments = allDocuments?.length || 0;
-  const totalPages = Math.ceil(totalDocuments / ITEMS_PER_PAGE);
-  
-  // Get current page documents
-  const documents = allDocuments ? allDocuments.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE, 
-    currentPage * ITEMS_PER_PAGE
-  ) : [];
+  const totalPages = documents ? Math.ceil(documents.totalCount / itemsPerPage) : 0;
 
   const handleUploadComplete = () => {
     refetch();
     setShowUploadDialog(false);
     toast({
       title: "Document uploaded successfully",
-      description: "Your document has been uploaded and will be processed shortly."
+      description: "Your document has been uploaded and will be processed shortly.",
     });
   };
 
@@ -140,66 +157,76 @@ const DocumentsPage = () => {
     navigate(`/documents/${documentId}`);
   };
 
-  const toggleDocumentSelection = (documentId: string) => {
-    setSelectedDocuments(prev => {
-      if (prev.includes(documentId)) {
-        return prev.filter(id => id !== documentId);
-      } else {
-        return [...prev, documentId];
-      }
-    });
-  };
-
-  const selectAllDocuments = () => {
-    if (documents && documents.length > 0) {
-      if (selectedDocuments.length === documents.length) {
-        setSelectedDocuments([]);
-      } else {
-        setSelectedDocuments(documents.map(doc => doc.id));
-      }
-    }
-  };
-
-  const updateDocumentReviewStatus = (documentId: string, reviewStatus: string) => {
+  const updateDocumentReviewStatus = (documentId: string, reviewStatus: ReviewStatus, reviewNote?: string) => {
     localStorage.setItem(`doc-review-${documentId}`, reviewStatus);
+    if (reviewNote) {
+      localStorage.setItem(`doc-review-note-${documentId}`, reviewNote);
+    }
+    
     refetch();
+    
     toast({
       title: "Review status updated",
       description: `Document has been marked as ${reviewStatus.replace('-', ' ')}`
     });
   };
 
-  const handlePageChange = (page: number) => {
-    if (page > 0 && page <= totalPages) {
-      setCurrentPage(page);
-      // Clear selection when changing pages
-      setSelectedDocuments([]);
+  const getReviewStatusBadge = (reviewStatus: ReviewStatus | undefined) => {
+    if (!reviewStatus || reviewStatus === 'not-reviewed') {
+      return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
+    } else if (reviewStatus === 'reviewed') {
+      return <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600 text-white">Reviewed</Badge>;
+    } else if (reviewStatus === 'needs-correction') {
+      return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
     }
   };
 
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
+  const getDocumentTypeOptions = () => {
+    return [
+      { label: "All Types", value: "all" },
+      { label: "Certificate of Fitness", value: "certificate-fitness" },
+      { label: "Medical Questionnaire", value: "medical-questionnaire" },
+      { label: "Medical Report", value: "medical-report" },
+      { label: "Audiogram", value: "audiogram" },
+      { label: "Spirometry", value: "spirometry" },
+      { label: "X-Ray Report", value: "xray-report" },
+      { label: "Other", value: "other" }
+    ];
+  };
 
+  const getStatusOptions = () => {
+    return [
+      { label: "All Statuses", value: "all" },
+      { label: "Pending", value: "pending" },
+      { label: "Processing", value: "processing" },
+      { label: "Processed", value: "processed" },
+      { label: "Error", value: "error" }
+    ];
+  };
+
+  const renderPagination = () => {
+    if (!documents || documents.totalCount === 0) return null;
+    
     const pageNumbers = [];
-    const maxPagesToShow = 5;
+    const maxVisiblePages = 5;
     
-    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
-    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
     
-    if (endPage - startPage + 1 < maxPagesToShow) {
-      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
     
     for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(i);
     }
-
+    
     return (
       <Pagination className="mt-6">
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious 
-              onClick={() => handlePageChange(currentPage - 1)} 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
             />
           </PaginationItem>
@@ -207,23 +234,23 @@ const DocumentsPage = () => {
           {startPage > 1 && (
             <>
               <PaginationItem>
-                <PaginationLink onClick={() => handlePageChange(1)}>1</PaginationLink>
+                <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
               </PaginationItem>
               {startPage > 2 && (
                 <PaginationItem>
-                  <PaginationEllipsis />
+                  <span className="flex h-9 w-9 items-center justify-center">...</span>
                 </PaginationItem>
               )}
             </>
           )}
           
-          {pageNumbers.map(page => (
-            <PaginationItem key={page}>
+          {pageNumbers.map(number => (
+            <PaginationItem key={number}>
               <PaginationLink 
-                isActive={page === currentPage}
-                onClick={() => handlePageChange(page)}
+                isActive={currentPage === number}
+                onClick={() => setCurrentPage(number)}
               >
-                {page}
+                {number}
               </PaginationLink>
             </PaginationItem>
           ))}
@@ -232,11 +259,11 @@ const DocumentsPage = () => {
             <>
               {endPage < totalPages - 1 && (
                 <PaginationItem>
-                  <PaginationEllipsis />
+                  <span className="flex h-9 w-9 items-center justify-center">...</span>
                 </PaginationItem>
               )}
               <PaginationItem>
-                <PaginationLink onClick={() => handlePageChange(totalPages)}>
+                <PaginationLink onClick={() => setCurrentPage(totalPages)}>
                   {totalPages}
                 </PaginationLink>
               </PaginationItem>
@@ -245,7 +272,7 @@ const DocumentsPage = () => {
           
           <PaginationItem>
             <PaginationNext 
-              onClick={() => handlePageChange(currentPage + 1)} 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
             />
           </PaginationItem>
@@ -254,33 +281,50 @@ const DocumentsPage = () => {
     );
   };
 
-  const canUpload = !!organizationId;
+  // Calculate review statistics if documents exist
+  const reviewStats = documents?.documents ? {
+    notReviewed: documents.documents.filter(doc => 
+      !doc.reviewStatus || doc.reviewStatus === 'not-reviewed'
+    ).length || 0,
+    
+    reviewed: documents.documents.filter(doc => 
+      doc.reviewStatus === 'reviewed'
+    ).length || 0,
+    
+    needsCorrection: documents.documents.filter(doc => 
+      doc.reviewStatus === 'needs-correction'
+    ).length || 0
+  } : { notReviewed: 0, reviewed: 0, needsCorrection: 0 };
 
   return (
     <div className="mt-4">
-      <Helmet>
-        <title>Documents</title>
-      </Helmet>
-      
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
           <p className="text-muted-foreground mt-1">
-            {contextLabel ? `Manage documents for ${contextLabel}` : "Manage your documents"}
+            {contextLabel ? `Viewing documents for ${contextLabel}` : "Manage your documents"}
           </p>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            onClick={() => refetch()} 
+            className="flex items-center gap-2"
+          >
+            <RefreshCw size={16} />
+            <span>Refresh</span>
+          </Button>
           <Button 
             className="flex items-center gap-2" 
             onClick={() => setShowUploadDialog(true)}
-            disabled={!canUpload}
+            disabled={!organizationId}
           >
             <Upload size={16} />
             <span>Upload Document</span>
           </Button>
         </div>
       </div>
-      
+
       {/* Document Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
@@ -298,273 +342,349 @@ const DocumentsPage = () => {
           />
         </DialogContent>
       </Dialog>
-      
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center">
-            <Filter className="mr-2 h-4 w-4" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Search</label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by filename..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium mb-1 block">Document Type</label>
-              <Select value={documentType} onValueChange={setDocumentType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="certificate-fitness">Certificate of Fitness</SelectItem>
-                  <SelectItem value="medical-questionnaire">Medical Questionnaire</SelectItem>
-                  <SelectItem value="medical-report">Medical Report</SelectItem>
-                  <SelectItem value="audiogram">Audiogram</SelectItem>
-                  <SelectItem value="spirometry">Spirometry</SelectItem>
-                  <SelectItem value="xray-report">X-Ray Report</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium mb-1 block">Status</label>
-              <Select value={documentStatus} onValueChange={setDocumentStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="processed">Processed</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex items-end">
-              <Button variant="outline" onClick={() => {
-                setSearchTerm("");
-                setDocumentType("all");
-                setDocumentStatus("all");
-                setCurrentPage(1); // Reset to first page when filters are reset
-              }}>
-                Reset Filters
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Documents */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <CardTitle>
-              Documents
-              {allDocuments && allDocuments.length > 0 && (
-                <Badge variant="outline" className="ml-2">
-                  {allDocuments.length}
-                </Badge>
-              )}
-            </CardTitle>
-            
-            {documents && documents.length > 0 && (
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={selectAllDocuments}
-                >
-                  {selectedDocuments.length === documents.length ? "Deselect All" : "Select All"}
-                </Button>
-                
-                {selectedDocuments.length > 0 && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        selectedDocuments.forEach(id => 
-                          updateDocumentReviewStatus(id, 'reviewed')
-                        );
-                      }}
-                    >
-                      <CheckCircle className="mr-1 h-4 w-4 text-green-500" />
-                      Mark Selected as Reviewed
-                    </Button>
-                    
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        selectedDocuments.forEach(id => 
-                          updateDocumentReviewStatus(id, 'needs-correction')
-                        );
-                      }}
-                    >
-                      <AlertCircle className="mr-1 h-4 w-4 text-red-500" />
-                      Mark Selected as Needs Correction
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <CardDescription>
-            {allDocuments && allDocuments.length > 0 
-              ? `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1} to ${Math.min(currentPage * ITEMS_PER_PAGE, totalDocuments)} of ${totalDocuments} documents` 
-              : "No documents found matching your criteria"}
-          </CardDescription>
-        </CardHeader>
+
+      <Tabs defaultValue="documents" className="w-full">
+        <TabsList className="mb-8">
+          <TabsTrigger value="documents">Document List</TabsTrigger>
+          <TabsTrigger value="uploads">Batch Upload</TabsTrigger>
+        </TabsList>
         
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          ) : error ? (
-            <div className="py-8 text-center">
-              <p className="text-destructive">Error: {(error as Error).message}</p>
-            </div>
-          ) : documents && documents.length > 0 ? (
-            <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox 
-                        checked={selectedDocuments.length === documents.length && documents.length > 0}
-                        onCheckedChange={selectAllDocuments}
-                      />
-                    </TableHead>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Review</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {documents.map(doc => (
-                    <TableRow key={doc.id}>
-                      <TableCell>
-                        <Checkbox 
-                          checked={selectedDocuments.includes(doc.id)}
-                          onCheckedChange={() => toggleDocumentSelection(doc.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{doc.file_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {doc.document_type || "Unknown"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            doc.status === 'processed' ? 'default' : 
-                            doc.status === 'processing' ? 'secondary' : 
-                            'destructive'
-                          }
-                        >
-                          {doc.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(doc.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            doc.reviewStatus === 'reviewed' ? 'default' : 
-                            doc.reviewStatus === 'needs-correction' ? 'destructive' : 
-                            'outline'
-                          }
-                          className={
-                            doc.reviewStatus === 'reviewed' ? 'bg-green-500 hover:bg-green-600' : 
-                            doc.reviewStatus === 'needs-correction' ? '' : 
-                            ''
-                          }
-                        >
-                          {doc.reviewStatus === 'reviewed' ? 'Reviewed' :
-                           doc.reviewStatus === 'needs-correction' ? 'Needs Correction' :
-                           'Not Reviewed'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleViewDocument(doc.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => updateDocumentReviewStatus(doc.id, 'reviewed')}
-                          >
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => updateDocumentReviewStatus(doc.id, 'needs-correction')}
-                          >
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              {/* Pagination */}
-              {renderPagination()}
+        <TabsContent value="documents">
+          {!organizationId ? (
+            <div className="text-center py-10 border rounded-lg bg-background">
+              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+              <p className="text-muted-foreground mb-4">Please select an organization to view documents</p>
             </div>
           ) : (
-            <div className="text-center py-8 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No documents found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || documentType !== "all" || documentStatus !== "all" 
-                  ? "Try adjusting your filters to see more results" 
-                  : "Upload your first document to get started"}
-              </p>
-              {!(searchTerm || documentType !== "all" || documentStatus !== "all") && (
-                <Button 
-                  variant="outline" 
-                  className="mx-auto"
-                  onClick={() => setShowUploadDialog(true)}
-                  disabled={!canUpload}
+            <div className="space-y-6">
+              {/* Search and Filters */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="w-full md:w-1/3">
+                      <label className="text-sm font-medium mb-1 block">Search Documents</label>
+                      <Input
+                        placeholder="Search by filename..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="w-full md:w-1/5">
+                      <label className="text-sm font-medium mb-1 block">Document Type</label>
+                      <Select value={documentTypeFilter} onValueChange={setDocumentTypeFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Filter by type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getDocumentTypeOptions().map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-full md:w-1/5">
+                      <label className="text-sm font-medium mb-1 block">Status</label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getStatusOptions().map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-full md:w-1/5">
+                      <label className="text-sm font-medium mb-1 block">Items Per Page</label>
+                      <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(parseInt(value))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Items per page" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5 per page</SelectItem>
+                          <SelectItem value="10">10 per page</SelectItem>
+                          <SelectItem value="25">25 per page</SelectItem>
+                          <SelectItem value="50">50 per page</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setDocumentTypeFilter('all');
+                        setStatusFilter('all');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <Filter size={16} />
+                      <span>Reset Filters</span>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Review Stats */}
+              {documents && documents.documents.length > 0 && (
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="outline" className="px-3 py-1">
+                    Total: {documents.totalCount} document{documents.totalCount !== 1 ? 's' : ''}
+                  </Badge>
+                  {reviewStats.notReviewed > 0 && (
+                    <Badge variant="outline" className="px-3 py-1">
+                      {reviewStats.notReviewed} not reviewed
+                    </Badge>
+                  )}
+                  {reviewStats.reviewed > 0 && (
+                    <Badge variant="default" className="bg-green-500 hover:bg-green-600 px-3 py-1">
+                      {reviewStats.reviewed} reviewed
+                    </Badge>
+                  )}
+                  {reviewStats.needsCorrection > 0 && (
+                    <Badge variant="destructive" className="px-3 py-1">
+                      {reviewStats.needsCorrection} need correction
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Documents Table */}
+              {isLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
+                </div>
+              ) : error ? (
+                <div className="py-10 text-center">
+                  <p className="text-destructive">Error: {(error as Error).message}</p>
+                </div>
+              ) : documents && documents.documents.length > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Document
-                </Button>
+                  <Card>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[350px]">
+                              <div className="flex items-center gap-2 cursor-pointer"
+                                onClick={() => {
+                                  if (sortField === 'file_name') {
+                                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setSortField('file_name');
+                                    setSortOrder('asc');
+                                  }
+                                }}
+                              >
+                                Document Name
+                                {sortField === 'file_name' && (
+                                  <SortDesc size={16} className={sortOrder === 'asc' ? 'transform rotate-180' : ''} />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>
+                              <div className="flex items-center gap-2 cursor-pointer"
+                                onClick={() => {
+                                  if (sortField === 'document_type') {
+                                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setSortField('document_type');
+                                    setSortOrder('asc');
+                                  }
+                                }}
+                              >
+                                Type
+                                {sortField === 'document_type' && (
+                                  <SortDesc size={16} className={sortOrder === 'asc' ? 'transform rotate-180' : ''} />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>
+                              <div className="flex items-center gap-2 cursor-pointer"
+                                onClick={() => {
+                                  if (sortField === 'status') {
+                                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setSortField('status');
+                                    setSortOrder('asc');
+                                  }
+                                }}
+                              >
+                                Status
+                                {sortField === 'status' && (
+                                  <SortDesc size={16} className={sortOrder === 'asc' ? 'transform rotate-180' : ''} />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>
+                              <div className="flex items-center gap-2 cursor-pointer"
+                                onClick={() => {
+                                  if (sortField === 'created_at') {
+                                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setSortField('created_at');
+                                    setSortOrder('desc');
+                                  }
+                                }}
+                              >
+                                Date Uploaded
+                                {sortField === 'created_at' && (
+                                  <SortDesc size={16} className={sortOrder === 'asc' ? 'transform rotate-180' : ''} />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>Review Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {documents.documents.map((doc) => (
+                            <TableRow key={doc.id} className="hover:bg-muted/50">
+                              <TableCell className="font-medium">{doc.file_name}</TableCell>
+                              <TableCell>
+                                {doc.document_type ? (
+                                  <Badge variant="outline" className="capitalize">
+                                    {doc.document_type.replace(/-/g, ' ')}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={
+                                    doc.status === 'processed' ? 'default' : 
+                                    doc.status === 'processing' ? 'secondary' : 
+                                    doc.status === 'error' ? 'destructive' : 'outline'
+                                  }
+                                  className="capitalize"
+                                >
+                                  {doc.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                              </TableCell>
+                              <TableCell>
+                                {getReviewStatusBadge(doc.reviewStatus)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          onClick={() => handleViewDocument(doc.id)}
+                                        >
+                                          <Eye size={16} />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>View Document</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => updateDocumentReviewStatus(doc.id, 'reviewed')}
+                                        >
+                                          <CheckCircle size={16} className="text-green-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Mark as Reviewed</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => updateDocumentReviewStatus(doc.id, 'needs-correction')}
+                                        >
+                                          <AlertCircle size={16} className="text-red-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Needs Correction</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Pagination */}
+                  {renderPagination()}
+                </motion.div>
+              ) : (
+                <div className="text-center py-10 border rounded-lg bg-background">
+                  <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No documents found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm || documentTypeFilter !== 'all' || statusFilter !== 'all' 
+                      ? "Try adjusting your filters" 
+                      : "Upload your first document to get started"}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="mx-auto"
+                    onClick={() => setShowUploadDialog(true)}
+                    disabled={!organizationId}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Document
+                  </Button>
+                </div>
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+        
+        <TabsContent value="uploads">
+          {!organizationId ? (
+            <div className="text-center py-10 border rounded-lg bg-background">
+              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+              <p className="text-muted-foreground mb-4">Please select an organization to upload documents</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <BatchDocumentUploader 
+                onUploadComplete={handleUploadComplete}
+                organizationId={currentOrganization?.id}
+                clientOrganizationId={currentClient?.id}
+              />
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
