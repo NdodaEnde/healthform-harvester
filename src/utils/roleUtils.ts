@@ -41,6 +41,7 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
   for (const roleData of data) {
     const currentRole = roleData.role as string;
     
+    // Fixed the type error by using string comparison
     if (currentRole === 'admin' || currentRole === 'superadmin') {
       highestRole = 'admin';
       break; // Admin is highest, no need to check further
