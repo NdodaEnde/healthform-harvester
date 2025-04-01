@@ -1,4 +1,3 @@
-
 import { NavLink, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -13,7 +12,7 @@ import {
   Activity,
   Calendar,
   ClipboardList,
-  BookMedical,
+  Stethoscope,
   BarChart,
   HelpCircle,
   Bell
@@ -33,7 +32,6 @@ export function DashboardSidebar() {
   const { role, loading: roleLoading } = useUserRole();
   const { user } = useAuth();
   
-  // Common navigation items for all roles
   const commonNavItems = [
     { 
       name: "Dashboard", 
@@ -43,49 +41,53 @@ export function DashboardSidebar() {
     }
   ];
   
-  // Role-specific navigation items
   const getRoleNavItems = () => {
     if (roleLoading) return [];
     
-    // Admin role items
     if (role === 'admin') {
       return [
         { 
           name: "Documents", 
           href: "/documents", 
           icon: FileText,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         {
           name: "Patients",
           href: "/patients",
           icon: UserRound,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         {
           name: "Certificate Templates",
           href: "/certificates/templates",
           icon: ScrollText,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         ...(isServiceProvider() ? [
           { 
             name: "Organizations", 
             href: "/admin/organizations", 
             icon: Building,
-            exact: false
+            exact: false,
+            badge: undefined
           },
           { 
             name: "Clients", 
             href: `/admin/organizations/${currentOrganization?.id}/clients`, 
             icon: Building,
-            exact: false
+            exact: false,
+            badge: undefined
           },
           { 
             name: "Users", 
             href: `/admin/organizations/${currentOrganization?.id}/users`, 
             icon: Users,
-            exact: false
+            exact: false,
+            badge: undefined
           }
         ] : []),
         { 
@@ -99,19 +101,20 @@ export function DashboardSidebar() {
           name: "Settings", 
           href: "/settings/organization", 
           icon: Settings,
-          exact: false
+          exact: false,
+          badge: undefined
         }
       ];
     }
     
-    // Clinician role items
     if (role === 'clinician') {
       return [
         {
           name: "Patients",
           href: "/patients",
           icon: UserRound,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         { 
           name: "Appointments", 
@@ -124,32 +127,34 @@ export function DashboardSidebar() {
           name: "Documents", 
           href: "/documents", 
           icon: FileText,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         {
           name: "Medical Records",
           href: "/medical-records",
-          icon: BookMedical,
+          icon: Stethoscope,
           exact: false,
           badge: "New"
         }
       ];
     }
     
-    // Staff role items
     if (role === 'staff') {
       return [
         { 
           name: "Documents", 
           href: "/documents", 
           icon: FileText,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         {
           name: "Patients",
           href: "/patients",
           icon: UserRound,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         { 
           name: "Appointments", 
@@ -168,14 +173,14 @@ export function DashboardSidebar() {
       ];
     }
     
-    // Client role items
     if (role === 'client') {
       return [
         { 
           name: "Documents", 
           href: "/documents", 
           icon: FileText,
-          exact: false
+          exact: false,
+          badge: undefined
         },
         {
           name: "Employees",
@@ -194,36 +199,38 @@ export function DashboardSidebar() {
       ];
     }
     
-    // Default items if role is not determined
     return [
       { 
         name: "Documents", 
         href: "/documents", 
         icon: FileText,
-        exact: false
+        exact: false,
+        badge: undefined
       },
       {
         name: "Patients",
         href: "/patients",
         icon: UserRound,
-        exact: false
+        exact: false,
+        badge: undefined
       },
       {
         name: "Certificate Templates",
         href: "/certificates/templates",
         icon: ScrollText,
-        exact: false
+        exact: false,
+        badge: undefined
       }
     ];
   };
   
-  // Footer items that appear at the bottom of the sidebar
   const footerNavItems = [
     { 
       name: "Help & Support", 
       href: "/support", 
       icon: HelpCircle,
-      exact: true
+      exact: true,
+      badge: undefined
     },
     { 
       name: "Notifications", 
@@ -234,7 +241,6 @@ export function DashboardSidebar() {
     }
   ];
   
-  // Combine common items with role-specific items
   const navItems = [...commonNavItems, ...getRoleNavItems()];
 
   return (
@@ -256,7 +262,6 @@ export function DashboardSidebar() {
           </Button>
         </div>
         
-        {/* User info section */}
         {!collapsed && (
           <div className="px-4 mb-6">
             <div className="text-sm font-medium truncate">
@@ -270,10 +275,8 @@ export function DashboardSidebar() {
           </div>
         )}
         
-        {/* Main navigation items */}
         <nav className="space-y-1 px-2 mb-6">
           {navItems.map((item) => {
-            // Check if the current path matches this nav item
             const isActive = item.exact 
               ? location.pathname === item.href 
               : location.pathname.startsWith(item.href);
@@ -305,7 +308,6 @@ export function DashboardSidebar() {
           })}
         </nav>
         
-        {/* Footer navigation items */}
         <div className="px-2 mt-auto">
           {!collapsed && <div className="h-px bg-border mb-2"></div>}
           {footerNavItems.map((item) => {

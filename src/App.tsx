@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,6 +8,31 @@ import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
 import { Helmet } from 'react-helmet';
 import { DashboardLayout } from './components/DashboardLayout';
+
+// Import pages and components
+import Dashboard from './pages/Dashboard';
+import DocumentsPage from './pages/DocumentsPage';
+import DocumentViewer from './pages/DocumentViewer';
+import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
+import OrganizationsPage from './pages/admin/OrganizationsPage';
+import CreateOrganizationPage from './pages/admin/CreateOrganizationPage';
+import EditOrganizationPage from './pages/admin/EditOrganizationPage';
+import OrganizationUsersPage from './pages/admin/OrganizationUsersPage';
+import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
+import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
+import PatientsPage from './pages/PatientsPage';
+import PatientDetailPage from './pages/PatientDetailPage';
+import PatientEditPage from './pages/PatientEditPage';
+import PatientRecordsPage from './pages/PatientRecordsPage';
+import Index from './pages/Index';
+import Auth from './pages/Auth';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import UpdatePasswordPage from './pages/UpdatePasswordPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
+import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
+import NotFound from './pages/NotFound';
+import HeaderComponent from './components/HeaderComponent';
+import OrganizationProtectedRoute from './components/OrganizationProtectedRoute';
 
 // Create a client
 const queryClient = new QueryClient();

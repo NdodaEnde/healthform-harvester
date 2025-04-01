@@ -1,14 +1,14 @@
-
 import React from 'react';
 import { useUserRole } from '@/utils/roleUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TotalDocumentsCard } from '@/components/dashboard/TotalDocumentsCard';
 import { DocumentActivityChart } from '@/components/dashboard/DocumentActivityChart';
 import { DocumentStatusChart } from '@/components/dashboard/DocumentStatusChart';
-import { LayoutDashboard, Loader2, AlertTriangle, UserRound, CalendarClock, BookMedical, FileText, ClipboardList, Users } from 'lucide-react';
+import { LayoutDashboard, Loader2, AlertTriangle, UserRound, CalendarClock, Stethoscope, FileText, ClipboardList, Users } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardStatProps {
   title: string;
@@ -216,7 +216,7 @@ export const RoleBasedDashboard: React.FC = () => {
           <DashboardStat
             title="Medical Records"
             value="156"
-            icon={<BookMedical />}
+            icon={<Stethoscope />}
             description="Updated in last 30 days"
             onClick={() => navigate('/medical-records')}
           />
@@ -621,6 +621,3 @@ export const RoleBasedDashboard: React.FC = () => {
     </div>
   );
 };
-
-// Import at the top
-import { Badge } from "@/components/ui/badge";

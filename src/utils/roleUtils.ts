@@ -1,6 +1,6 @@
-
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import React from 'react';
 
 export type UserRole = 'admin' | 'clinician' | 'staff' | 'client';
 
@@ -73,6 +73,3 @@ export const useUserRole = (): { role: UserRole | null, loading: boolean } => {
   
   return { role, loading };
 };
-
-// Import at the top
-import React from 'react';
