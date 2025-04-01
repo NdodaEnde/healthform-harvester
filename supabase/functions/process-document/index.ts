@@ -80,19 +80,40 @@ serve(async (req) => {
     // 3. Start document processing in the background
     const documentId = documentData.id;
     
-    // Create a copy of the file for processing to avoid streaming issues
-    // This is needed because formData entries can only be read once
-    const fileArrayBuffer = await file.arrayBuffer();
-    const fileBlob = new Blob([fileArrayBuffer], { type: file.type });
-    const fileCopy = new File([fileBlob], file.name, { type: file.type });
-    
-    // Start background task for document processing with the copy of the file
-    console.log(`Starting background processing for document ${documentId} (${fileName})`);
-    const processingPromise = processDocumentWithLandingAI(fileCopy, documentType, documentId, supabase);
-    
-    // Use EdgeRuntime.waitUntil to ensure the processing continues even after response is sent
-    // @ts-ignore - Deno specific API
-    EdgeRuntime.waitUntil(processingPromise);
+    try {
+      // Create a copy of the file for processing to avoid streaming issues
+      // This is crucial because the formData entries can only be read once
+      const fileArrayBuffer = await file.arrayBuffer();
+      const fileBlob = new Blob([fileArrayBuffer], { type: file.type });
+      const fileCopy = new File([fileBlob], file.name, { type: file.type });
+      
+      // Start background task for document processing with the copy of the file
+      console.log(`Starting background processing for document ${documentId} (${fileName})`);
+      const processingPromise = processDocumentWithLandingAI(fileCopy, documentType, documentId, supabase);
+      
+      // Use EdgeRuntime.waitUntil to ensure the processing continues even after response is sent
+      // @ts-ignore - Deno specific API
+      EdgeRuntime.waitUntil(processingPromise.catch(error => {
+        console.error(`Error in background processing for document ${documentId}:`, error);
+        // Try to update document status to failed if there's an error
+        return supabase
+          .from('documents')
+          .update({
+            status: 'failed',
+            processing_error: error.message || 'Unknown error during processing'
+          })
+          .eq('id', documentId)
+          .then(() => {
+            console.error(`Updated document ${documentId} status to failed due to background processing error`);
+          })
+          .catch(updateError => {
+            console.error(`Failed to update document ${documentId} status after processing error:`, updateError);
+          });
+      }));
+    } catch (processingSetupError) {
+      console.error(`Error setting up document processing for ${documentId}:`, processingSetupError);
+      // Don't fail the request, but log the error
+    }
 
     // 4. Return immediate success response with document ID
     return new Response(

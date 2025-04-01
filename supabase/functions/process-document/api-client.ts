@@ -9,7 +9,7 @@ export const apiClient = {
       throw new Error('Landing AI API key is not configured');
     }
     
-    console.log(`Calling Landing AI API for file: ${file.name}`);
+    console.log(`Calling Landing AI API for file: ${file.name} (Size: ${file.size} bytes)`);
     
     // API endpoint
     const apiUrl = 'https://api.va.landing.ai/v1/tools/agentic-document-analysis';
@@ -34,9 +34,12 @@ export const apiClient = {
     console.log(`File name: ${file.name}, File type: ${file.type}, File size: ${file.size} bytes`);
     
     try {
-      // Set longer timeout for large files (2 minutes)
+      // Set longer timeout for large files (3 minutes)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      const timeoutId = setTimeout(() => {
+        console.error(`API call timed out after 3 minutes for file: ${file.name}`);
+        controller.abort();
+      }, 180000);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -59,6 +62,11 @@ export const apiClient = {
       console.log(`Successfully received response from Landing AI API for file: ${file.name}`);
       return result;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error(`Request was aborted due to timeout for file ${file.name}`);
+        throw new Error(`Request timeout: Processing took too long for file ${file.name}`);
+      }
+      
       console.error(`Error calling Landing AI API for file ${file.name}:`, error);
       throw error;
     }

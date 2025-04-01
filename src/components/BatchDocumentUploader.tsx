@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, X, FileText, Upload, CheckCircle, AlertCircle, Save, Archive, Eye, FileBadge } from "lucide-react";
+import { Loader2, X, FileText, Upload, CheckCircle, AlertCircle, Eye, Save, Archive } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,6 +25,10 @@ const DOCUMENT_TYPES = [
 ];
 
 const BATCH_LOCAL_STORAGE_KEY = "doc-batch-";
+// Batch size for concurrent uploads - smaller to avoid overloading the server
+const MAX_CONCURRENT_UPLOADS = 2;
+// Delay between batches to prevent rate limiting (in ms)
+const BATCH_DELAY = 1000;
 
 export interface BatchDocumentUploaderProps {
   onUploadComplete?: (data?: any) => void;
@@ -182,43 +187,50 @@ const BatchDocumentUploader = ({
       formData.append('documentType', fileItem.documentType);
       formData.append('userId', user.id);
 
+      // Create a simulated progress updater
       const progressInterval = setInterval(() => {
-        const currentProgress = queuedFiles[index].progress;
-        const newProgress = currentProgress < 60 ? currentProgress + 5 : currentProgress;
-        updateFileProgress(index, newProgress);
-      }, 300);
+        updateFileProgress(index, Math.min(
+          (queuedFiles[index]?.progress || 0) + Math.random() * 5, 
+          60)
+        );
+      }, 500);
 
-      const { data, error } = await supabase.functions.invoke('process-document', {
-        body: formData,
-      });
+      try {
+        const { data, error } = await supabase.functions.invoke('process-document', {
+          body: formData,
+        });
 
-      clearInterval(progressInterval);
-      
-      if (error) throw error;
-      
-      updateFileProgress(index, 80);
-      updateFileStatus(index, 'processing', data?.documentId);
-      
-      if (!data?.documentId) {
-        throw new Error("No document ID returned from processing function");
-      }
-      
-      const { error: updateError } = await supabase
-        .from('documents')
-        .update({
-          organization_id: organizationId,
-          client_organization_id: clientOrganizationId || null
-        })
-        .eq('id', data.documentId);
+        clearInterval(progressInterval);
         
-      if (updateError) {
-        throw updateError;
+        if (error) throw error;
+        
+        updateFileProgress(index, 80);
+        updateFileStatus(index, 'processing', data?.documentId);
+        
+        if (!data?.documentId) {
+          throw new Error("No document ID returned from processing function");
+        }
+        
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({
+            organization_id: organizationId,
+            client_organization_id: clientOrganizationId || null
+          })
+          .eq('id', data.documentId);
+          
+        if (updateError) {
+          throw updateError;
+        }
+        
+        updateFileProgress(index, 100);
+        updateFileStatus(index, 'complete', data.documentId);
+        
+        return data;
+      } catch (error) {
+        clearInterval(progressInterval);
+        throw error;
       }
-      
-      updateFileProgress(index, 100);
-      updateFileStatus(index, 'complete', data.documentId);
-      
-      return data;
     } catch (error: any) {
       console.error("Error uploading document:", error);
       updateFileStatus(index, 'error', undefined, error.message || "Upload failed");
@@ -261,34 +273,42 @@ const BatchDocumentUploader = ({
         description: `Uploading ${pendingFiles.length} document(s)`,
       });
       
-      const batchSize = 3;
+      // Process in smaller batches to prevent overwhelming the server
+      let successCount = 0;
+      let failCount = 0;
       const results = [];
       
-      for (let i = 0; i < pendingFiles.length; i += batchSize) {
-        const batch = pendingFiles.slice(i, i + batchSize);
+      // Process files in batches of MAX_CONCURRENT_UPLOADS
+      for (let i = 0; i < pendingFiles.length; i += MAX_CONCURRENT_UPLOADS) {
+        const batch = pendingFiles.slice(i, i + MAX_CONCURRENT_UPLOADS);
+        
+        // Process this batch concurrently
         const batchPromises = batch.map(async (fileItem) => {
           const fileIndex = queuedFiles.findIndex(f => f === fileItem);
           if (fileIndex !== -1) {
             try {
-              return await uploadFile(fileItem, fileIndex);
+              const result = await uploadFile(fileItem, fileIndex);
+              successCount++;
+              return result;
             } catch (error) {
               console.error(`Error processing file:`, error);
+              failCount++;
               return null;
             }
           }
           return null;
         });
         
+        // Wait for this batch to complete
         const batchResults = await Promise.all(batchPromises);
         results.push(...batchResults.filter(Boolean));
         
-        if (i + batchSize < pendingFiles.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Add a delay between batches to prevent rate limiting
+        if (i + MAX_CONCURRENT_UPLOADS < pendingFiles.length) {
+          console.log(`Waiting ${BATCH_DELAY}ms before processing next batch...`);
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
       }
-
-      const successCount = results.length;
-      const failCount = pendingFiles.length - successCount;
       
       toast({
         title: "Batch upload complete",
@@ -296,7 +316,7 @@ const BatchDocumentUploader = ({
         variant: successCount > 0 ? "default" : "destructive"
       });
       
-      if (onUploadComplete && successCount > 0) {
+      if (onUploadComplete && results.length > 0) {
         onUploadComplete(results);
       }
     } catch (error: any) {
