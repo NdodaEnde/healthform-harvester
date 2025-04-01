@@ -1,58 +1,21 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { 
-  FileText, 
-  User, 
-  CheckCircle, 
-  Clock, 
-  Upload, 
-  AlertCircle, 
-  FolderCheck, 
-  BarChart3,
-  UserRound,
-  ArrowRight,
-  RefreshCw
-} from "lucide-react";
+import { BarChart3, Upload, RefreshCw } from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
-import { format, subDays } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import DocumentUploader from "@/components/DocumentUploader";
 import { Helmet } from 'react-helmet';
-import { TotalDocumentsCard } from '@/components/dashboard/TotalDocumentsCard';
-import { DocumentActivityChart } from '@/components/dashboard/DocumentActivityChart';
-import { DocumentStatusChart } from '@/components/dashboard/DocumentStatusChart';
-
-// Define a type for the work queue items
-interface WorkQueueItem {
-  id: string;
-  title: string;
-  description: string | null;
-  priority: string;
-  status: string;
-  type: string;
-  organization_id: string | null;
-  assigned_to: string | null;
-  related_entity_type: string | null;
-  related_entity_id: string | null;
-  due_date: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { RoleBasedDashboard } from '@/components/dashboard/RoleBasedDashboard';
 
 const Dashboard = () => {
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const navigate = useNavigate();
+  const [showUploadDialog, setShowUploadDialog] = React.useState(false);
   const { 
     currentOrganization, 
     currentClient,
-    isServiceProvider,
     getEffectiveOrganizationId
   } = useOrganization();
 
@@ -60,8 +23,7 @@ const Dashboard = () => {
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Fetch dashboard metrics
-  const { data: metrics, isLoading: loadingMetrics, refetch: refetchMetrics } = useQuery({
+  const { refetch: refetchMetrics } = useQuery({
     queryKey: ['dashboard-metrics', organizationId],
     queryFn: async () => {
       if (!organizationId) return null;
@@ -132,8 +94,7 @@ const Dashboard = () => {
     enabled: !!organizationId
   });
 
-  // Fetch recent activities (last 5 documents)
-  const { data: recentActivities, isLoading: loadingActivities, refetch: refetchActivities } = useQuery({
+  const { refetch: refetchActivities } = useQuery({
     queryKey: ['recent-activities', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
@@ -152,87 +113,14 @@ const Dashboard = () => {
     enabled: !!organizationId
   });
 
-  // Mock work queue items instead of fetching from the database
-  const { data: workQueue, isLoading: loadingWorkQueue, refetch: refetchWorkQueue } = useQuery({
-    queryKey: ['work-queue', organizationId],
-    queryFn: async () => {
-      if (!organizationId) return [];
-      
-      // Mock data for work queue since the table doesn't exist yet
-      const mockWorkQueue: WorkQueueItem[] = [
-        {
-          id: '1',
-          title: 'Review Document',
-          description: 'Review the uploaded medical certificate',
-          priority: 'high',
-          status: 'pending',
-          type: 'document_review',
-          organization_id: organizationId,
-          assigned_to: null,
-          related_entity_type: 'document',
-          related_entity_id: recentActivities && recentActivities.length > 0 ? recentActivities[0].id : null,
-          due_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          title: 'Patient Follow-up',
-          description: 'Follow up with patient about their latest visit',
-          priority: 'medium',
-          status: 'pending',
-          type: 'patient_followup',
-          organization_id: organizationId,
-          assigned_to: null,
-          related_entity_type: 'patient',
-          related_entity_id: null,
-          due_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      return mockWorkQueue;
-    },
-    enabled: !!organizationId && !!recentActivities
-  });
-
   const handleUploadComplete = () => {
     refetchMetrics();
     refetchActivities();
-    refetchWorkQueue();
     setShowUploadDialog(false);
     toast({
       title: "Document uploaded successfully",
       description: "Your document has been uploaded and will be processed shortly.",
     });
-  };
-
-  // Function to get status badge color
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'processed':
-        return "bg-green-100 text-green-800";
-      case 'processing':
-        return "bg-blue-100 text-blue-800";
-      case 'error':
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPriorityBadge = (priority) => {
-    switch (priority) {
-      case 'high':
-        return "bg-red-100 text-red-800";
-      case 'medium':
-        return "bg-yellow-100 text-yellow-800";
-      case 'low':
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
   };
 
   if (!organizationId) {
@@ -264,7 +152,6 @@ const Dashboard = () => {
             onClick={() => {
               refetchMetrics();
               refetchActivities();
-              refetchWorkQueue();
               toast({
                 title: "Dashboard refreshed",
                 description: "The dashboard data has been refreshed.",
@@ -304,263 +191,13 @@ const Dashboard = () => {
       </Dialog>
       
       {/* Main Dashboard Content */}
-      <div className="space-y-8">
-        {/* Key Metrics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Total Documents */}
-            <TotalDocumentsCard organizationId={organizationId} />
-            
-            {/* Total Patients */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Patients</CardTitle>
-                <UserRound className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {loadingMetrics ? (
-                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
-                  ) : (
-                    metrics?.totalPatients || 0
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <Button
-                    variant="link"
-                    className="h-auto p-0 text-xs"
-                    onClick={() => navigate('/patients')}
-                  >
-                    View all patients
-                  </Button>
-                </p>
-              </CardContent>
-            </Card>
-            
-            {/* Document Status */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Document Status</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {loadingMetrics ? (
-                    <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
-                  ) : (
-                    `${metrics?.processedDocuments || 0}/${metrics?.totalDocuments || 0}`
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics?.pendingDocuments || 0} pending documents
-                </p>
-              </CardContent>
-            </Card>
-            
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/documents')}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  <span>View Documents</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/patients')}
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Manage Patients</span>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </motion.div>
-        
-        {/* Document Activity and Status Charts */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
-          <div className="grid gap-4 grid-cols-12">
-            <DocumentActivityChart organizationId={organizationId} />
-            <DocumentStatusChart organizationId={organizationId} />
-          </div>
-        </motion.div>
-        
-        {/* Recent Activity and Work Queue */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Recent Activity */}
-          <Card className="md:col-span-1">
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>
-                Latest documents uploaded to your organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingActivities ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center space-x-4">
-                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
-                      <div className="space-y-2 flex-1">
-                        <div className="h-4 bg-muted animate-pulse rounded w-3/4"></div>
-                        <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : recentActivities && recentActivities.length > 0 ? (
-                <div className="space-y-4">
-                  {recentActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-center space-x-4">
-                      <div className="rounded-full bg-primary/10 p-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {activity.file_name}
-                        </p>
-                        <div className="flex items-center">
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(activity.created_at), 'MMM d, yyyy')}
-                          </p>
-                          <span className="mx-2 text-muted-foreground">•</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(activity.status)}`}>
-                            {activity.status}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(`/documents/${activity.id}`)}
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground text-sm">No recent activity found</p>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => navigate('/documents')}
-              >
-                View All Documents
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          {/* Work Queue */}
-          <Card className="md:col-span-1">
-            <CardHeader>
-              <CardTitle>Work Queue</CardTitle>
-              <CardDescription>
-                Tasks that need your attention
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingWorkQueue ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center space-x-4">
-                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
-                      <div className="space-y-2 flex-1">
-                        <div className="h-4 bg-muted animate-pulse rounded w-3/4"></div>
-                        <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : workQueue && workQueue.length > 0 ? (
-                <div className="space-y-4">
-                  {workQueue.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4">
-                      <div className="rounded-full bg-primary/10 p-2">
-                        <FolderCheck className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {item.title}
-                        </p>
-                        <div className="flex items-center">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityBadge(item.priority)}`}>
-                            {item.priority}
-                          </span>
-                          {item.due_date && (
-                            <>
-                              <span className="mx-2 text-muted-foreground">•</span>
-                              <p className="text-xs text-muted-foreground">
-                                Due: {format(new Date(item.due_date), 'MMM d, yyyy')}
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          // Handle work item action
-                          if (item.related_entity_type === 'document' && item.related_entity_id) {
-                            navigate(`/documents/${item.related_entity_id}`);
-                          } else if (item.related_entity_type === 'patient' && item.related_entity_id) {
-                            navigate(`/patients/${item.related_entity_id}`);
-                          }
-                        }}
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground text-sm">No work queue items found</p>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  // Add an action for viewing all work queue items
-                  toast({
-                    title: "Coming soon",
-                    description: "Full work queue management is coming soon.",
-                  });
-                }}
-              >
-                View All Tasks
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <RoleBasedDashboard />
+      </motion.div>
     </div>
   );
 };
