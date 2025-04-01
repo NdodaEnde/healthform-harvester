@@ -45,16 +45,18 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
     const currentRole = roleData.role as string;
     
     // Map database roles to application roles with type safety
-    if (currentRole === 'admin' || currentRole === 'superadmin') {
-      highestRole = 'admin';
-      break; // Admin is highest, no need to check further
-    } else if (currentRole === 'clinician' && highestRole !== 'admin') {
-      highestRole = 'clinician';
-    } else if (currentRole === 'staff' && highestRole !== 'admin' && highestRole !== 'clinician') {
-      highestRole = 'staff';
-    } else if (currentRole === 'viewer' && highestRole === 'client') {
-      // Map 'viewer' to 'client' if no higher role is found
-      highestRole = 'client';
+    if (isValidRole(currentRole)) {
+      if (currentRole === 'admin' || currentRole === 'superadmin') {
+        highestRole = 'admin';
+        break; // Admin is highest, no need to check further
+      } else if (currentRole === 'clinician' && highestRole !== 'admin') {
+        highestRole = 'clinician';
+      } else if (currentRole === 'staff' && highestRole !== 'admin' && highestRole !== 'clinician') {
+        highestRole = 'staff';
+      } else if (currentRole === 'viewer' && highestRole === 'client') {
+        // Map 'viewer' to 'client' if no higher role is found
+        highestRole = 'client';
+      }
     }
   }
   
