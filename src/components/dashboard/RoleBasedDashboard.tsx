@@ -9,10 +9,6 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from "@/components/ui/badge";
-import { SystemHealthCards } from './SystemHealthCards';
-import { OrganizationInsights } from './OrganizationInsights';
-import { AdminQuickActions } from './AdminQuickActions';
-import { StaffDashboard } from './StaffDashboard';
 
 interface DashboardStatProps {
   title: string;
@@ -83,16 +79,39 @@ export const RoleBasedDashboard: React.FC = () => {
   if (role === 'admin') {
     return (
       <div className="space-y-8">
-        <SystemHealthCards organizationId={organizationId} />
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <TotalDocumentsCard organizationId={organizationId} />
+          
+          <DashboardStat
+            title="Pending Certifications"
+            value="12"
+            icon={<FileText />}
+            description="Certificates awaiting review"
+            trend={{ value: 3, label: "since yesterday", positive: false }}
+            onClick={() => navigate('/documents?status=pending')}
+          />
+          
+          <DashboardStat
+            title="Active Patients"
+            value="245"
+            icon={<UserRound />}
+            description="Total patients in system"
+            trend={{ value: 18, label: "this month", positive: true }}
+            onClick={() => navigate('/patients')}
+          />
+          
+          <DashboardStat
+            title="Organization Users"
+            value="24"
+            icon={<Users />}
+            description="Staff and clinicians"
+            onClick={() => navigate(`/admin/organizations/${organizationId}/users`)}
+          />
+        </div>
         
         <div className="grid gap-4 grid-cols-12">
           <DocumentActivityChart organizationId={organizationId} />
           <DocumentStatusChart organizationId={organizationId} />
-        </div>
-        
-        <div className="grid gap-4 grid-cols-12">
-          <OrganizationInsights organizationId={organizationId} />
-          <AdminQuickActions />
         </div>
         
         <div className="grid gap-4 md:grid-cols-3">
@@ -299,7 +318,150 @@ export const RoleBasedDashboard: React.FC = () => {
   
   // Staff Dashboard  
   if (role === 'staff') {
-    return <StaffDashboard organizationId={organizationId} />;
+    return (
+      <div className="space-y-8">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <DashboardStat
+            title="Today's Appointments"
+            value="15"
+            icon={<CalendarClock />}
+            description="Scheduled for today"
+            onClick={() => navigate('/appointments')}
+          />
+          
+          <DashboardStat
+            title="Document Queue"
+            value="18"
+            icon={<FileText />}
+            description="Awaiting processing"
+            onClick={() => navigate('/documents?status=pending')}
+          />
+          
+          <DashboardStat
+            title="Tasks"
+            value="9"
+            icon={<ClipboardList />}
+            description="Assigned to you"
+            trend={{ value: 3, label: "completed today", positive: true }}
+            onClick={() => navigate('/tasks')}
+          />
+          
+          <TotalDocumentsCard organizationId={organizationId} />
+        </div>
+        
+        <div className="grid gap-4 grid-cols-12">
+          <Card className="col-span-12 md:col-span-7">
+            <CardHeader>
+              <CardTitle>Today's Schedule</CardTitle>
+              <CardDescription>
+                Appointments for today
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-background rounded-md border">
+                  <div>
+                    <p className="font-medium">Michael Thompson</p>
+                    <p className="text-sm text-muted-foreground">Dr. Anderson - Pre-employment</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">9:00 AM</p>
+                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                      Checked In
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-background rounded-md border">
+                  <div>
+                    <p className="font-medium">Emily Clark</p>
+                    <p className="text-sm text-muted-foreground">Dr. Martinez - Annual Medical</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">10:15 AM</p>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                      Upcoming
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-background rounded-md border">
+                  <div>
+                    <p className="font-medium">Robert Johnson</p>
+                    <p className="text-sm text-muted-foreground">Dr. Williams - Follow-up</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">11:30 AM</p>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                      Upcoming
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/appointments')}>
+                View Full Schedule
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="col-span-12 md:col-span-5">
+            <CardHeader>
+              <CardTitle>Tasks</CardTitle>
+              <CardDescription>
+                Your assigned tasks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-1">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between">
+                      <p className="text-sm font-medium">Follow up with patient</p>
+                      <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                        Urgent
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Call regarding test results</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-1">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between">
+                      <p className="text-sm font-medium">Process health records</p>
+                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200">
+                        Medium
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Update medical history for 3 patients</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-1">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between">
+                      <p className="text-sm font-medium">Schedule follow-up appointments</p>
+                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                        Low
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">For patients seen last week</p>
+                  </div>
+                </div>
+              </div>
+              <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/tasks')}>
+                View All Tasks
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
   
   // Client Dashboard
