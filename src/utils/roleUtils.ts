@@ -39,7 +39,7 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
   let highestRole: UserRole = 'client';
   
   for (const roleData of data) {
-    const currentRole = roleData.role;
+    const currentRole = roleData.role as string;
     
     if (currentRole === 'admin' || currentRole === 'superadmin') {
       highestRole = 'admin';
