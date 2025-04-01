@@ -5,6 +5,9 @@ import React from 'react';
 
 export type UserRole = 'admin' | 'clinician' | 'staff' | 'client';
 
+// Define all possible roles that might come from the database
+type DatabaseRole = UserRole | 'superadmin' | 'viewer';
+
 // Cache the user roles to avoid excessive database queries
 const userRoleCache = new Map<string, UserRole>();
 
@@ -41,7 +44,7 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
   for (const roleData of data) {
     const currentRole = roleData.role as string;
     
-    // Fixed the type error by using string comparison
+    // Map database roles to application roles with type safety
     if (currentRole === 'admin' || currentRole === 'superadmin') {
       highestRole = 'admin';
       break; // Admin is highest, no need to check further
@@ -49,6 +52,9 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
       highestRole = 'clinician';
     } else if (currentRole === 'staff' && highestRole !== 'admin' && highestRole !== 'clinician') {
       highestRole = 'staff';
+    } else if (currentRole === 'viewer' && highestRole === 'client') {
+      // Map 'viewer' to 'client' if no higher role is found
+      highestRole = 'client';
     }
   }
   
@@ -57,6 +63,13 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
   
   return highestRole;
 };
+
+/**
+ * Type guard function to check if a string is a valid role
+ */
+function isValidRole(role: string): role is DatabaseRole {
+  return ['admin', 'superadmin', 'clinician', 'staff', 'client', 'viewer'].includes(role);
+}
 
 /**
  * Hook to get the current user's role
