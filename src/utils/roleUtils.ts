@@ -1,3 +1,4 @@
+
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import React from 'react';
@@ -9,6 +10,7 @@ const userRoleCache = new Map<string, UserRole>();
 
 /**
  * Gets the role of the specified user
+ * Returns the highest privilege role if user has multiple roles
  */
 export const getUserRole = async (userId: string): Promise<UserRole> => {
   // Check cache first
@@ -16,33 +18,43 @@ export const getUserRole = async (userId: string): Promise<UserRole> => {
     return userRoleCache.get(userId) as UserRole;
   }
   
-  // Query the organization_users table to get the user's role
+  // Query the organization_users table to get the user's roles
   const { data, error } = await supabase
     .from('organization_users')
     .select('role')
-    .eq('user_id', userId)
-    .single();
+    .eq('user_id', userId);
     
   if (error) {
     console.error('Error fetching user role:', error);
     return 'staff'; // Default to staff if there's an error
   }
   
-  // Map the database role to our UserRole type
-  let role: UserRole = 'staff';
+  // If no roles found, default to staff
+  if (!data || data.length === 0) {
+    return 'staff';
+  }
   
-  if (data?.role === 'admin' || data?.role === 'superadmin') {
-    role = 'admin';
-  } else if (data?.role === 'clinician') {
-    role = 'clinician';
-  } else if (data?.role === 'client') {
-    role = 'client';
+  // Get the highest privilege role
+  // Priority: admin > clinician > staff > client
+  let highestRole: UserRole = 'client';
+  
+  for (const roleData of data) {
+    const currentRole = roleData.role;
+    
+    if (currentRole === 'admin' || currentRole === 'superadmin') {
+      highestRole = 'admin';
+      break; // Admin is highest, no need to check further
+    } else if (currentRole === 'clinician' && highestRole !== 'admin') {
+      highestRole = 'clinician';
+    } else if (currentRole === 'staff' && highestRole !== 'admin' && highestRole !== 'clinician') {
+      highestRole = 'staff';
+    }
   }
   
   // Cache the result
-  userRoleCache.set(userId, role);
+  userRoleCache.set(userId, highestRole);
   
-  return role;
+  return highestRole;
 };
 
 /**
