@@ -16,7 +16,10 @@ import {
   Stethoscope,
   BarChart,
   HelpCircle,
-  Bell
+  Bell,
+  Shield,
+  Database,
+  FileBarChart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -104,6 +107,13 @@ export function DashboardSidebar() {
           name: "Analytics", 
           href: "/analytics", 
           icon: BarChart,
+          exact: false,
+          badge: "New"
+        },
+        { 
+          name: "Compliance", 
+          href: "/compliance", 
+          icon: Shield,
           exact: false,
           badge: "New"
         },
@@ -203,6 +213,20 @@ export function DashboardSidebar() {
           name: "Reports", 
           href: "/reports", 
           icon: Activity,
+          exact: false,
+          badge: "New"
+        },
+        { 
+          name: "Compliance", 
+          href: "/compliance", 
+          icon: Shield,
+          exact: false,
+          badge: "New"
+        },
+        { 
+          name: "Analytics", 
+          href: "/reports/analytics", 
+          icon: FileBarChart,
           exact: false,
           badge: "New"
         }

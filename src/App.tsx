@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -269,6 +268,29 @@ function App() {
                         <div className="mt-4">
                           <h1 className="text-3xl font-bold mb-4">Notifications</h1>
                           <p className="text-muted-foreground">This page is coming soon.</p>
+                        </div>
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  {/* New Routes */}
+                  <Route path="/compliance" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <div className="mt-4">
+                          <h1 className="text-3xl font-bold mb-4">Compliance Dashboard</h1>
+                          <p className="text-muted-foreground">This page shows compliance metrics and statuses for your organization.</p>
+                        </div>
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/reports/analytics" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <div className="mt-4">
+                          <h1 className="text-3xl font-bold mb-4">Analytics Dashboard</h1>
+                          <p className="text-muted-foreground">Detailed analytics and metrics for your organization.</p>
                         </div>
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
