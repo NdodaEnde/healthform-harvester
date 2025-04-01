@@ -16,32 +16,17 @@ export function DocumentStatusChart({ organizationId }: { organizationId: string
 
   useEffect(() => {
     const fetchDocumentStatuses = async () => {
-      if (!organizationId) {
-        console.log("No organization ID provided to DocumentStatusChart");
-        setLoading(false);
-        return;
-      }
+      if (!organizationId) return;
       
       setLoading(true);
       
-      console.log("Fetching document statuses for organization:", organizationId);
-      
       try {
-        const query = supabase
+        const { data, error } = await supabase
           .from('documents')
           .select('status')
           .eq('organization_id', organizationId);
         
-        console.log("Constructed status query:", JSON.stringify(query));
-        
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Error fetching document statuses:', error);
-          throw error;
-        }
-        
-        console.log("Received document status data:", data?.length || 0, "documents");
+        if (error) throw error;
         
         // Count documents by status
         const statusCounts: Record<string, number> = {
@@ -55,8 +40,6 @@ export function DocumentStatusChart({ organizationId }: { organizationId: string
           const status = doc.status || 'pending';
           statusCounts[status] = (statusCounts[status] || 0) + 1;
         });
-        
-        console.log("Status counts:", statusCounts);
         
         // Transform to chart data format
         const chartData: StatusCount[] = [

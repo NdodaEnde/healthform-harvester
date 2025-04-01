@@ -16,11 +16,7 @@ export function DocumentActivityChart({ organizationId }: { organizationId: stri
 
   useEffect(() => {
     const fetchDocumentActivity = async () => {
-      if (!organizationId) {
-        console.log("No organization ID provided to DocumentActivityChart");
-        setLoading(false);
-        return;
-      }
+      if (!organizationId) return;
       
       setLoading(true);
       
@@ -28,27 +24,15 @@ export function DocumentActivityChart({ organizationId }: { organizationId: stri
       const startDate = startOfYear(new Date(currentYear, 0, 1)).toISOString();
       const endDate = endOfYear(new Date(currentYear, 11, 31)).toISOString();
       
-      console.log("Fetching documents for organization:", organizationId);
-      console.log("Date range:", { startDate, endDate });
-      
       try {
-        const query = supabase
+        const { data, error } = await supabase
           .from('documents')
           .select('created_at')
           .eq('organization_id', organizationId)
           .gte('created_at', startDate)
           .lte('created_at', endDate);
         
-        console.log("Constructed query:", JSON.stringify(query));
-        
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Error fetching document activity:', error);
-          throw error;
-        }
-        
-        console.log("Received document data:", data?.length || 0, "documents");
+        if (error) throw error;
         
         // Initialize array with all months
         const months = Array.from({ length: 12 }, (_, i) => ({
