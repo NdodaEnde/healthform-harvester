@@ -80,8 +80,17 @@ serve(async (req) => {
     // 3. Start document processing in the background
     const documentId = documentData.id;
     
-    // Start background task for document processing
-    const processingPromise = processDocumentWithLandingAI(file, documentType, documentId, supabase);
+    // Create a copy of the file for processing to avoid streaming issues
+    // This is needed because formData entries can only be read once
+    const fileArrayBuffer = await file.arrayBuffer();
+    const fileBlob = new Blob([fileArrayBuffer], { type: file.type });
+    const fileCopy = new File([fileBlob], file.name, { type: file.type });
+    
+    // Start background task for document processing with the copy of the file
+    console.log(`Starting background processing for document ${documentId} (${fileName})`);
+    const processingPromise = processDocumentWithLandingAI(fileCopy, documentType, documentId, supabase);
+    
+    // Use EdgeRuntime.waitUntil to ensure the processing continues even after response is sent
     // @ts-ignore - Deno specific API
     EdgeRuntime.waitUntil(processingPromise);
 

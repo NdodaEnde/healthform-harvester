@@ -33,21 +33,34 @@ export const apiClient = {
     console.log(`Making request to Landing AI API with ${isPdf ? 'PDF' : 'image'} file`);
     console.log(`File name: ${file.name}, File type: ${file.type}, File size: ${file.size} bytes`);
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${landingAiApiKey}`
-      },
-      body: apiFormData
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API Error: Status ${response.status}, Body: ${errorText}`);
-      throw new Error(`Landing AI API error (${response.status}): ${errorText}`);
+    try {
+      // Set longer timeout for large files (2 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${landingAiApiKey}`
+        },
+        body: apiFormData,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API Error: Status ${response.status}, Body: ${errorText}`);
+        throw new Error(`Landing AI API error (${response.status}): ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log(`Successfully received response from Landing AI API for file: ${file.name}`);
+      return result;
+    } catch (error) {
+      console.error(`Error calling Landing AI API for file ${file.name}:`, error);
+      throw error;
     }
-    
-    const result = await response.json();
-    return result;
   }
 };

@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -77,7 +76,6 @@ const BatchDocumentUploader = ({
   const [hasSavedBatch, setHasSavedBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check for saved batch on load
   useEffect(() => {
     if (!organizationId) return;
     
@@ -263,16 +261,29 @@ const BatchDocumentUploader = ({
         description: `Uploading ${pendingFiles.length} document(s)`,
       });
       
+      const batchSize = 3;
       const results = [];
-      for (let i = 0; i < pendingFiles.length; i++) {
-        const fileIndex = queuedFiles.findIndex(f => f === pendingFiles[i]);
-        if (fileIndex !== -1) {
-          try {
-            const result = await uploadFile(pendingFiles[i], fileIndex);
-            results.push(result);
-          } catch (error) {
-            console.error(`Error processing file ${i}:`, error);
+      
+      for (let i = 0; i < pendingFiles.length; i += batchSize) {
+        const batch = pendingFiles.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (fileItem) => {
+          const fileIndex = queuedFiles.findIndex(f => f === fileItem);
+          if (fileIndex !== -1) {
+            try {
+              return await uploadFile(fileItem, fileIndex);
+            } catch (error) {
+              console.error(`Error processing file:`, error);
+              return null;
+            }
           }
+          return null;
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults.filter(Boolean));
+        
+        if (i + batchSize < pendingFiles.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
@@ -366,8 +377,6 @@ const BatchDocumentUploader = ({
       const savedBatch: SavedBatch = JSON.parse(savedBatchJson);
       setDefaultDocumentType(savedBatch.defaultDocumentType);
       
-      // Keep only files that have been uploaded and have document IDs
-      // since we can't restore the actual File objects
       const loadableFiles = savedBatch.files.filter(file => 
         (file.status === 'complete' || file.status === 'processing') && file.documentId
       );
@@ -383,7 +392,6 @@ const BatchDocumentUploader = ({
         return;
       }
       
-      // Create placeholder File objects (with limited functionality)
       const restoredFiles: QueuedFile[] = loadableFiles.map(file => ({
         file: new File([], file.fileName, { type: file.fileType }),
         documentType: file.documentType,
@@ -402,7 +410,6 @@ const BatchDocumentUploader = ({
         description: `Restored ${restoredFiles.length} document(s) from your saved batch`,
       });
       
-      // Fetch latest document statuses from database
       restoredFiles.forEach(async (file, index) => {
         if (file.documentId) {
           const { data, error } = await supabase
@@ -412,7 +419,6 @@ const BatchDocumentUploader = ({
             .single();
             
           if (!error && data) {
-            // Update the file status based on latest database info
             const updatedStatus = data.status === 'completed' 
               ? 'complete' as FileStatus 
               : data.status === 'processing' 
@@ -492,7 +498,6 @@ const BatchDocumentUploader = ({
     }
   };
   
-  // Card actions for save/load functionality
   const cardActions = (
     <>
       {queuedFiles.length > 0 && !uploading && !processing && (
