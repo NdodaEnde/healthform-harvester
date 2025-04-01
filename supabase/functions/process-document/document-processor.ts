@@ -4,45 +4,15 @@ import { processCertificateOfFitnessData } from "./processors/certificate-of-fit
 
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
-  console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
-  
-  // First update status to processing to ensure it's marked as in-progress
   try {
-    await supabase
-      .from('documents')
-      .update({ status: 'processing' })
-      .eq('id', documentId);
-  } catch (error) {
-    console.error('Error updating document status to processing:', error);
-  }
-  
-  try {
-    // Call Landing AI API with retry mechanism
-    let result;
-    let attempts = 0;
-    const maxAttempts = 3;
+    console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
     
-    while (attempts < maxAttempts) {
-      attempts++;
-      try {
-        console.log(`Attempt ${attempts} to call Landing AI API`);
-        result = await apiClient.callLandingAI(file);
-        console.log(`Landing AI API response received for document ID: ${documentId}`);
-        break; // Success - exit the retry loop
-      } catch (apiError) {
-        console.error(`API call attempt ${attempts} failed:`, apiError);
-        if (attempts >= maxAttempts) {
-          throw new Error(`Failed to process document after ${maxAttempts} attempts: ${apiError.message}`);
-        }
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
+    // Call Landing AI API
+    const result = await apiClient.callLandingAI(file);
+    console.log(`Landing AI API response received for document ID: ${documentId}`);
     
-    // Verify we have a response
-    if (!result) {
-      throw new Error('No response received from Landing AI API');
-    }
+    // Log the full API response for debugging
+    console.log('Raw API Response:', JSON.stringify(result, null, 2));
     
     // Process and structure the data based on document type
     let structuredData;
@@ -52,7 +22,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       structuredData = processCertificateOfFitnessData(result);
     }
     
-    console.log('Structured data extracted successfully');
+    console.log('Structured data extracted:', JSON.stringify(structuredData));
     
     // Clean any problematic data in the structuredData
     cleanStructuredData(structuredData);
@@ -62,57 +32,104 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       ensureCertificateDates(structuredData);
     }
     
-    // Update the document record with the extracted data
-    const { data: updateData, error: updateError } = await supabase
-      .from('documents')
-      .update({
-        extracted_data: {
-          structured_data: structuredData,
-          raw_response: result
-        },
-        status: 'processed',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', documentId)
-      .select();
+    // Try to update the document record multiple times if needed
+    let updateSuccess = false;
+    let attempts = 0;
     
-    if (updateError) {
-      throw new Error(`Failed to update document with extracted data: ${updateError.message}`);
+    while (!updateSuccess && attempts < 3) {
+      attempts++;
+      
+      // Update the document record with the extracted data
+      const { data: updateData, error: updateError } = await supabase
+        .from('documents')
+        .update({
+          extracted_data: {
+            structured_data: structuredData,
+            raw_response: result
+          },
+          status: 'processed',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', documentId)
+        .select();
+      
+      if (updateError) {
+        console.error(`Failed to update document with extracted data (attempt ${attempts}):`, updateError);
+        if (attempts < 3) {
+          console.log(`Retrying document update in 1 second...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          throw updateError;
+        }
+      } else {
+        updateSuccess = true;
+        console.log(`Document processing completed for document ID: ${documentId}`);
+        console.log('Updated document record:', updateData);
+        
+        // Force another update to ensure the status is set to processed
+        await supabase
+          .from('documents')
+          .update({ status: 'processed' })
+          .eq('id', documentId);
+          
+        // Create or update patient record from the extracted data
+        await createOrUpdatePatientFromDocument(structuredData, documentType, updateData[0], supabase);
+      }
     }
     
-    console.log(`Document processing completed for document ID: ${documentId}`);
-    
-    // Create or update patient record from the extracted data
-    await createOrUpdatePatientFromDocument(structuredData, documentType, updateData[0], supabase);
-    
-    // Verify the document is marked as processed
-    const { data: verifyData } = await supabase
-      .from('documents')
-      .select('status')
-      .eq('id', documentId)
-      .single();
+    // Additional verification step: explicitly verify the document is marked as processed
+    for (let i = 0; i < 3; i++) {
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+        
+      if (verifyError) {
+        console.error('Error verifying document update:', verifyError);
+      } else {
+        console.log(`Verified document status is now: ${verifyData.status}`);
+        
+        if (verifyData.status !== 'processed') {
+          console.log(`Document status is not 'processed', forcing update one more time...`);
+          await supabase
+            .from('documents')
+            .update({ 
+              status: 'processed',
+              processed_at: new Date().toISOString()
+            })
+            .eq('id', documentId);
+        } else {
+          break;
+        }
+      }
       
-    console.log(`Verified document status is now: ${verifyData?.status}`);
+      // Wait before retrying verification
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
     
   } catch (error) {
     console.error('Document processing error:', error);
     
     // Update document status to failed with error message
     try {
-      await supabase
+      const { data, error: updateError } = await supabase
         .from('documents')
         .update({
           status: 'failed',
-          processing_error: error.message || 'Unknown processing error'
+          processing_error: error.message
         })
-        .eq('id', documentId);
+        .eq('id', documentId)
+        .select();
         
-      console.log('Updated document status to failed');
+      if (updateError) {
+        console.error('Error updating document status to failed:', updateError);
+      } else {
+        console.log('Updated document status to failed:', data);
+      }
     } catch (updateError) {
       console.error('Error updating document status after processing failure:', updateError);
     }
-    
-    throw error; // Re-throw for caller handling
   }
 }
 

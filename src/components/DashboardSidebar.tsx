@@ -1,5 +1,5 @@
 
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
   FileText, 
@@ -9,8 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UserRound,
-  ScrollText,
-  Activity
+  ScrollText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,58 +19,49 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
-  const location = useLocation();
   
   const navItems = [
     { 
       name: "Dashboard", 
       href: "/dashboard", 
-      icon: LayoutDashboard,
-      exact: true
+      icon: LayoutDashboard 
     },
     { 
       name: "Documents", 
-      href: "/documents", 
-      icon: FileText,
-      exact: false
+      href: "/dashboard", 
+      icon: FileText 
     },
     {
       name: "Patients",
       href: "/patients",
-      icon: UserRound,
-      exact: false
+      icon: UserRound
     },
     {
       name: "Certificate Templates",
       href: "/certificates/templates",
-      icon: ScrollText,
-      exact: false
+      icon: ScrollText
     },
     ...(isServiceProvider() ? [
       { 
         name: "Organizations", 
         href: "/admin/organizations", 
-        icon: Building,
-        exact: false
+        icon: Building
       },
       { 
         name: "Clients", 
         href: `/admin/organizations/${currentOrganization?.id}/clients`, 
-        icon: Building,
-        exact: false
+        icon: Building 
       },
       { 
         name: "Users", 
         href: `/admin/organizations/${currentOrganization?.id}/users`, 
-        icon: Users,
-        exact: false
+        icon: Users 
       }
     ] : []),
     { 
       name: "Settings", 
       href: "/settings/organization", 
-      icon: Settings,
-      exact: false
+      icon: Settings 
     }
   ];
 
@@ -96,30 +86,24 @@ export function DashboardSidebar() {
           </div>
           
           <nav className="space-y-1 px-2">
-            {navItems.map((item) => {
-              // Check if the current path matches this nav item
-              const isActive = item.exact 
-                ? location.pathname === item.href 
-                : location.pathname.startsWith(item.href);
-              
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
+            {navItems.map((item) => (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                className={({ isActive }) =>
+                  cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                     isActive 
                       ? "bg-primary/10 text-primary" 
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     collapsed && "justify-center px-0"
-                  )}
-                  end={item.exact}
-                >
-                  <item.icon size={20} />
-                  {!collapsed && <span>{item.name}</span>}
-                </NavLink>
-              );
-            })}
+                  )
+                }
+              >
+                <item.icon size={20} />
+                {!collapsed && <span>{item.name}</span>}
+              </NavLink>
+            ))}
           </nav>
         </div>
       </div>
