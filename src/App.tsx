@@ -4,35 +4,33 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
-import { Toaster } from "@/components/ui/toaster"
-import { Toaster as SonnerToaster } from "sonner";
-import { Helmet } from 'react-helmet';
-import { DashboardLayout } from './components/DashboardLayout';
-
-// Import pages and components
-import Dashboard from './pages/Dashboard';
-import DocumentsPage from './pages/DocumentsPage';
-import DocumentViewer from './pages/DocumentViewer';
-import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
-import OrganizationsPage from './pages/admin/OrganizationsPage';
-import CreateOrganizationPage from './pages/admin/CreateOrganizationPage';
-import EditOrganizationPage from './pages/admin/EditOrganizationPage';
-import OrganizationUsersPage from './pages/admin/OrganizationUsersPage';
-import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
-import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
-import PatientsPage from './pages/PatientsPage';
-import PatientDetailPage from './pages/PatientDetailPage';
-import PatientEditPage from './pages/PatientEditPage';
-import PatientRecordsPage from './pages/PatientRecordsPage';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import UpdatePasswordPage from './pages/UpdatePasswordPage';
-import AcceptInvitePage from './pages/AcceptInvitePage';
-import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
+import Dashboard from './pages/Dashboard';
+import DocumentsPage from './pages/DocumentsPage';
 import NotFound from './pages/NotFound';
 import HeaderComponent from './components/HeaderComponent';
 import OrganizationProtectedRoute from './components/OrganizationProtectedRoute';
+import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
+import DocumentViewer from './pages/DocumentViewer';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import UpdatePasswordPage from './pages/UpdatePasswordPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
+import { OrganizationsPage } from './pages/admin';
+import { CreateOrganizationPage } from './pages/admin';
+import { EditOrganizationPage } from './pages/admin';
+import { OrganizationUsersPage } from './pages/admin';
+import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
+import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
+import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner";
+import { DashboardLayout } from './components/DashboardLayout';
+import PatientsPage from './pages/PatientsPage';
+import PatientDetailPage from './pages/PatientDetailPage';
+import PatientRecordsPage from './pages/PatientRecordsPage';
+import PatientEditPage from './pages/PatientEditPage';
+import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
+import { Helmet } from 'react-helmet';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -170,106 +168,6 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <PatientRecordsPage />
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  {/* New Role-Based Routes */}
-                  <Route path="/appointments" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Appointments</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/tasks" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Tasks</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/medical-records" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Medical Records</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/employees" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Employees</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/reports" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Reports</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/reports/compliance" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Compliance Reports</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/analytics" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Analytics</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/support" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Help & Support</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
-                      </DashboardLayout>
-                    </OrganizationProtectedRoute>
-                  } />
-                  
-                  <Route path="/notifications" element={
-                    <OrganizationProtectedRoute>
-                      <DashboardLayout>
-                        <div className="mt-4">
-                          <h1 className="text-3xl font-bold mb-4">Notifications</h1>
-                          <p className="text-muted-foreground">This page is coming soon.</p>
-                        </div>
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
