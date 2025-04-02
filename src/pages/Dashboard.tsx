@@ -12,12 +12,14 @@ import { motion } from "framer-motion";
 import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import DocumentUploader from "@/components/DocumentUploader";
+import BatchDocumentUploader from "@/components/BatchDocumentUploader";
 import RlsTester from "@/components/RlsTester";
 import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
 import { toast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showBatchUploadDialog, setShowBatchUploadDialog] = useState(false);
   const { currentOrganization, currentClient, getEffectiveOrganizationId } = useOrganization();
   const navigate = useNavigate();
   const organizationId = getEffectiveOrganizationId();
@@ -138,6 +140,7 @@ const Dashboard = () => {
 
   const handleUploadComplete = () => {
     setShowUploadDialog(false);
+    setShowBatchUploadDialog(false);
     toast({
       title: "Document uploaded successfully",
       description: "Your document has been uploaded and will be processed shortly.",
@@ -187,6 +190,24 @@ const Dashboard = () => {
             </DialogTitle>
           </DialogHeader>
           <DocumentUploader 
+            onUploadComplete={handleUploadComplete} 
+            organizationId={currentOrganization?.id}
+            clientOrganizationId={currentClient?.id}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Document Upload Dialog */}
+      <Dialog open={showBatchUploadDialog} onOpenChange={setShowBatchUploadDialog}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>
+              {currentClient 
+                ? `Batch Upload Documents for ${currentClient.name}` 
+                : "Batch Upload Documents"}
+            </DialogTitle>
+          </DialogHeader>
+          <BatchDocumentUploader 
             onUploadComplete={handleUploadComplete} 
             organizationId={currentOrganization?.id}
             clientOrganizationId={currentClient?.id}
@@ -385,9 +406,9 @@ const Dashboard = () => {
                       <FileText className="h-5 w-5" />
                       <span>View Documents</span>
                     </Button>
-                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => setShowUploadDialog(true)}>
+                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => setShowBatchUploadDialog(true)}>
                       <Upload className="h-5 w-5" />
-                      <span>Upload Document</span>
+                      <span>Batch Upload</span>
                     </Button>
                     <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/patients')}>
                       <Users className="h-5 w-5" />
