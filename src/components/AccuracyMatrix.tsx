@@ -49,6 +49,12 @@ interface MonthlyAccuracy {
   documentCount: number;
 }
 
+interface AccuracyResult {
+  documentTypes: AccuracyData[];
+  frequentlyEditedFields: FrequentlyEditedField[];
+  monthlyTrends: MonthlyAccuracy[];
+}
+
 // Define an interface for the extracted data structure
 interface ExtractedData {
   edit_tracking?: Record<string, any>;
@@ -61,10 +67,14 @@ export const AccuracyMatrix = () => {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
 
-  const { data: accuracyData, isLoading } = useQuery({
+  const { data: accuracyData, isLoading } = useQuery<AccuracyResult>({
     queryKey: ['document-accuracy', organizationId],
     queryFn: async () => {
-      if (!organizationId) return [];
+      if (!organizationId) return {
+        documentTypes: [],
+        frequentlyEditedFields: [],
+        monthlyTrends: []
+      };
 
       // Fetch documents with edit tracking data
       const { data: documents, error } = await supabase
@@ -75,7 +85,11 @@ export const AccuracyMatrix = () => {
 
       if (error) {
         console.error('Error fetching accuracy data:', error);
-        return [];
+        return {
+          documentTypes: [],
+          frequentlyEditedFields: [],
+          monthlyTrends: []
+        };
       }
 
       const documentTypes: Record<string, AccuracyData> = {};
@@ -363,7 +377,7 @@ export const AccuracyMatrix = () => {
           </div>
         </div>
         
-        {/* NEW SECTION: Most Frequently Edited Fields */}
+        {/* Most Frequently Edited Fields */}
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Most Frequently Edited Fields</h3>
           {accuracyData.frequentlyEditedFields && accuracyData.frequentlyEditedFields.length > 0 ? (
@@ -417,7 +431,7 @@ export const AccuracyMatrix = () => {
           )}
         </div>
         
-        {/* NEW SECTION: Accuracy Trends Over Time */}
+        {/* Accuracy Trends Over Time */}
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Accuracy Trends Over Time</h3>
           {accuracyData.monthlyTrends && accuracyData.monthlyTrends.length > 0 ? (
@@ -520,3 +534,4 @@ export const AccuracyMatrix = () => {
     </Card>
   );
 };
+
