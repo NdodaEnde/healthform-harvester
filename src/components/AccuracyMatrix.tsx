@@ -19,11 +19,14 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  LineChart,
+  Line
 } from "recharts";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Json } from "@/integrations/supabase/types";
+import { format, subMonths } from "date-fns";
 
 interface AccuracyData {
   documentType: string;
@@ -32,6 +35,18 @@ interface AccuracyData {
   totalFields: number;
   editedFields: number;
   accuracyRate: number;
+}
+
+interface FrequentlyEditedField {
+  fieldName: string;
+  editCount: number;
+  percentage: number;
+}
+
+interface MonthlyAccuracy {
+  month: string;
+  accuracy: number;
+  documentCount: number;
 }
 
 // Define an interface for the extracted data structure
@@ -64,10 +79,27 @@ export const AccuracyMatrix = () => {
       }
 
       const documentTypes: Record<string, AccuracyData> = {};
+      const fieldEditCounts: Record<string, number> = {};
+      const monthlyAccuracyData: Record<string, { total: number, edited: number, documents: number }> = {};
+      
+      // Initialize monthly data for the last 6 months
+      const today = new Date();
+      for (let i = 0; i < 6; i++) {
+        const monthDate = subMonths(today, i);
+        const monthKey = format(monthDate, 'MMM yyyy');
+        monthlyAccuracyData[monthKey] = { total: 0, edited: 0, documents: 0 };
+      }
       
       // Process documents to calculate accuracy
       documents?.forEach(doc => {
         const docType = doc.document_type || 'unknown';
+        const docDate = new Date(doc.created_at);
+        const monthKey = format(docDate, 'MMM yyyy');
+        
+        // Only track the last 6 months
+        if (monthlyAccuracyData[monthKey]) {
+          monthlyAccuracyData[monthKey].documents += 1;
+        }
         
         if (!documentTypes[docType]) {
           documentTypes[docType] = {
@@ -101,10 +133,28 @@ export const AccuracyMatrix = () => {
           if (editedFieldCount > 0) {
             documentTypes[docType].editedDocuments++;
           }
+          
+          // Track frequency of edited fields
+          Object.keys(editTracking).forEach(fieldPath => {
+            // Normalize the field path - take the last segment for nested paths
+            const normalizedField = fieldPath.split('.').pop() || fieldPath;
+            fieldEditCounts[normalizedField] = (fieldEditCounts[normalizedField] || 0) + 1;
+          });
+          
+          // Update monthly accuracy data
+          if (monthlyAccuracyData[monthKey]) {
+            monthlyAccuracyData[monthKey].total += totalFieldCount;
+            monthlyAccuracyData[monthKey].edited += editedFieldCount;
+          }
         } else {
           // Count fields but no edits if there's no tracking data
           const totalFieldCount = countTotalFields(extractedData);
           documentTypes[docType].totalFields += totalFieldCount;
+          
+          // Update monthly accuracy data for documents without edits
+          if (monthlyAccuracyData[monthKey]) {
+            monthlyAccuracyData[monthKey].total += totalFieldCount;
+          }
         }
       });
       
@@ -120,7 +170,37 @@ export const AccuracyMatrix = () => {
         }
       });
       
-      return Object.values(documentTypes);
+      // Calculate most frequently edited fields
+      const frequentlyEditedFields = Object.entries(fieldEditCounts)
+        .map(([fieldName, editCount]) => ({
+          fieldName,
+          editCount,
+          percentage: parseFloat(((editCount / Object.values(fieldEditCounts).reduce((a, b) => a + b, 0)) * 100).toFixed(1))
+        }))
+        .sort((a, b) => b.editCount - a.editCount)
+        .slice(0, 5); // Top 5 most edited fields
+      
+      // Create monthly accuracy trend data
+      const monthlyTrends = Object.entries(monthlyAccuracyData)
+        .map(([month, data]) => ({
+          month,
+          accuracy: data.total > 0 
+            ? parseFloat((((data.total - data.edited) / data.total) * 100).toFixed(1)) 
+            : 100,
+          documentCount: data.documents
+        }))
+        .sort((a, b) => {
+          // Sort by date (most recent first)
+          const dateA = new Date(a.month);
+          const dateB = new Date(b.month);
+          return dateA.getTime() - dateB.getTime(); // Ascending order for the chart
+        });
+      
+      return {
+        documentTypes: Object.values(documentTypes),
+        frequentlyEditedFields,
+        monthlyTrends,
+      };
     },
     enabled: !!organizationId
   });
@@ -167,10 +247,10 @@ export const AccuracyMatrix = () => {
 
   // Calculate overall accuracy across all document types
   const calculateOverallAccuracy = (): number => {
-    if (!accuracyData || accuracyData.length === 0) return 100;
+    if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) return 100;
     
-    const totalFields = accuracyData.reduce((sum, item) => sum + item.totalFields, 0);
-    const totalEdited = accuracyData.reduce((sum, item) => sum + item.editedFields, 0);
+    const totalFields = accuracyData.documentTypes.reduce((sum, item) => sum + item.totalFields, 0);
+    const totalEdited = accuracyData.documentTypes.reduce((sum, item) => sum + item.editedFields, 0);
     
     if (totalFields === 0) return 100;
     return parseFloat((((totalFields - totalEdited) / totalFields) * 100).toFixed(2));
@@ -178,7 +258,7 @@ export const AccuracyMatrix = () => {
 
   // Prepare data for the accuracy pie chart
   const prepareOverallData = () => {
-    if (!accuracyData || accuracyData.length === 0) {
+    if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) {
       return [
         { name: 'Accurate', value: 100 },
         { name: 'Edited', value: 0 }
@@ -207,7 +287,7 @@ export const AccuracyMatrix = () => {
     );
   }
 
-  if (!accuracyData || accuracyData.length === 0) {
+  if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) {
     return (
       <Card className="col-span-1">
         <CardHeader>
@@ -261,7 +341,7 @@ export const AccuracyMatrix = () => {
             <h3 className="text-sm font-medium mb-2 text-center">Accuracy by Document Type</h3>
             <ResponsiveContainer width="100%" height="90%">
               <BarChart
-                data={accuracyData}
+                data={accuracyData.documentTypes}
                 margin={{
                   top: 5,
                   right: 30,
@@ -274,13 +354,114 @@ export const AccuracyMatrix = () => {
                 <YAxis domain={[0, 100]} />
                 <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
                 <Bar dataKey="accuracyRate" fill="#8884d8" name="Accuracy">
-                  {accuracyData.map((entry, index) => (
+                  {accuracyData.documentTypes.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+        
+        {/* NEW SECTION: Most Frequently Edited Fields */}
+        <div className="mt-6">
+          <h3 className="text-sm font-medium mb-2">Most Frequently Edited Fields</h3>
+          {accuracyData.frequentlyEditedFields && accuracyData.frequentlyEditedFields.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Field Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Edit Count
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      % of Total Edits
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Visualization
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {accuracyData.frequentlyEditedFields.map((field, index) => (
+                    <tr key={index}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {field.fieldName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {field.editCount}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {field.percentage}%
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div 
+                            className="h-2.5 rounded-full bg-blue-500"
+                            style={{ width: `${field.percentage}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-2">
+              No field edit data available yet.
+            </p>
+          )}
+        </div>
+        
+        {/* NEW SECTION: Accuracy Trends Over Time */}
+        <div className="mt-6">
+          <h3 className="text-sm font-medium mb-2">Accuracy Trends Over Time</h3>
+          {accuracyData.monthlyTrends && accuracyData.monthlyTrends.length > 0 ? (
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={accuracyData.monthlyTrends}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip formatter={(value, name) => {
+                    if (name === 'accuracy') return [`${value}%`, 'Accuracy'];
+                    if (name === 'documentCount') return [value, 'Documents'];
+                    return [value, name];
+                  }} />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="accuracy" 
+                    stroke="#10b981" 
+                    activeDot={{ r: 8 }} 
+                    name="Accuracy (%)"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="documentCount" 
+                    stroke="#6366f1" 
+                    name="Document Count" 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-2">
+              No trend data available yet. More document history is needed.
+            </p>
+          )}
         </div>
 
         <div className="mt-4">
@@ -304,7 +485,7 @@ export const AccuracyMatrix = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {accuracyData.map((item, index) => (
+                {accuracyData.documentTypes.map((item, index) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {item.documentType}
