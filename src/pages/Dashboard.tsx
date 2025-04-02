@@ -223,7 +223,6 @@ const Dashboard = () => {
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="mb-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="accuracy">Accuracy Metrics</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -409,19 +408,6 @@ const Dashboard = () => {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-          </TabsContent>
-
-          <TabsContent value="accuracy">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-6"
-            >
-              <div className="grid gap-4 md:grid-cols-1">
-                <AccuracyMatrix />
-              </div>
             </motion.div>
           </TabsContent>
 
