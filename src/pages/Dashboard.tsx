@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import BatchDocumentUploader from "@/components/BatchDocumentUploader";
 import RlsTester from "@/components/RlsTester";
 import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
 import { toast } from "@/components/ui/use-toast";
+import { AccuracyMatrix } from "@/components/AccuracyMatrix";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -25,11 +25,9 @@ const Dashboard = () => {
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Fetch summary data
   const { data: summaryData, isLoading: loadingSummary } = useQuery({
     queryKey: ['dashboard-summary', organizationId],
     queryFn: async () => {
-      // Get document counts
       const { data: documents, error: docError } = await supabase
         .from('documents')
         .select('id, status, created_at')
@@ -37,7 +35,6 @@ const Dashboard = () => {
       
       if (docError) throw docError;
       
-      // Get patient counts
       const { count: patientCount, error: patientError } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
@@ -45,7 +42,6 @@ const Dashboard = () => {
       
       if (patientError) throw patientError;
       
-      // Create status breakdown
       const statusCounts = {
         processed: 0,
         processing: 0,
@@ -59,14 +55,12 @@ const Dashboard = () => {
         }
       });
       
-      // Get documents created this month
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const thisMonthDocs = documents?.filter(doc => 
         new Date(doc.created_at) >= firstDayOfMonth
       ).length || 0;
       
-      // Calculate monthly document data
       const monthlyData = Array(12).fill(0);
       documents?.forEach(doc => {
         const docDate = new Date(doc.created_at);
@@ -81,7 +75,6 @@ const Dashboard = () => {
         documents: monthlyData[index]
       }));
       
-      // Create status chart data
       const statusData = [
         { name: 'Processed', value: statusCounts.processed },
         { name: 'Processing', value: statusCounts.processing },
@@ -102,7 +95,6 @@ const Dashboard = () => {
     enabled: !!organizationId
   });
 
-  // Check for orphaned documents
   const { data: orphanedDocsCount } = useQuery({
     queryKey: ['orphaned-documents-count'],
     queryFn: async () => {
@@ -121,7 +113,6 @@ const Dashboard = () => {
     enabled: !!currentOrganization
   });
 
-  // Recent documents
   const { data: recentDocuments } = useQuery({
     queryKey: ['recent-documents', organizationId],
     queryFn: async () => {
@@ -147,7 +138,6 @@ const Dashboard = () => {
     });
   };
 
-  // Status colors for the pie chart
   const COLORS = ['#10b981', '#3b82f6', '#ef4444', '#f59e0b'];
 
   return (
@@ -179,7 +169,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Document Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -197,7 +186,6 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Batch Document Upload Dialog */}
       <Dialog open={showBatchUploadDialog} onOpenChange={setShowBatchUploadDialog}>
         <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
@@ -215,7 +203,6 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Show orphaned document fixer if needed */}
       {orphanedDocsCount && orphanedDocsCount > 0 && (
         <div className="mb-6">
           <OrphanedDocumentFixer />
@@ -236,6 +223,7 @@ const Dashboard = () => {
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="mb-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="accuracy">Accuracy Metrics</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -246,7 +234,6 @@ const Dashboard = () => {
               transition={{ duration: 0.3 }}
               className="space-y-6"
             >
-              {/* Summary Cards */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -303,7 +290,6 @@ const Dashboard = () => {
                 </Card>
               </div>
 
-              {/* Charts Section */}
               <div className="grid gap-4 md:grid-cols-2">
                 <Card className="col-span-1">
                   <CardHeader>
@@ -350,7 +336,6 @@ const Dashboard = () => {
                 </Card>
               </div>
 
-              {/* Recent Activity */}
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Documents</CardTitle>
@@ -395,7 +380,6 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* Quick Actions */}
               <Card>
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
@@ -421,6 +405,19 @@ const Dashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="accuracy">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              <div className="grid gap-4 md:grid-cols-1">
+                <AccuracyMatrix />
+              </div>
             </motion.div>
           </TabsContent>
 

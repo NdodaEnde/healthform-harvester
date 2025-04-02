@@ -166,12 +166,15 @@ const DocumentViewer = () => {
   const [validatorData, setValidatorData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
+  const [originalData, setOriginalData] = useState<any>(null);
 
   const toggleEditMode = () => {
     if (!isEditing) {
+      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
       setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
     } else {
       setEditableData(null);
+      setOriginalData(null);
     }
     setIsEditing(!isEditing);
   };
@@ -182,45 +185,140 @@ const DocumentViewer = () => {
     try {
       console.log('Saving edited data:', editableData);
       
-      setDocument(prev => {
-        if (!prev) return null;
+      const trackEdits = (original: any, edited: any, path: string[] = []): Record<string, any> => {
+        if (!original || !edited) return {};
         
-        const updatedDoc = {
-          ...prev,
-          extractedData: editableData,
-          jsonData: JSON.stringify(editableData, null, 2)
-        };
+        let edits: Record<string, any> = {};
         
-        if (id) {
-          sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+        if (typeof original !== 'object' || typeof edited !== 'object') {
+          if (original !== edited) {
+            return { [path.join('.')]: { original, edited } };
+          }
+          return {};
         }
         
-        return updatedDoc;
-      });
-      
-      setIsEditing(false);
-      setEditableData(null);
-      
-      if (id) {
-        const { error } = await supabase
-          .from('documents')
-          .update({
-            extracted_data: editableData as Json,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', id);
+        if (Array.isArray(original) || Array.isArray(edited)) {
+          if (JSON.stringify(original) !== JSON.stringify(edited)) {
+            return { [path.join('.')]: { original, edited } };
+          }
+          return {};
+        }
+        
+        const allKeys = [...new Set([...Object.keys(original), ...Object.keys(edited)])];
+        
+        for (const key of allKeys) {
+          if (key === 'edit_tracking') continue;
           
-        if (error) {
-          console.error('Error saving edited data to Supabase:', error);
-          toast.error("Failed to save changes", {
-            description: "There was an error saving your changes to the database."
-          });
-          return;
+          const newPath = [...path, key];
+          
+          if (!(key in original)) {
+            edits[newPath.join('.')] = { original: undefined, edited: edited[key] };
+          } else if (!(key in edited)) {
+            edits[newPath.join('.')] = { original: original[key], edited: undefined };
+          } else if (typeof original[key] === 'object' && original[key] !== null && 
+                    typeof edited[key] === 'object' && edited[key] !== null) {
+            const nestedEdits = trackEdits(original[key], edited[key], newPath);
+            edits = { ...edits, ...nestedEdits };
+          } else if (original[key] !== edited[key]) {
+            edits[newPath.join('.')] = { original: original[key], edited: edited[key] };
+          }
+        }
+        
+        return edits;
+      };
+      
+      const edits = trackEdits(originalData, editableData);
+      const hasEdits = Object.keys(edits).length > 0;
+      
+      if (hasEdits) {
+        const existingTracking = editableData.edit_tracking || {};
+        
+        const dataWithTracking = {
+          ...editableData,
+          edit_tracking: {
+            ...existingTracking,
+            ...edits,
+            last_edited_at: new Date().toISOString(),
+          }
+        };
+        
+        setDocument(prev => {
+          if (!prev) return null;
+          
+          const updatedDoc = {
+            ...prev,
+            extractedData: dataWithTracking,
+            jsonData: JSON.stringify(dataWithTracking, null, 2)
+          };
+          
+          if (id) {
+            sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+          }
+          
+          return updatedDoc;
+        });
+        
+        if (id) {
+          const { error } = await supabase
+            .from('documents')
+            .update({
+              extracted_data: dataWithTracking as Json,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', id);
+            
+          if (error) {
+            console.error('Error saving edited data to Supabase:', error);
+            toast.error("Failed to save changes", {
+              description: "There was an error saving your changes to the database."
+            });
+            return;
+          }
+        }
+      } else {
+        setDocument(prev => {
+          if (!prev) return null;
+          
+          const updatedDoc = {
+            ...prev,
+            extractedData: editableData,
+            jsonData: JSON.stringify(editableData, null, 2)
+          };
+          
+          if (id) {
+            sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+          }
+          
+          return updatedDoc;
+        });
+        
+        if (id) {
+          const { error } = await supabase
+            .from('documents')
+            .update({
+              extracted_data: editableData as Json,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', id);
+            
+          if (error) {
+            console.error('Error saving edited data to Supabase:', error);
+            toast.error("Failed to save changes", {
+              description: "There was an error saving your changes to the database."
+            });
+            return;
+          }
         }
       }
       
+      setIsEditing(false);
+      setEditableData(null);
+      setOriginalData(null);
+      
       toast.success("Changes saved", {
-        description: "Your edits have been saved successfully."
+        description: hasEdits 
+          ? "Your edits have been saved and will contribute to accuracy metrics." 
+          : "Your edits have been saved successfully."
       });
     } catch (error) {
       console.error('Exception saving edited data:', error);
@@ -1484,4 +1582,3 @@ const DocumentViewer = () => {
 };
 
 export default DocumentViewer;
-
