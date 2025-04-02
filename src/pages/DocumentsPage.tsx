@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search } from 'lucide-react';
+import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -27,8 +27,10 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { StorageCleanupUtility } from '@/components/StorageCleanupUtility';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+type ViewMode = 'card' | 'list';
 
 const DocumentsPage = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -38,6 +40,7 @@ const DocumentsPage = () => {
   const [documentTypeFilter, setDocumentTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(9);
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const navigate = useNavigate();
   
   const { 
@@ -264,6 +267,181 @@ const DocumentsPage = () => {
     return items;
   };
   
+  // Render document card
+  const renderDocumentCard = (document: any) => (
+    <Card key={document.id}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-lg">{document.file_name}</CardTitle>
+          </div>
+          <div>
+            {getReviewStatusBadge(document.reviewStatus)}
+          </div>
+        </div>
+        <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Status:</span>
+            <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+              document.status === 'processed' 
+                ? 'bg-green-100 text-green-800' 
+                : document.status === 'processing' 
+                  ? 'bg-blue-100 text-blue-800' 
+                  : 'bg-red-100 text-red-800'
+            }`}>
+              {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Type:</span>
+            <span className="text-sm">{document.document_type || 'Unknown'}</span>
+          </div>
+          {document.client_organization_id && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Client:</span>
+              <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                For client
+              </span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <div className="flex gap-2">
+          <Button onClick={() => handleViewDocument(document.id)} variant="default">
+            <Eye className="mr-2 h-4 w-4" />
+            View
+          </Button>
+        </div>
+        <div className="flex gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
+                >
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Mark as reviewed</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
+                >
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Mark as needs correction</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+
+  // Render document list item
+  const renderDocumentListItem = (document: any) => (
+    <div key={document.id} className="flex items-center justify-between p-4 border rounded-lg mb-2 hover:bg-accent/10 transition-colors">
+      <div className="flex items-center gap-4 flex-1">
+        <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+        <div className="min-w-0">
+          <h3 className="font-medium truncate">{document.file_name}</h3>
+          <p className="text-sm text-muted-foreground">
+            Uploaded on {new Date(document.created_at).toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="hidden md:flex items-center gap-2">
+          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+            document.status === 'processed' 
+              ? 'bg-green-100 text-green-800' 
+              : document.status === 'processing' 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'bg-red-100 text-red-800'
+          }`}>
+            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
+          </span>
+          
+          {document.document_type && (
+            <Badge variant="secondary" className="capitalize">
+              {document.document_type.replace(/_/g, ' ')}
+            </Badge>
+          )}
+          
+          {getReviewStatusBadge(document.reviewStatus)}
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <Button 
+            onClick={() => handleViewDocument(document.id)} 
+            variant="outline" 
+            size="sm"
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            View
+          </Button>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
+                >
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Mark as reviewed</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
+                >
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Mark as needs correction</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+    </div>
+  );
+  
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between mb-8">
@@ -406,113 +584,50 @@ const DocumentsPage = () => {
                 </div>
               </div>
               
-              {/* Review status summary */}
-              {documents.documents.length > 0 && (
-                <div className="mb-6 flex items-center gap-4 text-sm">
-                  <span className="font-medium">Review Status:</span>
-                  {notReviewedCount > 0 && <span className="text-muted-foreground">{notReviewedCount} not reviewed</span>}
-                  {reviewedCount > 0 && <span className="text-green-500">{reviewedCount} reviewed</span>}
-                  {needsCorrectionCount > 0 && <span className="text-red-500">{needsCorrectionCount} needs correction</span>}
-                  <span className="ml-auto text-muted-foreground">
-                    Showing {documents.documents.length} of {documents.totalCount} documents
-                  </span>
-                </div>
-              )}
+              {/* View toggle and review status summary */}
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+                <ToggleGroup 
+                  type="single" 
+                  value={viewMode} 
+                  onValueChange={(value) => value && setViewMode(value as ViewMode)}
+                  className="border rounded-md p-1"
+                >
+                  <ToggleGroupItem value="card" aria-label="Card View">
+                    <LayoutGrid className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">Cards</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="list" aria-label="List View">
+                    <LayoutList className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">List</span>
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                
+                {documents.documents.length > 0 && (
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="font-medium">Review Status:</span>
+                    {notReviewedCount > 0 && <span className="text-muted-foreground">{notReviewedCount} not reviewed</span>}
+                    {reviewedCount > 0 && <span className="text-green-500">{reviewedCount} reviewed</span>}
+                    {needsCorrectionCount > 0 && <span className="text-red-500">{needsCorrectionCount} needs correction</span>}
+                    <span className="ml-auto text-muted-foreground">
+                      Showing {documents.documents.length} of {documents.totalCount} documents
+                    </span>
+                  </div>
+                )}
+              </div>
             
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+                className={viewMode === 'card' 
+                  ? "grid gap-6 md:grid-cols-2 lg:grid-cols-3" 
+                  : "space-y-2"
+                }
               >
                 {documents.documents.map((document) => (
-                  <Card key={document.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <CardTitle className="text-lg">{document.file_name}</CardTitle>
-                        </div>
-                        <div>
-                          {getReviewStatusBadge(document.reviewStatus)}
-                        </div>
-                      </div>
-                      <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Status:</span>
-                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                            document.status === 'processed' 
-                              ? 'bg-green-100 text-green-800' 
-                              : document.status === 'processing' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-red-100 text-red-800'
-                          }`}>
-                            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Type:</span>
-                          <span className="text-sm">{document.document_type || 'Unknown'}</span>
-                        </div>
-                        {document.client_organization_id && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Client:</span>
-                            <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                              For client
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleViewDocument(document.id)} variant="default">
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </div>
-                      <div className="flex gap-1">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
-                              >
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Mark as reviewed</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
-                              >
-                                <AlertCircle className="h-5 w-5 text-red-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Mark as needs correction</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </CardFooter>
-                  </Card>
+                  viewMode === 'card' 
+                    ? renderDocumentCard(document)
+                    : renderDocumentListItem(document)
                 ))}
               </motion.div>
               
