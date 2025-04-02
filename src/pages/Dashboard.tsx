@@ -336,6 +336,10 @@ const Dashboard = () => {
                 </Card>
               </div>
 
+              <div className="grid gap-4 md:grid-cols-1">
+                <AccuracyMatrix />
+              </div>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Documents</CardTitle>
