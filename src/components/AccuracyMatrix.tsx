@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Json } from "@/integrations/supabase/types";
 
 interface AccuracyData {
   documentType: string;
@@ -31,6 +32,12 @@ interface AccuracyData {
   totalFields: number;
   editedFields: number;
   accuracyRate: number;
+}
+
+// Define an interface for the extracted data structure
+interface ExtractedData {
+  edit_tracking?: Record<string, any>;
+  [key: string]: any;
 }
 
 const COLORS = ['#4ade80', '#f87171', '#60a5fa', '#fbbf24'];
@@ -77,11 +84,14 @@ export const AccuracyMatrix = () => {
         documentTypes[docType].totalDocuments++;
         
         // Check if document has edit tracking data
-        if (doc.extracted_data?.edit_tracking) {
-          const editTracking = doc.extracted_data.edit_tracking;
+        // Safely cast extracted_data to ExtractedData type
+        const extractedData = doc.extracted_data as ExtractedData;
+        
+        if (extractedData && typeof extractedData === 'object' && extractedData.edit_tracking) {
+          const editTracking = extractedData.edit_tracking;
           
           // Count total fields and edited fields
-          const totalFieldCount = countTotalFields(doc.extracted_data);
+          const totalFieldCount = countTotalFields(extractedData);
           const editedFieldCount = Object.keys(editTracking).length;
           
           documentTypes[docType].totalFields += totalFieldCount;
@@ -93,7 +103,7 @@ export const AccuracyMatrix = () => {
           }
         } else {
           // Count fields but no edits if there's no tracking data
-          const totalFieldCount = countTotalFields(doc.extracted_data);
+          const totalFieldCount = countTotalFields(extractedData);
           documentTypes[docType].totalFields += totalFieldCount;
         }
       });
