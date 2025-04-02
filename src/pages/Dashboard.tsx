@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight } from "lucide-react";
@@ -21,9 +22,22 @@ const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showBatchUploadDialog, setShowBatchUploadDialog] = useState(false);
   const { currentOrganization, currentClient, getEffectiveOrganizationId } = useOrganization();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const getUserDisplayName = () => {
+    if (!user?.email) return "";
+    return user.email.split('@')[0];
+  };
 
   const { data: summaryData, isLoading: loadingSummary } = useQuery({
     queryKey: ['dashboard-summary', organizationId],
@@ -168,6 +182,22 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
+
+      {user && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+        >
+          <h2 className="text-2xl font-semibold mb-2">
+            {getGreeting()}, {getUserDisplayName()}!
+          </h2>
+          <p className="text-muted-foreground">
+            Welcome to your document management dashboard. Here's an overview of your recent activity and statistics.
+          </p>
+        </motion.div>
+      )}
 
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
