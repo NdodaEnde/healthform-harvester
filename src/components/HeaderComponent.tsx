@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import {
   LogOut, 
-  User
+  User,
+  Moon,
+  Sun
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -18,11 +20,42 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Toggle } from '@/components/ui/toggle';
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut } = useAuth();
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Check for user's preferred color scheme and saved preference
+  useEffect(() => {
+    // Check for saved preference in localStorage
+    const savedTheme = localStorage.getItem('theme');
+    
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else if (savedTheme === 'light') {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      // If no saved preference, use system preference
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+    setIsDarkMode(!isDarkMode);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -54,6 +87,18 @@ const HeaderComponent: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-4">
+          {/* Dark Mode Toggle */}
+          <Toggle 
+            variant="outline" 
+            aria-label="Toggle dark mode" 
+            pressed={isDarkMode}
+            onPressedChange={toggleDarkMode}
+            className="rounded-full p-2"
+          >
+            {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
+            <span className="sr-only">Toggle dark mode</span>
+          </Toggle>
+
           {user ? (
             <>
               {currentOrganization && (
