@@ -34,13 +34,24 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
-import { PatientInfo, ContactInfo } from '@/types/patient';
+import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
 import { Json } from '@/integrations/supabase/types';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState<string>("all");
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -117,6 +128,20 @@ const PatientList = () => {
       }
     }
 
+    // Handle medical_history conversion
+    let medicalHistory: MedicalHistoryData | null = null;
+    if (p.medical_history) {
+      if (typeof p.medical_history === 'string') {
+        try {
+          medicalHistory = JSON.parse(p.medical_history);
+        } catch (e) {
+          console.error("Failed to parse medical_history string:", e);
+        }
+      } else {
+        medicalHistory = p.medical_history as MedicalHistoryData;
+      }
+    }
+
     return {
       id: p.id,
       first_name: p.first_name,
@@ -124,7 +149,7 @@ const PatientList = () => {
       date_of_birth: p.date_of_birth,
       gender: p.gender,
       contact_info: contactInfo,
-      medical_history: p.medical_history,
+      medical_history: medicalHistory,
       organization_id: p.organization_id,
       client_organization_id: p.client_organization_id,
       created_at: p.created_at,
@@ -192,6 +217,20 @@ const PatientList = () => {
     );
   };
 
+  // Pagination logic
+  const totalPages = Math.ceil(patients.length / pageSize);
+  const paginatedPatients = patients.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Calculate statistics for age groups
   const patientAgeGroups = {
     child: { count: 0, title: 'Child', description: '' },
     teen: { count: 0, title: 'Teen', description: '' },
@@ -341,81 +380,236 @@ const PatientList = () => {
           </Button>
         </div>
       ) : viewMode === 'card' ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {patients.map((patient) => (
-            <PatientCard key={patient.id} patient={patient} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedPatients.map((patient) => (
+              <PatientCard key={patient.id} patient={patient} />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => goToPage(currentPage - 1)} 
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  let pageNum: number;
+                  
+                  // Logic to show correct page numbers based on current page
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                    if (i === 4) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                    if (i === 0) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  } else {
+                    if (i === 0) return (
+                      <PaginationItem key={i}>
+                        <PaginationLink onClick={() => goToPage(1)}>1</PaginationLink>
+                      </PaginationItem>
+                    );
+                    if (i === 1) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                    if (i === 3) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                    if (i === 4) return (
+                      <PaginationItem key={i}>
+                        <PaginationLink onClick={() => goToPage(totalPages)}>{totalPages}</PaginationLink>
+                      </PaginationItem>
+                    );
+                    pageNum = currentPage + i - 2;
+                  }
+                  
+                  return (
+                    <PaginationItem key={i}>
+                      <PaginationLink 
+                        isActive={pageNum === currentPage}
+                        onClick={() => goToPage(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => goToPage(currentPage + 1)} 
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>Patient Name</TableHead>
-                <TableHead>Age</TableHead>
-                <TableHead>Gender</TableHead>
-                <TableHead>Added</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {patients.map((patient, index) => {
-                return (
-                  <TableRow key={patient.id}>
-                    <TableCell className="font-medium">{index + 1}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-medium">
-                          {patient.first_name[0]}{patient.last_name[0]}
+        <>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Patient Name</TableHead>
+                  <TableHead>Age</TableHead>
+                  <TableHead>Gender</TableHead>
+                  <TableHead>Added</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedPatients.map((patient, index) => {
+                  return (
+                    <TableRow key={patient.id}>
+                      <TableCell className="font-medium">{(currentPage - 1) * pageSize + index + 1}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-medium">
+                            {patient.first_name[0]}{patient.last_name[0]}
+                          </div>
+                          <div>
+                            <div className="font-medium">{patient.first_name} {patient.last_name}</div>
+                            <div className="text-sm text-muted-foreground">ID: {patient.id.slice(0, 8)}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium">{patient.first_name} {patient.last_name}</div>
-                          <div className="text-sm text-muted-foreground">ID: {patient.id.slice(0, 8)}</div>
+                      </TableCell>
+                      <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
+                      <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
+                      <TableCell>{format(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>
+                        {patient.contact_info?.email ? (
+                          <div className="text-sm text-blue-600">{patient.contact_info.email}</div>
+                        ) : patient.contact_info?.phone ? (
+                          <div className="text-sm">{patient.contact_info.phone}</div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No contact info</div>
+                        )}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(patient)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => navigate(`/patients/${patient.id}`)}
+                            className="h-8 px-2 text-purple-700"
+                          >
+                            View
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => navigate(`/patients/${patient.id}/edit`)}
+                            className="h-8 px-2 text-purple-700"
+                          >
+                            Edit
+                          </Button>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
-                    <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
-                    <TableCell>{format(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>
-                      {patient.contact_info?.email ? (
-                        <div className="text-sm text-blue-600">{patient.contact_info.email}</div>
-                      ) : patient.contact_info?.phone ? (
-                        <div className="text-sm">{patient.contact_info.phone}</div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">No contact info</div>
-                      )}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(patient)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => navigate(`/patients/${patient.id}`)}
-                          className="h-8 px-2 text-purple-700"
-                        >
-                          View
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => navigate(`/patients/${patient.id}/edit`)}
-                          className="h-8 px-2 text-purple-700"
-                        >
-                          Edit
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {totalPages > 1 && (
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => goToPage(currentPage - 1)} 
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  let pageNum: number;
+                  
+                  // Logic to show correct page numbers based on current page
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                    if (i === 4) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                    if (i === 0) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  } else {
+                    if (i === 0) return (
+                      <PaginationItem key={i}>
+                        <PaginationLink onClick={() => goToPage(1)}>1</PaginationLink>
+                      </PaginationItem>
+                    );
+                    if (i === 1) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                    if (i === 3) return (
+                      <PaginationItem key={i}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                    if (i === 4) return (
+                      <PaginationItem key={i}>
+                        <PaginationLink onClick={() => goToPage(totalPages)}>{totalPages}</PaginationLink>
+                      </PaginationItem>
+                    );
+                    pageNum = currentPage + i - 2;
+                  }
+                  
+                  return (
+                    <PaginationItem key={i}>
+                      <PaginationLink 
+                        isActive={pageNum === currentPage}
+                        onClick={() => goToPage(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => goToPage(currentPage + 1)} 
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       )}
     </div>
   );
