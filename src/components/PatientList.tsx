@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,7 +34,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
-import { PatientInfo } from '@/types/patient';
+import { PatientInfo, ContactInfo } from '@/types/patient';
+import { Json } from '@/integrations/supabase/types';
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,7 +52,7 @@ const PatientList = () => {
   const organizationId = getEffectiveOrganizationId();
   
   // Query patients with organization context
-  const { data: patients, isLoading, error, refetch } = useQuery({
+  const { data: patientsData, isLoading, error, refetch } = useQuery({
     queryKey: ['patients', organizationId, searchTerm, filterGender],
     queryFn: async () => {
       let query = supabase
@@ -100,6 +100,37 @@ const PatientList = () => {
     },
     enabled: !!organizationId,
   });
+
+  // Convert raw database patients to PatientInfo type
+  const patients: PatientInfo[] = patientsData?.map(p => {
+    // Handle contact_info conversion from Json to ContactInfo
+    let contactInfo: ContactInfo | null = null;
+    if (p.contact_info) {
+      if (typeof p.contact_info === 'string') {
+        try {
+          contactInfo = JSON.parse(p.contact_info);
+        } catch (e) {
+          console.error("Failed to parse contact_info string:", e);
+        }
+      } else {
+        contactInfo = p.contact_info as ContactInfo;
+      }
+    }
+
+    return {
+      id: p.id,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      date_of_birth: p.date_of_birth,
+      gender: p.gender,
+      contact_info: contactInfo,
+      medical_history: p.medical_history,
+      organization_id: p.organization_id,
+      client_organization_id: p.client_organization_id,
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    };
+  }) || [];
 
   const handleAddPatient = () => {
     navigate('/patients/new');
@@ -332,12 +363,6 @@ const PatientList = () => {
             </TableHeader>
             <TableBody>
               {patients.map((patient, index) => {
-                const contactInfo = patient.contact_info ? 
-                  (typeof patient.contact_info === 'string' ? 
-                    JSON.parse(patient.contact_info) : 
-                    patient.contact_info) : 
-                  {};
-                
                 return (
                   <TableRow key={patient.id}>
                     <TableCell className="font-medium">{index + 1}</TableCell>
@@ -356,10 +381,10 @@ const PatientList = () => {
                     <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
                     <TableCell>{format(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                     <TableCell>
-                      {contactInfo.email ? (
-                        <div className="text-sm text-blue-600">{contactInfo.email}</div>
-                      ) : contactInfo.phone ? (
-                        <div className="text-sm">{contactInfo.phone}</div>
+                      {patient.contact_info?.email ? (
+                        <div className="text-sm text-blue-600">{patient.contact_info.email}</div>
+                      ) : patient.contact_info?.phone ? (
+                        <div className="text-sm">{patient.contact_info.phone}</div>
                       ) : (
                         <div className="text-sm text-muted-foreground">No contact info</div>
                       )}
