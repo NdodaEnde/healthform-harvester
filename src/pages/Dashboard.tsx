@@ -1,42 +1,106 @@
 
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import DocumentUploader from "@/components/DocumentUploader";
-import BatchDocumentUploader from "@/components/BatchDocumentUploader";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
-import { motion } from "framer-motion";
-import RlsTester from "@/components/RlsTester";
-import { useNavigate } from "react-router-dom";
-import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useOrganization } from "@/contexts/OrganizationContext";
-import { toast } from "@/components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "framer-motion";
+import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import DocumentUploader from "@/components/DocumentUploader";
+import RlsTester from "@/components/RlsTester";
 import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
-import { StorageCleanupUtility } from "@/components/StorageCleanupUtility";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+import { toast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showCleanupTools, setShowCleanupTools] = useState(false);
+  const { currentOrganization, currentClient, getEffectiveOrganizationId } = useOrganization();
   const navigate = useNavigate();
-  const { 
-    currentOrganization, 
-    currentClient,
-    isServiceProvider,
-    getEffectiveOrganizationId
-  } = useOrganization();
-
-  // Get the effective organization ID (either client organization if selected, or current organization)
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
-  // Check for documents without organization context
+  // Fetch summary data
+  const { data: summaryData, isLoading: loadingSummary } = useQuery({
+    queryKey: ['dashboard-summary', organizationId],
+    queryFn: async () => {
+      // Get document counts
+      const { data: documents, error: docError } = await supabase
+        .from('documents')
+        .select('id, status, created_at')
+        .eq('organization_id', organizationId);
+      
+      if (docError) throw docError;
+      
+      // Get patient counts
+      const { count: patientCount, error: patientError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+      
+      if (patientError) throw patientError;
+      
+      // Create status breakdown
+      const statusCounts = {
+        processed: 0,
+        processing: 0,
+        failed:, 0,
+        pending: 0
+      };
+      
+      documents?.forEach(doc => {
+        if (statusCounts[doc.status] !== undefined) {
+          statusCounts[doc.status]++;
+        }
+      });
+      
+      // Get documents created this month
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const thisMonthDocs = documents?.filter(doc => 
+        new Date(doc.created_at) >= firstDayOfMonth
+      ).length || 0;
+      
+      // Calculate monthly document data
+      const monthlyData = Array(12).fill(0);
+      documents?.forEach(doc => {
+        const docDate = new Date(doc.created_at);
+        if (docDate.getFullYear() === now.getFullYear()) {
+          monthlyData[docDate.getMonth()]++;
+        }
+      });
+      
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const activityData = monthNames.map((month, index) => ({
+        name: month,
+        documents: monthlyData[index]
+      }));
+      
+      // Create status chart data
+      const statusData = [
+        { name: 'Processed', value: statusCounts.processed },
+        { name: 'Processing', value: statusCounts.processing },
+        { name: 'Failed', value: statusCounts.failed },
+        { name: 'Pending', value: statusCounts.pending }
+      ].filter(item => item.value > 0);
+      
+      return {
+        totalDocuments: documents?.length || 0,
+        thisMonthDocuments: thisMonthDocs,
+        totalPatients: patientCount || 0,
+        pendingReviews: (documents?.filter(d => d.status !== 'processed').length || 0),
+        activityData,
+        statusData,
+        statusCounts
+      };
+    },
+    enabled: !!organizationId
+  });
+
+  // Check for orphaned documents
   const { data: orphanedDocsCount } = useQuery({
     queryKey: ['orphaned-documents-count'],
     queryFn: async () => {
@@ -55,45 +119,24 @@ const Dashboard = () => {
     enabled: !!currentOrganization
   });
 
-  const { data: documents, isLoading, error, refetch } = useQuery({
-    queryKey: ['documents', organizationId],
+  // Recent documents
+  const { data: recentDocuments } = useQuery({
+    queryKey: ['recent-documents', organizationId],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('documents')
-        .select('*');
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(5);
       
-      // If viewing as service provider with a client selected
-      if (currentClient && isServiceProvider()) {
-        query = query.eq('client_organization_id', currentClient.id);
-      } 
-      // If viewing own organization
-      else if (organizationId) {
-        query = query.eq('organization_id', organizationId);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) {
-        toast({
-          title: "Error fetching documents",
-          description: error.message,
-          variant: "destructive"
-        });
-        throw new Error(error.message);
-      }
-
-      return data?.map(doc => ({
-        ...doc, 
-        reviewStatus: localStorage.getItem(`doc-review-${doc.id}`) as ReviewStatus || 'not-reviewed',
-        reviewNote: localStorage.getItem(`doc-review-note-${doc.id}`) || ''
-      })) || [];
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!organizationId
   });
 
   const handleUploadComplete = () => {
-    // Refresh the documents list after upload completes
-    refetch();
     setShowUploadDialog(false);
     toast({
       title: "Document uploaded successfully",
@@ -101,51 +144,8 @@ const Dashboard = () => {
     });
   };
 
-  const handleViewDocument = (documentId: string) => {
-    navigate(`/documents/${documentId}`);
-  };
-
-  const updateDocumentReviewStatus = (documentId: string, reviewStatus: ReviewStatus, reviewNote?: string) => {
-    // Store review status in localStorage
-    localStorage.setItem(`doc-review-${documentId}`, reviewStatus);
-    if (reviewNote) {
-      localStorage.setItem(`doc-review-note-${documentId}`, reviewNote);
-    }
-    
-    // Update the UI by refetching the documents
-    refetch();
-    
-    toast({
-      title: "Review status updated",
-      description: `Document has been marked as ${reviewStatus.replace('-', ' ')}`
-    });
-  };
-
-  const getReviewStatusBadge = (reviewStatus: ReviewStatus | undefined) => {
-    if (!reviewStatus || reviewStatus === 'not-reviewed') {
-      return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
-    } else if (reviewStatus === 'reviewed') {
-      return <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600 text-white">Reviewed</Badge>;
-    } else if (reviewStatus === 'needs-correction') {
-      return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
-    }
-  };
-
-  // Only show upload button if we have an organization context
-  const canUpload = !!organizationId;
-
-  // Calculate review statistics
-  const notReviewedCount = documents?.filter(doc => 
-    !doc.reviewStatus || doc.reviewStatus === 'not-reviewed'
-  ).length || 0;
-  
-  const reviewedCount = documents?.filter(doc => 
-    doc.reviewStatus === 'reviewed'
-  ).length || 0;
-  
-  const needsCorrectionCount = documents?.filter(doc => 
-    doc.reviewStatus === 'needs-correction'
-  ).length || 0;
+  // Status colors for the pie chart
+  const COLORS = ['#10b981', '#3b82f6', '#ef4444', '#f59e0b'];
 
   return (
     <div className="mt-4">
@@ -153,18 +153,10 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            {contextLabel ? `Viewing documents for ${contextLabel}` : "Manage your documents and organization"}
+            {contextLabel ? `Overview for ${contextLabel}` : "Organization overview"}
           </p>
         </div>
-        <div className="flex items-center gap-4 z-10 relative">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowCleanupTools(prev => !prev)} 
-            className="flex items-center gap-2"
-          >
-            <Trash2 size={16} />
-            <span>Cleanup Tools</span>
-          </Button>
+        <div className="flex items-center gap-4">
           <Button 
             variant="outline" 
             onClick={() => navigate('/admin/organizations/new')} 
@@ -176,14 +168,14 @@ const Dashboard = () => {
           <Button 
             className="flex items-center gap-2" 
             onClick={() => setShowUploadDialog(true)}
-            disabled={!canUpload}
+            disabled={!organizationId}
           >
             <Upload size={16} />
             <span>Upload Document</span>
           </Button>
         </div>
       </div>
-      
+
       {/* Document Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
@@ -209,222 +201,213 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Show cleanup tools if enabled */}
-      {showCleanupTools && (
-        <div className="mb-6">
-          <StorageCleanupUtility />
+      {!organizationId ? (
+        <div className="text-center py-10 border rounded-lg bg-background">
+          <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">No organization selected</h3>
+          <p className="text-muted-foreground mb-4">Please select an organization to view dashboard</p>
         </div>
-      )}
-      
-      <Tabs defaultValue="documents" className="w-full">
-        <TabsList className="mb-8">
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="uploads">Upload Documents</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="documents">
-          {!organizationId ? (
-            <div className="text-center py-10 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
-              <p className="text-muted-foreground mb-4">Please select an organization to view documents</p>
-            </div>
-          ) : isLoading ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          ) : error ? (
-            <div className="py-10 text-center">
-              <p className="text-destructive">Error: {(error as Error).message}</p>
-            </div>
-          ) : documents && documents.length > 0 ? (
-            <>
-              {/* Review status summary */}
-              {documents.length > 0 && (
-                <div className="mb-6 flex items-center gap-4 text-sm">
-                  <span className="font-medium">Review Status:</span>
-                  {notReviewedCount > 0 && <span className="text-muted-foreground">{notReviewedCount} not reviewed</span>}
-                  {reviewedCount > 0 && <span className="text-green-500">{reviewedCount} reviewed</span>}
-                  {needsCorrectionCount > 0 && <span className="text-red-500">{needsCorrectionCount} needs correction</span>}
-                </div>
-              )}
-            
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-              >
-                {documents.map((document) => (
-                  <Card key={document.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <CardTitle className="text-lg">{document.file_name}</CardTitle>
-                        </div>
-                        <div>
-                          {getReviewStatusBadge(document.reviewStatus)}
-                        </div>
-                      </div>
-                      <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Status:</span>
-                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                            document.status === 'processed' 
-                              ? 'bg-green-100 text-green-800' 
-                              : document.status === 'processing' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-red-100 text-red-800'
-                          }`}>
-                            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Type:</span>
-                          <span className="text-sm">{document.document_type || 'Unknown'}</span>
-                        </div>
-                        {document.client_organization_id && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Client:</span>
-                            <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                              For client
-                            </span>
+      ) : loadingSummary ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      ) : (
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="mb-8">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              {/* Summary Cards */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{summaryData?.totalDocuments || 0}</div>
+                    <p className="text-xs text-muted-foreground">
+                      +{summaryData?.thisMonthDocuments || 0} this month
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{summaryData?.totalPatients || 0}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Active patient records
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{summaryData?.pendingReviews || 0}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Documents awaiting review
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Processing Status</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {summaryData?.statusCounts.processed || 0}/{summaryData?.totalDocuments || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Documents successfully processed
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Charts Section */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="col-span-1">
+                  <CardHeader>
+                    <CardTitle>Document Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={summaryData?.activityData || []}>
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="documents" fill="#8884d8" name="Documents" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card className="col-span-1">
+                  <CardHeader>
+                    <CardTitle>Document Status</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={summaryData?.statusData || []}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {summaryData?.statusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Legend />
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Recent Activity */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {recentDocuments?.length > 0 ? (
+                      recentDocuments.map(doc => (
+                        <div key={doc.id} className="flex items-center justify-between border-b py-2 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{doc.file_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Uploaded on {new Date(doc.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleViewDocument(document.id)} variant="default">
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </div>
-                      <div className="flex gap-1">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
-                              >
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Mark as reviewed</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-9 w-9"
-                                onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
-                              >
-                                <AlertCircle className="h-5 w-5 text-red-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Mark as needs correction</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </motion.div>
-            </>
-          ) : (
-            <div className="text-center py-10 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No documents found</h3>
-              <p className="text-muted-foreground mb-4">Upload your first document to get started</p>
-              <Button 
-                variant="outline" 
-                className="mx-auto"
-                onClick={() => setShowUploadDialog(true)}
-                disabled={!canUpload}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Document
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="uploads">
-          {!organizationId ? (
-            <div className="text-center py-10 border rounded-lg bg-background">
-              <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No organization selected</h3>
-              <p className="text-muted-foreground mb-4">Please select an organization to upload documents</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              <BatchDocumentUploader 
-                onUploadComplete={handleUploadComplete}
-                organizationId={currentOrganization?.id}
-                clientOrganizationId={currentClient?.id}
-              />
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="security">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="grid gap-6 md:grid-cols-2"
-          >
+                          <div className="flex items-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                              ${doc.status === 'processed' ? 'bg-green-100 text-green-800' : 
+                                doc.status === 'processing' ? 'bg-blue-100 text-blue-800' : 
+                                'bg-red-100 text-red-800'}`}>
+                              {doc.status}
+                            </span>
+                            <Button variant="ghost" size="sm" className="ml-2" onClick={() => navigate(`/documents/${doc.id}`)}>
+                              <ArrowUpRight size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-muted-foreground py-2">No recent documents found</p>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => navigate('/documents')}>
+                      View all documents
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/documents')}>
+                      <FileText className="h-5 w-5" />
+                      <span>View Documents</span>
+                    </Button>
+                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => setShowUploadDialog(true)}>
+                      <Upload className="h-5 w-5" />
+                      <span>Upload Document</span>
+                    </Button>
+                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/patients')}>
+                      <Users className="h-5 w-5" />
+                      <span>Manage Patients</span>
+                    </Button>
+                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/settings/organization')}>
+                      <CheckCircle className="h-5 w-5" />
+                      <span>Update Settings</span>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="security">
             <RlsTester />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>RLS Testing Guide</CardTitle>
-                <CardDescription>
-                  How to verify multi-tenant security in your application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="font-medium">Testing Checklist:</h3>
-                  <ul className="list-disc pl-5 pt-2 space-y-1">
-                    <li>Create test users in different organizations</li>
-                    <li>Verify users can only see their organization's data</li>
-                    <li>Test document uploads with different user accounts</li>
-                    <li>Validate cross-organization access is prevented</li>
-                    <li>Test different roles within organizations</li>
-                  </ul>
-                </div>
-                
-                <div>
-                  <h3 className="font-medium">Common Issues:</h3>
-                  <ul className="list-disc pl-5 pt-2 space-y-1">
-                    <li>Missing RLS policies on tables</li>
-                    <li>Incorrectly configured policies</li>
-                    <li>Missing automatic organization ID assignment</li>
-                    <li>Recursive RLS policy issues</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 };

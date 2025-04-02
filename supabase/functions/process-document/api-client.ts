@@ -41,6 +41,9 @@ export const apiClient = {
         controller.abort();
       }, 180000);
       
+      console.log(`Starting API call to Landing AI at ${new Date().toISOString()}`);
+      const startTime = Date.now();
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -50,12 +53,30 @@ export const apiClient = {
         signal: controller.signal
       });
       
+      const endTime = Date.now();
+      const requestDuration = (endTime - startTime) / 1000;
+      console.log(`API request completed in ${requestDuration.toFixed(2)} seconds`);
+      
       clearTimeout(timeoutId);
       
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`API Error: Status ${response.status}, Body: ${errorText}`);
-        throw new Error(`Landing AI API error (${response.status}): ${errorText}`);
+        
+        // Enhanced error reporting based on status code
+        if (response.status === 429) {
+          throw new Error(`Landing AI API rate limit exceeded. Please try again later.`);
+        } else if (response.status === 413) {
+          throw new Error(`File is too large for processing. Maximum file size is 10MB.`);
+        } else if (response.status === 400) {
+          throw new Error(`Landing AI API error: Invalid request - ${errorText}`);
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error(`Authentication failed with Landing AI API. Please check your API key.`);
+        } else if (response.status >= 500) {
+          throw new Error(`Landing AI API server error. Please try again later.`);
+        } else {
+          throw new Error(`Landing AI API error (${response.status}): ${errorText}`);
+        }
       }
       
       const result = await response.json();
@@ -64,7 +85,12 @@ export const apiClient = {
     } catch (error) {
       if (error.name === 'AbortError') {
         console.error(`Request was aborted due to timeout for file ${file.name}`);
-        throw new Error(`Request timeout: Processing took too long for file ${file.name}`);
+        throw new Error(`Request timeout: Processing took too long for file ${file.name}. Try with a smaller file or try again later.`);
+      }
+      
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error(`Network error when calling Landing AI API for file ${file.name}`);
+        throw new Error(`Network error: Unable to connect to Landing AI. Please check your internet connection and try again.`);
       }
       
       console.error(`Error calling Landing AI API for file ${file.name}:`, error);

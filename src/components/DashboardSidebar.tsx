@@ -28,7 +28,7 @@ export function DashboardSidebar() {
     },
     { 
       name: "Documents", 
-      href: "/dashboard", 
+      href: "/documents", 
       icon: FileText 
     },
     {
