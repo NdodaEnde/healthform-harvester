@@ -47,7 +47,7 @@ const Dashboard = () => {
       const statusCounts = {
         processed: 0,
         processing: 0,
-        failed:, 0,
+        failed: 0,
         pending: 0
       };
       
