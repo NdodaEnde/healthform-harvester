@@ -102,7 +102,8 @@ export function DashboardSidebar() {
                     isActive 
                       ? "bg-primary/10 text-primary" 
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                    collapsed && "justify-center px-0"
+                    collapsed && "justify-center px-0",
+                    item.name === "Patients" && isActive && "bg-purple-100 text-purple-800"
                   )
                 }
               >

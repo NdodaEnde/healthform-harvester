@@ -10,17 +10,11 @@ const PatientsPage = () => {
 
   return (
     <div className="mt-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
-        <p className="text-muted-foreground mt-1">
-          {contextLabel ? `Managing patients for ${contextLabel}` : "Manage your patients"}
-        </p>
-      </div>
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
+        className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg"
       >
         <PatientList />
       </motion.div>
