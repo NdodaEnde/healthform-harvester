@@ -9,8 +9,8 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight, BarChart } from "lucide-react";
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import DocumentUploader from "@/components/DocumentUploader";
 import BatchDocumentUploader from "@/components/BatchDocumentUploader";
 import RlsTester from "@/components/RlsTester";
@@ -418,7 +418,7 @@ const Dashboard = () => {
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/documents')}>
                       <FileText className="h-5 w-5" />
                       <span>View Documents</span>
@@ -430,6 +430,10 @@ const Dashboard = () => {
                     <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/patients')}>
                       <Users className="h-5 w-5" />
                       <span>Manage Patients</span>
+                    </Button>
+                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/reports')}>
+                      <BarChart className="h-5 w-5" />
+                      <span>View Reports</span>
                     </Button>
                     <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={() => navigate('/settings/organization')}>
                       <CheckCircle className="h-5 w-5" />

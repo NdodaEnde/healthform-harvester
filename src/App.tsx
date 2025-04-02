@@ -30,6 +30,7 @@ import PatientDetailPage from './pages/PatientDetailPage';
 import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
 import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
+import ReportsPage from './pages/ReportsPage';
 import { Helmet } from 'react-helmet';
 
 // Create a client instance outside of the component
@@ -76,6 +77,15 @@ function App() {
                       <OrganizationProtectedRoute>
                         <DashboardLayout>
                           <DocumentViewer />
+                        </DashboardLayout>
+                      </OrganizationProtectedRoute>
+                    } />
+                    
+                    {/* Reports Page */}
+                    <Route path="/reports" element={
+                      <OrganizationProtectedRoute>
+                        <DashboardLayout>
+                          <ReportsPage />
                         </DashboardLayout>
                       </OrganizationProtectedRoute>
                     } />
