@@ -9,7 +9,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight, BarChart } from "lucide-react";
+import { FileText, Plus, Upload, Clock, Users, AlertTriangle, CheckCircle, ArrowUpRight, BarChart3 as BarChart } from "lucide-react";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import DocumentUploader from "@/components/DocumentUploader";
 import BatchDocumentUploader from "@/components/BatchDocumentUploader";
@@ -326,12 +326,12 @@ const Dashboard = () => {
                   </CardHeader>
                   <CardContent className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={summaryData?.activityData || []}>
+                      <RechartsBarChart data={summaryData?.activityData || []}>
                         <XAxis dataKey="name" />
                         <YAxis />
                         <Tooltip />
                         <Bar dataKey="documents" fill="#8884d8" name="Documents" />
-                      </BarChart>
+                      </RechartsBarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>

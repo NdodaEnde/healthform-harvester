@@ -10,7 +10,7 @@ import {
   ChevronRight,
   UserRound,
   ScrollText,
-  BarChart
+  BarChart3 as BarChart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
