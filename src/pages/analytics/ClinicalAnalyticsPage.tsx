@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Loader2 } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { CertificateData } from "@/types/patient";
 
 const ClinicalAnalyticsPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
@@ -118,16 +119,23 @@ const ClinicalAnalyticsPage = () => {
     
     documentsData.forEach(doc => {
       try {
-        const extractedData = doc.extracted_data?.structured_data?.certification || {};
+        // Properly handle the typing for extracted_data
+        const extractedData = doc.extracted_data as CertificateData | null;
         
-        if (extractedData.fit || extractedData.fit_for_duty) {
-          fitnessCounts['Fit']++;
-        } else if (extractedData.fit_with_restrictions) {
-          fitnessCounts['Fit with Restrictions']++;
-        } else if (extractedData.temporarily_unfit) {
-          fitnessCounts['Temporarily Unfit']++;
-        } else if (extractedData.unfit || extractedData.permanently_unfit) {
-          fitnessCounts['Permanently Unfit']++;
+        if (extractedData?.structured_data?.certification) {
+          const certification = extractedData.structured_data.certification;
+          
+          if (certification.fit || certification.fit_for_duty) {
+            fitnessCounts['Fit']++;
+          } else if (certification.fit_with_restrictions) {
+            fitnessCounts['Fit with Restrictions']++;
+          } else if (certification.temporarily_unfit) {
+            fitnessCounts['Temporarily Unfit']++;
+          } else if (certification.unfit || certification.permanently_unfit) {
+            fitnessCounts['Permanently Unfit']++;
+          } else {
+            fitnessCounts['Unknown']++;
+          }
         } else {
           fitnessCounts['Unknown']++;
         }
