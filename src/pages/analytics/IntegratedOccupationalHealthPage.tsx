@@ -14,6 +14,7 @@ import OccupationalRestrictionsChart from "./components/OccupationalRestrictions
 import MedicalExaminationStats from "./components/MedicalExaminationStats";
 import TestTypeBreakdownCard from "./components/TestTypeBreakdownCard";
 import CertificateComplianceCard from "./components/CertificateComplianceCard";
+import HealthMetricsAssessment from "./components/HealthMetricsAssessment";
 
 const IntegratedOccupationalHealthPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -115,15 +116,7 @@ const IntegratedOccupationalHealthPage = () => {
 
         <TabsContent value="health-metrics">
           <div className="grid gap-6">
-            <StatsSummaryCards />
-            <OccupationalRestrictionsChart 
-              title="Health Metrics Analysis"
-              description="Detailed breakdown of health metrics across the organization"
-            />
-            <MedicalExaminationStats
-              title="Health Screening Results"
-              description="Analysis of health screening outcomes and trends"
-            />
+            <HealthMetricsAssessment />
           </div>
         </TabsContent>
 
