@@ -10,7 +10,10 @@ import {
   ChevronRight,
   UserRound,
   ScrollText,
-  BarChart3 as BarChart
+  BarChart3 as BarChart,
+  PieChart,
+  LineChart,
+  Stethoscope
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -38,9 +41,24 @@ export function DashboardSidebar() {
       icon: UserRound
     },
     {
+      name: "Analytics",
+      href: "/analytics",
+      icon: BarChart
+    },
+    {
+      name: "Clinical Analytics",
+      href: "/clinical-analytics",
+      icon: LineChart
+    },
+    {
+      name: "Integrated Health",
+      href: "/integrated-occupational-health",
+      icon: Stethoscope
+    },
+    {
       name: "Reports",
       href: "/reports",
-      icon: BarChart
+      icon: PieChart
     },
     {
       name: "Certificate Templates",

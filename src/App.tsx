@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -31,6 +30,9 @@ import PatientRecordsPage from './pages/PatientRecordsPage';
 import PatientEditPage from './pages/PatientEditPage';
 import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
 import ReportsPage from './pages/ReportsPage';
+import AnalyticsPage from './pages/analytics/AnalyticsPage';
+import ClinicalAnalyticsPage from './pages/analytics/ClinicalAnalyticsPage';
+import IntegratedOccupationalHealthPage from './pages/analytics/IntegratedOccupationalHealthPage';
 import { Helmet } from 'react-helmet';
 
 // Create a client instance outside of the component
@@ -76,6 +78,31 @@ function App() {
                     <OrganizationProtectedRoute>
                       <DashboardLayout>
                         <DocumentViewer />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  {/* Analytics Pages */}
+                  <Route path="/analytics" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/clinical-analytics" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <ClinicalAnalyticsPage />
+                      </DashboardLayout>
+                    </OrganizationProtectedRoute>
+                  } />
+                  
+                  <Route path="/integrated-occupational-health" element={
+                    <OrganizationProtectedRoute>
+                      <DashboardLayout>
+                        <IntegratedOccupationalHealthPage />
                       </DashboardLayout>
                     </OrganizationProtectedRoute>
                   } />
