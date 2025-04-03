@@ -53,7 +53,7 @@ export function DashboardSidebar() {
       icon: ActivitySquare
     },
     {
-      name: "Integrated Health",
+      name: "Occupational Health",
       href: "/integrated-occupational-health",
       icon: HardHat
     },
@@ -124,7 +124,7 @@ export function DashboardSidebar() {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     collapsed && "justify-center px-0",
                     item.name === "Patients" && isActive && "bg-purple-100 text-purple-800",
-                    item.name === "Integrated Health" && isActive && "bg-blue-100 text-blue-800"
+                    item.name === "Occupational Health" && isActive && "bg-blue-100 text-blue-800"
                   )
                 }
               >
