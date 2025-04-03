@@ -115,9 +115,7 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsContent>
 
         <TabsContent value="health-metrics">
-          <div className="grid gap-6">
-            <HealthMetricsAssessment />
-          </div>
+          <HealthMetricsAssessment />
         </TabsContent>
 
         <TabsContent value="medical-tests">
