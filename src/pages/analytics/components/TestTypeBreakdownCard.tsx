@@ -220,6 +220,12 @@ export default function TestTypeBreakdownCard({
     }
   };
 
+  const getProgressColor = (completion: number) => {
+    if (completion >= 90) return "var(--chart-2)";
+    if (completion >= 75) return "var(--chart-3)";
+    return "var(--chart-5)";
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -261,13 +267,10 @@ export default function TestTypeBreakdownCard({
               </div>
               <Progress
                 value={test.completion}
-                className={`h-2 ${
-                  test.completion >= 90
-                    ? "bg-muted [&>div]:bg-green-500"
-                    : test.completion >= 75
-                      ? "bg-muted [&>div]:bg-yellow-500"
-                      : "bg-muted [&>div]:bg-red-500"
-                }`}
+                className="h-2 bg-muted"
+                style={{ 
+                  "--progress-foreground": `hsl(${getProgressColor(test.completion)})` 
+                } as React.CSSProperties}
               />
             </div>
           ))}

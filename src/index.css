@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -43,6 +42,18 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Chart color variables */
+    --chart-1: 215 100% 50%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 31 100% 50%;
+    --chart-4: 291 64% 42%;
+    --chart-5: 358 75% 59%;
+    --chart-6: 200 100% 37%;
+    --chart-7: 48 96% 53%;
+    --chart-8: 266 100% 60%;
+    --chart-9: 176 56% 46%;
+    --chart-10: 18 85% 55%;
   }
 
   .dark {
@@ -82,6 +93,18 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 240 4.9% 83.9%;
+
+    /* Chart color variables for dark mode */
+    --chart-1: 213 90% 60%;
+    --chart-2: 142 70% 45%;
+    --chart-3: 31 90% 60%;
+    --chart-4: 291 70% 55%;
+    --chart-5: 358 70% 65%;
+    --chart-6: 200 90% 50%;
+    --chart-7: 48 90% 60%;
+    --chart-8: 266 90% 65%;
+    --chart-9: 176 60% 50%;
+    --chart-10: 18 80% 60%;
   }
 }
 

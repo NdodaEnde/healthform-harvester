@@ -43,17 +43,17 @@ export default function OccupationalRestrictionsChart({
   const [chartType, setChartType] = useState<"pie" | "bar">("pie");
   const [department, setDepartment] = useState("all");
 
-  // Sample data for restrictions
+  // Sample data for restrictions with distinct colors
   const restrictionsData = [
     { name: "Heights", value: 28, color: "hsl(var(--chart-1))" },
     { name: "Dust Exposure", value: 22, color: "hsl(var(--chart-2))" },
     { name: "Chemical Exposure", value: 17, color: "hsl(var(--chart-3))" },
     { name: "Confined Spaces", value: 15, color: "hsl(var(--chart-4))" },
     { name: "Motorized Equipment", value: 12, color: "hsl(var(--chart-5))" },
-    { name: "Other", value: 6, color: "hsl(var(--chart-1))" },
+    { name: "Other", value: 6, color: "hsl(var(--chart-6))" },
   ];
 
-  // Sample data for protection requirements
+  // Sample data for protection requirements with distinct colors
   const protectionData = [
     { name: "Hearing Protection", value: 45, color: "hsl(var(--chart-1))" },
     { name: "Wear Spectacles", value: 32, color: "hsl(var(--chart-2))" },
@@ -69,6 +69,16 @@ export default function OccupationalRestrictionsChart({
   // Choose which dataset to display
   const chartData =
     department === "protection" ? protectionData : restrictionsData;
+
+  // Add chart config for colors
+  const chartConfig = {
+    1: { theme: { light: "hsl(var(--chart-1))", dark: "hsl(var(--chart-1))" } },
+    2: { theme: { light: "hsl(var(--chart-2))", dark: "hsl(var(--chart-2))" } },
+    3: { theme: { light: "hsl(var(--chart-3))", dark: "hsl(var(--chart-3))" } },
+    4: { theme: { light: "hsl(var(--chart-4))", dark: "hsl(var(--chart-4))" } },
+    5: { theme: { light: "hsl(var(--chart-5))", dark: "hsl(var(--chart-5))" } },
+    6: { theme: { light: "hsl(var(--chart-6))", dark: "hsl(var(--chart-6))" } },
+  };
 
   return (
     <Card className={className}>
@@ -116,7 +126,7 @@ export default function OccupationalRestrictionsChart({
         </div>
 
         {chartType === "pie" ? (
-          <ChartContainer config={{}} className="aspect-[none] h-[350px]">
+          <ChartContainer config={chartConfig} className="aspect-[none] h-[350px]">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent />} />
               <Pie
@@ -136,7 +146,7 @@ export default function OccupationalRestrictionsChart({
             </PieChart>
           </ChartContainer>
         ) : (
-          <ChartContainer config={{}} className="aspect-[none] h-[350px]">
+          <ChartContainer config={chartConfig} className="aspect-[none] h-[350px]">
             <BarChart data={chartData}>
               <ChartTooltip content={<ChartTooltipContent />} />
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -149,7 +159,6 @@ export default function OccupationalRestrictionsChart({
 
               <Bar
                 dataKey="value"
-                fill="hsl(var(--chart-1))"
                 radius={4}
                 barSize={40}
               >

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   Card,
@@ -31,7 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileTextIcon, TrendingUpIcon } from "lucide-react";
+import {
+  FileTextIcon,
+  TrendingUpIcon,
+} from "lucide-react";
 
 interface MedicalExaminationStatsProps {
   className?: string;
@@ -49,7 +51,7 @@ export default function MedicalExaminationStats({
   >("volume");
   const [timeRange, setTimeRange] = useState("30d");
 
-  // Sample data for medical examinations
+  // Sample data for medical examinations with distinct colors
   const testVolumeData = [
     { name: "Vision Test", count: 1248, color: "hsl(var(--chart-1))" },
     { name: "Hearing Test", count: 1156, color: "hsl(var(--chart-2))" },
@@ -65,6 +67,18 @@ export default function MedicalExaminationStats({
     { name: "Blood Pressure", value: 17, color: "hsl(var(--chart-4))" },
     { name: "Other Tests", value: 16, color: "hsl(var(--chart-5))" },
   ];
+
+  // Add chart config for colors
+  const chartConfig = {
+    1: { theme: { light: "hsl(var(--chart-1))", dark: "hsl(var(--chart-1))" } },
+    2: { theme: { light: "hsl(var(--chart-2))", dark: "hsl(var(--chart-2))" } },
+    3: { theme: { light: "hsl(var(--chart-3))", dark: "hsl(var(--chart-3))" } },
+    4: { theme: { light: "hsl(var(--chart-4))", dark: "hsl(var(--chart-4))" } },
+    5: { theme: { light: "hsl(var(--chart-5))", dark: "hsl(var(--chart-5))" } },
+    vision: { theme: { light: "hsl(var(--chart-1))", dark: "hsl(var(--chart-1))" } },
+    hearing: { theme: { light: "hsl(var(--chart-2))", dark: "hsl(var(--chart-2))" } },
+    lung: { theme: { light: "hsl(var(--chart-3))", dark: "hsl(var(--chart-3))" } },
+  };
 
   const testTrendsData = [
     { month: "Jan", vision: 210, hearing: 190, lung: 170 },
@@ -85,7 +99,7 @@ export default function MedicalExaminationStats({
 
   const renderVolumeView = () => (
     <div className="space-y-6">
-      <ChartContainer config={{}} className="aspect-[none] h-[300px]">
+      <ChartContainer config={chartConfig} className="aspect-[none] h-[300px]">
         <BarChart data={testVolumeData}>
           <ChartTooltip content={<ChartTooltipContent />} />
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -128,7 +142,7 @@ export default function MedicalExaminationStats({
   const renderDistributionView = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ChartContainer config={{}} className="aspect-[none] h-[300px]">
+        <ChartContainer config={chartConfig} className="aspect-[none] h-[300px]">
           <PieChart>
             <ChartTooltip content={<ChartTooltipContent />} />
             <Pie
@@ -162,7 +176,13 @@ export default function MedicalExaminationStats({
                 </div>
                 <span className="text-sm font-medium">{entry.value}%</span>
               </div>
-              <Progress value={entry.value} className="h-2" />
+              <Progress 
+                value={entry.value} 
+                className="h-2"
+                style={{ 
+                  "--progress-foreground": entry.color 
+                } as React.CSSProperties}
+              />
             </div>
           ))}
         </div>
@@ -199,7 +219,7 @@ export default function MedicalExaminationStats({
 
   const renderTrendsView = () => (
     <div className="space-y-6">
-      <ChartContainer config={{}} className="aspect-[none] h-[300px]">
+      <ChartContainer config={chartConfig} className="aspect-[none] h-[300px]">
         <BarChart data={testTrendsData}>
           <ChartTooltip content={<ChartTooltipContent />} />
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
