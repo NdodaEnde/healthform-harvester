@@ -6,16 +6,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download, FileText, CheckCircle, Activity, ClipboardList, HardHat, Eye, Filter } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 
 const IntegratedOccupationalHealthPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
   const [generatingReport, setGeneratingReport] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState("organizational");
+  const [timeRange, setTimeRange] = React.useState("30d");
 
   // Fetch documents and patients data
   const { data: combinedData, isLoading } = useQuery({
@@ -139,6 +141,36 @@ const IntegratedOccupationalHealthPage = () => {
     }));
   }, []);
 
+  // Medical examination summary stats
+  const examStats = React.useMemo(() => {
+    if (!combinedData?.documents) return {
+      total: 0,
+      complete: 0,
+      rate: 0,
+      avgPerEmployee: 0
+    };
+    
+    const total = combinedData.documents.length;
+    const complete = combinedData.documents.filter(d => d.status === 'processed').length;
+    const employeeCount = combinedData.patients.length || 1;
+    
+    return {
+      total: total,
+      complete: complete, 
+      rate: total ? Math.round((complete / total) * 100) : 0,
+      avgPerEmployee: (total / employeeCount).toFixed(1)
+    };
+  }, [combinedData]);
+
+  // Test type breakdown data
+  const testTypeData = React.useMemo(() => [
+    { name: 'Vision Tests', value: Math.floor(Math.random() * 250) + 500 },
+    { name: 'Hearing Tests', value: Math.floor(Math.random() * 200) + 450 },
+    { name: 'Lung Function', value: Math.floor(Math.random() * 150) + 400 },
+    { name: 'General Physical', value: Math.floor(Math.random() * 300) + 600 },
+    { name: 'Blood Work', value: Math.floor(Math.random() * 200) + 350 }
+  ], []);
+
   const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
 
   const handleGenerateReport = () => {
@@ -168,7 +200,7 @@ const IntegratedOccupationalHealthPage = () => {
         <title>Integrated Occupational Health</title>
       </Helmet>
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Integrated Occupational Health</h1>
           <p className="text-muted-foreground mt-1">
@@ -176,39 +208,56 @@ const IntegratedOccupationalHealthPage = () => {
           </p>
         </div>
         
-        <Button 
-          onClick={handleGenerateReport}
-          disabled={generatingReport}
-          className="flex items-center gap-2"
-        >
-          {generatingReport ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Generate Report
-            </>
-          )}
-        </Button>
+        <div className="mt-4 flex space-x-2 sm:mt-0">
+          <Select
+            value={timeRange}
+            onValueChange={setTimeRange}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select time range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="1y">Last year</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Button 
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            className="flex items-center gap-2"
+          >
+            {generatingReport ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Export Report
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Compliance Rate
+              Total Assessments
             </CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {combinedData?.documents?.length ? 
-                Math.round((combinedData.documents.filter(d => d.status === 'processed').length / combinedData.documents.length) * 100) : 0}%
+              {examStats.total}
             </div>
             <p className="text-xs text-muted-foreground">
-              Overall health assessment compliance
+              +12% from previous period
             </p>
           </CardContent>
         </Card>
@@ -216,8 +265,26 @@ const IntegratedOccupationalHealthPage = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Medical Restrictions
+              Completed Tests
             </CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {examStats.complete}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {examStats.rate}% completion rate
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Work Restrictions
+            </CardTitle>
+            <HardHat className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -232,23 +299,25 @@ const IntegratedOccupationalHealthPage = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Active Monitoring
+              Avg. Tests Per Employee
             </CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {combinedData?.patients?.length || 0}
+              {examStats.avgPerEmployee}
             </div>
             <p className="text-xs text-muted-foreground">
-              Employees under active health monitoring
+              {combinedData?.patients?.length || 0} employees monitored
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="organizational" className="space-y-4">
+      <Tabs defaultValue="organizational" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="organizational">Organizational Compliance</TabsTrigger>
+          <TabsTrigger value="testTypes">Test Types</TabsTrigger>
           <TabsTrigger value="restrictions">Workplace Restrictions</TabsTrigger>
           <TabsTrigger value="trends">Trends & Forecasting</TabsTrigger>
         </TabsList>
@@ -278,6 +347,45 @@ const IntegratedOccupationalHealthPage = () => {
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="compliance" fill="#8884d8" name="Compliance Rate (%)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="testTypes" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Test Type Distribution</CardTitle>
+                  <CardDescription>
+                    Breakdown of test types performed
+                  </CardDescription>
+                </div>
+                <Button variant="outline" size="sm">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={testTypeData}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" fill="#82ca9d" name="Number of Tests" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

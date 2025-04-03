@@ -13,7 +13,9 @@ import {
   BarChart3 as BarChart,
   PieChart,
   LineChart,
-  Stethoscope
+  Stethoscope,
+  ActivitySquare,
+  HardHat
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,12 +50,12 @@ export function DashboardSidebar() {
     {
       name: "Clinical Analytics",
       href: "/clinical-analytics",
-      icon: LineChart
+      icon: ActivitySquare
     },
     {
       name: "Integrated Health",
       href: "/integrated-occupational-health",
-      icon: Stethoscope
+      icon: HardHat
     },
     {
       name: "Reports",
@@ -121,7 +123,8 @@ export function DashboardSidebar() {
                       ? "bg-primary/10 text-primary" 
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     collapsed && "justify-center px-0",
-                    item.name === "Patients" && isActive && "bg-purple-100 text-purple-800"
+                    item.name === "Patients" && isActive && "bg-purple-100 text-purple-800",
+                    item.name === "Integrated Health" && isActive && "bg-blue-100 text-blue-800"
                   )
                 }
               >
