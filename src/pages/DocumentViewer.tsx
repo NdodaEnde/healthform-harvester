@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -912,7 +913,270 @@ const DocumentViewer = () => {
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-7xl">
-      {/* Component implementation here */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex gap-1 items-center mr-4"
+            onClick={() => navigate(-1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span>Back</span>
+          </Button>
+          <h1 className="text-2xl font-bold">{document?.name || "Document Viewer"}</h1>
+          {document?.status === "processed" && (
+            <Badge variant="success" className="ml-3">Processed</Badge>
+          )}
+          {document?.status === "processing" && (
+            <Badge variant="warning" className="ml-3 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Processing
+            </Badge>
+          )}
+          {document?.status === "error" && (
+            <Badge variant="destructive" className="ml-3 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Error
+            </Badge>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          {document?.imageUrl && (
+            <>
+              <Button size="sm" variant="outline" className="flex gap-1 items-center">
+                <Download className="h-4 w-4" />
+                <span>Download</span>
+              </Button>
+              <Button size="sm" variant="outline" className="flex gap-1 items-center">
+                <Copy className="h-4 w-4" />
+                <span>Copy</span>
+              </Button>
+              <Button size="sm" variant="outline" className="flex gap-1 items-center">
+                <Printer className="h-4 w-4" />
+                <span>Print</span>
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {document?.patientName && (
+        <div className="flex mb-6 gap-x-2">
+          <span className="font-semibold">Patient:</span>
+          <span>{document.patientName}</span>
+          {document.patientId && (
+            <>
+              <span className="mx-2">•</span>
+              <span className="font-semibold">ID:</span>
+              <span>{document.patientId}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden min-h-[70vh]">
+        <Tabs defaultValue="document" className="h-full">
+          <div className="flex justify-between items-center border-b px-4">
+            <TabsList className="h-14">
+              <TabsTrigger value="document" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4">
+                <FileText className="h-4 w-4 mr-2" />
+                Document
+              </TabsTrigger>
+              
+              <TabsTrigger value="structured" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4">
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Structured Data
+              </TabsTrigger>
+              
+              {document?.type === 'Certificate of Fitness' && (
+                <TabsTrigger value="validator" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4">
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Validator
+                </TabsTrigger>
+              )}
+            </TabsList>
+            
+            {document && (
+              <div className="flex items-center gap-2">
+                {document?.status === 'processed' && (
+                  <Button 
+                    size="sm"
+                    onClick={toggleEditMode}
+                    variant={isEditing ? "default" : "outline"}
+                  >
+                    {isEditing ? (
+                      <>
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-4 w-4 mr-1" />
+                        Edit Data
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                {isEditing && (
+                  <Button 
+                    size="sm"
+                    onClick={handleSaveEdits}
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Save Changes
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <TabsContent value="document" className="mt-0 p-0 h-full">
+            <div className="flex h-full">
+              <div className="flex-1 h-full flex flex-col">
+                <div className="flex items-center justify-between p-2 bg-gray-50 border-b">
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowOriginal(!showOriginal)}
+                      className="flex items-center gap-1"
+                    >
+                      {showOriginal ? (
+                        <>
+                          <EyeOff className="h-4 w-4" />
+                          <span>Hide Original</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4" />
+                          <span>Show Original</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Add zoom controls when showing original document */}
+                  {showOriginal && (
+                    <ZoomControls
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      onReset={resetZoom}
+                      zoomLevel={zoomLevel}
+                    />
+                  )}
+                </div>
+                
+                <div className="flex-1 overflow-auto">
+                  {showOriginal && document?.imageUrl ? (
+                    <div className="relative flex items-center justify-center min-h-full bg-gray-100">
+                      <div 
+                        className="relative"
+                        style={{
+                          transform: `scale(${zoomLevel})`,
+                          transition: 'transform 0.2s ease'
+                        }}
+                      >
+                        <img 
+                          src={document.imageUrl} 
+                          alt={document.name} 
+                          className="max-w-full shadow-md"
+                        />
+                      </div>
+                    </div>
+                  ) : document?.type === 'Certificate of Fitness' ? (
+                    <CertificateTemplate extractedData={document?.extractedData} />
+                  ) : (
+                    <div className="p-6 space-y-6">
+                      <Card>
+                        <CardContent className="p-4">
+                          <h2 className="text-lg font-semibold">Personal Information</h2>
+                          <Separator className="my-4" />
+                          {document?.extractedData?.personal && 
+                            renderStructuredSection("Personal Details", document.extractedData.personal, ['personal'])}
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <h2 className="text-lg font-semibold">Medical Information</h2>
+                          <Separator className="my-4" />
+                          {document?.extractedData?.medical && 
+                            renderStructuredSection("Medical Details", document.extractedData.medical, ['medical'])}
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <h2 className="text-lg font-semibold">Vital Signs</h2>
+                          <Separator className="my-4" />
+                          {document?.extractedData?.vitals && 
+                            renderStructuredSection("Vitals", document.extractedData.vitals, ['vitals'])}
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <h2 className="text-lg font-semibold">Examination Results</h2>
+                          <Separator className="my-4" />
+                          {document?.extractedData?.examResults && 
+                            renderStructuredSection("Results", document.extractedData.examResults, ['examResults'])}
+                        </CardContent>
+                      </Card>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <h2 className="text-lg font-semibold">Assessment</h2>
+                          <Separator className="my-4" />
+                          {document?.extractedData?.assessment && 
+                            renderStructuredSection("Assessment", document.extractedData.assessment, ['assessment'])}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="structured" className="mt-0 p-0 h-[calc(100%-56px)]">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <Card>
+                  <CardContent className="p-4 relative">
+                    {document?.type === 'Certificate of Fitness' ? (
+                      renderCertificateSection(document?.extractedData)
+                    ) : (
+                      <pre className="text-xs overflow-x-auto p-4 bg-gray-50 rounded-md">
+                        {document?.jsonData}
+                      </pre>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+          
+          {document?.type === 'Certificate of Fitness' && (
+            <TabsContent value="validator" className="mt-0 p-0 h-[calc(100%-56px)]">
+              <ScrollArea className="h-full">
+                <div className="p-4">
+                  <CertificateValidator
+                    document={document}
+                    isValidating={isValidating}
+                    setIsValidating={setIsValidating}
+                    validatorData={validatorData}
+                    setValidatorData={setValidatorData}
+                    refreshKey={refreshKey}
+                  />
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
     </div>
   );
 };
