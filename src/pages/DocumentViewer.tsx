@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -23,7 +22,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { ZoomControls } from "@/components/ui/ZoomControls";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -169,7 +167,6 @@ const DocumentViewer = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
   const [originalData, setOriginalData] = useState<any>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
 
   const toggleEditMode = () => {
     if (!isEditing) {
@@ -180,18 +177,6 @@ const DocumentViewer = () => {
       setOriginalData(null);
     }
     setIsEditing(!isEditing);
-  };
-
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 0.25, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
-  };
-
-  const resetZoom = () => {
-    setZoomLevel(1);
   };
 
   const handleSaveEdits = async () => {
@@ -800,7 +785,7 @@ const DocumentViewer = () => {
               <div className="text-sm">
                 <span className="font-semibold mr-1">Review Date:</span>
                 <Input 
-                  className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600"
+                  className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600" 
                   value={certification.review_date || ''}
                   onChange={(e) => updateEditableData(['structured_data', 'certification', 'review_date'], e.target.value)}
                 />
@@ -811,372 +796,787 @@ const DocumentViewer = () => {
       );
     };
     
-    const renderAssessmentSection = () => {
-      const assessment = structuredData.assessment || {};
+    const renderRestrictionsSection = () => {
+      const restrictions = structuredData.restrictions || {};
+      
+      const renderRestrictionCell = (label: string, key: string) => (
+        <td className={`border border-gray-400 p-2 text-center`}>
+          <div className="font-semibold">{label}</div>
+          <div className="flex justify-center mt-1">
+            <Checkbox 
+              checked={!!restrictions[key]} 
+              onCheckedChange={(checked) => updateEditableData(['structured_data', 'restrictions', key], !!checked)}
+            />
+          </div>
+        </td>
+      );
       
       return (
         <div className="mb-4">
-          <h3 className="text-lg font-medium mb-2">Assessment</h3>
-          <div className="space-y-3">
-            <div>
-              <div className="font-semibold mb-1">Diagnosis:</div>
-              <Textarea 
-                className="w-full border border-gray-300 p-2 min-h-[80px]" 
-                value={assessment.diagnosis || ''}
-                onChange={(e) => updateEditableData(['structured_data', 'assessment', 'diagnosis'], e.target.value)}
-              />
-            </div>
-            <div>
-              <div className="font-semibold mb-1">Recommendations:</div>
-              <Textarea 
-                className="w-full border border-gray-300 p-2 min-h-[80px]" 
-                value={assessment.recommendations || ''}
-                onChange={(e) => updateEditableData(['structured_data', 'assessment', 'recommendations'], e.target.value)}
-              />
-            </div>
-          </div>
+          <h3 className="text-lg font-medium mb-2">Restrictions</h3>
+          <table className="w-full border border-gray-400 text-sm">
+            <tbody>
+              <tr>
+                {renderRestrictionCell("Heights", "heights")}
+                {renderRestrictionCell("Dust Exposure", "dust_exposure")}
+                {renderRestrictionCell("Motorized Equipment", "motorized_equipment")}
+                {renderRestrictionCell("Wear Hearing Protection", "wear_hearing_protection")}
+              </tr>
+              <tr>
+                {renderRestrictionCell("Confined Spaces", "confined_spaces")}
+                {renderRestrictionCell("Chemical Exposure", "chemical_exposure")}
+                {renderRestrictionCell("Wear Spectacles", "wear_spectacles")}
+                {renderRestrictionCell("Remain on Treatment for Chronic Conditions", "remain_on_treatment_for_chronic_conditions")}
+              </tr>
+            </tbody>
+          </table>
         </div>
       );
     };
     
-    const renderFitnessConclusionSection = () => {
+    const renderFitnessAssessmentSection = () => {
       const certification = structuredData.certification || {};
       
       return (
         <div className="mb-4">
-          <h3 className="text-lg font-medium mb-2">Fitness Conclusion</h3>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="fit-unrestricted"
-                checked={certification.fitness_category === 'fit_unrestricted'} 
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'fit_unrestricted');
-                  }
-                }}
-              />
-              <Label htmlFor="fit-unrestricted" className="font-medium text-green-600">Fit for duty without restrictions</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="fit-restricted"
-                checked={certification.fitness_category === 'fit_restricted'} 
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'fit_restricted');
-                  }
-                }}
-              />
-              <Label htmlFor="fit-restricted" className="font-medium text-yellow-600">Temporarily fit for duty with restrictions (specify in recommendations)</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="unfit-temporary"
-                checked={certification.fitness_category === 'unfit_temporary'} 
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'unfit_temporary');
-                  }
-                }}
-              />
-              <Label htmlFor="unfit-temporary" className="font-medium text-orange-600">Temporarily unfit for duty (specify duration in recommendations)</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="unfit-permanent"
-                checked={certification.fitness_category === 'unfit_permanent'} 
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'unfit_permanent');
-                  }
-                }}
-              />
-              <Label htmlFor="unfit-permanent" className="font-medium text-red-600">Permanently unfit for duty</Label>
-            </div>
-          </div>
+          <h3 className="text-lg font-medium mb-2">Fitness Assessment</h3>
+          <table className="w-full border border-gray-400">
+            <tbody>
+              <tr>
+                <th className="border border-gray-400 p-2 text-center">
+                  FIT
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.fit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  Fit with Restriction
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.fit_with_restrictions} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit_with_restrictions'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  Fit with Condition
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.fit_with_condition} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit_with_condition'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  Temporary Unfit
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.temporarily_unfit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'temporarily_unfit'], !!checked)}
+                    />
+                  </div>
+                </th>
+                <th className="border border-gray-400 p-2 text-center">
+                  UNFIT
+                  <div className="flex justify-center mt-1">
+                    <Checkbox 
+                      checked={!!certification.unfit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'unfit'], !!checked)}
+                    />
+                  </div>
+                </th>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+    
+    const renderCommentsSection = () => {
+      const certification = structuredData.certification || {};
+      
+      return (
+        <div className="mb-4">
+          <div className="font-semibold text-sm mb-1">Comments:</div>
+          <Textarea 
+            className="border border-gray-400 p-2 min-h-16 text-sm w-full resize-none focus-visible:ring-0" 
+            value={certification.comments || ''}
+            onChange={(e) => updateEditableData(['structured_data', 'certification', 'comments'], e.target.value)}
+          />
         </div>
       );
     };
     
     return (
-      <div className="space-y-6 p-4">
+      <div className="space-y-6 px-6">
         {renderPatientSection()}
+        <Separator />
         {renderExaminationTypeSection()}
+        <Separator />
         {renderTestResultsSection()}
+        <Separator />
         {renderFollowUpSection()}
-        {renderAssessmentSection()}
-        {renderFitnessConclusionSection()}
+        <Separator />
+        {renderRestrictionsSection()}
+        <Separator />
+        {renderFitnessAssessmentSection()}
+        <Separator />
+        {renderCommentsSection()}
+        
+        <div className="mt-6 flex justify-end space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsEditing(false);
+              setEditableData(null);
+            }}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEdits}>
+            <Save className="h-4 w-4 mr-2" />
+            Save Changes
+          </Button>
+        </div>
       </div>
     );
   };
 
-  return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex gap-1 items-center mr-4"
-            onClick={() => navigate(-1)}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span>Back</span>
-          </Button>
-          <h1 className="text-2xl font-bold">{document?.name || "Document Viewer"}</h1>
-          {document?.status === "processed" && (
-            <Badge variant="success" className="ml-3">Processed</Badge>
-          )}
-          {document?.status === "processing" && (
-            <Badge variant="warning" className="ml-3 flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Processing
-            </Badge>
-          )}
-          {document?.status === "error" && (
-            <Badge variant="destructive" className="ml-3 flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              Error
-            </Badge>
-          )}
+  const renderExtractedData = () => {
+    if (isValidating && document) {
+      console.log('Data passed to validator:', validatorData || document.extractedData);
+      
+      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
+      
+      return (
+        <CertificateValidator 
+          documentId={document.id}
+          extractedData={dataForValidator}
+          onSave={handleValidationSave}
+          onCancel={() => {
+            setIsValidating(false);
+            setValidatorData(null);
+          }}
+        />
+      );
+    }
+    
+    if (!document || !document.extractedData) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available</p>
         </div>
-        
-        <div className="flex gap-2">
-          {document?.imageUrl && (
+      );
+    }
+    
+    const extractedData = isEditing ? editableData : document.extractedData;
+    
+    if (document.type === 'Certificate of Fitness') {
+      if (isEditing) {
+        return renderCertificateSection(extractedData);
+      }
+      
+      console.log("Passing to CertificateTemplate:", extractedData);
+      return (
+        <div className="certificate-container pb-6">
+          <CertificateTemplate extractedData={extractedData} />
+        </div>
+      );
+    }
+    
+    if (
+      typeof extractedData === 'object' && 
+      extractedData !== null && 
+      !Array.isArray(extractedData) && 
+      extractedData.structured_data
+    ) {
+      const structuredData = extractedData.structured_data;
+      
+      return (
+        <div className="space-y-6">
+          {structuredData.patient && (
             <>
-              <Button size="sm" variant="outline" className="flex gap-1 items-center">
-                <Download className="h-4 w-4" />
-                <span>Download</span>
-              </Button>
-              <Button size="sm" variant="outline" className="flex gap-1 items-center">
-                <Copy className="h-4 w-4" />
-                <span>Copy</span>
-              </Button>
-              <Button size="sm" variant="outline" className="flex gap-1 items-center">
-                <Printer className="h-4 w-4" />
-                <span>Print</span>
-              </Button>
+              {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
+              <Separator />
             </>
           )}
+          
+          {structuredData.medical_details && (
+            <>
+              {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.examination_results && (
+            <>
+              {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.certification && (
+            <>
+              {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
+            </>
+          )}
+          
+          {isEditing && (
+            <div className="mt-6 flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditableData(null);
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          )}
+          
+          {!structuredData.patient && !structuredData.medical_details && 
+           !structuredData.examination_results && !structuredData.certification && (
+            <div>
+              <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
+              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                {JSON.stringify(structuredData, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            The data structure from this extraction doesn't match the expected format. 
+            Here's the raw data that was extracted:
+          </p>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+            {JSON.stringify(extractedData, null, 2)}
+          </pre>
         </div>
       </div>
+    );
+  };
 
-      {document?.patientName && (
-        <div className="flex mb-6 gap-x-2">
-          <span className="font-semibold">Patient:</span>
-          <span>{document.patientName}</span>
-          {document.patientId && (
-            <>
-              <span className="mx-2">•</span>
-              <span className="font-semibold">ID:</span>
-              <span>{document.patientId}</span>
-            </>
-          )}
-        </div>
-      )}
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!id) {
+        setIsLoading(false);
+        return;
+      }
 
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden min-h-[70vh]">
-        <Tabs defaultValue="document" className="h-full">
-          <div className="flex justify-between items-center border-b px-4">
-            <TabsList className="h-14">
-              <TabsTrigger value="document" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4">
-                <FileText className="h-4 w-4 mr-2" />
-                Document
-              </TabsTrigger>
-              
-              <TabsTrigger value="structured" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4">
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Structured Data
-              </TabsTrigger>
-              
-              {document?.type === 'Certificate of Fitness' && (
-                <TabsTrigger value="validator" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4">
-                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                  Validator
-                </TabsTrigger>
-              )}
-            </TabsList>
+      setIsLoading(true);
+      
+      try {
+        const documentData = await fetchDocumentFromSupabase(id);
+        
+        if (documentData) {
+          setDocument(documentData);
+          setImageUrl(documentData.imageUrl);
+          
+          sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
+          
+          if (documentData.status === 'processing') {
+            const timeout = setTimeout(() => {
+              console.log('Processing timeout reached, updating status');
+              setDocument(prev => {
+                if (prev && prev.status === 'processing') {
+                  const updated = { ...prev, status: 'processed' };
+                  return updated;
+                }
+                return prev;
+              });
+            }, 30000);
             
-            {document && (
-              <div className="flex items-center gap-2">
-                {document?.status === 'processed' && (
-                  <Button 
-                    size="sm"
+            setProcessingTimeout(timeout);
+          }
+        } else {
+          const storedData = sessionStorage.getItem(`document-${id}`);
+          
+          if (storedData) {
+            try {
+              const parsedData = JSON.parse(storedData);
+              setDocument(parsedData);
+              setImageUrl(parsedData.imageUrl);
+            } catch (error) {
+              console.error("Error parsing stored document data:", error);
+              setDocument(mockDocumentData);
+            }
+          } else {
+            console.log('Using mock data as fallback');
+            setDocument(mockDocumentData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching document:', error);
+        setDocument(mockDocumentData);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    
+    const pollInterval = setInterval(async () => {
+      if (!id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('status, extracted_data')
+          .eq('id', id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error polling document status:', error);
+          return;
+        }
+        
+        if (data && document) {
+          console.log('Poll result:', data.status, 'Current status:', document.status);
+          
+          if (document.status === 'processing' && data.status === 'processed') {
+            console.log('Document processing completed, refreshing data');
+            
+            if (processingTimeout) {
+              clearTimeout(processingTimeout);
+              setProcessingTimeout(null);
+            }
+            
+            const documentData = await fetchDocumentFromSupabase(id);
+            if (documentData) {
+              setDocument(documentData);
+              
+              sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
+              
+              toast.success("Document processing completed", {
+                description: "The document has been successfully processed and data extracted."
+              });
+            }
+          } else if (document.status !== data.status) {
+            console.log('Document status changed:', data.status);
+            setDocument(prev => ({
+              ...prev,
+              status: data.status,
+              extractedData: data.extracted_data || prev.extractedData,
+              patientName: extractPatientName(data.extracted_data) || prev.patientName,
+              patientId: extractPatientId(data.extracted_data) || prev.patientId,
+              jsonData: JSON.stringify(data.extracted_data || prev.extractedData, null, 2)
+            }));
+          }
+        }
+      } catch (e) {
+        console.error('Error in polling interval:', e);
+      }
+    }, 5000);
+    
+    return () => {
+      clearInterval(pollInterval);
+      if (processingTimeout) {
+        clearTimeout(processingTimeout);
+      }
+    };
+  }, [id, document?.status, processingTimeout, refreshKey]);
+
+  const handleValidationSave = async (validatedData: any) => {
+    console.log('Saving validated data:', validatedData);
+    
+    const processedData = mapExtractedDataToValidatorFormat(validatedData) as unknown as Json;
+    
+    setDocument(prev => {
+      if (!prev) return null;
+      
+      const updatedDoc = {
+        ...prev,
+        extractedData: processedData,
+        jsonData: JSON.stringify(processedData, null, 2),
+        validationStatus: 'validated'
+      };
+      
+      if (id) {
+        sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+      }
+      
+      return updatedDoc;
+    });
+    
+    setRefreshKey(prevKey => prevKey + 1);
+    setValidatorData(null);
+    setIsValidating(false);
+    
+    if (id) {
+      try {
+        const { error } = await supabase
+          .from('documents')
+          .update({
+            extracted_data: processedData,
+            is_validated: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error saving validated data to Supabase:', error);
+          toast.error("Failed to save validation", {
+            description: "There was an error saving your changes to the database."
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Exception saving validated data:', error);
+        toast.error("Failed to save validation", {
+          description: "There was an error saving your changes to the database."
+        });
+        return;
+      }
+    }
+    
+    toast.success("Validation completed", {
+      description: "The document data has been validated and saved."
+    });
+  };
+
+  const prepareValidatorData = () => {
+    if (!document) return null;
+    
+    console.log("Preparing data for validator:", document.extractedData);
+    
+    const formattedData = mapExtractedDataToValidatorFormat(document.extractedData) as unknown as Record<string, any>;
+    
+    if (formattedData.structured_data.examination_results) {
+      formattedData.structured_data.examination_results.test_results = 
+        formattedData.structured_data.examination_results.test_results || {};
+      
+      formattedData.structured_data.examination_results.type = 
+        formattedData.structured_data.examination_results.type || {};
+    }
+    
+    console.log("Formatted data for validator:", formattedData);
+    setValidatorData(formattedData);
+    return formattedData;
+  };
+
+  const startValidation = () => {
+    const data = prepareValidatorData();
+    console.log("Starting validation with data:", data);
+    setIsValidating(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+          <p className="text-muted-foreground">Loading document data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!document) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
+          <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
+          <Button onClick={() => navigate("/dashboard")}>
+            <ChevronLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center space-x-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate("/dashboard")}
+          >
+            <ChevronLeft className="h-5 w-5" />
+            <span className="sr-only">Back</span>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-medium truncate">{document.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {document.type} | {document.patientName || "Unknown Patient"}
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              {showOriginal ? (
+                <>
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  Hide Original
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Show Original
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (document.imageUrl) {
+                  window.open(document.imageUrl, '_blank');
+                } else {
+                  toast.error("Document preview not available");
+                }
+              }}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(document.jsonData);
+                toast.success("JSON data copied to clipboard");
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy JSON
+            </Button>
+            {!isValidating && !isEditing && document.status === 'processed' && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={toggleEditMode}
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Data
+              </Button>
+            )}
+            {isEditing && (
+              <Button 
+                variant="warning" 
+                size="sm"
+                onClick={toggleEditMode}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel Edit
+              </Button>
+            )}
+            {!isValidating && !isEditing && document.validationStatus === 'validated' && (
+              <Badge variant="default" className="text-xs">
+                <Check className="h-3 w-3 mr-1" />
+                Validated
+              </Badge>
+            )}
+          </div>
+        </div>
+      </header>
+      
+      <main className="flex-1 container py-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+        >
+          {showOriginal && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Original Document</h2>
+                <Badge variant="outline" className="text-xs">
+                  {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
+                </Badge>
+              </div>
+              <Card className="overflow-hidden h-[calc(100vh-220px)]">
+                <div className="relative w-full h-full">
+                  {imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt="Document preview" 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </motion.div>
+          )}
+          
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
+            key={`document-content-${refreshKey}-${isEditing ? 'edit' : 'view'}`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">
+                {isValidating ? "Validate Document Data" : (isEditing ? "Edit Document Data" : "Extracted Data")}
+              </h2>
+              {!isValidating && !isEditing && (
+                <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
+                  {document.status === 'processed' ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Processed
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3 w-3 mr-1 animate-pulse" />
+                      Processing
+                    </>
+                  )}
+                </Badge>
+              )}
+              {isEditing && (
+                <Badge variant="secondary" className="text-xs">
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Editing
+                </Badge>
+              )}
+              {!isValidating && !isEditing && document.validationStatus === 'validated' && (
+                <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
+                  <Check className="h-3 w-3 mr-1" />
+                  Validated
+                </Badge>
+              )}
+            </div>
+            
+            <Card className="flex-1 overflow-hidden">
+              {isValidating ? (
+                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
+                  {renderExtractedData()}
+                </CardContent>
+              ) : isEditing ? (
+                <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
+                  {renderExtractedData()}
+                </CardContent>
+              ) : (
+                <>
+                  <Tabs defaultValue="structured">
+                    <CardContent className="pb-0 pt-4">
+                      <TabsList className="grid grid-cols-2">
+                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                        <TabsTrigger value="json">JSON</TabsTrigger>
+                      </TabsList>
+                    </CardContent>
+                    
+                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
+                      <TabsContent value="structured" className="m-0 h-full">
+                        <ScrollArea className="h-full pr-4">
+                          {renderExtractedData()}
+                        </ScrollArea>
+                      </TabsContent>
+                      
+                      <TabsContent value="json" className="m-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="relative">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="absolute top-1 right-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(document.jsonData);
+                                toast.success("JSON data copied to clipboard");
+                              }}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </Button>
+                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
+                              {document.jsonData}
+                            </pre>
+                          </div>
+                        </ScrollArea>
+                      </TabsContent>
+                    </CardContent>
+                  </Tabs>
+                </>
+              )}
+            </Card>
+            
+            {!isValidating && !isEditing && (
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/dashboard")}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Back to Dashboard
+                </Button>
+                {document.status === 'processed' && !isEditing && (
+                  <Button
                     onClick={toggleEditMode}
-                    variant={isEditing ? "default" : "outline"}
                   >
-                    {isEditing ? (
-                      <>
-                        <X className="h-4 w-4 mr-1" />
-                        Cancel
-                      </>
-                    ) : (
-                      <>
-                        <Pencil className="h-4 w-4 mr-1" />
-                        Edit Data
-                      </>
-                    )}
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Data
                   </Button>
                 )}
-                
-                {isEditing && (
-                  <Button 
-                    size="sm"
-                    onClick={handleSaveEdits}
+                {document.status === 'processed' && !isValidating && !isEditing && (
+                  <Button
+                    onClick={startValidation}
                   >
-                    <Save className="h-4 w-4 mr-1" />
-                    Save Changes
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
                   </Button>
                 )}
               </div>
             )}
-          </div>
-          
-          <TabsContent value="document" className="mt-0 p-0 h-full">
-            <div className="flex h-full">
-              <div className="flex-1 h-full flex flex-col">
-                <div className="flex items-center justify-between p-2 bg-gray-50 border-b">
-                  <div className="flex items-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowOriginal(!showOriginal)}
-                      className="flex items-center gap-1"
-                    >
-                      {showOriginal ? (
-                        <>
-                          <EyeOff className="h-4 w-4" />
-                          <span>Hide Original</span>
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-4 w-4" />
-                          <span>Show Original</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {/* Add zoom controls when showing original document */}
-                  {showOriginal && (
-                    <ZoomControls
-                      onZoomIn={handleZoomIn}
-                      onZoomOut={handleZoomOut}
-                      onReset={resetZoom}
-                      zoomLevel={zoomLevel}
-                    />
-                  )}
-                </div>
-                
-                <div className="flex-1 overflow-auto">
-                  {showOriginal && document?.imageUrl ? (
-                    <div className="relative flex items-center justify-center min-h-full bg-gray-100">
-                      <div 
-                        className="relative"
-                        style={{
-                          transform: `scale(${zoomLevel})`,
-                          transition: 'transform 0.2s ease'
-                        }}
-                      >
-                        <img 
-                          src={document.imageUrl} 
-                          alt={document.name} 
-                          className="max-w-full shadow-md"
-                        />
-                      </div>
-                    </div>
-                  ) : document?.type === 'Certificate of Fitness' ? (
-                    <CertificateTemplate extractedData={document?.extractedData} />
-                  ) : (
-                    <div className="p-6 space-y-6">
-                      <Card>
-                        <CardContent className="p-4">
-                          <h2 className="text-lg font-semibold">Personal Information</h2>
-                          <Separator className="my-4" />
-                          {document?.extractedData?.personal && 
-                            renderStructuredSection("Personal Details", document.extractedData.personal, ['personal'])}
-                        </CardContent>
-                      </Card>
-                      
-                      <Card>
-                        <CardContent className="p-4">
-                          <h2 className="text-lg font-semibold">Medical Information</h2>
-                          <Separator className="my-4" />
-                          {document?.extractedData?.medical && 
-                            renderStructuredSection("Medical Details", document.extractedData.medical, ['medical'])}
-                        </CardContent>
-                      </Card>
-                      
-                      <Card>
-                        <CardContent className="p-4">
-                          <h2 className="text-lg font-semibold">Vital Signs</h2>
-                          <Separator className="my-4" />
-                          {document?.extractedData?.vitals && 
-                            renderStructuredSection("Vitals", document.extractedData.vitals, ['vitals'])}
-                        </CardContent>
-                      </Card>
-                      
-                      <Card>
-                        <CardContent className="p-4">
-                          <h2 className="text-lg font-semibold">Examination Results</h2>
-                          <Separator className="my-4" />
-                          {document?.extractedData?.examResults && 
-                            renderStructuredSection("Results", document.extractedData.examResults, ['examResults'])}
-                        </CardContent>
-                      </Card>
-                      
-                      <Card>
-                        <CardContent className="p-4">
-                          <h2 className="text-lg font-semibold">Assessment</h2>
-                          <Separator className="my-4" />
-                          {document?.extractedData?.assessment && 
-                            renderStructuredSection("Assessment", document.extractedData.assessment, ['assessment'])}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </div>
+            
+            {isEditing && (
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditableData(null);
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveEdits}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
               </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="structured" className="mt-0 p-0 h-[calc(100%-56px)]">
-            <ScrollArea className="h-full">
-              <div className="p-4">
-                <Card>
-                  <CardContent className="p-4 relative">
-                    {document?.type === 'Certificate of Fitness' ? (
-                      renderCertificateSection(document?.extractedData)
-                    ) : (
-                      <pre className="text-xs overflow-x-auto p-4 bg-gray-50 rounded-md">
-                        {document?.jsonData}
-                      </pre>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </ScrollArea>
-          </TabsContent>
-          
-          {document?.type === 'Certificate of Fitness' && (
-            <TabsContent value="validator" className="mt-0 p-0 h-[calc(100%-56px)]">
-              <ScrollArea className="h-full">
-                <div className="p-4">
-                  <CertificateValidator
-                    document={document}
-                    isValidating={isValidating}
-                    setIsValidating={setIsValidating}
-                    validatorData={validatorData}
-                    setValidatorData={setValidatorData}
-                    refreshKey={refreshKey}
-                  />
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          )}
-        </Tabs>
-      </div>
+            )}
+          </motion.div>
+        </motion.div>
+      </main>
     </div>
   );
 };
