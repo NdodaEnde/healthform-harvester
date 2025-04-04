@@ -168,7 +168,6 @@ const DocumentViewer = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
   const [originalData, setOriginalData] = useState<any>(null);
-  // Add zoom state
   const [zoomLevel, setZoomLevel] = useState(1);
 
   const toggleEditMode = () => {
@@ -801,3 +800,121 @@ const DocumentViewer = () => {
                 <span className="font-semibold mr-1">Review Date:</span>
                 <Input 
                   className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600"
+                  value={certification.review_date || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'review_date'], e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+    
+    const renderAssessmentSection = () => {
+      const assessment = structuredData.assessment || {};
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Assessment</h3>
+          <div className="space-y-3">
+            <div>
+              <div className="font-semibold mb-1">Diagnosis:</div>
+              <Textarea 
+                className="w-full border border-gray-300 p-2 min-h-[80px]" 
+                value={assessment.diagnosis || ''}
+                onChange={(e) => updateEditableData(['structured_data', 'assessment', 'diagnosis'], e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="font-semibold mb-1">Recommendations:</div>
+              <Textarea 
+                className="w-full border border-gray-300 p-2 min-h-[80px]" 
+                value={assessment.recommendations || ''}
+                onChange={(e) => updateEditableData(['structured_data', 'assessment', 'recommendations'], e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    };
+    
+    const renderFitnessConclusionSection = () => {
+      const certification = structuredData.certification || {};
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Fitness Conclusion</h3>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="fit-unrestricted"
+                checked={certification.fitness_category === 'fit_unrestricted'} 
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'fit_unrestricted');
+                  }
+                }}
+              />
+              <Label htmlFor="fit-unrestricted" className="font-medium text-green-600">Fit for duty without restrictions</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="fit-restricted"
+                checked={certification.fitness_category === 'fit_restricted'} 
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'fit_restricted');
+                  }
+                }}
+              />
+              <Label htmlFor="fit-restricted" className="font-medium text-yellow-600">Temporarily fit for duty with restrictions (specify in recommendations)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="unfit-temporary"
+                checked={certification.fitness_category === 'unfit_temporary'} 
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'unfit_temporary');
+                  }
+                }}
+              />
+              <Label htmlFor="unfit-temporary" className="font-medium text-orange-600">Temporarily unfit for duty (specify duration in recommendations)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="unfit-permanent"
+                checked={certification.fitness_category === 'unfit_permanent'} 
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateEditableData(['structured_data', 'certification', 'fitness_category'], 'unfit_permanent');
+                  }
+                }}
+              />
+              <Label htmlFor="unfit-permanent" className="font-medium text-red-600">Permanently unfit for duty</Label>
+            </div>
+          </div>
+        </div>
+      );
+    };
+    
+    return (
+      <div className="space-y-6 p-4">
+        {renderPatientSection()}
+        {renderExaminationTypeSection()}
+        {renderTestResultsSection()}
+        {renderFollowUpSection()}
+        {renderAssessmentSection()}
+        {renderFitnessConclusionSection()}
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto py-6 px-4 max-w-7xl">
+      {/* Component implementation here */}
+    </div>
+  );
+};
+
+export default DocumentViewer;
