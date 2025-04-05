@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,15 +117,31 @@ const ClinicalAnalyticsPage = () => {
     
     documentsData.forEach(doc => {
       try {
-        const extractedData = doc.extracted_data?.structured_data?.certification || {};
+        const extractedData = doc.extracted_data;
+        if (!extractedData || typeof extractedData !== 'object') {
+          fitnessCounts['Unknown']++;
+          return;
+        }
         
-        if (extractedData.fit || extractedData.fit_for_duty) {
+        const structuredData = extractedData.structured_data;
+        if (!structuredData || typeof structuredData !== 'object') {
+          fitnessCounts['Unknown']++;
+          return;
+        }
+        
+        const certification = structuredData.certification;
+        if (!certification || typeof certification !== 'object') {
+          fitnessCounts['Unknown']++;
+          return;
+        }
+        
+        if (certification.fit || certification.fit_for_duty) {
           fitnessCounts['Fit']++;
-        } else if (extractedData.fit_with_restrictions) {
+        } else if (certification.fit_with_restrictions) {
           fitnessCounts['Fit with Restrictions']++;
-        } else if (extractedData.temporarily_unfit) {
+        } else if (certification.temporarily_unfit) {
           fitnessCounts['Temporarily Unfit']++;
-        } else if (extractedData.unfit || extractedData.permanently_unfit) {
+        } else if (certification.unfit || certification.permanently_unfit) {
           fitnessCounts['Permanently Unfit']++;
         } else {
           fitnessCounts['Unknown']++;

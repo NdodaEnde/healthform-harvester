@@ -59,15 +59,35 @@ export default function StatsSummaryCards({
     
     documentsData.forEach(doc => {
       try {
-        const extractedData = doc.extracted_data?.structured_data?.certification || {};
+        // Add type checking before accessing properties
+        const extractedData = doc.extracted_data;
+        if (!extractedData || typeof extractedData !== 'object') {
+          statuses['Unknown']++;
+          return;
+        }
         
-        if (extractedData.fit || extractedData.fit_for_duty) {
+        // Check if structured_data exists and is an object
+        const structuredData = extractedData.structured_data;
+        if (!structuredData || typeof structuredData !== 'object') {
+          statuses['Unknown']++;
+          return;
+        }
+        
+        // Check if certification exists and is an object
+        const certification = structuredData.certification;
+        if (!certification || typeof certification !== 'object') {
+          statuses['Unknown']++;
+          return;
+        }
+        
+        // Now safely access the certification data
+        if (certification.fit || certification.fit_for_duty) {
           statuses['Fit']++;
-        } else if (extractedData.fit_with_restrictions) {
+        } else if (certification.fit_with_restrictions) {
           statuses['Fit with Restrictions']++;
-        } else if (extractedData.temporarily_unfit) {
+        } else if (certification.temporarily_unfit) {
           statuses['Temporarily Unfit']++;
-        } else if (extractedData.unfit || extractedData.permanently_unfit) {
+        } else if (certification.unfit || certification.permanently_unfit) {
           statuses['Permanently Unfit']++;
         } else {
           statuses['Unknown']++;

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,15 +61,31 @@ const IntegratedOccupationalHealthPage = () => {
     
     documentsData.forEach(doc => {
       try {
-        const extractedData = doc.extracted_data?.structured_data?.certification || {};
+        const extractedData = doc.extracted_data;
+        if (!extractedData || typeof extractedData !== 'object') {
+          statuses['Unknown']++;
+          return;
+        }
         
-        if (extractedData.fit || extractedData.fit_for_duty) {
+        const structuredData = extractedData.structured_data;
+        if (!structuredData || typeof structuredData !== 'object') {
+          statuses['Unknown']++;
+          return;
+        }
+        
+        const certification = structuredData.certification;
+        if (!certification || typeof certification !== 'object') {
+          statuses['Unknown']++;
+          return;
+        }
+        
+        if (certification.fit || certification.fit_for_duty) {
           statuses['Fit']++;
-        } else if (extractedData.fit_with_restrictions) {
+        } else if (certification.fit_with_restrictions) {
           statuses['Fit with Restrictions']++;
-        } else if (extractedData.temporarily_unfit) {
+        } else if (certification.temporarily_unfit) {
           statuses['Temporarily Unfit']++;
-        } else if (extractedData.unfit || extractedData.permanently_unfit) {
+        } else if (certification.unfit || certification.permanently_unfit) {
           statuses['Permanently Unfit']++;
         } else {
           statuses['Unknown']++;
