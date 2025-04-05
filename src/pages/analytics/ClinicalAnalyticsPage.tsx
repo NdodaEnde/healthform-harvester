@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,20 +8,73 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { ArrowUpRight, Filter, PlusCircle, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FitnessCertificateStats } from "./components/FitnessCertificateStats";
-import { StatsSummaryCards } from "./components/StatsSummaryCards";
-import { OccupationalHealthMetricsChart } from "./components/OccupationalHealthMetricsChart";
-import { OccupationalRestrictionsChart } from "./components/OccupationalRestrictionsChart";
-import { TestTypeBreakdownCard } from "./components/TestTypeBreakdownCard";
-import { CertificateComplianceCard } from "./components/CertificateComplianceCard";
-import { ReportGeneratorCard } from "./components/ReportGeneratorCard";
+import FitnessCertificateStats from "./components/FitnessCertificateStats";
+import StatsSummaryCards from "./components/StatsSummaryCards";
+import OccupationalHealthMetricsChart from "./components/OccupationalHealthMetricsChart";
+import OccupationalRestrictionsChart from "./components/OccupationalRestrictionsChart";
+import TestTypeBreakdownCard from "./components/TestTypeBreakdownCard";
+import CertificateComplianceCard from "./components/CertificateComplianceCard";
+import ReportGeneratorCard from "./components/ReportGeneratorCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePickerWithRange } from "@/components/ui/date-range-picker";
-import { DateRange } from "react-day-picker";
-import { formatDistanceToNow, subDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
+import { formatDistanceToNow, subDays, format } from "date-fns";
+import { cn } from "@/lib/utils";
+
+// Let's create a DatePickerWithRange component since it's missing
+const DatePickerWithRange = ({
+  date,
+  onDateChange,
+}: {
+  date: DateRange | undefined;
+  onDateChange: (date: DateRange | undefined) => void;
+}) => {
+  return (
+    <div className="grid gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="date"
+            variant={"outline"}
+            className={cn(
+              "w-[240px] justify-start text-left font-normal",
+              !date && "text-muted-foreground"
+            )}
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            {date?.from ? (
+              date.to ? (
+                <>
+                  {format(date.from, "LLL dd, y")} -{" "}
+                  {format(date.to, "LLL dd, y")}
+                </>
+              ) : (
+                format(date.from, "LLL dd, y")
+              )
+            ) : (
+              <span>Pick a date range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarComponent
+            initialFocus
+            mode="range"
+            defaultMonth={date?.from}
+            selected={date}
+            onSelect={onDateChange}
+            numberOfMonths={2}
+            className="pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
 
 const ClinicalAnalyticsPage = () => {
   const navigate = useNavigate();
