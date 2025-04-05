@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Download } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 // Import components
 import StatsSummaryCards from "./components/StatsSummaryCards";
@@ -20,6 +23,65 @@ const IntegratedOccupationalHealthPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [timeRange, setTimeRange] = useState("30d");
   const [generatingReport, setGeneratingReport] = useState(false);
+  
+  const { getEffectiveOrganizationId } = useOrganization();
+  const organizationId = getEffectiveOrganizationId();
+  
+  // Fetch documents data
+  const { data: documentsData, isLoading } = useQuery({
+    queryKey: ['documents-occupational', organizationId, timeRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('organization_id', organizationId);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organizationId
+  });
+  
+  // Calculate fitness statuses
+  const fitnessStatuses = React.useMemo(() => {
+    if (!documentsData) return {
+      "Fit": 0,
+      "Fit with Restrictions": 0,
+      "Temporarily Unfit": 0,
+      "Permanently Unfit": 0,
+      "Unknown": 0
+    };
+    
+    const statuses = {
+      "Fit": 0,
+      "Fit with Restrictions": 0,
+      "Temporarily Unfit": 0,
+      "Permanently Unfit": 0,
+      "Unknown": 0
+    };
+    
+    documentsData.forEach(doc => {
+      try {
+        const extractedData = doc.extracted_data?.structured_data?.certification || {};
+        
+        if (extractedData.fit || extractedData.fit_for_duty) {
+          statuses['Fit']++;
+        } else if (extractedData.fit_with_restrictions) {
+          statuses['Fit with Restrictions']++;
+        } else if (extractedData.temporarily_unfit) {
+          statuses['Temporarily Unfit']++;
+        } else if (extractedData.unfit || extractedData.permanently_unfit) {
+          statuses['Permanently Unfit']++;
+        } else {
+          statuses['Unknown']++;
+        }
+      } catch (err) {
+        statuses['Unknown']++;
+      }
+    });
+    
+    return statuses;
+  }, [documentsData]);
 
   const handleGenerateReport = () => {
     setGeneratingReport(true);
@@ -96,7 +158,11 @@ const IntegratedOccupationalHealthPage = () => {
 
         <TabsContent value="overview" className="space-y-6">
           {/* Key stats cards */}
-          <StatsSummaryCards />
+          <StatsSummaryCards 
+            totalDocuments={documentsData?.length}
+            isLoading={isLoading}
+            fitnessStatuses={fitnessStatuses}
+          />
 
           {/* Certificate of Fitness and Workplace Restrictions */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
