@@ -2,25 +2,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface StatsSummaryCardsProps {
-  totalDocuments: number;
-  isLoading: boolean;
-  fitnessStatuses: Record<string, number>;
   className?: string;
 }
 
-export default function StatsSummaryCards({ totalDocuments, isLoading, fitnessStatuses, className }: StatsSummaryCardsProps) {
-  // Calculate percentages
-  const totalFit = fitnessStatuses["Fit"] || 0;
-  const totalWithRestrictions = fitnessStatuses["Fit with Restrictions"] || 0;
-  const percentageFit = totalDocuments > 0 ? ((totalFit / totalDocuments) * 100).toFixed(1) + "%" : "0%";
-  const percentageRestrictions = totalDocuments > 0 ? ((totalWithRestrictions / totalDocuments) * 100).toFixed(1) + "%" : "0%";
-  
-  // Sample data for growth indicators - in a real app these would be calculated
-  const growthAssessments = '+12%';
-  const growthTests = '+8.2%';
+export default function StatsSummaryCards({ className }: StatsSummaryCardsProps) {
+  // Sample examination stats data
+  const examStats = {
+    totalAssessments: 2854,
+    fitForWork: 2345,
+    withRestrictions: 412,
+    totalMedicalTests: 5021,
+    growthAssessments: '+12%',
+    percentageFit: '82.2%',
+    percentageRestrictions: '14.4%',
+    growthTests: '+8.2%'
+  };
 
   return (
-    <>
+    <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 ${className}`}>
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">
@@ -29,10 +28,10 @@ export default function StatsSummaryCards({ totalDocuments, isLoading, fitnessSt
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">
-            {isLoading ? '...' : totalDocuments.toLocaleString()}
+            {examStats.totalAssessments.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {growthAssessments} from previous period
+            {examStats.growthAssessments} from previous period
           </p>
         </CardContent>
       </Card>
@@ -45,10 +44,10 @@ export default function StatsSummaryCards({ totalDocuments, isLoading, fitnessSt
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">
-            {isLoading ? '...' : totalFit.toLocaleString()}
+            {examStats.fitForWork.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {percentageFit} of total
+            {examStats.percentageFit} of total
           </p>
         </CardContent>
       </Card>
@@ -61,13 +60,29 @@ export default function StatsSummaryCards({ totalDocuments, isLoading, fitnessSt
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">
-            {isLoading ? '...' : totalWithRestrictions.toLocaleString()}
+            {examStats.withRestrictions.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {percentageRestrictions} of total
+            {examStats.percentageRestrictions} of total
           </p>
         </CardContent>
       </Card>
-    </>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
+            Total Medical Tests
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">
+            {examStats.totalMedicalTests.toLocaleString()}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {examStats.growthTests} from last month
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
