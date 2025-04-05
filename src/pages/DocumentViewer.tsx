@@ -799,4 +799,35 @@ const DocumentViewer = () => {
               <div className="text-sm">
                 <span className="font-semibold mr-1">Review Date:</span>
                 <Input 
-                  className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600
+                  className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600" 
+                  value={certification.review_date || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'review_date'], e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+    
+    return (
+      <div className="px-6">
+        <h3 className="text-lg font-medium mb-4">Certificate Information</h3>
+        <div className="space-y-4">
+          {renderPatientSection()}
+          {renderExaminationTypeSection()}
+          {renderTestResultsSection()}
+          {renderFollowUpSection()}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {/* Component implementation */}
+    </div>
+  );
+};
+
+export default DocumentViewer;
