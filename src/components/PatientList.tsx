@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,8 @@ import {
   CheckCircle,
   AlertTriangle,
   Clock,
-  Activity
+  Activity,
+  ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -36,10 +37,9 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
-import { Json } from '@/integrations/supabase/types';
 import {
   Pagination,
   PaginationContent,
@@ -49,6 +49,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +68,12 @@ const PatientList = () => {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(9);
+  const [dateFilter, setDateFilter] = useState<{
+    label: string;
+    startDate: Date | null;
+    endDate: Date | null;
+  }>({ label: "All time", startDate: null, endDate: null });
+  const [calendarDate, setCalendarDate] = useState<Date | null>(null);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -68,7 +86,7 @@ const PatientList = () => {
   
   // Query patients with organization context
   const { data: patientsData, isLoading, error, refetch } = useQuery({
-    queryKey: ['patients', organizationId, searchTerm, filterGender],
+    queryKey: ['patients', organizationId, searchTerm, filterGender, dateFilter],
     queryFn: async () => {
       let query = supabase
         .from('patients')
@@ -93,13 +111,24 @@ const PatientList = () => {
         query = query.eq('gender', filterGender);
       }
       
+      // Apply date filter if set
+      if (dateFilter.startDate && dateFilter.endDate) {
+        query = query.gte('created_at', dateFilter.startDate.toISOString())
+                    .lte('created_at', dateFilter.endDate.toISOString());
+      }
+      
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
         throw new Error(`Error fetching patients: ${error.message}`);
       }
       
-      console.log('Patients fetched:', data?.length, 'Query params:', { organizationId, searchTerm, filterGender });
+      console.log('Patients fetched:', data?.length, 'Query params:', { 
+        organizationId, 
+        searchTerm, 
+        filterGender,
+        dateFilter: dateFilter.label
+      });
       
       if (!data || data.length === 0) {
         console.log('No patients found for this organization. Organization ID:', organizationId);
@@ -176,6 +205,49 @@ const PatientList = () => {
     };
   }) || [];
 
+  // Date filter presets
+  const datePresets = [
+    { label: "All time", days: null },
+    { label: "Last 7 days", days: 7 },
+    { label: "Last 30 days", days: 30 },
+    { label: "Last 90 days", days: 90 },
+    { label: "Custom range", days: 'custom' }
+  ];
+
+  const handleDateFilterChange = (preset: { label: string, days: number | null | 'custom' }) => {
+    if (preset.days === null) {
+      // All time
+      setDateFilter({ label: preset.label, startDate: null, endDate: null });
+    } else if (preset.days === 'custom') {
+      // Custom range - leave the current filter and open the calendar popover
+      return;
+    } else {
+      // Specific days
+      const endDate = new Date();
+      const startDate = subDays(endDate, preset.days);
+      setDateFilter({ label: preset.label, startDate, endDate });
+    }
+  };
+
+  // Set custom date from calendar
+  const handleSetCustomDate = (date: Date | null) => {
+    if (!date) return;
+    
+    setCalendarDate(date);
+    // When a single date is selected, show patients from that day only
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    setDateFilter({ 
+      label: `${format(date, 'PP')}`, 
+      startDate: startOfDay, 
+      endDate: endOfDay 
+    });
+  };
+
   const handleAddPatient = () => {
     navigate('/patients/new');
   };
@@ -188,9 +260,91 @@ const PatientList = () => {
     refetch();
   };
 
+  // Export patients function
+  const exportPatients = (format: 'csv' | 'excel' | 'pdf') => {
+    // Here we'll implement a simple CSV export
+    if (format === 'csv') {
+      try {
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        // CSV Headers
+        const headers = [
+          "ID", "First Name", "Last Name", "Gender", "Date of Birth", 
+          "Age", "Email", "Phone", "Status", "Created"
+        ];
+        csvContent += headers.join(",") + "\n";
+        
+        // CSV Data
+        patients.forEach(patient => {
+          const age = calculateAge(patient.date_of_birth);
+          const email = patient.contact_info?.email || '';
+          const phone = patient.contact_info?.phone || '';
+          
+          let status = "Unknown";
+          if (patient.medical_history?.assessment?.fitness_conclusion) {
+            const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
+            
+            if (conclusion.includes("fit") || conclusion.includes("suitable")) {
+              status = "Fit";
+            } else if (conclusion.includes("unfit") || conclusion.includes("not suitable")) {
+              status = "Unfit";
+            } else if (conclusion.includes("temporarily") || conclusion.includes("conditional")) {
+              status = "Conditional";
+            }
+          }
+          
+          const row = [
+            patient.id,
+            patient.first_name,
+            patient.last_name,
+            patient.gender || "Unknown",
+            patient.date_of_birth,
+            age.toString(),
+            `"${email}"`, // Wrap in quotes to handle commas
+            `"${phone}"`,
+            status,
+            format(new Date(patient.created_at), 'yyyy-MM-dd')
+          ];
+          
+          // Escape any commas in the data
+          csvContent += row.join(",") + "\n";
+        });
+        
+        // Create download link
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `patients_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        document.body.appendChild(link);
+        
+        // Download the CSV
+        link.click();
+        document.body.removeChild(link);
+        
+        toast({
+          title: "Export Successful",
+          description: `${patients.length} patients exported as CSV.`,
+        });
+      } catch (err) {
+        console.error("Export error:", err);
+        toast({
+          title: "Export Failed",
+          description: "There was an error exporting the patients data.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // For other formats, we'll just show a toast for now
+      toast({
+        title: `${format.toUpperCase()} Export`,
+        description: `${format.toUpperCase()} export is not implemented yet.`,
+      });
+    }
+  };
+
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
-    const birthDate = new Date(dateOfBirth);
+    const birthDate = new Date(date_of_birth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDifference = today.getMonth() - birthDate.getMonth();
     
@@ -360,91 +514,64 @@ const PatientList = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="outline" className="gap-2 border-purple-200 text-purple-700" onClick={() => {}}>
-            <Calendar className="h-4 w-4" />
-            <span>Days</span>
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2 border-purple-200 text-purple-700">
+                <Calendar className="h-4 w-4" />
+                <span>{dateFilter.label}</span>
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0 w-auto" align="end">
+              <div className="border-b p-2">
+                <div className="grid gap-1">
+                  {datePresets.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      variant="ghost"
+                      className="justify-start font-normal"
+                      onClick={() => handleDateFilterChange(preset)}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="p-2">
+                <CalendarComponent
+                  mode="single"
+                  selected={calendarDate || undefined}
+                  onSelect={(date) => handleSetCustomDate(date)}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
           
-          <Button variant="outline" className="gap-2 border-purple-200 text-purple-700" onClick={() => {}}>
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 border-purple-200 text-purple-700">
+                <Download className="h-4 w-4" />
+                <span>Export</span>
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportPatients('csv')}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportPatients('excel')}>
+                Export as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportPatients('pdf')}>
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <Button onClick={handleAddPatient} className="bg-indigo-600 hover:bg-indigo-700">
             <Plus className="mr-2 h-4 w-4" />
             Add Patient
           </Button>
-        </div>
-      </div>
-
-      {/* Corporate Health Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Fit for Work</h3>
-            <CheckCircle className="h-5 w-5 text-green-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{corporateMetrics.certificateStatus.fit.count}</span>
-            <span className="text-sm text-green-500">
-              {patients.length ? Math.round((corporateMetrics.certificateStatus.fit.count / patients.length) * 100) : 0}%
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Employees cleared for full duties without restrictions
-          </div>
-        </div>
-
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">With Restrictions</h3>
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{corporateMetrics.certificateStatus.conditional.count}</span>
-            <span className="text-sm text-amber-500">
-              {patients.length ? Math.round((corporateMetrics.certificateStatus.conditional.count / patients.length) * 100) : 0}%
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Employees with specific workplace accommodations needed
-          </div>
-        </div>
-
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Compliance Rate</h3>
-            <Activity className="h-5 w-5 text-indigo-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{complianceRate}%</span>
-            <span className="text-sm text-indigo-500">+2%</span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Overall medical compliance across workforce
-          </div>
-        </div>
-
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Due for Review</h3>
-            <Clock className="h-5 w-5 text-blue-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{reviewDeadlines.dueSoon}</span>
-            <span className="text-sm text-red-500">{reviewDeadlines.overdue} overdue</span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Certifications due for renewal within 30 days
-          </div>
         </div>
       </div>
 
