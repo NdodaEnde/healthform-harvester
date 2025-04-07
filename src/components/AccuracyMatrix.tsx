@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -55,7 +54,6 @@ interface AccuracyResult {
   monthlyTrends: MonthlyAccuracy[];
 }
 
-// Define an interface for the extracted data structure
 interface ExtractedData {
   edit_tracking?: Record<string, any>;
   [key: string]: any;
@@ -76,7 +74,6 @@ export const AccuracyMatrix = () => {
         monthlyTrends: []
       };
 
-      // Fetch documents with edit tracking data
       const { data: documents, error } = await supabase
         .from('documents')
         .select('*')
@@ -96,7 +93,6 @@ export const AccuracyMatrix = () => {
       const fieldEditCounts: Record<string, number> = {};
       const monthlyAccuracyData: Record<string, { total: number, edited: number, documents: number }> = {};
       
-      // Initialize monthly data for the last 6 months
       const today = new Date();
       for (let i = 0; i < 6; i++) {
         const monthDate = subMonths(today, i);
@@ -104,13 +100,11 @@ export const AccuracyMatrix = () => {
         monthlyAccuracyData[monthKey] = { total: 0, edited: 0, documents: 0 };
       }
       
-      // Process documents to calculate accuracy
       documents?.forEach(doc => {
         const docType = doc.document_type || 'unknown';
         const docDate = new Date(doc.created_at);
         const monthKey = format(docDate, 'MMM yyyy');
         
-        // Only track the last 6 months
         if (monthlyAccuracyData[monthKey]) {
           monthlyAccuracyData[monthKey].documents += 1;
         }
@@ -122,61 +116,49 @@ export const AccuracyMatrix = () => {
             editedDocuments: 0,
             totalFields: 0,
             editedFields: 0,
-            accuracyRate: 100 // Default to 100% if no edits
+            accuracyRate: 100
           };
         }
 
-        // Count this document
         documentTypes[docType].totalDocuments++;
         
-        // Check if document has edit tracking data
-        // Safely cast extracted_data to ExtractedData type
         const extractedData = doc.extracted_data as ExtractedData;
         
         if (extractedData && typeof extractedData === 'object' && extractedData.edit_tracking) {
           const editTracking = extractedData.edit_tracking;
           
-          // Count total fields and edited fields
           const totalFieldCount = countTotalFields(extractedData);
           const editedFieldCount = Object.keys(editTracking).length;
           
           documentTypes[docType].totalFields += totalFieldCount;
           documentTypes[docType].editedFields += editedFieldCount;
           
-          // Count this as an edited document if any fields were changed
           if (editedFieldCount > 0) {
             documentTypes[docType].editedDocuments++;
           }
           
-          // Track frequency of edited fields
           Object.keys(editTracking).forEach(fieldPath => {
-            // Normalize the field path - take the last segment for nested paths
             const normalizedField = fieldPath.split('.').pop() || fieldPath;
             fieldEditCounts[normalizedField] = (fieldEditCounts[normalizedField] || 0) + 1;
           });
           
-          // Update monthly accuracy data
           if (monthlyAccuracyData[monthKey]) {
             monthlyAccuracyData[monthKey].total += totalFieldCount;
             monthlyAccuracyData[monthKey].edited += editedFieldCount;
           }
         } else {
-          // Count fields but no edits if there's no tracking data
           const totalFieldCount = countTotalFields(extractedData);
           documentTypes[docType].totalFields += totalFieldCount;
           
-          // Update monthly accuracy data for documents without edits
           if (monthlyAccuracyData[monthKey]) {
             monthlyAccuracyData[monthKey].total += totalFieldCount;
           }
         }
       });
       
-      // Calculate accuracy rates
       Object.keys(documentTypes).forEach(docType => {
         const data = documentTypes[docType];
         
-        // Calculate field-level accuracy
         if (data.totalFields > 0) {
           data.accuracyRate = parseFloat(
             (((data.totalFields - data.editedFields) / data.totalFields) * 100).toFixed(2)
@@ -184,7 +166,6 @@ export const AccuracyMatrix = () => {
         }
       });
       
-      // Calculate most frequently edited fields
       const frequentlyEditedFields = Object.entries(fieldEditCounts)
         .map(([fieldName, editCount]) => ({
           fieldName,
@@ -192,9 +173,8 @@ export const AccuracyMatrix = () => {
           percentage: parseFloat(((editCount / Object.values(fieldEditCounts).reduce((a, b) => a + b, 0)) * 100).toFixed(1))
         }))
         .sort((a, b) => b.editCount - a.editCount)
-        .slice(0, 5); // Top 5 most edited fields
+        .slice(0, 5);
       
-      // Create monthly accuracy trend data
       const monthlyTrends = Object.entries(monthlyAccuracyData)
         .map(([month, data]) => ({
           month,
@@ -204,10 +184,9 @@ export const AccuracyMatrix = () => {
           documentCount: data.documents
         }))
         .sort((a, b) => {
-          // Sort by date (most recent first)
           const dateA = new Date(a.month);
           const dateB = new Date(b.month);
-          return dateA.getTime() - dateB.getTime(); // Ascending order for the chart
+          return dateA.getTime() - dateB.getTime();
         });
       
       return {
@@ -219,7 +198,6 @@ export const AccuracyMatrix = () => {
     enabled: !!organizationId
   });
 
-  // Helper to count total fields in extracted data
   const countTotalFields = (extractedData: any): number => {
     if (!extractedData) return 0;
     
@@ -247,7 +225,6 @@ export const AccuracyMatrix = () => {
     return count;
   };
 
-  // Format document type for display
   const formatDocumentType = (type: string): string => {
     if (!type) return 'Unknown';
     
@@ -259,7 +236,6 @@ export const AccuracyMatrix = () => {
       .join(' ');
   };
 
-  // Calculate overall accuracy across all document types
   const calculateOverallAccuracy = (): number => {
     if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) return 100;
     
@@ -270,7 +246,6 @@ export const AccuracyMatrix = () => {
     return parseFloat((((totalFields - totalEdited) / totalFields) * 100).toFixed(2));
   };
 
-  // Prepare data for the accuracy pie chart
   const prepareOverallData = () => {
     if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) {
       return [
@@ -325,7 +300,6 @@ export const AccuracyMatrix = () => {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Overall accuracy pie chart */}
           <div className="h-[250px]">
             <h3 className="text-sm font-medium mb-2 text-center">Overall Accuracy</h3>
             <ResponsiveContainer width="100%" height="90%">
@@ -350,7 +324,6 @@ export const AccuracyMatrix = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Accuracy by document type */}
           <div className="h-[250px]">
             <h3 className="text-sm font-medium mb-2 text-center">Accuracy by Document Type</h3>
             <ResponsiveContainer width="100%" height="90%">
@@ -377,7 +350,6 @@ export const AccuracyMatrix = () => {
           </div>
         </div>
         
-        {/* Most Frequently Edited Fields */}
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Most Frequently Edited Fields</h3>
           {accuracyData.frequentlyEditedFields && accuracyData.frequentlyEditedFields.length > 0 ? (
@@ -431,7 +403,6 @@ export const AccuracyMatrix = () => {
           )}
         </div>
         
-        {/* Accuracy Trends Over Time */}
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Accuracy Trends Over Time</h3>
           {accuracyData.monthlyTrends && accuracyData.monthlyTrends.length > 0 ? (
@@ -534,4 +505,3 @@ export const AccuracyMatrix = () => {
     </Card>
   );
 };
-
