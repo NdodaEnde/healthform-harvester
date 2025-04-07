@@ -8,6 +8,7 @@ export interface ContactInfo {
   occupation?: string;
   address?: string;
   employee_id?: string;
+  citizenship?: string;  // Added citizenship property
   [key: string]: any;
 }
 

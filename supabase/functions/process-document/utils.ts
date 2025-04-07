@@ -1,3 +1,4 @@
+
 // Helper utilities for document processing
 
 // Helper function to safely extract nested properties from an object
@@ -58,6 +59,24 @@ export function checkCondition(data: any, path: string, condition: string): bool
 }
 
 /**
+ * Calculate age based on date of birth
+ * @param dateOfBirth - Date of birth
+ * @returns age in years
+ */
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  
+  // Adjust age if birthday hasn't occurred yet this year
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age--;
+  }
+  
+  return age;
+}
+
+/**
  * Extract information from a South African ID number
  * @param idNumber - South African ID number
  * @returns Object with extracted date of birth, gender and citizenship
@@ -66,12 +85,13 @@ export function extractInfoFromSAID(idNumber: string): {
   dateOfBirth: string | null;
   gender: 'male' | 'female' | null;
   citizenship: 'citizen' | 'permanent_resident' | null;
+  age?: number;
 } {
   // Default return object
   const result = {
-    dateOfBirth: null,
+    dateOfBirth: null as string | null,
     gender: null as 'male' | 'female' | null,
-    citizenship: null as 'citizen' | 'permanent_resident' | null
+    citizenship: null as 'citizen' | 'permanent_resident' | null,
   };
   
   if (!idNumber || idNumber.length !== 13 || !/^\d+$/.test(idNumber)) {
@@ -89,6 +109,12 @@ export function extractInfoFromSAID(idNumber: string): {
       // Determine century (assuming 2000s for years less than 22, otherwise 1900s)
       const fullYear = yearPrefix < 22 ? 2000 + yearPrefix : 1900 + yearPrefix;
       result.dateOfBirth = `${fullYear}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      
+      // Calculate age
+      const dob = new Date(fullYear, month - 1, day);
+      if (!isNaN(dob.getTime())) {
+        result.age = calculateAge(dob);
+      }
     }
     
     // Extract gender

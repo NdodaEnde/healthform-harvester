@@ -36,20 +36,6 @@ const PatientsPage = () => {
     }
 
     const info = extractInfoFromSAID(idNumber);
-    
-    // Calculate age if date of birth is available
-    if (info.dateOfBirth) {
-      const today = new Date();
-      let age = today.getFullYear() - info.dateOfBirth.getFullYear();
-      const monthDiff = today.getMonth() - info.dateOfBirth.getMonth();
-      
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < info.dateOfBirth.getDate())) {
-        age--;
-      }
-      
-      info.age = age;
-    }
-    
     setIdAnalysis(info);
   };
 

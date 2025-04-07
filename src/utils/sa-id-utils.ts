@@ -130,6 +130,24 @@ export function validateSAID(idNumber: string): boolean {
 }
 
 /**
+ * Calculate age based on date of birth
+ * @param dateOfBirth - Date of birth
+ * @returns age in years
+ */
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  
+  // Adjust age if birthday hasn't occurred yet this year
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age--;
+  }
+  
+  return age;
+}
+
+/**
  * Extract all relevant information from a South African ID number
  * @param idNumber - The South African ID number
  * @returns Object containing extracted information or null if invalid
@@ -139,11 +157,24 @@ export function extractInfoFromSAID(idNumber: string): {
   gender: 'male' | 'female' | null;
   citizenship: 'citizen' | 'permanent_resident' | null;
   isValid: boolean;
+  age?: number;
 } {
-  return {
-    dateOfBirth: extractDateOfBirthFromSAID(idNumber),
-    gender: extractGenderFromSAID(idNumber),
-    citizenship: extractCitizenshipFromSAID(idNumber),
-    isValid: validateSAID(idNumber)
+  const dateOfBirth = extractDateOfBirthFromSAID(idNumber);
+  const gender = extractGenderFromSAID(idNumber);
+  const citizenship = extractCitizenshipFromSAID(idNumber);
+  const isValid = validateSAID(idNumber);
+  
+  const result = {
+    dateOfBirth,
+    gender,
+    citizenship,
+    isValid
   };
+  
+  // Only calculate age if date of birth is valid
+  if (dateOfBirth) {
+    result.age = calculateAge(dateOfBirth);
+  }
+  
+  return result;
 }

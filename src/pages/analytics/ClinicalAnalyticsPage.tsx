@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Loader2 } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { ContactInfo, MedicalHistoryData } from "@/types/patient";
 
 const ClinicalAnalyticsPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
@@ -109,7 +110,10 @@ const ClinicalAnalyticsPage = () => {
     if (!patientsData) return [];
     
     const counts = patientsData.reduce((acc, patient) => {
-      const citizenship = patient.contact_info?.citizenship || 'unknown';
+      // Cast contact_info to ContactInfo type to allow TypeScript to access citizenship
+      const contactInfo = patient.contact_info as ContactInfo | null;
+      const citizenship = contactInfo?.citizenship || 'unknown';
+      
       acc[citizenship] = (acc[citizenship] || 0) + 1;
       return acc;
     }, {});
@@ -214,7 +218,9 @@ const ClinicalAnalyticsPage = () => {
       try {
         // Get the patient related to this document
         const patientInfo = patientsData?.find(p => {
-          const patientDocs = p.medical_history?.documents || [];
+          // Cast medical_history to MedicalHistoryData type to access documents property safely
+          const medicalHistory = p.medical_history as MedicalHistoryData | null;
+          const patientDocs = medicalHistory?.documents || [];
           return patientDocs.some(d => d.document_id === doc.id);
         });
         
@@ -223,10 +229,21 @@ const ClinicalAnalyticsPage = () => {
         const gender = patientInfo.gender || 'other';
         const genderCategory = genderFitness[gender] ? gender : 'other';
         
-        const extractedData = doc?.extracted_data?.structured_data;
-        if (!extractedData?.certification) return;
+        // Safely access extractedData with proper type checking
+        const extractedData = doc.extracted_data;
+        if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
+          return;
+        }
         
-        const certification = extractedData.certification;
+        const structuredData = extractedData.structured_data;
+        if (!structuredData || typeof structuredData !== 'object' || Array.isArray(structuredData)) {
+          return;
+        }
+        
+        const certification = structuredData.certification;
+        if (!certification || typeof certification !== 'object' || Array.isArray(certification)) {
+          return;
+        }
         
         if (certification.fit || certification.fit_for_duty) {
           genderFitness[genderCategory].fit++;
