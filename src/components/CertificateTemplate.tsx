@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +30,61 @@ const CertificateTemplate = ({
       current = current[key];
     }
     return current !== undefined && current !== null ? current : defaultValue;
+  };
+
+  const getMarkdown = (data: any): string | null => {
+    if (!data) return null;
+    console.log("Attempting to extract markdown from data structure");
+
+    const possiblePaths = [
+      'raw_response.data.markdown', 
+      'extracted_data.raw_response.data.markdown', 
+      'markdown', 
+      'raw_markdown', 
+      'structured_data.raw_content'
+    ];
+    
+    for (const path of possiblePaths) {
+      const value = getValue(data, path);
+      if (value && typeof value === 'string') {
+        console.log(`Found markdown at path: ${path}`);
+        return value;
+      }
+    }
+
+    const searchForMarkdown = (obj: any, path = ''): string | null => {
+      if (!obj || typeof obj !== 'object') return null;
+      
+      if (obj.markdown && typeof obj.markdown === 'string') {
+        console.log(`Found markdown at deep path: ${path}.markdown`);
+        return obj.markdown;
+      }
+      
+      if (obj.raw_content && typeof obj.raw_content === 'string') {
+        console.log(`Found markdown at deep path: ${path}.raw_content`);
+        return obj.raw_content;
+      }
+      
+      if (obj.raw_response?.data?.markdown && typeof obj.raw_response.data.markdown === 'string') {
+        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
+        return obj.raw_response.data.markdown;
+      }
+      
+      for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+          const result = searchForMarkdown(obj[key], `${path}.${key}`);
+          if (result) return result;
+        }
+      }
+      
+      return null;
+    };
+    
+    const deepMarkdown = searchForMarkdown(data);
+    if (deepMarkdown) return deepMarkdown;
+
+    console.log("Could not find markdown in provided data");
+    return null;
   };
 
   const extractDataFromMarkdown = (markdown: string): any => {
@@ -213,53 +267,6 @@ const CertificateTemplate = ({
     return extracted;
   };
 
-  const getMarkdown = (data: any): string | null => {
-    if (!data) return null;
-    console.log("Attempting to extract markdown from data structure");
-
-    const possiblePaths = ['raw_response.data.markdown', 'extracted_data.raw_response.data.markdown', 'markdown', 'raw_markdown'];
-    for (const path of possiblePaths) {
-      const value = getValue(data, path);
-      if (value && typeof value === 'string') {
-        console.log(`Found markdown at path: ${path}`);
-        return value;
-      }
-    }
-
-    const searchForMarkdown = (obj: any, path = ''): string | null => {
-      if (!obj || typeof obj !== 'object') return null;
-      if (obj.markdown && typeof obj.markdown === 'string') {
-        console.log(`Found markdown at deep path: ${path}.markdown`);
-        return obj.markdown;
-      }
-      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
-        return obj.raw_response.data.markdown;
-      }
-      if (obj.data && obj.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.data.markdown`);
-        return obj.data.markdown;
-      }
-      for (const key in obj) {
-        if (typeof obj[key] === 'object' && obj[key] !== null) {
-          const result = searchForMarkdown(obj[key], `${path}.${key}`);
-          if (result) return result;
-        }
-      }
-      return null;
-    };
-    
-    const deepMarkdown = searchForMarkdown(data);
-    if (deepMarkdown) return deepMarkdown;
-
-    if (data.structured_data && data.structured_data.raw_content) {
-      console.log("Found structured_data.raw_content, using as markdown");
-      return data.structured_data.raw_content;
-    }
-    console.log("Could not find markdown in provided data");
-    return null;
-  };
-
   let structuredData: any = {};
 
   if (extractedData?.structured_data) {
@@ -268,13 +275,16 @@ const CertificateTemplate = ({
   } else if (extractedData?.extracted_data?.structured_data) {
     console.log("Using structured_data from extracted_data");
     structuredData = extractedData.extracted_data.structured_data;
+  } else if (extractedData?.extracted_data) {
+    console.log("Using extracted_data directly");
+    structuredData = extractedData.extracted_data;
   } else {
     const markdown = getMarkdown(extractedData);
     if (markdown) {
       console.log("Extracting from markdown content");
       structuredData = extractDataFromMarkdown(markdown);
     } else {
-      console.log("No markdown found, using extractedData as is");
+      console.log("No structured data or markdown found, using extractedData as is");
       structuredData = extractedData || {};
     }
   }
@@ -652,7 +662,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Moved Fitness Assessment to be before Comments section */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 FITNESS ASSESSMENT
@@ -688,7 +697,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Moved Comments section to be the last section before the signature */}
             <div className="px-4 mb-4">
               <div className="font-semibold text-sm mb-1">Comments:</div>
               <div className="border border-gray-400 p-2 min-h-16 text-sm">
