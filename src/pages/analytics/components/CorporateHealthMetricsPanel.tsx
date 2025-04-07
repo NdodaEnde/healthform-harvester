@@ -7,6 +7,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { Building2, HardHat, AlertOctagon, CheckCircle, Activity } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface CorporateHealthMetricsPanelProps {
   className?: string;
@@ -211,19 +212,37 @@ export default function CorporateHealthMetricsPanel({ className }: CorporateHeal
                 <div className="text-sm">High Risk</div>
                 <div className="text-sm font-medium">{riskCategoryBreakdown['High Risk']}</div>
               </div>
-              <Progress value={(riskCategoryBreakdown['High Risk'] / (totalEmployees || 1)) * 100} className="h-2 bg-gray-100" indicatorClassName="bg-red-500" />
+              <Progress value={(riskCategoryBreakdown['High Risk'] / (totalEmployees || 1)) * 100} className="h-2 bg-gray-100" />
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-red-500 rounded-full" 
+                  style={{width: `${(riskCategoryBreakdown['High Risk'] / (totalEmployees || 1)) * 100}%`}}
+                ></div>
+              </div>
               
               <div className="flex items-center justify-between">
                 <div className="text-sm">Medium Risk</div>
                 <div className="text-sm font-medium">{riskCategoryBreakdown['Medium Risk']}</div>
               </div>
-              <Progress value={(riskCategoryBreakdown['Medium Risk'] / (totalEmployees || 1)) * 100} className="h-2 bg-gray-100" indicatorClassName="bg-amber-500" />
+              <Progress value={(riskCategoryBreakdown['Medium Risk'] / (totalEmployees || 1)) * 100} className="h-2 bg-gray-100" />
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-amber-500 rounded-full" 
+                  style={{width: `${(riskCategoryBreakdown['Medium Risk'] / (totalEmployees || 1)) * 100}%`}}
+                ></div>
+              </div>
               
               <div className="flex items-center justify-between">
                 <div className="text-sm">Low Risk</div>
                 <div className="text-sm font-medium">{riskCategoryBreakdown['Low Risk']}</div>
               </div>
-              <Progress value={(riskCategoryBreakdown['Low Risk'] / (totalEmployees || 1)) * 100} className="h-2 bg-gray-100" indicatorClassName="bg-green-500" />
+              <Progress value={(riskCategoryBreakdown['Low Risk'] / (totalEmployees || 1)) * 100} className="h-2 bg-gray-100" />
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 rounded-full" 
+                  style={{width: `${(riskCategoryBreakdown['Low Risk'] / (totalEmployees || 1)) * 100}%`}}
+                ></div>
+              </div>
             </div>
           </CardContent>
         </Card>
