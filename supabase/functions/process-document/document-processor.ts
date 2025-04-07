@@ -1,6 +1,7 @@
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
+import { extractInfoFromSAID } from "./utils.ts";
 
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
@@ -214,7 +215,12 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
               }
             ]
           },
-          contact_info: patientInfo.contactInfo || existingPatients[0].contact_info,
+          contact_info: {
+            ...existingPatients[0].contact_info,
+            ...patientInfo.contactInfo,
+            employee_id: patientInfo.employeeId || existingPatients[0].contact_info?.employee_id,
+            citizenship: patientInfo.citizenship || existingPatients[0].contact_info?.citizenship
+          },
           organization_id: documentData.organization_id,
           client_organization_id: documentData.client_organization_id,
           updated_at: new Date().toISOString()
@@ -245,7 +251,11 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
               processed_at: documentData.processed_at
             }]
           },
-          contact_info: patientInfo.contactInfo || null,
+          contact_info: {
+            ...patientInfo.contactInfo,
+            employee_id: patientInfo.employeeId,
+            citizenship: patientInfo.citizenship
+          },
           organization_id: documentData.organization_id,
           client_organization_id: documentData.client_organization_id
         })
@@ -330,6 +340,30 @@ function extractPatientInfoFromCertificate(data: any) {
     }
   }
   
+  // Try to extract information from SA ID if available
+  let dateOfBirth = patientData.date_of_birth || null;
+  let citizenship = null;
+  
+  if (patientData.employee_id && 
+      patientData.employee_id.length === 13 && 
+      /^\d+$/.test(patientData.employee_id)) {
+    
+    const idInfo = extractInfoFromSAID(patientData.employee_id);
+    
+    // Only use extracted date_of_birth if not already available
+    if (!dateOfBirth && idInfo.dateOfBirth) {
+      dateOfBirth = idInfo.dateOfBirth;
+    }
+    
+    // Only use extracted gender if not already available
+    if (!gender && idInfo.gender) {
+      gender = idInfo.gender;
+    }
+    
+    // Set citizenship information
+    citizenship = idInfo.citizenship;
+  }
+  
   // Always default to 'unknown' if gender is still not determined
   if (!gender) {
     gender = 'unknown';
@@ -338,8 +372,9 @@ function extractPatientInfoFromCertificate(data: any) {
   return {
     firstName: names[0] || 'Unknown',
     lastName: names.length > 1 ? names.slice(1).join(' ') : 'Patient',
-    dateOfBirth: patientData.date_of_birth || null,
+    dateOfBirth: dateOfBirth,
     gender: gender,
+    citizenship: citizenship,
     employeeId: patientData.employee_id || patientData.id_number || null,
     contactInfo: {
       email: null,

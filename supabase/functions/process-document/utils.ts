@@ -58,6 +58,87 @@ export function checkCondition(data: any, path: string, condition: string): bool
   );
 }
 
+/**
+ * Calculate age based on date of birth
+ * @param dateOfBirth - Date of birth
+ * @returns age in years
+ */
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  
+  // Adjust age if birthday hasn't occurred yet this year
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age--;
+  }
+  
+  return age;
+}
+
+/**
+ * Extract information from a South African ID number
+ * @param idNumber - South African ID number
+ * @returns Object with extracted date of birth, gender and citizenship
+ */
+export function extractInfoFromSAID(idNumber: string): {
+  dateOfBirth: string | null;
+  gender: 'male' | 'female' | null;
+  citizenship: 'citizen' | 'permanent_resident' | null;
+  age?: number;
+} {
+  // Default return object
+  const result = {
+    dateOfBirth: null as string | null,
+    gender: null as 'male' | 'female' | null,
+    citizenship: null as 'citizen' | 'permanent_resident' | null,
+  };
+  
+  if (!idNumber || idNumber.length !== 13 || !/^\d+$/.test(idNumber)) {
+    return result;
+  }
+
+  try {
+    // Extract date of birth
+    const yearPrefix = parseInt(idNumber.substring(0, 2), 10);
+    const month = parseInt(idNumber.substring(2, 4), 10);
+    const day = parseInt(idNumber.substring(4, 6), 10);
+    
+    // Validate date components
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      // Determine century (assuming 2000s for years less than 22, otherwise 1900s)
+      const fullYear = yearPrefix < 22 ? 2000 + yearPrefix : 1900 + yearPrefix;
+      result.dateOfBirth = `${fullYear}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      
+      // Calculate age
+      const dob = new Date(fullYear, month - 1, day);
+      if (!isNaN(dob.getTime())) {
+        result.age = calculateAge(dob);
+      }
+    }
+    
+    // Extract gender
+    const genderDigits = parseInt(idNumber.substring(6, 10), 10);
+    if (genderDigits >= 0 && genderDigits <= 4999) {
+      result.gender = 'female';
+    } else if (genderDigits >= 5000 && genderDigits <= 9999) {
+      result.gender = 'male';
+    }
+    
+    // Extract citizenship
+    const citizenshipDigit = parseInt(idNumber.charAt(10), 10);
+    if (citizenshipDigit === 0) {
+      result.citizenship = 'citizen';
+    } else if (citizenshipDigit === 1) {
+      result.citizenship = 'permanent_resident';
+    }
+  } catch (error) {
+    console.error('Error extracting information from SA ID:', error);
+  }
+  
+  return result;
+}
+
 // Improved helper function to check if a specific item is checked in the markdown
 export function isChecked(markdown: string, term: string, debug: boolean = false): boolean {
   if (!markdown || !term) return false;
