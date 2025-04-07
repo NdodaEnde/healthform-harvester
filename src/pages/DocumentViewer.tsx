@@ -11,14 +11,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import DocumentHeader from '@/components/DocumentHeader';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificateOverview from '@/components/CertificateOverview';
-import { CertificateData } from '@/types/patient';
-
-interface ExtractedData {
-  text?: string;
-  structured_data?: CertificateData['structured_data'];
-  patient_info?: CertificateData['patient_info'];
-  [key: string]: any;
-}
+import { parseCertificateData, CertificateData } from '@/types/patient';
+import { Json } from '@/integrations/supabase/types';
 
 interface Document {
   id: string;
@@ -28,7 +22,7 @@ interface Document {
   document_type: string | null;
   processed_at: string | null;
   created_at: string;
-  extracted_data: ExtractedData | null;
+  extracted_data: Json | null;
   [key: string]: any;
 }
 
@@ -89,7 +83,8 @@ const DocumentViewer = () => {
     return <div>Error loading document.</div>;
   }
 
-  // Pass the document to DocumentHeader component
+  const certificateData = parseCertificateData(document.extracted_data);
+
   return (
     <div className="container mx-auto py-8 space-y-6">
       {/* Document header */}
@@ -124,7 +119,7 @@ const DocumentViewer = () => {
           {/* Add the certificate overview component when document is a certificate */}
           {document?.document_type?.includes('certificate') && document?.extracted_data && (
             <CertificateOverview 
-              certificateData={document.extracted_data}
+              certificateData={certificateData}
             />
           )}
           

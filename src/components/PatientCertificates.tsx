@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { FileText, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import CertificateDemographicDisplay from './CertificateDemographicDisplay';
+import { parseCertificateData } from '@/types/patient';
 
 interface PatientCertificatesProps {
   patientId: string;
@@ -59,7 +60,8 @@ interface Document {
 type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
 const getFitnessStatusColor = (document: Document) => {
-  const certification = document.extracted_data?.structured_data?.certification;
+  const certificateData = parseCertificateData(document.extracted_data);
+  const certification = certificateData.structured_data?.certification;
   
   if (certification?.fit) return "success";
   if (certification?.fit_with_restrictions) return "warning";
@@ -69,8 +71,9 @@ const getFitnessStatusColor = (document: Document) => {
 };
 
 const getFitnessStatusText = (document: Document) => {
-  const certification = document.extracted_data?.structured_data?.certification;
-  const results = document.extracted_data?.structured_data?.examination_results;
+  const certificateData = parseCertificateData(document.extracted_data);
+  const certification = certificateData.structured_data?.certification;
+  const results = certificateData.structured_data?.examination_results;
   
   if (certification?.fit) return "Fit";
   if (certification?.fit_with_restrictions) return "Fit with Restrictions";
@@ -138,9 +141,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       }
       
       const filteredDocs = (data || []).filter(doc => {
-        const extractedData = doc.extracted_data as ExtractedData | null;
+        const certificateData = parseCertificateData(doc.extracted_data);
         
-        if (extractedData?.patient_info?.id === patientId) {
+        if (certificateData.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
           return true;
         }
@@ -148,8 +151,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         const patientName = patient ? 
           `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
         
-        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
-                                extractedData?.patient_info?.name?.toLowerCase() || '';
+        const patientNameInData = certificateData.structured_data?.patient?.name?.toLowerCase() || 
+                              certificateData.patient_info?.name?.toLowerCase() || '';
         
         if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
           console.log('Match by patient name in data:', doc.id);
@@ -179,13 +182,22 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       const docsWithReviewStatus = filteredDocs.map(doc => {
         // Process certificate dates if needed
-        if (doc.extracted_data?.structured_data?.certification?.valid_until && 
-            !doc.extracted_data?.structured_data?.certification?.examination_date && 
-            !doc.extracted_data?.structured_data?.examination_results?.date) {
+        const certificateData = parseCertificateData(doc.extracted_data);
+        if (certificateData.structured_data?.certification?.valid_until && 
+            !certificateData.structured_data?.certification?.examination_date && 
+            !certificateData.structured_data?.examination_results?.date) {
           
-          const examDate = getExaminationDate(doc.extracted_data.structured_data.certification.valid_until);
-          if (examDate && doc.extracted_data.structured_data.certification) {
-            doc.extracted_data.structured_data.certification.examination_date = examDate;
+          const examDate = getExaminationDate(certificateData.structured_data.certification.valid_until);
+          if (examDate && doc.extracted_data && typeof doc.extracted_data === 'object') {
+            // Create a properly structured update that won't cause typing issues
+            const extractedDataObj = doc.extracted_data as any;
+            if (!extractedDataObj.structured_data) {
+              extractedDataObj.structured_data = {};
+            }
+            if (!extractedDataObj.structured_data.certification) {
+              extractedDataObj.structured_data.certification = {};
+            }
+            extractedDataObj.structured_data.certification.examination_date = examDate;
           }
         }
         
@@ -221,53 +233,57 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           </div>
         ) : certificates && certificates.length > 0 ? (
           <div className="space-y-4">
-            {certificates.map(cert => (
-              <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div className="w-full">
-                    <h3 className="font-medium">{cert.file_name}</h3>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant="outline">
-                        {cert.processed_at 
-                          ? format(new Date(cert.processed_at), 'PP') 
-                          : format(new Date(cert.created_at), 'PP')}
-                      </Badge>
-                      
-                      <Badge variant={getFitnessStatusColor(cert)}>
-                        {getFitnessStatusText(cert)}
-                      </Badge>
-                      
-                      {cert.extracted_data?.structured_data?.certification?.valid_until && (
-                        <Badge variant="secondary">
-                          Valid until: {cert.extracted_data.structured_data.certification.valid_until}
+            {certificates.map(cert => {
+              const certificateData = parseCertificateData(cert.extracted_data);
+              
+              return (
+                <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="w-full">
+                      <h3 className="font-medium">{cert.file_name}</h3>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="outline">
+                          {cert.processed_at 
+                            ? format(new Date(cert.processed_at), 'PP') 
+                            : format(new Date(cert.created_at), 'PP')}
                         </Badge>
-                      )}
+                        
+                        <Badge variant={getFitnessStatusColor(cert)}>
+                          {getFitnessStatusText(cert)}
+                        </Badge>
+                        
+                        {certificateData.structured_data?.certification?.valid_until && (
+                          <Badge variant="secondary">
+                            Valid until: {certificateData.structured_data.certification.valid_until}
+                          </Badge>
+                        )}
+                        
+                        {cert.reviewStatus === 'reviewed' ? (
+                          <Badge variant="success">Reviewed</Badge>
+                        ) : cert.reviewStatus === 'needs-correction' ? (
+                          <Badge variant="destructive">Needs Correction</Badge>
+                        ) : (
+                          <Badge variant="outline">Not Reviewed</Badge>
+                        )}
+                      </div>
                       
-                      {cert.reviewStatus === 'reviewed' ? (
-                        <Badge variant="success">Reviewed</Badge>
-                      ) : cert.reviewStatus === 'needs-correction' ? (
-                        <Badge variant="destructive">Needs Correction</Badge>
-                      ) : (
-                        <Badge variant="outline">Not Reviewed</Badge>
-                      )}
+                      <div className="mt-4">
+                        <CertificateDemographicDisplay 
+                          certificateData={cert.extracted_data}
+                        />
+                      </div>
                     </div>
-                    
-                    <div className="mt-4">
-                      <CertificateDemographicDisplay 
-                        certificateData={cert.extracted_data}
-                      />
-                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleViewCertificate(cert.id)}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Certificate
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleViewCertificate(cert.id)}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Certificate
-                  </Button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8 border rounded-lg bg-muted/30">
