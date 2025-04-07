@@ -110,8 +110,38 @@ export interface CertificateData {
       valid_until?: string;
       issue_date?: string;
       examination_date?: string;
+      fit?: boolean;
+      fit_with_restrictions?: boolean;
+      temporarily_unfit?: boolean;
+      unfit?: boolean;
+      comments?: string;
       [key: string]: any;
     };
+    patient?: {
+      name?: string;
+      gender?: string;
+      employee_id?: string;
+      citizenship?: string;
+      company?: string;
+      occupation?: string;
+      [key: string]: any;
+    };
+    examination_results?: {
+      fitness_status?: string;
+      date?: string;
+      test_results?: {
+        [key: string]: any;
+      };
+      [key: string]: any;
+    };
+    restrictions?: {
+      [key: string]: boolean;
+    };
+    [key: string]: any;
+  };
+  patient_info?: {
+    id?: string;
+    name?: string;
     [key: string]: any;
   };
   [key: string]: any;

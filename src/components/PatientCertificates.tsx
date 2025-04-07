@@ -178,7 +178,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       });
       
       const docsWithReviewStatus = filteredDocs.map(doc => {
-        // Fixed issue here - extractedData was undefined
+        // Process certificate dates if needed
         if (doc.extracted_data?.structured_data?.certification?.valid_until && 
             !doc.extracted_data?.structured_data?.certification?.examination_date && 
             !doc.extracted_data?.structured_data?.examination_results?.date) {

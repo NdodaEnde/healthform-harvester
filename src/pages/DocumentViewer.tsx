@@ -11,9 +11,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import DocumentHeader from '@/components/DocumentHeader';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificateOverview from '@/components/CertificateOverview';
+import { CertificateData } from '@/types/patient';
 
 interface ExtractedData {
   text?: string;
+  structured_data?: CertificateData['structured_data'];
+  patient_info?: CertificateData['patient_info'];
   [key: string]: any;
 }
 
