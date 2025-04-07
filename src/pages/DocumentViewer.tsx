@@ -9,8 +9,11 @@ import { ArrowLeft, Download, FileText, Link2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import DocumentHeader from '@/components/DocumentHeader';
 import { toast } from '@/components/ui/use-toast';
+import { Json } from '@/integrations/supabase/types';
+
+// Update DocumentHeader import to match its props
+import DocumentHeaderComponent from '@/components/DocumentHeader';
 
 interface Document {
   id: string;
@@ -20,7 +23,7 @@ interface Document {
   document_type: string | null;
   processed_at: string | null;
   created_at: string;
-  extracted_data: any;
+  extracted_data: any; // Using 'any' for extracted_data to avoid type errors
 }
 
 const DocumentViewer = () => {
@@ -52,20 +55,28 @@ const DocumentViewer = () => {
       // Extract patient information for linking
       if (data && data.extracted_data) {
         console.log('Extracting patient name from:', data.extracted_data);
-        const patientInfo = data.extracted_data.patient_info;
+        
+        // Safely access nested properties
+        const extractedData = data.extracted_data as any;
+        const patientInfo = extractedData.patient_info;
+        
+        // Get patient name from various possible locations in the data structure
         const patientName = patientInfo?.name || (
-          data.extracted_data.structured_data?.patient?.name || 
+          extractedData.structured_data?.patient?.name || 
           'Unknown Patient'
         );
         setPatientName(patientName);
         
         console.log('Extracting patient ID from:', data.extracted_data);
-        const patientId = patientInfo?.id || data.extracted_data.structured_data?.patient?.id || null;
+        // Get patient ID from various possible locations
+        const patientId = patientInfo?.id || 
+          (extractedData.structured_data?.patient?.id) || null;
         setPatientId(patientId);
 
         // Process the extracted data further if needed
-        data.processed_extracted_data = processExtractedData(data.extracted_data);
-        console.log('Processed extracted data:', data.processed_extracted_data);
+        // Instead of adding to the document type, create a local processed data variable
+        const processedData = processExtractedData(data.extracted_data);
+        console.log('Processed extracted data:', processedData);
       }
 
       return data as Document;
@@ -121,13 +132,13 @@ const DocumentViewer = () => {
         throw new Error(urlError?.message || "Unable to generate download link");
       }
 
-      // Create a temporary anchor element to trigger the download
-      const link = document.createElement('a');
+      // Use window.document instead of document to avoid confusion with our Document interface
+      const link = window.document.createElement('a');
       link.href = urlData.signedUrl;
       link.setAttribute('download', document.file_name);
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
 
       toast({
         title: "Download Started",
@@ -183,15 +194,32 @@ const DocumentViewer = () => {
     }
   };
 
+  // Create a simple document header component for the document viewer
+  const DocumentHeader = () => (
+    <div className="flex justify-between items-center mb-6">
+      <Button onClick={handleBack} variant="outline" size="sm">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
+      <div>
+        <h2 className="text-2xl font-bold">
+          {document ? document.file_name : 'Document Details'}
+        </h2>
+        {patientName && (
+          <p className="text-muted-foreground">Patient: {patientName}</p>
+        )}
+      </div>
+      {patientId && (
+        <Button onClick={handleViewPatient} variant="outline" size="sm">
+          View Patient
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <DocumentHeader 
-        document={document} 
-        isLoading={isLoading} 
-        patientName={patientName} 
-        handleBack={handleBack}
-        handleViewPatient={handleViewPatient}
-      />
+      <DocumentHeader />
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -337,7 +365,7 @@ const DocumentPreview = ({ documentPath }: { documentPath: string }) => {
       src={url} 
       className="absolute inset-0 w-full h-full border-0" 
       title="Document Preview" 
-      onError={(e) => setError('Failed to load preview')}
+      onError={() => setError('Failed to load preview')}
     />
   );
 };
