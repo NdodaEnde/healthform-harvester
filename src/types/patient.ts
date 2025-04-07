@@ -54,6 +54,8 @@ export interface Assessment {
   recommendations?: string;
   restrictions?: string;
   fitness_conclusion?: string;
+  expired?: boolean;
+  next_assessment?: string;
 }
 
 export interface MedicalHistoryData {
