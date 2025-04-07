@@ -13,11 +13,7 @@ import {
   LayoutGrid, 
   List as ListIcon,
   Calendar,
-  Download,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Activity
+  Download 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -114,21 +110,6 @@ const PatientList = () => {
       return data || [];
     },
     enabled: !!organizationId,
-  });
-
-  // Query for documents to get certification status information
-  const { data: documentsData } = useQuery({
-    queryKey: ['documents-status', organizationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('organization_id', organizationId);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!organizationId
   });
 
   // Convert raw database patients to PatientInfo type
@@ -249,105 +230,29 @@ const PatientList = () => {
     }
   };
 
-  // Calculate metrics for corporate health insights
-  const calculateCorporateHealthMetrics = () => {
-    // Default values if data is not available
-    const metrics = {
-      certificateStatus: {
-        fit: { count: 0, title: 'Fit for Work', description: 'No restrictions' },
-        conditional: { count: 0, title: 'Conditional', description: 'With restrictions' },
-        unfit: { count: 0, title: 'Unfit', description: 'Temporarily or permanently' },
-        pending: { count: 0, title: 'Pending Review', description: 'Awaiting assessment' }
-      }
-    };
+  // Calculate statistics for age groups
+  const patientAgeGroups = {
+    child: { count: 0, title: 'Child', description: '' },
+    teen: { count: 0, title: 'Teen', description: '' },
+    adult: { count: 0, title: 'Adult', description: '' },
+    older: { count: 0, title: 'Older', description: '' }
+  };
 
-    // Count patients with different certificate statuses
+  // Calculate statistics for age groups
+  if (patients?.length) {
     patients.forEach(patient => {
-      if (patient.medical_history?.assessment?.fitness_conclusion) {
-        const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
-        
-        if (conclusion.includes("fit") || conclusion.includes("suitable")) {
-          metrics.certificateStatus.fit.count++;
-        } else if (conclusion.includes("temporarily") || conclusion.includes("conditional")) {
-          metrics.certificateStatus.conditional.count++;
-        } else if (conclusion.includes("unfit") || conclusion.includes("not suitable")) {
-          metrics.certificateStatus.unfit.count++;
-        } 
+      const age = calculateAge(patient.date_of_birth);
+      if (age < 13) {
+        patientAgeGroups.child.count++;
+      } else if (age < 20) {
+        patientAgeGroups.teen.count++;
+      } else if (age < 65) {
+        patientAgeGroups.adult.count++;
       } else {
-        // If no assessment, count as pending
-        metrics.certificateStatus.pending.count++;
+        patientAgeGroups.older.count++;
       }
     });
-
-    return metrics;
-  };
-
-  const corporateMetrics = calculateCorporateHealthMetrics();
-
-  // Calculate document processing stats
-  const calculateDocumentStats = () => {
-    if (!documentsData) return { processed: 0, processing: 0, failed: 0, total: 0 };
-    
-    const stats = {
-      processed: 0,
-      processing: 0,
-      failed: 0,
-      total: documentsData.length
-    };
-
-    documentsData.forEach(doc => {
-      if (doc.status === 'processed') {
-        stats.processed++;
-      } else if (doc.status === 'processing') {
-        stats.processing++;
-      } else if (doc.status === 'failed') {
-        stats.failed++;
-      }
-    });
-
-    return stats;
-  };
-
-  const documentStats = calculateDocumentStats();
-
-  // Calculate compliance rate
-  const calculateComplianceRate = () => {
-    const totalPatients = patients.length;
-    if (totalPatients === 0) return 0;
-
-    const patientsWithValidCertificates = patients.filter(p => 
-      p.medical_history?.assessment?.fitness_conclusion && 
-      !p.medical_history?.assessment?.expired
-    ).length;
-
-    return Math.round((patientsWithValidCertificates / totalPatients) * 100);
-  };
-
-  const complianceRate = calculateComplianceRate();
-
-  // Calculate review deadline metrics
-  const calculateReviewDeadlines = () => {
-    const today = new Date();
-    let dueSoon = 0;
-    let overdue = 0;
-
-    patients.forEach(patient => {
-      if (patient.medical_history?.assessment?.next_assessment) {
-        const nextReviewDate = new Date(patient.medical_history.assessment.next_assessment);
-        const daysDiff = Math.floor((nextReviewDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
-        
-        if (daysDiff < 0) {
-          overdue++;
-        } else if (daysDiff <= 30) {
-          dueSoon++;
-        }
-      }
-    });
-
-    return { dueSoon, overdue };
-  };
-
-  const reviewDeadlines = calculateReviewDeadlines();
+  }
 
   return (
     <div className="space-y-6">
@@ -377,75 +282,32 @@ const PatientList = () => {
         </div>
       </div>
 
-      {/* Corporate Health Metrics */}
+      {/* Age Group Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Fit for Work</h3>
-            <CheckCircle className="h-5 w-5 text-green-500" />
+        {Object.entries(patientAgeGroups).map(([key, group]) => (
+          <div 
+            key={key} 
+            className="bg-white rounded-lg shadow p-4 border border-gray-100"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-500">{group.title}</h3>
+              <Button variant="outline" size="sm" className="text-xs h-7 px-2 border-purple-200 text-purple-700">
+                See Details
+              </Button>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold text-gray-800">{group.count}</span>
+              <span className="text-sm text-green-500">+{Math.round(group.count * 0.05)}</span>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {/* This would be populated with actual data in a real application */}
+              {key === 'child' && 'Common conditions: asthma, immunizations'}
+              {key === 'teen' && 'Common conditions: acne, sports injuries'}
+              {key === 'adult' && 'Common conditions: hypertension, diabetes'}
+              {key === 'older' && 'Common conditions: arthritis, heart disease'}
+            </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{corporateMetrics.certificateStatus.fit.count}</span>
-            <span className="text-sm text-green-500">
-              {patients.length ? Math.round((corporateMetrics.certificateStatus.fit.count / patients.length) * 100) : 0}%
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Employees cleared for full duties without restrictions
-          </div>
-        </div>
-
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">With Restrictions</h3>
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{corporateMetrics.certificateStatus.conditional.count}</span>
-            <span className="text-sm text-amber-500">
-              {patients.length ? Math.round((corporateMetrics.certificateStatus.conditional.count / patients.length) * 100) : 0}%
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Employees with specific workplace accommodations needed
-          </div>
-        </div>
-
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Compliance Rate</h3>
-            <Activity className="h-5 w-5 text-indigo-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{complianceRate}%</span>
-            <span className="text-sm text-indigo-500">+2%</span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Overall medical compliance across workforce
-          </div>
-        </div>
-
-        <div 
-          className="bg-white rounded-lg shadow p-4 border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Due for Review</h3>
-            <Clock className="h-5 w-5 text-blue-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-gray-800">{reviewDeadlines.dueSoon}</span>
-            <span className="text-sm text-red-500">{reviewDeadlines.overdue} overdue</span>
-          </div>
-          <div className="mt-2 text-xs text-gray-500">
-            Certifications due for renewal within 30 days
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-lg shadow">
