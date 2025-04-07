@@ -1487,14 +1487,6 @@ const DocumentViewer = () => {
                     Edit Data
                   </Button>
                 )}
-                {document.status === 'processed' && !isValidating && !isEditing && (
-                  <Button
-                    onClick={startValidation}
-                  >
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
-                  </Button>
-                )}
               </div>
             )}
             
