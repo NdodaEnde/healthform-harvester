@@ -18,7 +18,10 @@ import {
   AlertTriangle,
   Clock,
   Activity,
-  ChevronDown
+  ChevronDown,
+  BadgeCheck,
+  User,
+  Flag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -128,7 +131,9 @@ const PatientList = () => {
         console.log('Retrieved patients:', data.map(p => ({
           id: p.id, 
           name: `${p.first_name} ${p.last_name}`,
-          gender: p.gender
+          gender: p.gender,
+          citizenship: p.citizenship,
+          id_number_validated: p.id_number_validated
         })));
       }
       
@@ -184,6 +189,9 @@ const PatientList = () => {
       last_name: p.last_name,
       date_of_birth: p.date_of_birth,
       gender: p.gender,
+      citizenship: p.citizenship,
+      id_number_validated: p.id_number_validated,
+      age_at_registration: p.age_at_registration,
       contact_info: contactInfo,
       medical_history: medicalHistory,
       organization_id: p.organization_id,
@@ -361,6 +369,32 @@ const PatientList = () => {
         {status}
       </Badge>
     );
+  };
+
+  const calculateCitizenshipBadge = (citizenship: string | null | undefined) => {
+    if (!citizenship) return null;
+    
+    const label = citizenship === 'citizen' ? 'SA Citizen' : 
+                 citizenship === 'permanent_resident' ? 'Permanent Resident' : 
+                 citizenship;
+                 
+    return (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        <Flag className="mr-1 h-3 w-3" />
+        {label}
+      </Badge>
+    );
+  };
+
+  const calculateIdValidationBadge = (isValidated: boolean | null | undefined) => {
+    if (isValidated === null || isValidated === undefined) return null;
+    
+    return isValidated ? (
+      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+        <BadgeCheck className="mr-1 h-3 w-3" />
+        Validated ID
+      </Badge>
+    ) : null;
   };
 
   const totalPages = Math.ceil(patients.length / pageSize);
@@ -701,6 +735,7 @@ const PatientList = () => {
                   <TableHead>Patient Name</TableHead>
                   <TableHead>Age</TableHead>
                   <TableHead>Gender</TableHead>
+                  <TableHead>ID Info</TableHead>
                   <TableHead>Added</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Status</TableHead>
@@ -723,8 +758,27 @@ const PatientList = () => {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
-                      <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
+                      <TableCell>
+                        {patient.age_at_registration || calculateAge(patient.date_of_birth)}
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        <div className="flex items-center">
+                          {patient.gender ? (
+                            <>
+                              <User className="mr-1 h-3 w-3 text-muted-foreground" />
+                              <span className="capitalize">{patient.gender}</span>
+                            </>
+                          ) : (
+                            'Unknown'
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {calculateCitizenshipBadge(patient.citizenship)}
+                          {calculateIdValidationBadge(patient.id_number_validated)}
+                        </div>
+                      </TableCell>
                       <TableCell>{formatDate(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         {patient.contact_info?.email ? (
