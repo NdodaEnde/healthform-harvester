@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -7,7 +8,6 @@ import {
   Check, Pencil, Save, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -800,5 +800,309 @@ const DocumentViewer = () => {
       const restrictions = structuredData.restrictions || {};
       
       const renderRestrictionCell = (label: string, key: string) => (
-        <td className={`border border-gray-400 p-2 text-center`}>
-          <div className="
+        <td className="border border-gray-400 p-2 text-center">
+          <div className="flex items-center justify-center">
+            <Checkbox 
+              checked={!!restrictions[key]} 
+              onCheckedChange={(checked) => updateEditableData(['structured_data', 'restrictions', key], !!checked)}
+              className="mx-auto"
+            />
+            <span className="ml-2">{label}</span>
+          </div>
+        </td>
+      );
+      
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-medium mb-2">Restrictions</h3>
+          <table className="w-full border border-gray-400">
+            <thead>
+              <tr>
+                <th className="border border-gray-400 py-1 text-center bg-yellow-50 text-sm" colSpan={3}>
+                  RESTRICTIONS APPLICABLE
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {renderRestrictionCell("Work at Heights", "heights")}
+                {renderRestrictionCell("Confined Spaces", "confined_spaces")}
+                {renderRestrictionCell("Fire Fighting", "fire_fighting")}
+              </tr>
+              <tr>
+                {renderRestrictionCell("Heavy Physical Work", "heavy_physical")}
+                {renderRestrictionCell("Driving", "driving")}
+                {renderRestrictionCell("None", "none")}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+
+    // Render all certificate sections
+    return (
+      <div className="space-y-6 p-4">
+        {renderPatientSection()}
+        {renderExaminationTypeSection()}
+        {renderTestResultsSection()}
+        {renderFollowUpSection()}
+        {renderRestrictionsSection()}
+      </div>
+    );
+  };
+
+  // useEffect for fetching the document
+  useEffect(() => {
+    const fetchDocument = async () => {
+      setIsLoading(true);
+      
+      try {
+        if (id) {
+          // Try to get from session storage first
+          const cachedDocument = sessionStorage.getItem(`document-${id}`);
+          
+          if (cachedDocument) {
+            const parsedDocument = JSON.parse(cachedDocument);
+            setDocument(parsedDocument);
+            setImageUrl(parsedDocument.imageUrl);
+            setIsLoading(false);
+            return;
+          }
+          
+          const documentData = await fetchDocumentFromSupabase(id);
+          
+          if (documentData) {
+            // Store in session storage for faster retrieval
+            sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
+            setDocument(documentData);
+            setImageUrl(documentData.imageUrl);
+          } else {
+            // Handle case where document not found
+            toast.error("Document not found", {
+              description: "The document you are trying to view may have been deleted or moved."
+            });
+            // Optionally navigate back
+            // navigate("/documents");
+          }
+        } else {
+          // For development/preview purposes with mockData
+          setDocument(mockDocumentData);
+          setImageUrl(mockDocumentData.imageUrl);
+        }
+      } catch (error) {
+        console.error("Error fetching document:", error);
+        toast.error("Error loading document", {
+          description: "There was a problem fetching the document. Please try again."
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDocument();
+    
+    return () => {
+      // Cleanup: clear any processing timeouts
+      if (processingTimeout) {
+        clearTimeout(processingTimeout);
+      }
+    };
+  }, [id, refreshKey]); // Refresh on id change or when refreshKey changes
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin mb-2 text-blue-500" />
+        <p className="text-gray-600">Loading document...</p>
+      </div>
+    );
+  }
+
+  // Render document not found
+  if (!document) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+        <h2 className="text-xl font-semibold mb-2">Document Not Found</h2>
+        <p className="text-gray-600 mb-4">The document you are looking for could not be found.</p>
+        <Button onClick={() => navigate("/documents")}>
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          Back to Documents
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container max-w-7xl mx-auto px-4 py-8">
+      {/* Document Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start mb-6">
+        <div className="mb-4 md:mb-0">
+          <div className="flex items-center">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate("/documents")} 
+              className="mr-3"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold">{document.name}</h1>
+            <Badge className="ml-3" variant={document.status === 'processed' ? 'success' : 'warning'}>
+              {document.status === 'processed' ? (
+                <><CheckCircle2 className="h-3 w-3 mr-1" /> Processed</>
+              ) : (
+                <><Clock className="h-3 w-3 mr-1" /> Processing</>
+              )}
+            </Badge>
+          </div>
+          <div className="flex items-center mt-2 text-gray-600">
+            <span className="text-sm">Document Type: {document.type}</span>
+            <span className="mx-2">•</span>
+            <span className="text-sm">Patient: {document.patientName} ({document.patientId})</span>
+            <span className="mx-2">•</span>
+            <span className="text-sm">Uploaded: {new Date(document.uploadedAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => window.open(document.imageUrl, '_blank')}>
+            <Download className="h-4 w-4 mr-2" />
+            Download
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              navigator.clipboard.writeText(document.jsonData);
+              toast.success("Copied to clipboard", {
+                description: "The document data has been copied to your clipboard."
+              });
+            }}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copy Data
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowOriginal(!showOriginal)}
+          >
+            {showOriginal ? (
+              <><Eye className="h-4 w-4 mr-2" />View Original</>
+            ) : (
+              <><EyeOff className="h-4 w-4 mr-2" />Hide Original</>
+            )}
+          </Button>
+          {document.status === 'processed' && (
+            <Button 
+              variant={isEditing ? "destructive" : "default"} 
+              size="sm" 
+              onClick={isEditing ? toggleEditMode : toggleEditMode}
+            >
+              {isEditing ? (
+                <><X className="h-4 w-4 mr-2" />Cancel</>
+              ) : (
+                <><Pencil className="h-4 w-4 mr-2" />Edit Data</>
+              )}
+            </Button>
+          )}
+          {isEditing && (
+            <Button 
+              variant="success" 
+              size="sm" 
+              onClick={handleSaveEdits}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Document Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Original Document */}
+        {showOriginal && (
+          <Card className="shadow-md">
+            <CardContent className="p-0">
+              {imageUrl && document.status === 'processed' ? (
+                <div className="relative">
+                  <img 
+                    src={imageUrl} 
+                    alt="Document Preview" 
+                    className="w-full rounded-t-lg"
+                    style={{ maxHeight: '800px', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 bg-gray-100 rounded-lg">
+                  {document.status === 'processing' ? (
+                    <>
+                      <Loader2 className="h-8 w-8 animate-spin mb-2 text-blue-500" />
+                      <p className="text-gray-600">Processing document...</p>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-8 w-8 mb-2 text-gray-400" />
+                      <p className="text-gray-600">Preview not available</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Extracted Data */}
+        <Card className="shadow-md">
+          <CardContent className="p-4">
+            <h2 className="text-xl font-semibold mb-4">
+              <ClipboardCheck className="inline-block h-5 w-5 mr-2 text-green-600" />
+              Extracted Data
+            </h2>
+            <div className="border rounded-md">
+              <ScrollArea className="h-[600px]">
+                {document.type === 'Certificate of Fitness' ? (
+                  renderCertificateSection(isEditing ? editableData : document.extractedData)
+                ) : (
+                  <div className="p-4 space-y-6">
+                    {Object.entries((isEditing ? editableData : document.extractedData) || {}).map(
+                      ([section, data]) => {
+                        if (section === 'edit_tracking') return null;
+                        if (typeof data !== 'object' || data === null) return null;
+                        
+                        const sectionTitle = section
+                          .replace(/_/g, ' ')
+                          .split(' ')
+                          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' ');
+                        
+                        return (
+                          <div key={section} className="mb-6">
+                            {renderStructuredSection(sectionTitle, data, [section])}
+                            {section !== Object.entries((isEditing ? editableData : document.extractedData) || {}).slice(-1)[0][0] && (
+                              <Separator className="my-4" />
+                            )}
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default DocumentViewer;
