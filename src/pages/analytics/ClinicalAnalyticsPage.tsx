@@ -61,7 +61,7 @@ const ClinicalAnalyticsPage = () => {
     }));
   }, [patientsData]);
 
-  // Calculate age distribution
+  // Calculate age distribution - now using dedicated age_at_registration column if available
   const ageDistribution = React.useMemo(() => {
     if (!patientsData) return [];
     
@@ -75,6 +75,25 @@ const ClinicalAnalyticsPage = () => {
     };
     
     patientsData.forEach(patient => {
+      // First try to use the age_at_registration column (more accurate for analytics)
+      if (patient.age_at_registration) {
+        const age = patient.age_at_registration;
+        
+        if (age <= 18) {
+          ageGroups['0-18']++;
+        } else if (age <= 30) {
+          ageGroups['19-30']++;
+        } else if (age <= 45) {
+          ageGroups['31-45']++;
+        } else if (age <= 60) {
+          ageGroups['46-60']++;
+        } else {
+          ageGroups['61+']++;
+        }
+        return;
+      }
+
+      // Fallback to calculating from date of birth
       if (!patient.date_of_birth) {
         ageGroups['Unknown']++;
         return;
@@ -105,14 +124,13 @@ const ClinicalAnalyticsPage = () => {
     return Object.entries(ageGroups).map(([name, value]) => ({ name, value }));
   }, [patientsData]);
 
-  // Calculate citizenship distribution
+  // Calculate citizenship distribution - now using dedicated citizenship column
   const citizenshipDistribution = React.useMemo(() => {
     if (!patientsData) return [];
     
     const counts = patientsData.reduce((acc, patient) => {
-      // Cast contact_info to ContactInfo type to allow TypeScript to access citizenship
-      const contactInfo = patient.contact_info as ContactInfo | null;
-      const citizenship = contactInfo?.citizenship || 'unknown';
+      // First try to use the dedicated citizenship column
+      const citizenship = patient.citizenship || 'unknown';
       
       acc[citizenship] = (acc[citizenship] || 0) + 1;
       return acc;

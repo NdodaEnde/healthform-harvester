@@ -221,6 +221,9 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
             employee_id: patientInfo.employeeId || existingPatients[0].contact_info?.employee_id,
             citizenship: patientInfo.citizenship || existingPatients[0].contact_info?.citizenship
           },
+          citizenship: patientInfo.citizenship || existingPatients[0].citizenship,
+          age_at_registration: patientInfo.age || existingPatients[0].age_at_registration,
+          id_number_validated: patientInfo.validatedID || existingPatients[0].id_number_validated || false,
           organization_id: documentData.organization_id,
           client_organization_id: documentData.client_organization_id,
           updated_at: new Date().toISOString()
@@ -236,35 +239,42 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       console.log('Creating new patient record');
       
       // Create new patient record
-      const { data: newPatient, error: insertError } = await supabase
+      const { data: newPatient, error: createError } = await supabase
         .from('patients')
-        .insert({
-          first_name: patientInfo.firstName,
-          last_name: patientInfo.lastName,
-          gender: patientInfo.gender || 'unknown',
-          date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
-          medical_history: {
-            ...medicalHistory,
-            documents: [{
-              document_id: documentData.id,
-              document_type: documentType,
-              processed_at: documentData.processed_at
-            }]
-          },
-          contact_info: {
-            ...patientInfo.contactInfo,
-            employee_id: patientInfo.employeeId,
-            citizenship: patientInfo.citizenship
-          },
-          organization_id: documentData.organization_id,
-          client_organization_id: documentData.client_organization_id
-        })
+        .insert([
+          {
+            first_name: patientInfo.firstName,
+            last_name: patientInfo.lastName,
+            gender: patientInfo.gender || 'unknown',
+            date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
+            medical_history: {
+              ...medicalHistory,
+              documents: [
+                { 
+                  document_id: documentData.id,
+                  document_type: documentType,
+                  processed_at: documentData.processed_at
+                }
+              ]
+            },
+            contact_info: {
+              ...patientInfo.contactInfo,
+              employee_id: patientInfo.employeeId,
+              citizenship: patientInfo.citizenship
+            },
+            citizenship: patientInfo.citizenship,
+            age_at_registration: patientInfo.age,
+            id_number_validated: patientInfo.validatedID || false,
+            organization_id: documentData.organization_id,
+            client_organization_id: documentData.client_organization_id
+          }
+        ])
         .select();
         
-      if (insertError) {
-        console.error('Error creating patient record:', insertError);
+      if (createError) {
+        console.error('Error creating patient record:', createError);
       } else {
-        console.log('New patient record created:', newPatient[0]?.id);
+        console.log('New patient created successfully:', newPatient);
       }
     }
     

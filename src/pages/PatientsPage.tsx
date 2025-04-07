@@ -12,6 +12,7 @@ import { InfoIcon, CalendarIcon, Users2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { extractInfoFromSAID } from "@/utils/sa-id-utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const PatientsPage = () => {
   const { currentOrganization, currentClient } = useOrganization();
@@ -37,6 +38,48 @@ const PatientsPage = () => {
 
     const info = extractInfoFromSAID(idNumber);
     setIdAnalysis(info);
+  };
+
+  // New function to apply ID analysis to a patient record in the database
+  const applyToPatient = async (patientId: string) => {
+    if (!idAnalysis || !idAnalysis.isValid) {
+      toast({
+        title: "Invalid ID Analysis",
+        description: "Please analyze a valid South African ID number first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Update the patient record with extracted demographic information
+      const { error } = await supabase
+        .from('patients')
+        .update({
+          gender: idAnalysis.gender || undefined,
+          citizenship: idAnalysis.citizenship || undefined,
+          age_at_registration: idAnalysis.age,
+          id_number_validated: true,
+          contact_info: {
+            citizenship: idAnalysis.citizenship // Keep for backward compatibility
+          }
+        })
+        .eq('id', patientId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Patient Updated",
+        description: "Demographic information has been applied to the patient record.",
+      });
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      toast({
+        title: "Update Failed",
+        description: "There was an error updating the patient record.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -120,8 +163,17 @@ const PatientsPage = () => {
                 </Card>
               )}
               
-              <DialogFooter>
+              <DialogFooter className="flex items-center justify-between">
                 <Button onClick={analyzeID} type="button">Analyze</Button>
+                
+                {idAnalysis && idAnalysis.isValid && (
+                  <Button variant="outline" onClick={() => toast({
+                    title: "Select Patient",
+                    description: "Use the Apply To Patient button in the patient details page to update their demographics with this ID data.",
+                  })}>
+                    Apply To Patient
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>

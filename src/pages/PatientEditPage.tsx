@@ -20,6 +20,9 @@ interface PatientFormState {
   date_of_birth: string;
   gender: string;
   contact_info: ContactInfo;
+  citizenship?: string | null;
+  age_at_registration?: number | null;
+  id_number_validated?: boolean;
 }
 
 const PatientEditPage = () => {
@@ -37,12 +40,14 @@ const PatientEditPage = () => {
     contact_info: {
       email: '',
       phone: ''
-    }
+    },
+    citizenship: null,
+    age_at_registration: null,
+    id_number_validated: false
   });
 
   const [activeTab, setActiveTab] = useState('personal');
 
-  // Query patient data
   const { isLoading, isError } = useQuery({
     queryKey: ['patient', id],
     queryFn: async () => {
@@ -54,13 +59,11 @@ const PatientEditPage = () => {
       
       if (error) throw error;
       
-      // Initialize default contact_info if it doesn't exist
       const contactInfo: ContactInfo = 
         (data.contact_info && typeof data.contact_info === 'object') 
           ? data.contact_info as ContactInfo 
           : { email: '', phone: '' };
       
-      // Update form state with existing patient data
       setFormState({
         first_name: data.first_name || '',
         last_name: data.last_name || '',
@@ -68,8 +71,11 @@ const PatientEditPage = () => {
         gender: data.gender || '',
         contact_info: {
           email: contactInfo.email || '',
-          phone: contactInfo.phone || ''
-        }
+          phone: contactInfo.phone || '',
+        },
+        citizenship: data.citizenship || null,
+        age_at_registration: data.age_at_registration || null,
+        id_number_validated: data.id_number_validated || false
       });
       
       return data;
@@ -77,7 +83,6 @@ const PatientEditPage = () => {
     enabled: !!id,
   });
 
-  // Update patient mutation
   const { mutate, isPending } = useMutation({
     mutationFn: async (patientData: PatientFormState) => {
       const { error } = await supabase
@@ -88,6 +93,9 @@ const PatientEditPage = () => {
           date_of_birth: patientData.date_of_birth,
           gender: patientData.gender,
           contact_info: patientData.contact_info,
+          citizenship: patientData.citizenship,
+          age_at_registration: patientData.age_at_registration,
+          id_number_validated: patientData.id_number_validated,
           organization_id: organizationId,
           updated_at: new Date().toISOString()
         })
@@ -113,10 +121,8 @@ const PatientEditPage = () => {
     }
   });
 
-  // Medical history update mutation
   const { mutate: updateMedicalHistory, isPending: isSavingMedicalHistory } = useMutation({
     mutationFn: async (medicalHistoryData: MedicalHistoryData) => {
-      // Get current patient data to preserve existing medical_history.documents array
       const { data: currentPatient, error: fetchError } = await supabase
         .from('patients')
         .select('medical_history')
@@ -125,7 +131,6 @@ const PatientEditPage = () => {
       
       if (fetchError) throw fetchError;
       
-      // Parse the medical history to ensure we have proper object
       let currentMedicalHistory: MedicalHistoryData = {};
       if (currentPatient?.medical_history) {
         if (typeof currentPatient.medical_history === 'object') {
@@ -139,7 +144,6 @@ const PatientEditPage = () => {
         }
       }
       
-      // Preserve documents array if it exists
       const documents = currentMedicalHistory?.documents || [];
       const updatedMedicalHistory = {
         ...medicalHistoryData,
@@ -172,7 +176,6 @@ const PatientEditPage = () => {
     }
   });
 
-  // Wrapper function to make updateMedicalHistory return a Promise
   const handleSaveMedicalHistory = async (data: MedicalHistoryData): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       updateMedicalHistory(data, {
@@ -206,6 +209,21 @@ const PatientEditPage = () => {
     setFormState(prev => ({
       ...prev,
       gender: value
+    }));
+  };
+
+  const handleCitizenshipChange = (value: string) => {
+    setFormState(prev => ({
+      ...prev,
+      citizenship: value
+    }));
+  };
+
+  const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value !== '' ? parseInt(e.target.value, 10) : null;
+    setFormState(prev => ({
+      ...prev,
+      age_at_registration: value
     }));
   };
 
@@ -252,6 +270,7 @@ const PatientEditPage = () => {
         <TabsList>
           <TabsTrigger value="personal">Personal Information</TabsTrigger>
           <TabsTrigger value="medical">Medical History</TabsTrigger>
+          <TabsTrigger value="demographics">Demographics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal" className="mt-4">
@@ -373,6 +392,73 @@ const PatientEditPage = () => {
             initialData={queryClient.getQueryData<any>(['patient', id])?.medical_history || {}}
             onSave={handleSaveMedicalHistory}
           />
+        </TabsContent>
+
+        <TabsContent value="demographics" className="mt-4">
+          <form onSubmit={handleSubmit}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Demographic Information</CardTitle>
+                <CardDescription>
+                  Used for analytics and reporting
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="citizenship">Citizenship Status</Label>
+                    <Select value={formState.citizenship || ''} onValueChange={handleCitizenshipChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select citizenship status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="citizen">South African Citizen</SelectItem>
+                        <SelectItem value="permanent_resident">Permanent Resident</SelectItem>
+                        <SelectItem value="unknown">Unknown</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age at Registration</Label>
+                    <Input
+                      id="age"
+                      name="age_at_registration"
+                      type="number"
+                      value={formState.age_at_registration?.toString() || ''}
+                      onChange={handleAgeChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {formState.id_number_validated && (
+                    <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                      ID Validated
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          </form>
         </TabsContent>
       </Tabs>
     </div>

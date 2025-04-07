@@ -1,4 +1,3 @@
-
 import { Json } from "@/integrations/supabase/types";
 
 export interface ContactInfo {
@@ -8,7 +7,7 @@ export interface ContactInfo {
   occupation?: string;
   address?: string;
   employee_id?: string;
-  citizenship?: string;  // Added citizenship property
+  citizenship?: string;  // Still keep this for backward compatibility
   [key: string]: any;
 }
 
@@ -96,6 +95,9 @@ export interface PatientInfo {
   client_organization_id?: string | null;
   created_at: string;
   updated_at: string;
+  citizenship?: string | null;
+  age_at_registration?: number | null;
+  id_number_validated?: boolean;
 }
 
 export interface CertificateData {
