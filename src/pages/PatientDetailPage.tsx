@@ -1,15 +1,16 @@
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PatientInfo } from '@/types/patient';
 import { format } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import PatientVisits from '@/components/PatientVisits';
-import { ArrowLeft, Edit, Calendar, User, Mail, Phone, MapPin } from 'lucide-react';
+import { ArrowLeft, Edit, Calendar, User, Mail, Phone, MapPin, Clipboard } from 'lucide-react';
 import PatientCertificates from '@/components/PatientCertificates';
 import { Badge } from '@/components/ui/badge';
 
@@ -219,8 +220,8 @@ const PatientDetailPage = () => {
             </TabsContent>
             
             <TabsContent value="visits">
-              {patientData && (
-                <PatientVisits patientId={id!} />
+              {patientData && organizationId && (
+                <PatientVisits patientId={id!} organizationId={organizationId} />
               )}
             </TabsContent>
             

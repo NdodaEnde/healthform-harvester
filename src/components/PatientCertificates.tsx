@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -177,13 +178,14 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       });
       
       const docsWithReviewStatus = filteredDocs.map(doc => {
-        if (extractedData?.structured_data?.certification?.valid_until && 
-            !extractedData?.structured_data?.certification?.examination_date && 
-            !extractedData?.structured_data?.examination_results?.date) {
+        // Fixed issue here - extractedData was undefined
+        if (doc.extracted_data?.structured_data?.certification?.valid_until && 
+            !doc.extracted_data?.structured_data?.certification?.examination_date && 
+            !doc.extracted_data?.structured_data?.examination_results?.date) {
           
-          const examDate = getExaminationDate(extractedData.structured_data.certification.valid_until);
-          if (examDate && extractedData.structured_data.certification) {
-            extractedData.structured_data.certification.examination_date = examDate;
+          const examDate = getExaminationDate(doc.extracted_data.structured_data.certification.valid_until);
+          if (examDate && doc.extracted_data.structured_data.certification) {
+            doc.extracted_data.structured_data.certification.examination_date = examDate;
           }
         }
         

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -85,6 +86,7 @@ const DocumentViewer = () => {
     return <div>Error loading document.</div>;
   }
 
+  // Pass the document to DocumentHeader component
   return (
     <div className="container mx-auto py-8 space-y-6">
       {/* Document header */}
