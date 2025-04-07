@@ -7,7 +7,6 @@ import {
   Check, Pencil, Save, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -19,7 +18,6 @@ import CertificateValidator from "@/components/CertificateValidator";
 import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -1023,25 +1021,6 @@ const DocumentViewer = () => {
             <>
               {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
             </>
-          )}
-          
-          {isEditing && (
-            <div className="mt-6 flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditableData(null);
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button onClick={handleSaveEdits}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </Button>
-            </div>
           )}
           
           {!structuredData.patient && !structuredData.medical_details && 
