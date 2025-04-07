@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -204,9 +203,7 @@ export const AccuracyMatrix = () => {
     enabled: !!organizationId
   });
 
-  // Format field names to be more user-friendly
   const formatFieldName = (fieldName: string): string => {
-    // Skip already formatted field names
     if (fieldName.includes(' ')) return fieldName;
     
     return fieldName
@@ -383,7 +380,7 @@ export const AccuracyMatrix = () => {
                       Edit Count
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      % of Total Edits
+                      % of All Field Edits
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Visualization
@@ -400,7 +397,7 @@ export const AccuracyMatrix = () => {
                         {field.editCount}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {field.percentage}%
+                        {field.percentage}% of all edits
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="w-full bg-gray-200 rounded-full h-2.5">
