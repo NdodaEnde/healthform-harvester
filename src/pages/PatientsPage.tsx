@@ -3,6 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import PatientList from '@/components/PatientList';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import CorporateHealthMetricsPanel from './analytics/components/CorporateHealthMetricsPanel';
 
 const PatientsPage = () => {
   const { currentOrganization, currentClient } = useOrganization();
@@ -16,6 +17,10 @@ const PatientsPage = () => {
         transition={{ duration: 0.3 }}
         className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4"
       >
+        {/* Corporate Health Metrics Panel - shows job role distribution, risk categories, etc. */}
+        <CorporateHealthMetricsPanel className="mb-6" />
+        
+        {/* Patient List Component */}
         <PatientList />
       </motion.div>
     </div>
