@@ -14,7 +14,7 @@ const PatientsPage = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg"
+        className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4"
       >
         <PatientList />
       </motion.div>
