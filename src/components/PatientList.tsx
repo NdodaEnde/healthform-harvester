@@ -310,7 +310,7 @@ const PatientList = () => {
       }
     } else {
       toast({
-        title: `${format.toString()}`,
+        title: `${format.toUpperCase()}`,
         description: `${format.toUpperCase()} export is not implemented yet.`,
       });
     }
