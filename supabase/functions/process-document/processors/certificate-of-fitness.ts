@@ -1,5 +1,4 @@
-
-import { extractPath, cleanValue, isChecked, extractInfoFromSAID } from "../utils.ts";
+import { extractPath, cleanValue, isChecked } from "../utils.ts";
 
 // Process certificate of fitness data from Landing AI response
 export function processCertificateOfFitnessData(apiResponse: any) {
@@ -29,8 +28,7 @@ export function processCertificateOfFitnessData(apiResponse: any) {
                   cleanValue(extractPath(extractedData, 'job_title')) || '',
         gender: cleanValue(extractPath(extractedData, 'patient.gender')) || 
                cleanValue(extractPath(extractedData, 'gender')) || 
-               inferGenderFromMarkdown(markdown) || 'unknown',
-        citizenship: null
+               inferGenderFromMarkdown(markdown) || 'unknown'
       },
       examination_results: {
         date: cleanValue(extractPath(extractedData, 'examination.date')) || 
@@ -72,35 +70,6 @@ export function processCertificateOfFitnessData(apiResponse: any) {
       raw_content: markdown || null
     };
     
-    // Extract information from South African ID if available
-    if (structuredData.patient.employee_id && 
-        structuredData.patient.employee_id.length === 13 && 
-        /^\d+$/.test(structuredData.patient.employee_id)) {
-      
-      console.log('Extracting information from South African ID');
-      const idInfo = extractInfoFromSAID(structuredData.patient.employee_id);
-      
-      // Only use extracted date_of_birth if not already available
-      if (!structuredData.patient.date_of_birth && idInfo.dateOfBirth) {
-        structuredData.patient.date_of_birth = idInfo.dateOfBirth;
-        console.log('Extracted date of birth from ID:', structuredData.patient.date_of_birth);
-      }
-      
-      // Only use extracted gender if not already available or is "unknown"
-      if ((!structuredData.patient.gender || 
-           structuredData.patient.gender === 'unknown') && 
-          idInfo.gender) {
-        structuredData.patient.gender = idInfo.gender;
-        console.log('Extracted gender from ID:', structuredData.patient.gender);
-      }
-      
-      // Set citizenship information
-      if (idInfo.citizenship) {
-        structuredData.patient.citizenship = idInfo.citizenship;
-        console.log('Extracted citizenship from ID:', structuredData.patient.citizenship);
-      }
-    }
-    
     // If we have markdown, extract more detailed data
     if (markdown) {
       console.log('Extracting detailed data from markdown');
@@ -122,9 +91,7 @@ export function processCertificateOfFitnessData(apiResponse: any) {
     }
     
     // If we have valid_until but no examination_date, calculate it based on valid_until (typically one year before)
-    if (structuredData.certification.valid_until && 
-        !structuredData.certification.examination_date && 
-        !structuredData.examination_results.date) {
+    if (structuredData.certification.valid_until && !structuredData.certification.examination_date && !structuredData.examination_results.date) {
       try {
         const expiryDate = new Date(structuredData.certification.valid_until);
         if (!isNaN(expiryDate.getTime())) {

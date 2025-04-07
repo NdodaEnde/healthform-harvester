@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Clock,
-  Activity,
-  ChevronDown
+  Activity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -37,9 +36,10 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format as formatDate, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
+import { Json } from '@/integrations/supabase/types';
 import {
   Pagination,
   PaginationContent,
@@ -49,18 +49,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,12 +56,6 @@ const PatientList = () => {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(9);
-  const [dateFilter, setDateFilter] = useState<{
-    label: string;
-    startDate: Date | null;
-    endDate: Date | null;
-  }>({ label: "All time", startDate: null, endDate: null });
-  const [calendarDate, setCalendarDate] = useState<Date | null>(null);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -81,32 +63,34 @@ const PatientList = () => {
     getEffectiveOrganizationId 
   } = useOrganization();
   
+  // Get the effective organization ID (client or current org)
   const organizationId = getEffectiveOrganizationId();
   
+  // Query patients with organization context
   const { data: patientsData, isLoading, error, refetch } = useQuery({
-    queryKey: ['patients', organizationId, searchTerm, filterGender, dateFilter],
+    queryKey: ['patients', organizationId, searchTerm, filterGender],
     queryFn: async () => {
       let query = supabase
         .from('patients')
         .select('*');
       
+      // Apply organization filtering
       if (currentClient) {
+        // If viewing as a service provider with a client selected
         query = query.eq('client_organization_id', currentClient.id);
       } else if (organizationId) {
+        // If viewing own organization
         query = query.eq('organization_id', organizationId);
       }
       
+      // Apply search term filter
       if (searchTerm) {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
       
+      // Apply gender filter (only if not "all")
       if (filterGender && filterGender !== "all") {
         query = query.eq('gender', filterGender);
-      }
-      
-      if (dateFilter.startDate && dateFilter.endDate) {
-        query = query.gte('created_at', dateFilter.startDate.toISOString())
-                    .lte('created_at', dateFilter.endDate.toISOString());
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -115,12 +99,7 @@ const PatientList = () => {
         throw new Error(`Error fetching patients: ${error.message}`);
       }
       
-      console.log('Patients fetched:', data?.length, 'Query params:', { 
-        organizationId, 
-        searchTerm, 
-        filterGender,
-        dateFilter: dateFilter.label
-      });
+      console.log('Patients fetched:', data?.length, 'Query params:', { organizationId, searchTerm, filterGender });
       
       if (!data || data.length === 0) {
         console.log('No patients found for this organization. Organization ID:', organizationId);
@@ -137,6 +116,7 @@ const PatientList = () => {
     enabled: !!organizationId,
   });
 
+  // Query for documents to get certification status information
   const { data: documentsData } = useQuery({
     queryKey: ['documents-status', organizationId],
     queryFn: async () => {
@@ -151,7 +131,9 @@ const PatientList = () => {
     enabled: !!organizationId
   });
 
+  // Convert raw database patients to PatientInfo type
   const patients: PatientInfo[] = patientsData?.map(p => {
+    // Handle contact_info conversion from Json to ContactInfo
     let contactInfo: ContactInfo | null = null;
     if (p.contact_info) {
       if (typeof p.contact_info === 'string') {
@@ -165,6 +147,7 @@ const PatientList = () => {
       }
     }
 
+    // Handle medical_history conversion
     let medicalHistory: MedicalHistoryData | null = null;
     if (p.medical_history) {
       if (typeof p.medical_history === 'string') {
@@ -193,43 +176,6 @@ const PatientList = () => {
     };
   }) || [];
 
-  const datePresets = [
-    { label: "All time", days: null },
-    { label: "Last 7 days", days: 7 },
-    { label: "Last 30 days", days: 30 },
-    { label: "Last 90 days", days: 90 },
-    { label: "Custom range", days: "custom" as const }
-  ];
-
-  const handleDateFilterChange = (preset: { label: string, days: number | null | 'custom' }) => {
-    if (preset.days === null) {
-      setDateFilter({ label: preset.label, startDate: null, endDate: null });
-    } else if (preset.days === 'custom') {
-      return;
-    } else {
-      const endDate = new Date();
-      const startDate = subDays(endDate, preset.days);
-      setDateFilter({ label: preset.label, startDate, endDate });
-    }
-  };
-
-  const handleSetCustomDate = (date: Date | null) => {
-    if (!date) return;
-    
-    setCalendarDate(date);
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    setDateFilter({ 
-      label: `${formatDate(date, 'PP')}`, 
-      startDate: startOfDay, 
-      endDate: endOfDay 
-    });
-  };
-
   const handleAddPatient = () => {
     navigate('/patients/new');
   };
@@ -240,80 +186,6 @@ const PatientList = () => {
       description: "The patients list is being updated."
     });
     refetch();
-  };
-
-  const exportPatients = (format: 'csv' | 'excel' | 'pdf') => {
-    if (format === 'csv') {
-      try {
-        let csvContent = "data:text/csv;charset=utf-8,";
-        
-        const headers = [
-          "ID", "First Name", "Last Name", "Gender", "Date of Birth", 
-          "Age", "Email", "Phone", "Status", "Created"
-        ];
-        csvContent += headers.join(",") + "\n";
-        
-        patients.forEach(patient => {
-          const age = calculateAge(patient.date_of_birth);
-          const email = patient.contact_info?.email || '';
-          const phone = patient.contact_info?.phone || '';
-          
-          let status = "Unknown";
-          if (patient.medical_history?.assessment?.fitness_conclusion) {
-            const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
-            
-            if (conclusion.includes("fit") || conclusion.includes("suitable")) {
-              status = "Fit";
-            } else if (conclusion.includes("unfit") || conclusion.includes("not suitable")) {
-              status = "Unfit";
-            } else if (conclusion.includes("temporarily") || conclusion.includes("conditional")) {
-              status = "Conditional";
-            }
-          }
-          
-          const row = [
-            patient.id,
-            patient.first_name,
-            patient.last_name,
-            patient.gender || "Unknown",
-            patient.date_of_birth,
-            age.toString(),
-            `"${email}"`,
-            `"${phone}"`,
-            status,
-            formatDate(new Date(patient.created_at), 'yyyy-MM-dd')
-          ];
-          
-          csvContent += row.join(",") + "\n";
-        });
-        
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `patients_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`);
-        document.body.appendChild(link);
-        
-        link.click();
-        document.body.removeChild(link);
-        
-        toast({
-          title: "Export Successful",
-          description: `${patients.length} patients exported as CSV.`,
-        });
-      } catch (err) {
-        console.error("Export error:", err);
-        toast({
-          title: "Export Failed",
-          description: "There was an error exporting the patients data.",
-          variant: "destructive",
-        });
-      }
-    } else {
-      toast({
-        title: `${format.toUpperCase()}`,
-        description: `${format.toUpperCase()} export is not implemented yet.`,
-      });
-    }
   };
 
   const calculateAge = (dateOfBirth: string) => {
@@ -333,6 +205,7 @@ const PatientList = () => {
     let status = "Unknown";
     let variant: "default" | "secondary" | "outline" | "destructive" | "success" = "secondary";
 
+    // Try to determine status from medical_history if available
     if (patient.medical_history?.assessment?.fitness_conclusion) {
       const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
       
@@ -363,6 +236,7 @@ const PatientList = () => {
     );
   };
 
+  // Pagination logic
   const totalPages = Math.ceil(patients.length / pageSize);
   const paginatedPatients = patients.slice(
     (currentPage - 1) * pageSize,
@@ -375,7 +249,9 @@ const PatientList = () => {
     }
   };
 
+  // Calculate metrics for corporate health insights
   const calculateCorporateHealthMetrics = () => {
+    // Default values if data is not available
     const metrics = {
       certificateStatus: {
         fit: { count: 0, title: 'Fit for Work', description: 'No restrictions' },
@@ -385,6 +261,7 @@ const PatientList = () => {
       }
     };
 
+    // Count patients with different certificate statuses
     patients.forEach(patient => {
       if (patient.medical_history?.assessment?.fitness_conclusion) {
         const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
@@ -397,6 +274,7 @@ const PatientList = () => {
           metrics.certificateStatus.unfit.count++;
         } 
       } else {
+        // If no assessment, count as pending
         metrics.certificateStatus.pending.count++;
       }
     });
@@ -406,6 +284,7 @@ const PatientList = () => {
 
   const corporateMetrics = calculateCorporateHealthMetrics();
 
+  // Calculate document processing stats
   const calculateDocumentStats = () => {
     if (!documentsData) return { processed: 0, processing: 0, failed: 0, total: 0 };
     
@@ -431,6 +310,7 @@ const PatientList = () => {
 
   const documentStats = calculateDocumentStats();
 
+  // Calculate compliance rate
   const calculateComplianceRate = () => {
     const totalPatients = patients.length;
     if (totalPatients === 0) return 0;
@@ -445,6 +325,7 @@ const PatientList = () => {
 
   const complianceRate = calculateComplianceRate();
 
+  // Calculate review deadline metrics
   const calculateReviewDeadlines = () => {
     const today = new Date();
     let dueSoon = 0;
@@ -479,64 +360,91 @@ const PatientList = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2 border-purple-200 text-purple-700">
-                <Calendar className="h-4 w-4" />
-                <span>{dateFilter.label}</span>
-                <ChevronDown className="h-4 w-4 ml-1" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="p-0 w-auto" align="end">
-              <div className="border-b p-2">
-                <div className="grid gap-1">
-                  {datePresets.map((preset) => (
-                    <Button
-                      key={preset.label}
-                      variant="ghost"
-                      className="justify-start font-normal"
-                      onClick={() => handleDateFilterChange(preset)}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="p-2">
-                <CalendarComponent
-                  mode="single"
-                  selected={calendarDate || undefined}
-                  onSelect={(date) => handleSetCustomDate(date)}
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
+          <Button variant="outline" className="gap-2 border-purple-200 text-purple-700" onClick={() => {}}>
+            <Calendar className="h-4 w-4" />
+            <span>Days</span>
+          </Button>
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 border-purple-200 text-purple-700">
-                <Download className="h-4 w-4" />
-                <span>Export</span>
-                <ChevronDown className="h-4 w-4 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportPatients('csv')}>
-                Export as CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportPatients('excel')}>
-                Export as Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportPatients('pdf')}>
-                Export as PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" className="gap-2 border-purple-200 text-purple-700" onClick={() => {}}>
+            <Download className="h-4 w-4" />
+            <span>Export</span>
+          </Button>
           
           <Button onClick={handleAddPatient} className="bg-indigo-600 hover:bg-indigo-700">
             <Plus className="mr-2 h-4 w-4" />
             Add Patient
           </Button>
+        </div>
+      </div>
+
+      {/* Corporate Health Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div 
+          className="bg-white rounded-lg shadow p-4 border border-gray-100"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Fit for Work</h3>
+            <CheckCircle className="h-5 w-5 text-green-500" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-gray-800">{corporateMetrics.certificateStatus.fit.count}</span>
+            <span className="text-sm text-green-500">
+              {patients.length ? Math.round((corporateMetrics.certificateStatus.fit.count / patients.length) * 100) : 0}%
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Employees cleared for full duties without restrictions
+          </div>
+        </div>
+
+        <div 
+          className="bg-white rounded-lg shadow p-4 border border-gray-100"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">With Restrictions</h3>
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-gray-800">{corporateMetrics.certificateStatus.conditional.count}</span>
+            <span className="text-sm text-amber-500">
+              {patients.length ? Math.round((corporateMetrics.certificateStatus.conditional.count / patients.length) * 100) : 0}%
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Employees with specific workplace accommodations needed
+          </div>
+        </div>
+
+        <div 
+          className="bg-white rounded-lg shadow p-4 border border-gray-100"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Compliance Rate</h3>
+            <Activity className="h-5 w-5 text-indigo-500" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-gray-800">{complianceRate}%</span>
+            <span className="text-sm text-indigo-500">+2%</span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Overall medical compliance across workforce
+          </div>
+        </div>
+
+        <div 
+          className="bg-white rounded-lg shadow p-4 border border-gray-100"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Due for Review</h3>
+            <Clock className="h-5 w-5 text-blue-500" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-gray-800">{reviewDeadlines.dueSoon}</span>
+            <span className="text-sm text-red-500">{reviewDeadlines.overdue} overdue</span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Certifications due for renewal within 30 days
+          </div>
         </div>
       </div>
 
@@ -629,6 +537,7 @@ const PatientList = () => {
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNum: number;
                   
+                  // Logic to show correct page numbers based on current page
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
@@ -725,7 +634,7 @@ const PatientList = () => {
                       </TableCell>
                       <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
                       <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
-                      <TableCell>{formatDate(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{format(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         {patient.contact_info?.email ? (
                           <div className="text-sm text-blue-600">{patient.contact_info.email}</div>
@@ -776,6 +685,7 @@ const PatientList = () => {
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNum: number;
                   
+                  // Logic to show correct page numbers based on current page
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
