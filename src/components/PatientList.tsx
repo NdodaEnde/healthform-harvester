@@ -81,10 +81,8 @@ const PatientList = () => {
     getEffectiveOrganizationId 
   } = useOrganization();
   
-  // Get the effective organization ID (client or current org)
   const organizationId = getEffectiveOrganizationId();
   
-  // Query patients with organization context
   const { data: patientsData, isLoading, error, refetch } = useQuery({
     queryKey: ['patients', organizationId, searchTerm, filterGender, dateFilter],
     queryFn: async () => {
@@ -92,26 +90,20 @@ const PatientList = () => {
         .from('patients')
         .select('*');
       
-      // Apply organization filtering
       if (currentClient) {
-        // If viewing as a service provider with a client selected
         query = query.eq('client_organization_id', currentClient.id);
       } else if (organizationId) {
-        // If viewing own organization
         query = query.eq('organization_id', organizationId);
       }
       
-      // Apply search term filter
       if (searchTerm) {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
       
-      // Apply gender filter (only if not "all")
       if (filterGender && filterGender !== "all") {
         query = query.eq('gender', filterGender);
       }
       
-      // Apply date filter if set
       if (dateFilter.startDate && dateFilter.endDate) {
         query = query.gte('created_at', dateFilter.startDate.toISOString())
                     .lte('created_at', dateFilter.endDate.toISOString());
@@ -145,7 +137,6 @@ const PatientList = () => {
     enabled: !!organizationId,
   });
 
-  // Query for documents to get certification status information
   const { data: documentsData } = useQuery({
     queryKey: ['documents-status', organizationId],
     queryFn: async () => {
@@ -160,9 +151,7 @@ const PatientList = () => {
     enabled: !!organizationId
   });
 
-  // Convert raw database patients to PatientInfo type
   const patients: PatientInfo[] = patientsData?.map(p => {
-    // Handle contact_info conversion from Json to ContactInfo
     let contactInfo: ContactInfo | null = null;
     if (p.contact_info) {
       if (typeof p.contact_info === 'string') {
@@ -176,7 +165,6 @@ const PatientList = () => {
       }
     }
 
-    // Handle medical_history conversion
     let medicalHistory: MedicalHistoryData | null = null;
     if (p.medical_history) {
       if (typeof p.medical_history === 'string') {
@@ -205,36 +193,30 @@ const PatientList = () => {
     };
   }) || [];
 
-  // Date filter presets
   const datePresets = [
     { label: "All time", days: null },
     { label: "Last 7 days", days: 7 },
     { label: "Last 30 days", days: 30 },
     { label: "Last 90 days", days: 90 },
-    { label: "Custom range", days: 'custom' }
+    { label: "Custom range", days: "custom" as const }
   ];
 
   const handleDateFilterChange = (preset: { label: string, days: number | null | 'custom' }) => {
     if (preset.days === null) {
-      // All time
       setDateFilter({ label: preset.label, startDate: null, endDate: null });
     } else if (preset.days === 'custom') {
-      // Custom range - leave the current filter and open the calendar popover
       return;
     } else {
-      // Specific days
       const endDate = new Date();
       const startDate = subDays(endDate, preset.days);
       setDateFilter({ label: preset.label, startDate, endDate });
     }
   };
 
-  // Set custom date from calendar
   const handleSetCustomDate = (date: Date | null) => {
     if (!date) return;
     
     setCalendarDate(date);
-    // When a single date is selected, show patients from that day only
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     
@@ -260,21 +242,17 @@ const PatientList = () => {
     refetch();
   };
 
-  // Export patients function
   const exportPatients = (format: 'csv' | 'excel' | 'pdf') => {
-    // Here we'll implement a simple CSV export
     if (format === 'csv') {
       try {
         let csvContent = "data:text/csv;charset=utf-8,";
         
-        // CSV Headers
         const headers = [
           "ID", "First Name", "Last Name", "Gender", "Date of Birth", 
           "Age", "Email", "Phone", "Status", "Created"
         ];
         csvContent += headers.join(",") + "\n";
         
-        // CSV Data
         patients.forEach(patient => {
           const age = calculateAge(patient.date_of_birth);
           const email = patient.contact_info?.email || '';
@@ -300,24 +278,21 @@ const PatientList = () => {
             patient.gender || "Unknown",
             patient.date_of_birth,
             age.toString(),
-            `"${email}"`, // Wrap in quotes to handle commas
+            `"${email}"`,
             `"${phone}"`,
             status,
             format(new Date(patient.created_at), 'yyyy-MM-dd')
           ];
           
-          // Escape any commas in the data
           csvContent += row.join(",") + "\n";
         });
         
-        // Create download link
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", `patients_${format(new Date(), 'yyyy-MM-dd')}.csv`);
         document.body.appendChild(link);
         
-        // Download the CSV
         link.click();
         document.body.removeChild(link);
         
@@ -334,9 +309,8 @@ const PatientList = () => {
         });
       }
     } else {
-      // For other formats, we'll just show a toast for now
       toast({
-        title: `${format.toUpperCase()} Export`,
+        title: `${format.toString()}`,
         description: `${format.toUpperCase()} export is not implemented yet.`,
       });
     }
@@ -344,7 +318,7 @@ const PatientList = () => {
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
-    const birthDate = new Date(date_of_birth);
+    const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDifference = today.getMonth() - birthDate.getMonth();
     
@@ -359,7 +333,6 @@ const PatientList = () => {
     let status = "Unknown";
     let variant: "default" | "secondary" | "outline" | "destructive" | "success" = "secondary";
 
-    // Try to determine status from medical_history if available
     if (patient.medical_history?.assessment?.fitness_conclusion) {
       const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
       
@@ -390,7 +363,6 @@ const PatientList = () => {
     );
   };
 
-  // Pagination logic
   const totalPages = Math.ceil(patients.length / pageSize);
   const paginatedPatients = patients.slice(
     (currentPage - 1) * pageSize,
@@ -403,9 +375,7 @@ const PatientList = () => {
     }
   };
 
-  // Calculate metrics for corporate health insights
   const calculateCorporateHealthMetrics = () => {
-    // Default values if data is not available
     const metrics = {
       certificateStatus: {
         fit: { count: 0, title: 'Fit for Work', description: 'No restrictions' },
@@ -415,7 +385,6 @@ const PatientList = () => {
       }
     };
 
-    // Count patients with different certificate statuses
     patients.forEach(patient => {
       if (patient.medical_history?.assessment?.fitness_conclusion) {
         const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
@@ -428,7 +397,6 @@ const PatientList = () => {
           metrics.certificateStatus.unfit.count++;
         } 
       } else {
-        // If no assessment, count as pending
         metrics.certificateStatus.pending.count++;
       }
     });
@@ -438,7 +406,6 @@ const PatientList = () => {
 
   const corporateMetrics = calculateCorporateHealthMetrics();
 
-  // Calculate document processing stats
   const calculateDocumentStats = () => {
     if (!documentsData) return { processed: 0, processing: 0, failed: 0, total: 0 };
     
@@ -464,7 +431,6 @@ const PatientList = () => {
 
   const documentStats = calculateDocumentStats();
 
-  // Calculate compliance rate
   const calculateComplianceRate = () => {
     const totalPatients = patients.length;
     if (totalPatients === 0) return 0;
@@ -479,7 +445,6 @@ const PatientList = () => {
 
   const complianceRate = calculateComplianceRate();
 
-  // Calculate review deadline metrics
   const calculateReviewDeadlines = () => {
     const today = new Date();
     let dueSoon = 0;
@@ -664,7 +629,6 @@ const PatientList = () => {
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNum: number;
                   
-                  // Logic to show correct page numbers based on current page
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
@@ -812,7 +776,6 @@ const PatientList = () => {
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNum: number;
                   
-                  // Logic to show correct page numbers based on current page
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
