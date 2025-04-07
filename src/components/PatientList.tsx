@@ -37,7 +37,7 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format, subDays } from 'date-fns';
+import { format as formatDate, subDays } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
 import {
@@ -224,7 +224,7 @@ const PatientList = () => {
     endOfDay.setHours(23, 59, 59, 999);
     
     setDateFilter({ 
-      label: `${format(date, 'PP')}`, 
+      label: `${formatDate(date, 'PP')}`, 
       startDate: startOfDay, 
       endDate: endOfDay 
     });
@@ -281,7 +281,7 @@ const PatientList = () => {
             `"${email}"`,
             `"${phone}"`,
             status,
-            format(new Date(patient.created_at), 'yyyy-MM-dd')
+            formatDate(new Date(patient.created_at), 'yyyy-MM-dd')
           ];
           
           csvContent += row.join(",") + "\n";
@@ -290,7 +290,7 @@ const PatientList = () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `patients_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        link.setAttribute("download", `patients_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`);
         document.body.appendChild(link);
         
         link.click();
@@ -725,7 +725,7 @@ const PatientList = () => {
                       </TableCell>
                       <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
                       <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
-                      <TableCell>{format(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{formatDate(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         {patient.contact_info?.email ? (
                           <div className="text-sm text-blue-600">{patient.contact_info.email}</div>
