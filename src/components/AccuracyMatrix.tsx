@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -60,6 +61,8 @@ interface ExtractedData {
 }
 
 const COLORS = ['#4ade80', '#f87171', '#60a5fa', '#fbbf24'];
+// Metadata fields that should be excluded from accuracy tracking
+const METADATA_FIELDS = ['last_edited_at', 'edit_tracking', 'created_at', 'updated_at'];
 
 export const AccuracyMatrix = () => {
   const { getEffectiveOrganizationId } = useOrganization();
@@ -139,7 +142,10 @@ export const AccuracyMatrix = () => {
           
           Object.keys(editTracking).forEach(fieldPath => {
             const normalizedField = fieldPath.split('.').pop() || fieldPath;
-            fieldEditCounts[normalizedField] = (fieldEditCounts[normalizedField] || 0) + 1;
+            // Skip metadata fields
+            if (!METADATA_FIELDS.includes(normalizedField)) {
+              fieldEditCounts[normalizedField] = (fieldEditCounts[normalizedField] || 0) + 1;
+            }
           });
           
           if (monthlyAccuracyData[monthKey]) {
@@ -168,7 +174,7 @@ export const AccuracyMatrix = () => {
       
       const frequentlyEditedFields = Object.entries(fieldEditCounts)
         .map(([fieldName, editCount]) => ({
-          fieldName,
+          fieldName: formatFieldName(fieldName),
           editCount,
           percentage: parseFloat(((editCount / Object.values(fieldEditCounts).reduce((a, b) => a + b, 0)) * 100).toFixed(1))
         }))
@@ -198,6 +204,18 @@ export const AccuracyMatrix = () => {
     enabled: !!organizationId
   });
 
+  // Format field names to be more user-friendly
+  const formatFieldName = (fieldName: string): string => {
+    // Skip already formatted field names
+    if (fieldName.includes(' ')) return fieldName;
+    
+    return fieldName
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   const countTotalFields = (extractedData: any): number => {
     if (!extractedData) return 0;
     
@@ -211,7 +229,8 @@ export const AccuracyMatrix = () => {
       }
       
       Object.keys(obj).forEach(key => {
-        if (key !== 'edit_tracking') {
+        // Skip metadata fields when counting
+        if (!METADATA_FIELDS.includes(key)) {
           if (typeof obj[key] === 'object' && obj[key] !== null) {
             countObjectFields(obj[key]);
           } else {
@@ -328,7 +347,7 @@ export const AccuracyMatrix = () => {
             <h3 className="text-sm font-medium mb-2 text-center">Accuracy by Document Type</h3>
             <ResponsiveContainer width="100%" height="90%">
               <BarChart
-                data={accuracyData.documentTypes}
+                data={accuracyData?.documentTypes}
                 margin={{
                   top: 5,
                   right: 30,
@@ -341,7 +360,7 @@ export const AccuracyMatrix = () => {
                 <YAxis domain={[0, 100]} />
                 <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
                 <Bar dataKey="accuracyRate" fill="#8884d8" name="Accuracy">
-                  {accuracyData.documentTypes.map((entry, index) => (
+                  {accuracyData?.documentTypes.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
@@ -352,7 +371,7 @@ export const AccuracyMatrix = () => {
         
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Most Frequently Edited Fields</h3>
-          {accuracyData.frequentlyEditedFields && accuracyData.frequentlyEditedFields.length > 0 ? (
+          {accuracyData?.frequentlyEditedFields && accuracyData.frequentlyEditedFields.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -405,7 +424,7 @@ export const AccuracyMatrix = () => {
         
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Accuracy Trends Over Time</h3>
-          {accuracyData.monthlyTrends && accuracyData.monthlyTrends.length > 0 ? (
+          {accuracyData?.monthlyTrends && accuracyData.monthlyTrends.length > 0 ? (
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -470,7 +489,7 @@ export const AccuracyMatrix = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {accuracyData.documentTypes.map((item, index) => (
+                {accuracyData?.documentTypes.map((item, index) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {item.documentType}
