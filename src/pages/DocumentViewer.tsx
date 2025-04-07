@@ -1483,46 +1483,11 @@ const DocumentViewer = () => {
                   {renderExtractedData()}
                 </CardContent>
               ) : (
-                <>
-                  <Tabs defaultValue="structured">
-                    <CardContent className="pb-0 pt-4">
-                      <TabsList className="grid grid-cols-2">
-                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
-                        <TabsTrigger value="json">JSON</TabsTrigger>
-                      </TabsList>
-                    </CardContent>
-                    
-                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
-                      <TabsContent value="structured" className="m-0 h-full">
-                        <ScrollArea className="h-full pr-4">
-                          {renderExtractedData()}
-                        </ScrollArea>
-                      </TabsContent>
-                      
-                      <TabsContent value="json" className="m-0 h-full">
-                        <ScrollArea className="h-full">
-                          <div className="relative">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="absolute top-1 right-1"
-                              onClick={() => {
-                                navigator.clipboard.writeText(document.jsonData);
-                                toast.success("JSON data copied to clipboard");
-                              }}
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </Button>
-                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
-                              {document.jsonData}
-                            </pre>
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-                    </CardContent>
-                  </Tabs>
-                </>
+                <CardContent className="pt-4 h-[calc(100vh-290px)] overflow-hidden">
+                  <ScrollArea className="h-full pr-4">
+                    {renderExtractedData()}
+                  </ScrollArea>
+                </CardContent>
               )}
             </Card>
             
