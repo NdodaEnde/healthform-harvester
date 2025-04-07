@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Loader2 } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { ContactInfo, MedicalHistoryData } from "@/types/patient";
+import { ContactInfo, MedicalHistoryData, PatientInfo } from "@/types/patient";
 
 const ClinicalAnalyticsPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
@@ -24,7 +23,7 @@ const ClinicalAnalyticsPage = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return data || [];
+      return data as PatientInfo[] || [];
     },
     enabled: !!organizationId
   });
