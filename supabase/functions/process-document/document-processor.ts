@@ -1,7 +1,6 @@
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
-import { extractInfoFromSAID } from "./utils.ts";
 
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
@@ -215,15 +214,7 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
               }
             ]
           },
-          contact_info: {
-            ...existingPatients[0].contact_info,
-            ...patientInfo.contactInfo,
-            employee_id: patientInfo.employeeId || existingPatients[0].contact_info?.employee_id,
-            citizenship: patientInfo.citizenship || existingPatients[0].contact_info?.citizenship
-          },
-          citizenship: patientInfo.citizenship || existingPatients[0].citizenship,
-          age_at_registration: patientInfo.age || existingPatients[0].age_at_registration,
-          id_number_validated: patientInfo.validatedID || existingPatients[0].id_number_validated || false,
+          contact_info: patientInfo.contactInfo || existingPatients[0].contact_info,
           organization_id: documentData.organization_id,
           client_organization_id: documentData.client_organization_id,
           updated_at: new Date().toISOString()
@@ -239,42 +230,31 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       console.log('Creating new patient record');
       
       // Create new patient record
-      const { data: newPatient, error: createError } = await supabase
+      const { data: newPatient, error: insertError } = await supabase
         .from('patients')
-        .insert([
-          {
-            first_name: patientInfo.firstName,
-            last_name: patientInfo.lastName,
-            gender: patientInfo.gender || 'unknown',
-            date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
-            medical_history: {
-              ...medicalHistory,
-              documents: [
-                { 
-                  document_id: documentData.id,
-                  document_type: documentType,
-                  processed_at: documentData.processed_at
-                }
-              ]
-            },
-            contact_info: {
-              ...patientInfo.contactInfo,
-              employee_id: patientInfo.employeeId,
-              citizenship: patientInfo.citizenship
-            },
-            citizenship: patientInfo.citizenship,
-            age_at_registration: patientInfo.age,
-            id_number_validated: patientInfo.validatedID || false,
-            organization_id: documentData.organization_id,
-            client_organization_id: documentData.client_organization_id
-          }
-        ])
+        .insert({
+          first_name: patientInfo.firstName,
+          last_name: patientInfo.lastName,
+          gender: patientInfo.gender || 'unknown',
+          date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
+          medical_history: {
+            ...medicalHistory,
+            documents: [{
+              document_id: documentData.id,
+              document_type: documentType,
+              processed_at: documentData.processed_at
+            }]
+          },
+          contact_info: patientInfo.contactInfo || null,
+          organization_id: documentData.organization_id,
+          client_organization_id: documentData.client_organization_id
+        })
         .select();
         
-      if (createError) {
-        console.error('Error creating patient record:', createError);
+      if (insertError) {
+        console.error('Error creating patient record:', insertError);
       } else {
-        console.log('New patient created successfully:', newPatient);
+        console.log('New patient record created:', newPatient[0]?.id);
       }
     }
     
@@ -350,30 +330,6 @@ function extractPatientInfoFromCertificate(data: any) {
     }
   }
   
-  // Try to extract information from SA ID if available
-  let dateOfBirth = patientData.date_of_birth || null;
-  let citizenship = null;
-  
-  if (patientData.employee_id && 
-      patientData.employee_id.length === 13 && 
-      /^\d+$/.test(patientData.employee_id)) {
-    
-    const idInfo = extractInfoFromSAID(patientData.employee_id);
-    
-    // Only use extracted date_of_birth if not already available
-    if (!dateOfBirth && idInfo.dateOfBirth) {
-      dateOfBirth = idInfo.dateOfBirth;
-    }
-    
-    // Only use extracted gender if not already available
-    if (!gender && idInfo.gender) {
-      gender = idInfo.gender;
-    }
-    
-    // Set citizenship information
-    citizenship = idInfo.citizenship;
-  }
-  
   // Always default to 'unknown' if gender is still not determined
   if (!gender) {
     gender = 'unknown';
@@ -382,9 +338,8 @@ function extractPatientInfoFromCertificate(data: any) {
   return {
     firstName: names[0] || 'Unknown',
     lastName: names.length > 1 ? names.slice(1).join(' ') : 'Patient',
-    dateOfBirth: dateOfBirth,
+    dateOfBirth: patientData.date_of_birth || null,
     gender: gender,
-    citizenship: citizenship,
     employeeId: patientData.employee_id || patientData.id_number || null,
     contactInfo: {
       email: null,

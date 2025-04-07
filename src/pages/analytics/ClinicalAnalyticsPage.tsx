@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Loader2 } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { ContactInfo, MedicalHistoryData, PatientInfo } from "@/types/patient";
 
 const ClinicalAnalyticsPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
@@ -23,7 +23,7 @@ const ClinicalAnalyticsPage = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return data as PatientInfo[] || [];
+      return data || [];
     },
     enabled: !!organizationId
   });
@@ -60,7 +60,7 @@ const ClinicalAnalyticsPage = () => {
     }));
   }, [patientsData]);
 
-  // Calculate age distribution - now using dedicated age_at_registration column if available
+  // Calculate age distribution
   const ageDistribution = React.useMemo(() => {
     if (!patientsData) return [];
     
@@ -74,25 +74,6 @@ const ClinicalAnalyticsPage = () => {
     };
     
     patientsData.forEach(patient => {
-      // First try to use the age_at_registration column (more accurate for analytics)
-      if (patient.age_at_registration) {
-        const age = patient.age_at_registration;
-        
-        if (age <= 18) {
-          ageGroups['0-18']++;
-        } else if (age <= 30) {
-          ageGroups['19-30']++;
-        } else if (age <= 45) {
-          ageGroups['31-45']++;
-        } else if (age <= 60) {
-          ageGroups['46-60']++;
-        } else {
-          ageGroups['61+']++;
-        }
-        return;
-      }
-
-      // Fallback to calculating from date of birth
       if (!patient.date_of_birth) {
         ageGroups['Unknown']++;
         return;
@@ -121,32 +102,6 @@ const ClinicalAnalyticsPage = () => {
     });
     
     return Object.entries(ageGroups).map(([name, value]) => ({ name, value }));
-  }, [patientsData]);
-
-  // Calculate citizenship distribution - now using dedicated citizenship column
-  const citizenshipDistribution = React.useMemo(() => {
-    if (!patientsData) return [];
-    
-    const counts = patientsData.reduce((acc, patient) => {
-      // First try to use the dedicated citizenship column
-      const citizenship = patient.citizenship || 'unknown';
-      
-      acc[citizenship] = (acc[citizenship] || 0) + 1;
-      return acc;
-    }, {});
-    
-    return Object.entries(counts).map(([name, value]) => {
-      // Format the citizenship name for display
-      let formattedName = name;
-      if (name === 'citizen') formattedName = 'SA Citizen';
-      else if (name === 'permanent_resident') formattedName = 'Permanent Resident';
-      else if (name === 'unknown') formattedName = 'Unknown';
-      
-      return { 
-        name: formattedName, 
-        value 
-      };
-    });
   }, [patientsData]);
 
   // Extract fitness assessment data
@@ -209,80 +164,6 @@ const ClinicalAnalyticsPage = () => {
       .filter(([_, value]) => value > 0)
       .map(([name, value]) => ({ name, value }));
   }, [documentsData]);
-
-  // Gender distribution by fitness status
-  const genderFitnessDistribution = React.useMemo(() => {
-    if (!documentsData || !patientsData) return [];
-    
-    const genderFitness = {
-      male: { fit: 0, restrictions: 0, unfit: 0, total: 0 },
-      female: { fit: 0, restrictions: 0, unfit: 0, total: 0 },
-      other: { fit: 0, restrictions: 0, unfit: 0, total: 0 }
-    };
-
-    // First count total patients by gender
-    patientsData.forEach(patient => {
-      const gender = patient.gender || 'other';
-      if (genderFitness[gender]) {
-        genderFitness[gender].total++;
-      } else {
-        genderFitness['other'].total++;
-      }
-    });
-    
-    // Then analyze documents with fitness data
-    documentsData.forEach(doc => {
-      try {
-        // Get the patient related to this document
-        const patientInfo = patientsData?.find(p => {
-          // Cast medical_history to MedicalHistoryData type to access documents property safely
-          const medicalHistory = p.medical_history as MedicalHistoryData | null;
-          const patientDocs = medicalHistory?.documents || [];
-          return patientDocs.some(d => d.document_id === doc.id);
-        });
-        
-        if (!patientInfo) return;
-        
-        const gender = patientInfo.gender || 'other';
-        const genderCategory = genderFitness[gender] ? gender : 'other';
-        
-        // Safely access extractedData with proper type checking
-        const extractedData = doc.extracted_data;
-        if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
-          return;
-        }
-        
-        const structuredData = extractedData.structured_data;
-        if (!structuredData || typeof structuredData !== 'object' || Array.isArray(structuredData)) {
-          return;
-        }
-        
-        const certification = structuredData.certification;
-        if (!certification || typeof certification !== 'object' || Array.isArray(certification)) {
-          return;
-        }
-        
-        if (certification.fit || certification.fit_for_duty) {
-          genderFitness[genderCategory].fit++;
-        } else if (certification.fit_with_restrictions) {
-          genderFitness[genderCategory].restrictions++;
-        } else if (certification.temporarily_unfit || certification.unfit) {
-          genderFitness[genderCategory].unfit++;
-        }
-      } catch (err) {
-        console.error('Error processing document for gender fitness analysis:', err);
-      }
-    });
-    
-    // Convert to chart format
-    const data = [
-      { name: 'Fit', male: genderFitness.male.fit, female: genderFitness.female.fit, other: genderFitness.other.fit },
-      { name: 'With Restrictions', male: genderFitness.male.restrictions, female: genderFitness.female.restrictions, other: genderFitness.other.restrictions },
-      { name: 'Unfit', male: genderFitness.male.unfit, female: genderFitness.female.unfit, other: genderFitness.other.unfit }
-    ];
-    
-    return data;
-  }, [documentsData, patientsData]);
 
   const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
 
@@ -368,7 +249,7 @@ const ClinicalAnalyticsPage = () => {
         </TabsList>
 
         <TabsContent value="demographics" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Gender Distribution</CardTitle>
@@ -428,118 +309,47 @@ const ClinicalAnalyticsPage = () => {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Citizenship Status</CardTitle>
-                <CardDescription>
-                  Distribution of patients by citizenship status
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={citizenshipDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {citizenshipDistribution.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={
-                            entry.name === 'SA Citizen' ? '#4ade80' : 
-                            entry.name === 'Permanent Resident' ? '#60a5fa' : 
-                            '#d4d4d8'
-                          } 
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="clinical" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Fitness Assessment Results</CardTitle>
-                <CardDescription>
-                  Distribution of fitness assessment outcomes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={fitnessAssessment}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {fitnessAssessment.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={entry.name === 'Fit' ? '#10b981' : 
-                                entry.name === 'Fit with Restrictions' ? '#f59e0b' : 
-                                entry.name === 'Temporarily Unfit' ? '#f97316' : 
-                                entry.name === 'Permanently Unfit' ? '#ef4444' : 
-                                '#71717a'} 
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Fitness Status by Gender</CardTitle>
-                <CardDescription>
-                  Distribution of fitness outcomes across genders
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={genderFitnessDistribution}
-                    margin={{
-                      top: 5,
-                      right: 30,
-                      left: 20,
-                      bottom: 5,
-                    }}
+          <Card>
+            <CardHeader>
+              <CardTitle>Fitness Assessment Results</CardTitle>
+              <CardDescription>
+                Distribution of fitness assessment outcomes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={fitnessAssessment}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="male" name="Male" fill="#60a5fa" />
-                    <Bar dataKey="female" name="Female" fill="#f472b6" />
-                    <Bar dataKey="other" name="Other" fill="#a78bfa" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
+                    {fitnessAssessment.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.name === 'Fit' ? '#10b981' : 
+                              entry.name === 'Fit with Restrictions' ? '#f59e0b' : 
+                              entry.name === 'Temporarily Unfit' ? '#f97316' : 
+                              entry.name === 'Permanently Unfit' ? '#ef4444' : 
+                              '#71717a'} 
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="medical" className="space-y-4">

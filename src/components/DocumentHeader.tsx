@@ -4,24 +4,17 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import OrganizationLogo from './OrganizationLogo';
 
 interface DocumentHeaderProps {
-  title?: string;
-  document?: any; // Added document prop to fix the type error
+  title: string;
   showLogo?: boolean;
   showAddress?: boolean;
 }
 
 const DocumentHeader: React.FC<DocumentHeaderProps> = ({ 
   title, 
-  document, // Added document prop to component
   showLogo = true, 
   showAddress = true 
 }) => {
   const { currentOrganization } = useOrganization();
-  
-  // Get the title from document if available
-  const displayTitle = title || (document?.document_type ? 
-    document.document_type.replace(/-/g, ' ').replace(/_/g, ' ') : 
-    'Document');
   
   // Safely access address from organization settings
   const address = currentOrganization?.address 
@@ -40,7 +33,7 @@ const DocumentHeader: React.FC<DocumentHeaderProps> = ({
         )}
         
         <div className="text-right">
-          <h1 className="text-2xl font-bold mb-2">{displayTitle}</h1>
+          <h1 className="text-2xl font-bold mb-2">{title}</h1>
           <div className="text-sm text-gray-600">
             <div className="font-semibold">{currentOrganization?.name}</div>
             {currentOrganization?.contact_email && (

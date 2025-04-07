@@ -480,8 +480,6 @@ export type Database = {
       }
       patients: {
         Row: {
-          age_at_registration: number | null
-          citizenship: string | null
           client_organization_id: string | null
           contact_info: Json | null
           created_at: string
@@ -489,15 +487,12 @@ export type Database = {
           first_name: string
           gender: string | null
           id: string
-          id_number_validated: boolean | null
           last_name: string
           medical_history: Json | null
           organization_id: string | null
           updated_at: string
         }
         Insert: {
-          age_at_registration?: number | null
-          citizenship?: string | null
           client_organization_id?: string | null
           contact_info?: Json | null
           created_at?: string
@@ -505,15 +500,12 @@ export type Database = {
           first_name: string
           gender?: string | null
           id?: string
-          id_number_validated?: boolean | null
           last_name: string
           medical_history?: Json | null
           organization_id?: string | null
           updated_at?: string
         }
         Update: {
-          age_at_registration?: number | null
-          citizenship?: string | null
           client_organization_id?: string | null
           contact_info?: Json | null
           created_at?: string
@@ -521,7 +513,6 @@ export type Database = {
           first_name?: string
           gender?: string | null
           id?: string
-          id_number_validated?: boolean | null
           last_name?: string
           medical_history?: Json | null
           organization_id?: string | null

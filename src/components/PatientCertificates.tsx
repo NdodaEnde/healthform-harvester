@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { FileText, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import CertificateDemographicDisplay from './CertificateDemographicDisplay';
-import { parseCertificateData } from '@/types/patient';
 
 interface PatientCertificatesProps {
   patientId: string;
@@ -59,9 +57,9 @@ interface Document {
 
 type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
+// Function to determine the fitness status color
 const getFitnessStatusColor = (document: Document) => {
-  const certificateData = parseCertificateData(document.extracted_data);
-  const certification = certificateData.structured_data?.certification;
+  const certification = document.extracted_data?.structured_data?.certification;
   
   if (certification?.fit) return "success";
   if (certification?.fit_with_restrictions) return "warning";
@@ -70,23 +68,27 @@ const getFitnessStatusColor = (document: Document) => {
   return "secondary";
 };
 
+// Function to format fitness status text
 const getFitnessStatusText = (document: Document) => {
-  const certificateData = parseCertificateData(document.extracted_data);
-  const certification = certificateData.structured_data?.certification;
-  const results = certificateData.structured_data?.examination_results;
+  const certification = document.extracted_data?.structured_data?.certification;
+  const results = document.extracted_data?.structured_data?.examination_results;
   
   if (certification?.fit) return "Fit";
   if (certification?.fit_with_restrictions) return "Fit with Restrictions";
   if (certification?.temporarily_unfit) return "Temporarily Unfit";
   if (certification?.unfit) return "Unfit";
   
+  // Fallback to examination_results if available
   return results?.fitness_status || "Unknown";
 };
 
+// Helper function to get document review status from localStorage
 const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
   return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
 };
 
+// Helper function to get examination date based on valid_until date
+// Assuming examination date is typically one year before expiry date
 export const getExaminationDate = (validUntil: string | undefined): string | null => {
   if (!validUntil) return null;
   
@@ -94,8 +96,9 @@ export const getExaminationDate = (validUntil: string | undefined): string | nul
     const expiryDate = new Date(validUntil);
     if (isNaN(expiryDate.getTime())) return null;
     
+    // Get date one year before expiry
     const examDate = new Date(expiryDate);
-    examDate.setFullYear(expiryDate.getFullYear() - 1);
+    examDate.setFullYear(examDate.getFullYear() - 1);
     return examDate.toISOString().split('T')[0];
   } catch (e) {
     console.error('Error calculating examination date:', e);
@@ -106,6 +109,7 @@ export const getExaminationDate = (validUntil: string | undefined): string | nul
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const navigate = useNavigate();
 
+  // Query to fetch patient details to assist with matching
   const { data: patient } = useQuery({
     queryKey: ['patient-details', patientId],
     queryFn: async () => {
@@ -121,12 +125,14 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId,
   });
 
+  // Query certificates related to this patient with enhanced matching, showing all certificates
   const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
     queryFn: async () => {
       console.log('Fetching certificates for patient:', patientId);
       console.log('Patient name:', patient?.first_name, patient?.last_name);
       
+      // Get all processed documents of certificate types
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -140,25 +146,31 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         throw error;
       }
       
+      console.log('Raw processed documents fetched:', data?.length);
+      
+      // Enhanced multi-strategy matching without validation filter
       const filteredDocs = (data || []).filter(doc => {
-        const certificateData = parseCertificateData(doc.extracted_data);
+        const extractedData = doc.extracted_data as ExtractedData | null;
         
-        if (certificateData.patient_info?.id === patientId) {
+        // Strategy 1: Direct patient ID match in patient_info
+        if (extractedData?.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
           return true;
         }
         
+        // Strategy 2: Patient name match in structured data
         const patientName = patient ? 
           `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
         
-        const patientNameInData = certificateData.structured_data?.patient?.name?.toLowerCase() || 
-                              certificateData.patient_info?.name?.toLowerCase() || '';
+        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
+                                extractedData?.patient_info?.name?.toLowerCase() || '';
         
         if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
           console.log('Match by patient name in data:', doc.id);
           return true;
         }
         
+        // Strategy 3: Patient name in filename (simplified)
         const fileName = doc.file_name.toLowerCase();
         
         if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
@@ -171,6 +183,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           return true;
         }
         
+        // Strategy 4: Patient ID in filename
         if (fileName.includes(patientId.toLowerCase())) {
           console.log('Match by patient ID in filename:', doc.id);
           return true;
@@ -180,24 +193,17 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         return false;
       });
       
+      // Add review status from localStorage to each document
       const docsWithReviewStatus = filteredDocs.map(doc => {
-        // Process certificate dates if needed
-        const certificateData = parseCertificateData(doc.extracted_data);
-        if (certificateData.structured_data?.certification?.valid_until && 
-            !certificateData.structured_data?.certification?.examination_date && 
-            !certificateData.structured_data?.examination_results?.date) {
+        // Add calculated examination date if missing but has valid_until
+        const extractedData = doc.extracted_data as ExtractedData | null;
+        if (extractedData?.structured_data?.certification?.valid_until && 
+            !extractedData?.structured_data?.certification?.examination_date && 
+            !extractedData?.structured_data?.examination_results?.date) {
           
-          const examDate = getExaminationDate(certificateData.structured_data.certification.valid_until);
-          if (examDate && doc.extracted_data && typeof doc.extracted_data === 'object') {
-            // Create a properly structured update that won't cause typing issues
-            const extractedDataObj = doc.extracted_data as any;
-            if (!extractedDataObj.structured_data) {
-              extractedDataObj.structured_data = {};
-            }
-            if (!extractedDataObj.structured_data.certification) {
-              extractedDataObj.structured_data.certification = {};
-            }
-            extractedDataObj.structured_data.certification.examination_date = examDate;
+          const examDate = getExaminationDate(extractedData.structured_data.certification.valid_until);
+          if (examDate && extractedData.structured_data.certification) {
+            extractedData.structured_data.certification.examination_date = examDate;
           }
         }
         
@@ -217,6 +223,10 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     navigate(`/documents/${documentId}`);
   };
 
+  // Filter for only reviewed certificates if needed
+  // Uncomment this to show only reviewed certificates
+  // const reviewedCertificates = certificates?.filter(cert => cert.reviewStatus === 'reviewed') || [];
+
   return (
     <Card>
       <CardHeader>
@@ -233,57 +243,47 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           </div>
         ) : certificates && certificates.length > 0 ? (
           <div className="space-y-4">
-            {certificates.map(cert => {
-              const certificateData = parseCertificateData(cert.extracted_data);
-              
-              return (
-                <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div className="w-full">
-                      <h3 className="font-medium">{cert.file_name}</h3>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="outline">
-                          {cert.processed_at 
-                            ? format(new Date(cert.processed_at), 'PP') 
-                            : format(new Date(cert.created_at), 'PP')}
-                        </Badge>
-                        
-                        <Badge variant={getFitnessStatusColor(cert)}>
-                          {getFitnessStatusText(cert)}
-                        </Badge>
-                        
-                        {certificateData.structured_data?.certification?.valid_until && (
-                          <Badge variant="secondary">
-                            Valid until: {certificateData.structured_data.certification.valid_until}
-                          </Badge>
-                        )}
-                        
-                        {cert.reviewStatus === 'reviewed' ? (
-                          <Badge variant="success">Reviewed</Badge>
-                        ) : cert.reviewStatus === 'needs-correction' ? (
-                          <Badge variant="destructive">Needs Correction</Badge>
-                        ) : (
-                          <Badge variant="outline">Not Reviewed</Badge>
-                        )}
-                      </div>
+            {certificates.map(cert => (
+              <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div>
+                    <h3 className="font-medium">{cert.file_name}</h3>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Badge variant="outline">
+                        {cert.processed_at 
+                          ? format(new Date(cert.processed_at), 'PP') 
+                          : format(new Date(cert.created_at), 'PP')}
+                      </Badge>
                       
-                      <div className="mt-4">
-                        <CertificateDemographicDisplay 
-                          certificateData={cert.extracted_data}
-                        />
-                      </div>
+                      <Badge variant={getFitnessStatusColor(cert)}>
+                        {getFitnessStatusText(cert)}
+                      </Badge>
+                      
+                      {cert.extracted_data?.structured_data?.certification?.valid_until && (
+                        <Badge variant="secondary">
+                          Valid until: {cert.extracted_data.structured_data.certification.valid_until}
+                        </Badge>
+                      )}
+                      
+                      {cert.reviewStatus === 'reviewed' ? (
+                        <Badge variant="success">Reviewed</Badge>
+                      ) : cert.reviewStatus === 'needs-correction' ? (
+                        <Badge variant="destructive">Needs Correction</Badge>
+                      ) : (
+                        <Badge variant="outline">Not Reviewed</Badge>
+                      )}
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleViewCertificate(cert.id)}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Certificate
-                    </Button>
                   </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleViewCertificate(cert.id)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Certificate
+                  </Button>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-8 border rounded-lg bg-muted/30">
