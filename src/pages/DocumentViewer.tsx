@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -63,13 +62,15 @@ const DocumentViewer = () => {
     },
     enabled: !!documentId,
     retry: 1,
-    onError: (err) => {
-      console.error('Query error:', err);
-      toast({
-        title: 'Error',
-        description: `Failed to load document: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        variant: 'destructive'
-      });
+    meta: {
+      onError: (err: Error) => {
+        console.error('Query error:', err);
+        toast({
+          title: 'Error',
+          description: `Failed to load document: ${err.message || 'Unknown error'}`,
+          variant: 'destructive'
+        });
+      }
     }
   });
 
