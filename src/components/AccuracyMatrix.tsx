@@ -25,7 +25,7 @@ import {
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Json } from "@/integrations/supabase/types";
-import { format, subMonths } from "date-fns";
+import { format, subMonths, parse } from "date-fns";
 
 interface AccuracyData {
   documentType: string;
@@ -184,8 +184,8 @@ export const AccuracyMatrix = () => {
           documentCount: data.documents
         }))
         .sort((a, b) => {
-          const dateA = new Date(a.month);
-          const dateB = new Date(b.month);
+          const dateA = parse(a.month, 'MMM yyyy', new Date());
+          const dateB = parse(b.month, 'MMM yyyy', new Date());
           return dateA.getTime() - dateB.getTime();
         });
       
