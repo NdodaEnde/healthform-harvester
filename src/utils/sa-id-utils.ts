@@ -164,7 +164,13 @@ export function extractInfoFromSAID(idNumber: string): {
   const citizenship = extractCitizenshipFromSAID(idNumber);
   const isValid = validateSAID(idNumber);
   
-  const result = {
+  const result: {
+    dateOfBirth: Date | null;
+    gender: 'male' | 'female' | null;
+    citizenship: 'citizen' | 'permanent_resident' | null;
+    isValid: boolean;
+    age?: number;
+  } = {
     dateOfBirth,
     gender,
     citizenship,
