@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, ChevronRight, FileText, User, BadgeCheck, Flag } from 'lucide-react';
+import { Calendar, ChevronRight, User, BadgeCheck, Flag } from 'lucide-react';
 import { PatientInfo } from '@/types/patient';
 
 interface PatientCardProps {

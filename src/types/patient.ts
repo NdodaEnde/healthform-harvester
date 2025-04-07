@@ -101,48 +101,71 @@ export interface PatientInfo {
   id_number_validated?: boolean | null;
 }
 
-export interface CertificateData {
-  structured_data?: {
-    validation?: {
-      date?: string;
-    };
-    certification?: {
-      valid_until?: string;
-      issue_date?: string;
-      examination_date?: string;
-      fit?: boolean;
-      fit_with_restrictions?: boolean;
-      temporarily_unfit?: boolean;
-      unfit?: boolean;
-      comments?: string;
+// Define more specific types for certificate data
+export interface CertificateStructuredData {
+  validation?: {
+    date?: string;
+  };
+  certification?: {
+    valid_until?: string;
+    issue_date?: string;
+    examination_date?: string;
+    fit?: boolean;
+    fit_with_restrictions?: boolean;
+    temporarily_unfit?: boolean;
+    unfit?: boolean;
+    comments?: string;
+    [key: string]: any;
+  };
+  patient?: {
+    name?: string;
+    gender?: string;
+    employee_id?: string;
+    citizenship?: string;
+    company?: string;
+    occupation?: string;
+    [key: string]: any;
+  };
+  examination_results?: {
+    fitness_status?: string;
+    date?: string;
+    test_results?: {
       [key: string]: any;
-    };
-    patient?: {
-      name?: string;
-      gender?: string;
-      employee_id?: string;
-      citizenship?: string;
-      company?: string;
-      occupation?: string;
-      [key: string]: any;
-    };
-    examination_results?: {
-      fitness_status?: string;
-      date?: string;
-      test_results?: {
-        [key: string]: any;
-      };
-      [key: string]: any;
-    };
-    restrictions?: {
-      [key: string]: boolean;
     };
     [key: string]: any;
   };
+  restrictions?: {
+    [key: string]: boolean;
+  };
+  [key: string]: any;
+}
+
+export interface CertificateData {
+  structured_data?: CertificateStructuredData;
   patient_info?: {
     id?: string;
     name?: string;
     [key: string]: any;
   };
   [key: string]: any;
+}
+
+/**
+ * Helper function to safely parse Json data
+ * @param jsonData - Raw Json data from Supabase
+ * @returns Properly typed CertificateData
+ */
+export function parseCertificateData(jsonData: Json | null): CertificateData {
+  if (!jsonData) return {};
+  
+  if (typeof jsonData === 'string') {
+    try {
+      return JSON.parse(jsonData) as CertificateData;
+    } catch (e) {
+      console.error('Failed to parse JSON string:', e);
+      return {};
+    }
+  }
+  
+  return jsonData as unknown as CertificateData;
 }
