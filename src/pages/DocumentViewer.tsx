@@ -1274,9 +1274,9 @@ const DocumentViewer = () => {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
           <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => navigate("/dashboard")}>
+          <Button onClick={() => navigate("/documents")}>
             <ChevronLeft className="h-4 w-4" />
-            Back to Dashboard
+            Back to Documents
           </Button>
         </div>
       </div>
@@ -1290,7 +1290,7 @@ const DocumentViewer = () => {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/documents")}
           >
             <ChevronLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
@@ -1474,10 +1474,10 @@ const DocumentViewer = () => {
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => navigate("/documents")}
                 >
                   <ChevronLeft className="h-4 w-4 mr-2" />
-                  Back to Dashboard
+                  Back to Documents
                 </Button>
                 {document.status === 'processed' && !isEditing && (
                   <Button
