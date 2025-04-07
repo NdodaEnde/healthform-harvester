@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,14 +124,22 @@ const ClinicalAnalyticsPage = () => {
           return;
         }
         
-        const structuredData = extractedData.structured_data;
-        if (!structuredData || typeof structuredData !== 'object') {
+        // Check if extracted_data is an array
+        if (Array.isArray(extractedData)) {
           fitnessCounts['Unknown']++;
           return;
         }
         
+        // Now we know extractedData is an object type
+        const structuredData = extractedData.structured_data;
+        if (!structuredData || typeof structuredData !== 'object' || Array.isArray(structuredData)) {
+          fitnessCounts['Unknown']++;
+          return;
+        }
+        
+        // Check if certification exists and is an object
         const certification = structuredData.certification;
-        if (!certification || typeof certification !== 'object') {
+        if (!certification || typeof certification !== 'object' || Array.isArray(certification)) {
           fitnessCounts['Unknown']++;
           return;
         }

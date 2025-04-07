@@ -66,16 +66,22 @@ export default function StatsSummaryCards({
           return;
         }
         
-        // Check if structured_data exists and is an object
+        // Check if extracted_data is an array
+        if (Array.isArray(extractedData)) {
+          statuses['Unknown']++;
+          return;
+        }
+        
+        // Now we know extractedData is an object type
         const structuredData = extractedData.structured_data;
-        if (!structuredData || typeof structuredData !== 'object') {
+        if (!structuredData || typeof structuredData !== 'object' || Array.isArray(structuredData)) {
           statuses['Unknown']++;
           return;
         }
         
         // Check if certification exists and is an object
         const certification = structuredData.certification;
-        if (!certification || typeof certification !== 'object') {
+        if (!certification || typeof certification !== 'object' || Array.isArray(certification)) {
           statuses['Unknown']++;
           return;
         }

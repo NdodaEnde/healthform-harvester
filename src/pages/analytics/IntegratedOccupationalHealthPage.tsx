@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -67,14 +68,22 @@ const IntegratedOccupationalHealthPage = () => {
           return;
         }
         
-        const structuredData = extractedData.structured_data;
-        if (!structuredData || typeof structuredData !== 'object') {
+        // Check if extracted_data is an array
+        if (Array.isArray(extractedData)) {
           statuses['Unknown']++;
           return;
         }
         
+        // Now we know extractedData is an object type
+        const structuredData = extractedData.structured_data;
+        if (!structuredData || typeof structuredData !== 'object' || Array.isArray(structuredData)) {
+          statuses['Unknown']++;
+          return;
+        }
+        
+        // Check if certification exists and is an object
         const certification = structuredData.certification;
-        if (!certification || typeof certification !== 'object') {
+        if (!certification || typeof certification !== 'object' || Array.isArray(certification)) {
           statuses['Unknown']++;
           return;
         }
