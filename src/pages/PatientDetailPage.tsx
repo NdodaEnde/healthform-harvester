@@ -12,6 +12,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import PatientCertificates, { getExaminationDate } from '@/components/PatientCertificates';
 import PatientVisits from '@/components/PatientVisits';
+import PatientSAIDInfo from '@/components/PatientSAIDInfo';
 import { Separator } from '@/components/ui/separator';
 
 const PatientDetailPage = () => {
@@ -320,6 +321,9 @@ const PatientDetailPage = () => {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6 mt-6">
+          {/* South African ID info card - will only display if ID number exists */}
+          <PatientSAIDInfo patient={patient} />
+          
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>

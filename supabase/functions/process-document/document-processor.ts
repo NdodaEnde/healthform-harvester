@@ -1,6 +1,7 @@
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
+import { parseSouthAfricanIDNumber, normalizeIDNumber } from "./sa-id-parser.ts";
 
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
@@ -173,6 +174,19 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       console.log('Setting default gender to "unknown"');
     }
     
+    // Process South African ID number if available
+    const idNumber = patientInfo.employeeId || null;
+    let idNumberData = null;
+    
+    if (idNumber) {
+      const normalizedID = normalizeIDNumber(idNumber);
+      if (normalizedID) {
+        console.log('Found potential South African ID number:', normalizedID);
+        idNumberData = parseSouthAfricanIDNumber(normalizedID);
+        console.log('Parsed ID number data:', idNumberData);
+      }
+    }
+    
     // Check if patient already exists with the same name and organization
     const { data: existingPatients, error: searchError } = await supabase
       .from('patients')
@@ -196,29 +210,59 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
     if (existingPatients && existingPatients.length > 0) {
       console.log('Updating existing patient record:', existingPatients[0].id);
       
+      // Prepare update data
+      const updateData: any = {
+        gender: patientInfo.gender || existingPatients[0].gender || 'unknown',
+        date_of_birth: patientInfo.dateOfBirth || existingPatients[0].date_of_birth || new Date().toISOString().split('T')[0],
+        medical_history: {
+          ...existingPatients[0].medical_history,
+          ...medicalHistory,
+          documents: [
+            ...(existingPatients[0].medical_history?.documents || []),
+            { 
+              document_id: documentData.id,
+              document_type: documentType,
+              processed_at: documentData.processed_at
+            }
+          ]
+        },
+        contact_info: patientInfo.contactInfo || existingPatients[0].contact_info,
+        organization_id: documentData.organization_id,
+        client_organization_id: documentData.client_organization_id,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add ID number data if available
+      if (idNumberData && idNumberData.isValid) {
+        updateData.id_number = idNumberData.original;
+        updateData.birthdate_from_id = idNumberData.birthdate;
+        updateData.gender_from_id = idNumberData.gender;
+        updateData.citizenship_status = idNumberData.citizenshipStatus;
+        updateData.id_number_valid = true;
+        
+        // Update date of birth and gender from ID number if applicable
+        if (idNumberData.birthdate && (!patientInfo.dateOfBirth || patientInfo.dateOfBirth === '')) {
+          updateData.date_of_birth = idNumberData.birthdate;
+          console.log('Using birthdate from ID number:', idNumberData.birthdate);
+        }
+        
+        if (idNumberData.gender && (patientInfo.gender === 'unknown' || patientInfo.gender === '')) {
+          updateData.gender = idNumberData.gender;
+          console.log('Using gender from ID number:', idNumberData.gender);
+        }
+      } else if (idNumber) {
+        // Store the ID even if invalid, but mark it as invalid
+        const normalizedID = normalizeIDNumber(idNumber);
+        if (normalizedID) {
+          updateData.id_number = normalizedID;
+          updateData.id_number_valid = false;
+        }
+      }
+      
       // Update existing patient record
       const { error: updateError } = await supabase
         .from('patients')
-        .update({
-          gender: patientInfo.gender || existingPatients[0].gender || 'unknown',
-          date_of_birth: patientInfo.dateOfBirth || existingPatients[0].date_of_birth || new Date().toISOString().split('T')[0],
-          medical_history: {
-            ...existingPatients[0].medical_history,
-            ...medicalHistory,
-            documents: [
-              ...(existingPatients[0].medical_history?.documents || []),
-              { 
-                document_id: documentData.id,
-                document_type: documentType,
-                processed_at: documentData.processed_at
-              }
-            ]
-          },
-          contact_info: patientInfo.contactInfo || existingPatients[0].contact_info,
-          organization_id: documentData.organization_id,
-          client_organization_id: documentData.client_organization_id,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', existingPatients[0].id);
         
       if (updateError) {
@@ -229,26 +273,56 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
     } else {
       console.log('Creating new patient record');
       
+      // Prepare insert data
+      const insertData: any = {
+        first_name: patientInfo.firstName,
+        last_name: patientInfo.lastName,
+        gender: patientInfo.gender || 'unknown',
+        date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
+        medical_history: {
+          ...medicalHistory,
+          documents: [{
+            document_id: documentData.id,
+            document_type: documentType,
+            processed_at: documentData.processed_at
+          }]
+        },
+        contact_info: patientInfo.contactInfo || null,
+        organization_id: documentData.organization_id,
+        client_organization_id: documentData.client_organization_id
+      };
+      
+      // Add ID number data if available
+      if (idNumberData && idNumberData.isValid) {
+        insertData.id_number = idNumberData.original;
+        insertData.birthdate_from_id = idNumberData.birthdate;
+        insertData.gender_from_id = idNumberData.gender;
+        insertData.citizenship_status = idNumberData.citizenshipStatus;
+        insertData.id_number_valid = true;
+        
+        // Use date of birth and gender from ID number if applicable
+        if (idNumberData.birthdate && (!patientInfo.dateOfBirth || patientInfo.dateOfBirth === '')) {
+          insertData.date_of_birth = idNumberData.birthdate;
+          console.log('Using birthdate from ID number:', idNumberData.birthdate);
+        }
+        
+        if (idNumberData.gender && (patientInfo.gender === 'unknown' || patientInfo.gender === '')) {
+          insertData.gender = idNumberData.gender;
+          console.log('Using gender from ID number:', idNumberData.gender);
+        }
+      } else if (idNumber) {
+        // Store the ID even if invalid, but mark it as invalid
+        const normalizedID = normalizeIDNumber(idNumber);
+        if (normalizedID) {
+          insertData.id_number = normalizedID;
+          insertData.id_number_valid = false;
+        }
+      }
+      
       // Create new patient record
       const { data: newPatient, error: insertError } = await supabase
         .from('patients')
-        .insert({
-          first_name: patientInfo.firstName,
-          last_name: patientInfo.lastName,
-          gender: patientInfo.gender || 'unknown',
-          date_of_birth: patientInfo.dateOfBirth || new Date().toISOString().split('T')[0],
-          medical_history: {
-            ...medicalHistory,
-            documents: [{
-              document_id: documentData.id,
-              document_type: documentType,
-              processed_at: documentData.processed_at
-            }]
-          },
-          contact_info: patientInfo.contactInfo || null,
-          organization_id: documentData.organization_id,
-          client_organization_id: documentData.client_organization_id
-        })
+        .insert(insertData)
         .select();
         
       if (insertError) {

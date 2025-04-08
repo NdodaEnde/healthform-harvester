@@ -95,6 +95,12 @@ export interface PatientInfo {
   client_organization_id?: string | null;
   created_at: string;
   updated_at: string;
+  // South African ID number fields
+  id_number?: string;
+  birthdate_from_id?: string;
+  gender_from_id?: 'male' | 'female' | null;
+  citizenship_status?: 'citizen' | 'permanent_resident' | null;
+  id_number_valid?: boolean;
 }
 
 export interface CertificateData {

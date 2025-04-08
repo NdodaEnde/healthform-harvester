@@ -148,13 +148,42 @@ function extractPatientInfoFromMarkdown(markdown: string, structuredData: any) {
     console.log('Extracted name:', structuredData.patient.name);
   }
   
-  // ID extraction
-  const idMatch = markdown.match(/\*\*ID No[.:]\*\*\s*(.*?)(?=\n|\r|$|\*\*)/i) || 
-                 markdown.match(/\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i) ||
-                 markdown.match(/ID No[.:]\s*(.*?)(?=\n|\r|$|\*\*)/i);
-  if (idMatch && idMatch[1]) {
-    structuredData.patient.employee_id = cleanValue(idMatch[1].trim());
-    console.log('Extracted ID:', structuredData.patient.employee_id);
+  // ID extraction - enhanced to handle more formats including South African ID numbers
+  const idPatterns = [
+    // Common patterns in medical forms
+    /\*\*ID No[.:]\*\*\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /ID No[.:]\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    // South African specific patterns
+    /\*\*ID Number\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*South African ID\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    /\*\*Identity Number\*\*:\s*(.*?)(?=\n|\r|$|\*\*)/i,
+    // More general patterns
+    /\bID\s*(?:Number|No|#)?\s*[:.]\s*(\d[\d\s-]*\d)/i,
+    /\bIdentity\s*(?:Number|No|#)?\s*[:.]\s*(\d[\d\s-]*\d)/i,
+    // Look for 13-digit numbers that might be SA ID numbers
+    /\b(\d{6}[-\s]?\d{4}[-\s]?\d{3})\b/
+  ];
+  
+  let foundId = false;
+  for (const pattern of idPatterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      structuredData.patient.employee_id = cleanValue(match[1].trim());
+      console.log('Extracted ID:', structuredData.patient.employee_id);
+      foundId = true;
+      break;
+    }
+  }
+  
+  // If we still don't have an ID, try a more aggressive approach
+  // looking for ID number-like patterns in the text
+  if (!foundId) {
+    const aggressiveIdMatch = markdown.match(/\b(\d{13})\b/);
+    if (aggressiveIdMatch && aggressiveIdMatch[1]) {
+      structuredData.patient.employee_id = aggressiveIdMatch[1];
+      console.log('Extracted potential SA ID with aggressive pattern:', structuredData.patient.employee_id);
+    }
   }
   
   // Company extraction
