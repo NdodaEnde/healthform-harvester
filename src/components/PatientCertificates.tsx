@@ -274,13 +274,15 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleViewCertificate(cert.id)}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Certificate
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleViewCertificate(cert.id)}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Certificate
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

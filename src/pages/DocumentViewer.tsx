@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check, Pencil, Save, X
+  Check, Pencil, Save, X, Mail, FileDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,11 +15,18 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
+import EnhancedCertificateGenerator from "@/components/certificates/EnhancedCertificateGenerator";
 import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/components/ui/tabs";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -981,7 +988,29 @@ const DocumentViewer = () => {
       console.log("Passing to CertificateTemplate:", extractedData);
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
+          <Tabs defaultValue="view" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="view">View Certificate</TabsTrigger>
+              <TabsTrigger value="download">Download & Print Options</TabsTrigger>
+            </TabsList>
+            <TabsContent value="view" className="pt-4">
+              <CertificateTemplate extractedData={extractedData} />
+            </TabsContent>
+            <TabsContent value="download" className="pt-4">
+              <Card className="border-0 shadow-none">
+                <CardContent className="pt-4">
+                  <div className="flex items-center mb-4">
+                    <FileDown className="mr-2 h-5 w-5 text-blue-500" />
+                    <h3 className="text-lg font-medium">Download, Print or Email Certificate</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Use the options below to download, print or email this certificate.
+                  </p>
+                  <EnhancedCertificateGenerator extractedData={extractedData} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       );
     }
