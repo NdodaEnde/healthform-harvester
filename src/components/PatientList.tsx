@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,12 @@ import {
   LayoutGrid, 
   List as ListIcon,
   Calendar,
-  Download 
+  Download,
+  CheckCircle,
+  AlertTriangle,
+  Clock,
+  Activity,
+  ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -32,10 +37,9 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format as formatDate, subDays } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
-import { Json } from '@/integrations/supabase/types';
 import {
   Pagination,
   PaginationContent,
@@ -45,6 +49,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +68,12 @@ const PatientList = () => {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(9);
+  const [dateFilter, setDateFilter] = useState<{
+    label: string;
+    startDate: Date | null;
+    endDate: Date | null;
+  }>({ label: "All time", startDate: null, endDate: null });
+  const [calendarDate, setCalendarDate] = useState<Date | null>(null);
   const navigate = useNavigate();
   const { 
     currentOrganization, 
@@ -59,34 +81,32 @@ const PatientList = () => {
     getEffectiveOrganizationId 
   } = useOrganization();
   
-  // Get the effective organization ID (client or current org)
   const organizationId = getEffectiveOrganizationId();
   
-  // Query patients with organization context
   const { data: patientsData, isLoading, error, refetch } = useQuery({
-    queryKey: ['patients', organizationId, searchTerm, filterGender],
+    queryKey: ['patients', organizationId, searchTerm, filterGender, dateFilter],
     queryFn: async () => {
       let query = supabase
         .from('patients')
         .select('*');
       
-      // Apply organization filtering
       if (currentClient) {
-        // If viewing as a service provider with a client selected
         query = query.eq('client_organization_id', currentClient.id);
       } else if (organizationId) {
-        // If viewing own organization
         query = query.eq('organization_id', organizationId);
       }
       
-      // Apply search term filter
       if (searchTerm) {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
       
-      // Apply gender filter (only if not "all")
       if (filterGender && filterGender !== "all") {
         query = query.eq('gender', filterGender);
+      }
+      
+      if (dateFilter.startDate && dateFilter.endDate) {
+        query = query.gte('created_at', dateFilter.startDate.toISOString())
+                    .lte('created_at', dateFilter.endDate.toISOString());
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -95,7 +115,12 @@ const PatientList = () => {
         throw new Error(`Error fetching patients: ${error.message}`);
       }
       
-      console.log('Patients fetched:', data?.length, 'Query params:', { organizationId, searchTerm, filterGender });
+      console.log('Patients fetched:', data?.length, 'Query params:', { 
+        organizationId, 
+        searchTerm, 
+        filterGender,
+        dateFilter: dateFilter.label
+      });
       
       if (!data || data.length === 0) {
         console.log('No patients found for this organization. Organization ID:', organizationId);
@@ -112,9 +137,21 @@ const PatientList = () => {
     enabled: !!organizationId,
   });
 
-  // Convert raw database patients to PatientInfo type
+  const { data: documentsData } = useQuery({
+    queryKey: ['documents-status', organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('organization_id', organizationId);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organizationId
+  });
+
   const patients: PatientInfo[] = patientsData?.map(p => {
-    // Handle contact_info conversion from Json to ContactInfo
     let contactInfo: ContactInfo | null = null;
     if (p.contact_info) {
       if (typeof p.contact_info === 'string') {
@@ -128,7 +165,6 @@ const PatientList = () => {
       }
     }
 
-    // Handle medical_history conversion
     let medicalHistory: MedicalHistoryData | null = null;
     if (p.medical_history) {
       if (typeof p.medical_history === 'string') {
@@ -157,6 +193,43 @@ const PatientList = () => {
     };
   }) || [];
 
+  const datePresets = [
+    { label: "All time", days: null },
+    { label: "Last 7 days", days: 7 },
+    { label: "Last 30 days", days: 30 },
+    { label: "Last 90 days", days: 90 },
+    { label: "Custom range", days: "custom" as const }
+  ];
+
+  const handleDateFilterChange = (preset: { label: string, days: number | null | 'custom' }) => {
+    if (preset.days === null) {
+      setDateFilter({ label: preset.label, startDate: null, endDate: null });
+    } else if (preset.days === 'custom') {
+      return;
+    } else {
+      const endDate = new Date();
+      const startDate = subDays(endDate, preset.days);
+      setDateFilter({ label: preset.label, startDate, endDate });
+    }
+  };
+
+  const handleSetCustomDate = (date: Date | null) => {
+    if (!date) return;
+    
+    setCalendarDate(date);
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    setDateFilter({ 
+      label: `${formatDate(date, 'PP')}`, 
+      startDate: startOfDay, 
+      endDate: endOfDay 
+    });
+  };
+
   const handleAddPatient = () => {
     navigate('/patients/new');
   };
@@ -167,6 +240,80 @@ const PatientList = () => {
       description: "The patients list is being updated."
     });
     refetch();
+  };
+
+  const exportPatients = (format: 'csv' | 'excel' | 'pdf') => {
+    if (format === 'csv') {
+      try {
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        const headers = [
+          "ID", "First Name", "Last Name", "Gender", "Date of Birth", 
+          "Age", "Email", "Phone", "Status", "Created"
+        ];
+        csvContent += headers.join(",") + "\n";
+        
+        patients.forEach(patient => {
+          const age = calculateAge(patient.date_of_birth);
+          const email = patient.contact_info?.email || '';
+          const phone = patient.contact_info?.phone || '';
+          
+          let status = "Unknown";
+          if (patient.medical_history?.assessment?.fitness_conclusion) {
+            const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
+            
+            if (conclusion.includes("fit") || conclusion.includes("suitable")) {
+              status = "Fit";
+            } else if (conclusion.includes("unfit") || conclusion.includes("not suitable")) {
+              status = "Unfit";
+            } else if (conclusion.includes("temporarily") || conclusion.includes("conditional")) {
+              status = "Conditional";
+            }
+          }
+          
+          const row = [
+            patient.id,
+            patient.first_name,
+            patient.last_name,
+            patient.gender || "Unknown",
+            patient.date_of_birth,
+            age.toString(),
+            `"${email}"`,
+            `"${phone}"`,
+            status,
+            formatDate(new Date(patient.created_at), 'yyyy-MM-dd')
+          ];
+          
+          csvContent += row.join(",") + "\n";
+        });
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `patients_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`);
+        document.body.appendChild(link);
+        
+        link.click();
+        document.body.removeChild(link);
+        
+        toast({
+          title: "Export Successful",
+          description: `${patients.length} patients exported as CSV.`,
+        });
+      } catch (err) {
+        console.error("Export error:", err);
+        toast({
+          title: "Export Failed",
+          description: "There was an error exporting the patients data.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      toast({
+        title: `${format.toUpperCase()}`,
+        description: `${format.toUpperCase()} export is not implemented yet.`,
+      });
+    }
   };
 
   const calculateAge = (dateOfBirth: string) => {
@@ -186,7 +333,6 @@ const PatientList = () => {
     let status = "Unknown";
     let variant: "default" | "secondary" | "outline" | "destructive" | "success" = "secondary";
 
-    // Try to determine status from medical_history if available
     if (patient.medical_history?.assessment?.fitness_conclusion) {
       const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
       
@@ -217,7 +363,6 @@ const PatientList = () => {
     );
   };
 
-  // Pagination logic
   const totalPages = Math.ceil(patients.length / pageSize);
   const paginatedPatients = patients.slice(
     (currentPage - 1) * pageSize,
@@ -230,29 +375,98 @@ const PatientList = () => {
     }
   };
 
-  // Calculate statistics for age groups
-  const patientAgeGroups = {
-    child: { count: 0, title: 'Child', description: '' },
-    teen: { count: 0, title: 'Teen', description: '' },
-    adult: { count: 0, title: 'Adult', description: '' },
-    older: { count: 0, title: 'Older', description: '' }
-  };
+  const calculateCorporateHealthMetrics = () => {
+    const metrics = {
+      certificateStatus: {
+        fit: { count: 0, title: 'Fit for Work', description: 'No restrictions' },
+        conditional: { count: 0, title: 'Conditional', description: 'With restrictions' },
+        unfit: { count: 0, title: 'Unfit', description: 'Temporarily or permanently' },
+        pending: { count: 0, title: 'Pending Review', description: 'Awaiting assessment' }
+      }
+    };
 
-  // Calculate statistics for age groups
-  if (patients?.length) {
     patients.forEach(patient => {
-      const age = calculateAge(patient.date_of_birth);
-      if (age < 13) {
-        patientAgeGroups.child.count++;
-      } else if (age < 20) {
-        patientAgeGroups.teen.count++;
-      } else if (age < 65) {
-        patientAgeGroups.adult.count++;
+      if (patient.medical_history?.assessment?.fitness_conclusion) {
+        const conclusion = patient.medical_history.assessment.fitness_conclusion.toLowerCase();
+        
+        if (conclusion.includes("fit") || conclusion.includes("suitable")) {
+          metrics.certificateStatus.fit.count++;
+        } else if (conclusion.includes("temporarily") || conclusion.includes("conditional")) {
+          metrics.certificateStatus.conditional.count++;
+        } else if (conclusion.includes("unfit") || conclusion.includes("not suitable")) {
+          metrics.certificateStatus.unfit.count++;
+        } 
       } else {
-        patientAgeGroups.older.count++;
+        metrics.certificateStatus.pending.count++;
       }
     });
-  }
+
+    return metrics;
+  };
+
+  const corporateMetrics = calculateCorporateHealthMetrics();
+
+  const calculateDocumentStats = () => {
+    if (!documentsData) return { processed: 0, processing: 0, failed: 0, total: 0 };
+    
+    const stats = {
+      processed: 0,
+      processing: 0,
+      failed: 0,
+      total: documentsData.length
+    };
+
+    documentsData.forEach(doc => {
+      if (doc.status === 'processed') {
+        stats.processed++;
+      } else if (doc.status === 'processing') {
+        stats.processing++;
+      } else if (doc.status === 'failed') {
+        stats.failed++;
+      }
+    });
+
+    return stats;
+  };
+
+  const documentStats = calculateDocumentStats();
+
+  const calculateComplianceRate = () => {
+    const totalPatients = patients.length;
+    if (totalPatients === 0) return 0;
+
+    const patientsWithValidCertificates = patients.filter(p => 
+      p.medical_history?.assessment?.fitness_conclusion && 
+      !p.medical_history?.assessment?.expired
+    ).length;
+
+    return Math.round((patientsWithValidCertificates / totalPatients) * 100);
+  };
+
+  const complianceRate = calculateComplianceRate();
+
+  const calculateReviewDeadlines = () => {
+    const today = new Date();
+    let dueSoon = 0;
+    let overdue = 0;
+
+    patients.forEach(patient => {
+      if (patient.medical_history?.assessment?.next_assessment) {
+        const nextReviewDate = new Date(patient.medical_history.assessment.next_assessment);
+        const daysDiff = Math.floor((nextReviewDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        
+        if (daysDiff < 0) {
+          overdue++;
+        } else if (daysDiff <= 30) {
+          dueSoon++;
+        }
+      }
+    });
+
+    return { dueSoon, overdue };
+  };
+
+  const reviewDeadlines = calculateReviewDeadlines();
 
   return (
     <div className="space-y-6">
@@ -265,49 +479,65 @@ const PatientList = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="outline" className="gap-2 border-purple-200 text-purple-700" onClick={() => {}}>
-            <Calendar className="h-4 w-4" />
-            <span>Days</span>
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2 border-purple-200 text-purple-700">
+                <Calendar className="h-4 w-4" />
+                <span>{dateFilter.label}</span>
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0 w-auto" align="end">
+              <div className="border-b p-2">
+                <div className="grid gap-1">
+                  {datePresets.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      variant="ghost"
+                      className="justify-start font-normal"
+                      onClick={() => handleDateFilterChange(preset)}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="p-2">
+                <CalendarComponent
+                  mode="single"
+                  selected={calendarDate || undefined}
+                  onSelect={(date) => handleSetCustomDate(date)}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
           
-          <Button variant="outline" className="gap-2 border-purple-200 text-purple-700" onClick={() => {}}>
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 border-purple-200 text-purple-700">
+                <Download className="h-4 w-4" />
+                <span>Export</span>
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportPatients('csv')}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportPatients('excel')}>
+                Export as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportPatients('pdf')}>
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <Button onClick={handleAddPatient} className="bg-indigo-600 hover:bg-indigo-700">
             <Plus className="mr-2 h-4 w-4" />
             Add Patient
           </Button>
         </div>
-      </div>
-
-      {/* Age Group Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Object.entries(patientAgeGroups).map(([key, group]) => (
-          <div 
-            key={key} 
-            className="bg-white rounded-lg shadow p-4 border border-gray-100"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-500">{group.title}</h3>
-              <Button variant="outline" size="sm" className="text-xs h-7 px-2 border-purple-200 text-purple-700">
-                See Details
-              </Button>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-gray-800">{group.count}</span>
-              <span className="text-sm text-green-500">+{Math.round(group.count * 0.05)}</span>
-            </div>
-            <div className="mt-2 text-xs text-gray-500">
-              {/* This would be populated with actual data in a real application */}
-              {key === 'child' && 'Common conditions: asthma, immunizations'}
-              {key === 'teen' && 'Common conditions: acne, sports injuries'}
-              {key === 'adult' && 'Common conditions: hypertension, diabetes'}
-              {key === 'older' && 'Common conditions: arthritis, heart disease'}
-            </div>
-          </div>
-        ))}
       </div>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-lg shadow">
@@ -399,7 +629,6 @@ const PatientList = () => {
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNum: number;
                   
-                  // Logic to show correct page numbers based on current page
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
@@ -496,7 +725,7 @@ const PatientList = () => {
                       </TableCell>
                       <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
                       <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
-                      <TableCell>{format(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{formatDate(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         {patient.contact_info?.email ? (
                           <div className="text-sm text-blue-600">{patient.contact_info.email}</div>
@@ -547,7 +776,6 @@ const PatientList = () => {
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNum: number;
                   
-                  // Logic to show correct page numbers based on current page
                   if (totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (currentPage <= 3) {
