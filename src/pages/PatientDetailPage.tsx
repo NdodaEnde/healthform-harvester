@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getEffectiveOrganizationId } = useOrganization();
+  const queryClient = useQueryClient();
   const organizationId = getEffectiveOrganizationId();
 
   const { data: patient, isLoading } = useQuery({
@@ -170,6 +171,15 @@ const PatientDetailPage = () => {
       daysToExpiration
     };
   }, [certificates]);
+  
+  // Force refresh of patient data when component mounts
+  React.useEffect(() => {
+    if (id) {
+      // Invalidate the query to force a refresh
+      queryClient.invalidateQueries({ queryKey: ['patient', id] });
+      queryClient.invalidateQueries({ queryKey: ['patient-certificates-data', id, organizationId] });
+    }
+  }, [id, organizationId, queryClient]);
 
   const handleBackToList = () => {
     navigate('/patients');

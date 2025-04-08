@@ -189,7 +189,13 @@ const PatientList = () => {
       organization_id: p.organization_id,
       client_organization_id: p.client_organization_id,
       created_at: p.created_at,
-      updated_at: p.updated_at
+      updated_at: p.updated_at,
+      // South African ID number fields
+      id_number: p.id_number,
+      birthdate_from_id: p.birthdate_from_id,
+      gender_from_id: p.gender_from_id,
+      citizenship_status: p.citizenship_status,
+      id_number_valid: p.id_number_valid
     };
   }) || [];
 
