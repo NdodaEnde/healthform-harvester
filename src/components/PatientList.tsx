@@ -719,12 +719,21 @@ const PatientList = () => {
                           </div>
                           <div>
                             <div className="font-medium">{patient.first_name} {patient.last_name}</div>
-                            <div className="text-sm text-muted-foreground">ID: {patient.id.slice(0, 8)}</div>
+                            <div className="text-sm text-muted-foreground">
+                              ID: {patient.id_number || patient.id.slice(0, 8)}
+                              {patient.id_number && patient.id_number_valid && 
+                                <span className="ml-1 text-green-600 text-xs">✓</span>
+                              }
+                            </div>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{calculateAge(patient.date_of_birth)}</TableCell>
-                      <TableCell className="capitalize">{patient.gender || 'Unknown'}</TableCell>
+                      <TableCell>
+                        {calculateAge(patient.birthdate_from_id || patient.date_of_birth)}
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        {patient.gender_from_id || patient.gender || 'Unknown'}
+                      </TableCell>
                       <TableCell>{formatDate(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         {patient.contact_info?.email ? (

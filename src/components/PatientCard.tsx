@@ -116,7 +116,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
             )}
           </div>
           <p className="text-sm text-purple-600">
-            {getGenderLabel(patient.gender)} • {calculateAge(patient.date_of_birth)} years old
+            {getGenderLabel(patient.gender_from_id || patient.gender)} • {calculateAge(patient.birthdate_from_id || patient.date_of_birth)} years old
           </p>
         </div>
         <Badge className={`${status.color} border-0`}>
@@ -125,9 +125,20 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
       </CardHeader>
       <CardContent className="pt-4 bg-white">
         <div className="space-y-3">
+          {patient.id_number && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-gray-700">ID Number:</span>
+              <div className="flex items-center">
+                <span className="text-gray-600">{patient.id_number}</span>
+                {patient.id_number_valid && 
+                  <span className="ml-1 text-green-600 text-xs">✓</span>
+                }
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-700">Date of Birth:</span>
-            <span className="text-gray-600">{format(new Date(patient.date_of_birth), 'PP')}</span>
+            <span className="text-gray-600">{format(new Date(patient.birthdate_from_id || patient.date_of_birth), 'PP')}</span>
           </div>
           {contactInfo.email && (
             <div className="flex items-center justify-between text-sm">

@@ -226,8 +226,11 @@ const PatientDetailPage = () => {
   const ehrData = {
     personal: {
       fullName: `${patient.first_name} ${patient.last_name}`,
-      dateOfBirth: patient.date_of_birth ? format(new Date(patient.date_of_birth), 'PPP') : 'Not available',
-      gender: patient.gender || 'Not specified',
+      dateOfBirth: (patient.birthdate_from_id || patient.date_of_birth) 
+        ? format(new Date(patient.birthdate_from_id || patient.date_of_birth), 'PPP') 
+        : 'Not available',
+      gender: patient.gender_from_id || patient.gender || 'Not specified',
+      idNumber: patient.id_number || 'N/A',
       employeeId: patient.contact_info?.employee_id || 'N/A',
       address: patient.contact_info?.address || 'N/A',
       phoneNumber: patient.contact_info?.phone || 'N/A',
@@ -296,8 +299,12 @@ const PatientDetailPage = () => {
             </h1>
           </div>
           <p className="text-muted-foreground">
-            {patient.gender ? `${patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1)}` : 'Unknown gender'}{' '}
-            • {patient.date_of_birth ? `${calculateAge(patient.date_of_birth)} years old` : 'Unknown age'}
+            {(patient.gender_from_id || patient.gender) 
+              ? `${(patient.gender_from_id || patient.gender).charAt(0).toUpperCase() + (patient.gender_from_id || patient.gender).slice(1)}` 
+              : 'Unknown gender'}{' '}
+            • {(patient.birthdate_from_id || patient.date_of_birth) 
+              ? `${calculateAge(patient.birthdate_from_id || patient.date_of_birth)} years old` 
+              : 'Unknown age'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -570,6 +577,7 @@ const PatientDetailPage = () => {
                       {renderSectionItem("Full Name", ehrData.personal.fullName)}
                       {renderSectionItem("Date of Birth", ehrData.personal.dateOfBirth)}
                       {renderSectionItem("Gender", ehrData.personal.gender)}
+                      {renderSectionItem("ID Number", ehrData.personal.idNumber)}
                       {renderSectionItem("Employee ID", ehrData.personal.employeeId)}
                       {renderSectionItem("Address", ehrData.personal.address)}
                       {renderSectionItem("Phone Number", ehrData.personal.phoneNumber)}
