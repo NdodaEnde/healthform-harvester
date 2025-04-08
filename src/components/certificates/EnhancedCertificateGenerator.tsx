@@ -911,7 +911,7 @@ const EnhancedCertificateGenerator = ({
               </div>
             </div>
             
-            <div className="px-4 mb-1">
+            <div className="px-4 mb-3">
               <div className="flex justify-between items-end">
                 <div className="flex-1">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56">
@@ -937,7 +937,7 @@ const EnhancedCertificateGenerator = ({
               </div>
             </div>
             
-            <div className="bg-gray-800 text-white text-center px-1 text-[0.55rem] leading-none py-1">
+            <div className="bg-gray-800 text-white text-center px-1 text-[0.55rem] leading-none py-1 mt-2">
               © {new Date().getFullYear()} BlueCollar Health & Wellness
             </div>
           </div>
