@@ -611,39 +611,39 @@ const CertificateTemplate = ({
                 <table className="w-full border border-gray-400 text-sm">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Heights</div>
-                        {restrictionsData.heights && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Heights</div>
+                        {restrictionsData.heights && <div className="text-[0.6rem]">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Dust Exposure</div>
-                        {restrictionsData.dustExposure && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Dust Exposure</div>
+                        {restrictionsData.dustExposure && <div className="text-[0.6rem]">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Motorized Equipment</div>
-                        {restrictionsData.motorizedEquipment && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Motorized Equipment</div>
+                        {restrictionsData.motorizedEquipment && <div className="text-[0.6rem]">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Wear Hearing Protection</div>
-                        {restrictionsData.hearingProtection && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Wear Hearing Protection</div>
+                        {restrictionsData.hearingProtection && <div className="text-[0.6rem]">✓</div>}
                       </td>
                     </tr>
                     <tr>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Confined Spaces</div>
-                        {restrictionsData.confinedSpaces && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Confined Spaces</div>
+                        {restrictionsData.confinedSpaces && <div className="text-[0.6rem]">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Chemical Exposure</div>
-                        {restrictionsData.chemicalExposure && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Chemical Exposure</div>
+                        {restrictionsData.chemicalExposure && <div className="text-[0.6rem]">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Wear Spectacles</div>
-                        {restrictionsData.wearSpectacles && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Wear Spectacles</div>
+                        {restrictionsData.wearSpectacles && <div className="text-[0.6rem]">✓</div>}
                       </td>
-                      <td className={`border border-gray-400 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
-                        <div className="font-semibold">Remain on Treatment for Chronic Conditions</div>
-                        {restrictionsData.chronicConditions && <div className="text-xs">✓</div>}
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Remain on Treatment</div>
+                        {restrictionsData.chronicConditions && <div className="text-[0.6rem]">✓</div>}
                       </td>
                     </tr>
                   </tbody>
@@ -662,24 +662,24 @@ const CertificateTemplate = ({
                   <tbody>
                     <tr>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
-                        FIT
-                        {fitnessStatus.fit && <div className="text-green-600 text-lg">✓</div>}
+                        <div className="text-xs">FIT</div>
+                        {fitnessStatus.fit && <div className="text-green-600 text-sm">✓</div>}
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
-                        Fit with Restriction
-                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-lg">✓</div>}
+                        <div className="text-xs">Fit with Restriction</div>
+                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-sm">✓</div>}
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
-                        Fit with Condition
-                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-lg">✓</div>}
+                        <div className="text-xs">Fit with Condition</div>
+                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-sm">✓</div>}
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
-                        Temporary Unfit
-                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-lg">✓</div>}
+                        <div className="text-xs">Temporary Unfit</div>
+                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-sm">✓</div>}
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
-                        UNFIT
-                        {fitnessStatus.unfit && <div className="text-red-600 text-lg">✓</div>}
+                        <div className="text-xs">UNFIT</div>
+                        {fitnessStatus.unfit && <div className="text-red-600 text-sm">✓</div>}
                       </th>
                     </tr>
                   </tbody>
