@@ -13,6 +13,8 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import { MedicalHistoryData, ContactInfo } from '@/types/patient';
+import PatientSAIDInfo from '@/components/PatientSAIDInfo';
+import { processIDNumberForPatient, doesIDNumberNeedProcessing } from '@/utils/id-number-processor';
 
 interface PatientFormState {
   first_name: string;
@@ -20,6 +22,11 @@ interface PatientFormState {
   date_of_birth: string;
   gender: string;
   contact_info: ContactInfo;
+  id_number?: string;
+  id_number_valid?: boolean;
+  birthdate_from_id?: string;
+  gender_from_id?: 'male' | 'female' | null;
+  citizenship_status?: 'citizen' | 'permanent_resident' | null;
 }
 
 const PatientEditPage = () => {
@@ -37,8 +44,12 @@ const PatientEditPage = () => {
     contact_info: {
       email: '',
       phone: ''
-    }
+    },
+    id_number: '',
+    id_number_valid: false
   });
+  
+  const [showIdValidation, setShowIdValidation] = useState(false);
 
   const [activeTab, setActiveTab] = useState('personal');
 
@@ -69,8 +80,16 @@ const PatientEditPage = () => {
         contact_info: {
           email: contactInfo.email || '',
           phone: contactInfo.phone || ''
-        }
+        },
+        id_number: data.id_number || '',
+        id_number_valid: data.id_number_valid || false,
+        birthdate_from_id: data.birthdate_from_id || '',
+        gender_from_id: data.gender_from_id || null,
+        citizenship_status: data.citizenship_status || null
       });
+      
+      // Show validation if ID number exists
+      setShowIdValidation(!!data.id_number);
       
       return data;
     },
@@ -80,15 +99,28 @@ const PatientEditPage = () => {
   // Update patient mutation
   const { mutate, isPending } = useMutation({
     mutationFn: async (patientData: PatientFormState) => {
+      // Process ID number if changed or added
+      let processedPatientData = { ...patientData };
+      
+      if (doesIDNumberNeedProcessing(processedPatientData, patientData.id_number || '')) {
+        processedPatientData = processIDNumberForPatient(processedPatientData, patientData.id_number || '');
+      }
+      
       const { error } = await supabase
         .from('patients')
         .update({
-          first_name: patientData.first_name,
-          last_name: patientData.last_name,
-          date_of_birth: patientData.date_of_birth,
-          gender: patientData.gender,
-          contact_info: patientData.contact_info,
+          first_name: processedPatientData.first_name,
+          last_name: processedPatientData.last_name,
+          date_of_birth: processedPatientData.date_of_birth,
+          gender: processedPatientData.gender,
+          contact_info: processedPatientData.contact_info,
           organization_id: organizationId,
+          // ID number fields
+          id_number: processedPatientData.id_number,
+          id_number_valid: processedPatientData.id_number_valid,
+          birthdate_from_id: processedPatientData.birthdate_from_id,
+          gender_from_id: processedPatientData.gender_from_id,
+          citizenship_status: processedPatientData.citizenship_status,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -194,6 +226,15 @@ const PatientEditPage = () => {
           [field]: value
         }
       }));
+    } else if (name === 'id_number') {
+      // For ID number, process it and show validation
+      setFormState(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      
+      // Only show validation when we have input
+      setShowIdValidation(!!value.trim());
     } else {
       setFormState(prev => ({
         ...prev,
@@ -312,6 +353,26 @@ const PatientEditPage = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="id_number">South African ID Number</Label>
+                  <Input
+                    id="id_number"
+                    name="id_number"
+                    value={formState.id_number || ''}
+                    onChange={handleInputChange}
+                    placeholder="Enter 13 digit South African ID number"
+                    className="font-mono"
+                  />
+                  {showIdValidation && (
+                    <div className="mt-2">
+                      <PatientSAIDInfo 
+                        idNumber={formState.id_number} 
+                        showDetailed={true}
+                      />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

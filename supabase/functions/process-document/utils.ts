@@ -1,5 +1,6 @@
 
 // Helper utilities for document processing
+import { parseSouthAfricanIDNumber, normalizeIDNumber } from '../../../src/utils/sa-id-parser';
 
 // Helper function to safely extract nested properties from an object
 export function extractPath(obj: any, path: string): any {
@@ -187,4 +188,47 @@ export function isChecked(markdown: string, term: string, debug: boolean = false
   }
   
   return false;
+}
+
+// Extract and normalize South African ID number from text
+export function extractSouthAfricanIDNumber(text: string): string | null {
+  if (!text) return null;
+  
+  // Pattern to match South African ID numbers (13 digits, optionally with spaces or hyphens)
+  const idPattern = /\b(\d{2}[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{4}[\s-]?\d{3})\b/g;
+  
+  // Find all potential matches
+  const matches = [...text.matchAll(idPattern)];
+  
+  if (matches.length === 0) return null;
+  
+  // Return the first match, normalized (removing spaces and hyphens)
+  return matches[0][1].replace(/[\s-]/g, '');
+}
+
+// Process South African ID number and extract demographic information
+export function processSouthAfricanIDNumber(idNumber: string | null) {
+  if (!idNumber) return null;
+  
+  // Normalize the ID number
+  const normalizedID = normalizeIDNumber(idNumber);
+  
+  // Parse the ID number
+  const idData = parseSouthAfricanIDNumber(normalizedID);
+  
+  // Only return data if the ID is valid
+  if (!idData.isValid) return null;
+  
+  // Format the birth date as ISO string (YYYY-MM-DD)
+  const birthDate = idData.birthDate ? 
+    idData.birthDate.toISOString().split('T')[0] : null;
+  
+  return {
+    id_number: normalizedID,
+    id_number_valid: true,
+    birthdate_from_id: birthDate,
+    gender_from_id: idData.gender,
+    citizenship_status: idData.citizenshipStatus === 'citizen' ? 
+      'citizen' : 'permanent_resident'
+  };
 }

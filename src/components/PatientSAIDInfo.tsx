@@ -1,111 +1,127 @@
-import React from 'react';
-import { format, parseISO } from 'date-fns';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { IdCardIcon, CalendarIcon, UserIcon, FlagIcon, CheckIcon, XIcon } from 'lucide-react';
-import { PatientInfo } from '@/types/patient';
+import React, { useState, useEffect } from 'react';
+import { parseSouthAfricanIDNumber, getIDNumberSummary } from '../utils/sa-id-parser';
+import { Badge } from './ui/badge';
+import { InfoCircledIcon, CheckCircledIcon, CrossCircledIcon } from '@radix-ui/react-icons';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 interface PatientSAIDInfoProps {
-  patient: PatientInfo;
+  idNumber: string | null | undefined;
+  className?: string;
+  showDetailed?: boolean;
 }
 
-/**
- * Component that displays South African ID number information for a patient
- */
-const PatientSAIDInfo: React.FC<PatientSAIDInfoProps> = ({ patient }) => {
-  // If there's no ID number, don't display this component
-  if (!patient.id_number) {
-    return null;
+const PatientSAIDInfo: React.FC<PatientSAIDInfoProps> = ({ 
+  idNumber, 
+  className,
+  showDetailed = false
+}) => {
+  const [idData, setIdData] = useState(() => 
+    idNumber ? parseSouthAfricanIDNumber(idNumber) : { isValid: false }
+  );
+
+  useEffect(() => {
+    if (idNumber) {
+      setIdData(parseSouthAfricanIDNumber(idNumber));
+    } else {
+      setIdData({ isValid: false });
+    }
+  }, [idNumber]);
+
+  if (!idNumber) {
+    return (
+      <div className={cn("flex items-center text-sm text-muted-foreground", className)}>
+        <InfoCircledIcon className="mr-1 h-4 w-4" />
+        <span>No ID number provided</span>
+      </div>
+    );
   }
 
-  // Format the ID number for display (add spaces for readability)
-  const formatIDNumber = (idNumber: string) => {
-    if (!idNumber) return '';
-    
-    // Format as YYMMDD SSSS CAS (birth date, gender, citizenship, indicator, checksum)
-    return idNumber.replace(/^(\d{6})(\d{4})(\d{1})(\d{1})(\d{1})$/, '$1 $2 $3$4$5');
-  };
-
-  // Format the birthdate for display
-  const formatBirthdate = (dateString: string | undefined) => {
-    if (!dateString) return 'Not available';
-    
-    try {
-      return format(parseISO(dateString), 'dd MMMM yyyy');
-    } catch (e) {
-      return dateString;
-    }
-  };
-
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <IdCardIcon className="h-5 w-5 mr-2 text-primary" />
-            <CardTitle className="text-lg">South African ID Information</CardTitle>
-          </div>
-          {patient.id_number_valid ? (
-            <Badge variant="default" className="bg-green-600">
-              <CheckIcon className="h-3 w-3 mr-1" /> Valid
-            </Badge>
+    <div className={className}>
+      {/* Simple view */}
+      {!showDetailed && (
+        <div className="flex items-center">
+          {idData.isValid ? (
+            <>
+              <Badge variant="outline" className="font-mono mr-2 border-green-200 bg-green-50">
+                {idData.formattedIDNumber}
+              </Badge>
+              <CheckCircledIcon className="h-4 w-4 text-green-500 mr-1" />
+              <span className="text-sm text-muted-foreground">{getIDNumberSummary(idData)}</span>
+            </>
           ) : (
-            <Badge variant="destructive">
-              <XIcon className="h-3 w-3 mr-1" /> Invalid
-            </Badge>
+            <>
+              <Badge variant="outline" className="font-mono mr-2 border-red-200 bg-red-50">
+                {idNumber}
+              </Badge>
+              <CrossCircledIcon className="h-4 w-4 text-red-500 mr-1" />
+              <span className="text-sm text-muted-foreground">Invalid ID number</span>
+            </>
           )}
         </div>
-        <CardDescription>Demographic information extracted from ID number</CardDescription>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="space-y-4">
-          <div>
-            <div className="text-sm font-semibold mb-1">ID Number</div>
-            <div className="font-mono text-lg">{formatIDNumber(patient.id_number)}</div>
+      )}
+
+      {/* Detailed view */}
+      {showDetailed && (
+        <div className="space-y-2">
+          <div className="flex items-center">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center">
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "font-mono text-sm mr-2",
+                        idData.isValid 
+                          ? "border-green-200 bg-green-50" 
+                          : "border-red-200 bg-red-50"
+                      )}
+                    >
+                      {idData.isValid ? idData.formattedIDNumber : idNumber}
+                    </Badge>
+                    {idData.isValid 
+                      ? <CheckCircledIcon className="h-4 w-4 text-green-500" /> 
+                      : <CrossCircledIcon className="h-4 w-4 text-red-500" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{idData.isValid ? 'Valid South African ID' : 'Invalid South African ID'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-          
-          <Separator />
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-start">
-              <CalendarIcon className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
-              <div>
-                <div className="text-sm font-semibold">Birth Date</div>
-                <div>{formatBirthdate(patient.birthdate_from_id)}</div>
+
+          {idData.isValid && (
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Date of Birth</div>
+                <div>
+                  {idData.birthDate?.toLocaleDateString('en-ZA', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  })}
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-start">
-              <UserIcon className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
-              <div>
-                <div className="text-sm font-semibold">Gender</div>
-                <div className="capitalize">{patient.gender_from_id || 'Not determined'}</div>
+              
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Gender</div>
+                <div className="capitalize">{idData.gender}</div>
               </div>
-            </div>
-            
-            <div className="flex items-start">
-              <FlagIcon className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
-              <div>
-                <div className="text-sm font-semibold">Citizenship</div>
+              
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Status</div>
                 <div className="capitalize">
-                  {patient.citizenship_status === 'citizen' ? 'South African Citizen' : 
-                   patient.citizenship_status === 'permanent_resident' ? 'Permanent Resident' : 
-                   'Not determined'}
+                  {idData.citizenshipStatus === 'citizen' ? 'Citizen' : 'Permanent Resident'}
                 </div>
               </div>
             </div>
-          </div>
-          
-          {patient.id_number_valid === false && (
-            <div className="text-sm text-destructive mt-2">
-              <p>Note: This ID number did not pass validation. It may contain errors or be improperly formatted.</p>
-            </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 

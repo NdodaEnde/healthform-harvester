@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar, Clock } from 'lucide-react';
-import { format, differenceInDays, isFuture, parseISO, isValid } from 'date-fns';
+import { format, differenceInDays, isFuture, parseISO, isValid, parse, differenceInYears } from 'date-fns';
 import { PatientInfo, CertificateData } from '@/types/patient';
+import { formatSafeDateEnhanced, calculateAgeEnhanced, getEffectiveGenderEnhanced } from '@/utils/date-utils';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import PatientCertificates, { getExaminationDate } from '@/components/PatientCertificates';
 import PatientVisits from '@/components/PatientVisits';
 import PatientSAIDInfo from '@/components/PatientSAIDInfo';
 import { Separator } from '@/components/ui/separator';
+
+
 
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -193,9 +196,38 @@ const PatientDetailPage = () => {
     navigate(`/patients/${id}/records`);
   };
 
-  const calculateAge = (dateOfBirth: string) => {
+  // Improved age calculation with fallbacks and better date validation
+  const calculateAge = (dateOfBirth?: string) => {
+    if (!dateOfBirth) return null;
+    
     const today = new Date();
-    const birthDate = new Date(dateOfBirth);
+    
+    // Try parsing with built-in Date constructor first
+    let birthDate = new Date(dateOfBirth);
+    
+    // If it's an invalid date, try parseISO from date-fns
+    if (isNaN(birthDate.getTime())) {
+      birthDate = parseISO(dateOfBirth);
+      
+      // If still invalid, return null
+      if (!isValid(birthDate)) {
+        console.warn('Invalid date format for age calculation:', dateOfBirth);
+        return null;
+      }
+    }
+    
+    // Make sure the parsed date is valid
+    if (!isValid(birthDate)) {
+      console.warn('Invalid date after parsing:', dateOfBirth);
+      return null;
+    }
+    
+    // Check for dates in the future
+    if (birthDate > today) {
+      console.warn('Birth date is in the future:', dateOfBirth);
+      return null;
+    }
+    
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDifference = today.getMonth() - birthDate.getMonth();
     
@@ -204,6 +236,42 @@ const PatientDetailPage = () => {
     }
     
     return age;
+  };
+  
+  // Helper function to format dates with appropriate error handling
+  const formatSafeDate = (dateString?: string, formatStr = 'PPP') => {
+    if (!dateString) return 'Not available';
+    
+    try {
+      // Try with Date constructor first
+      let dateObj = new Date(dateString);
+      
+      // If invalid, try with parseISO
+      if (isNaN(dateObj.getTime())) {
+        dateObj = parseISO(dateString);
+      }
+      
+      // Check if date is valid
+      if (!isValid(dateObj)) {
+        return 'Invalid date';
+      }
+      
+      return format(dateObj, formatStr);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Error formatting date';
+    }
+  };
+
+  // Helper function to get effective gender with proper capitalization
+  const getEffectiveGender = () => {
+    if (!patient) return 'Unknown';
+    
+    const gender = patient.gender_from_id || patient.gender;
+    if (!gender) return 'Unknown';
+    
+    // Capitalize first letter
+    return gender.charAt(0).toUpperCase() + gender.slice(1);
   };
 
   if (isLoading) {
@@ -233,13 +301,14 @@ const PatientDetailPage = () => {
     patient.contact_info.address
   );
 
+  // Get the patient's age
+  const patientAge = calculateAge(patient.birthdate_from_id || patient.date_of_birth);
+
   const ehrData = {
     personal: {
       fullName: `${patient.first_name} ${patient.last_name}`,
-      dateOfBirth: (patient.birthdate_from_id || patient.date_of_birth) 
-        ? format(new Date(patient.birthdate_from_id || patient.date_of_birth), 'PPP') 
-        : 'Not available',
-      gender: patient.gender_from_id || patient.gender || 'Not specified',
+      dateOfBirth: formatSafeDateEnhanced(patient.birthdate_from_id || patient.date_of_birth), 
+      gender: getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender),
       idNumber: patient.id_number || 'N/A',
       employeeId: patient.contact_info?.employee_id || 'N/A',
       address: patient.contact_info?.address || 'N/A',
@@ -309,12 +378,11 @@ const PatientDetailPage = () => {
             </h1>
           </div>
           <p className="text-muted-foreground">
-            {(patient.gender_from_id || patient.gender) 
-              ? `${(patient.gender_from_id || patient.gender).charAt(0).toUpperCase() + (patient.gender_from_id || patient.gender).slice(1)}` 
-              : 'Unknown gender'}{' '}
-            • {(patient.birthdate_from_id || patient.date_of_birth) 
-              ? `${calculateAge(patient.birthdate_from_id || patient.date_of_birth)} years old` 
-              : 'Unknown age'}
+            {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
+            {' • '}
+            {calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth) !== 'N/A'
+              ? `${calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth)} years old` 
+              : 'Age not available'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -339,7 +407,20 @@ const PatientDetailPage = () => {
         
         <TabsContent value="overview" className="space-y-6 mt-6">
           {/* South African ID info card - will only display if ID number exists */}
-          <PatientSAIDInfo patient={patient} />
+          {patient.id_number && (
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-3">
+                <CardTitle>South African ID Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PatientSAIDInfo 
+                  idNumber={patient.id_number} 
+                  showDetailed={true}
+                  className="pt-1" 
+                />
+              </CardContent>
+            </Card>
+          )}
           
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
@@ -348,27 +429,29 @@ const PatientDetailPage = () => {
               </CardHeader>
               <CardContent>
                 <dl className="space-y-4">
-                  <div>
-                    <dt className="text-sm font-medium text-muted-foreground">Full Name</dt>
-                    <dd className="text-base flex items-center mt-1">
-                      <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                      {patient.first_name} {patient.last_name}
-                    </dd>
-                  </div>
                   
-                  <div>
-                    <dt className="text-sm font-medium text-muted-foreground">Date of Birth</dt>
-                    <dd className="text-base flex items-center mt-1">
-                      <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                      {patient.date_of_birth ? format(new Date(patient.date_of_birth), 'PPP') : 'Not available'}
-                      {patient.date_of_birth && ` (${calculateAge(patient.date_of_birth)} years old)`}
-                    </dd>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={handleBackToList}>
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                      {patient.first_name} {patient.last_name}
+                    </h1>
                   </div>
+                  <p className="text-muted-foreground">
+                    {getEffectiveGenderEnhanced(patient)}
+                    {' • '}
+                    {calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth) 
+                      ? `${calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth)} years old` 
+                      : 'Age not available'}
+                  </p>
+                </div>
                   
                   <div>
                     <dt className="text-sm font-medium text-muted-foreground">Gender</dt>
                     <dd className="text-base capitalize mt-1">
-                      {patient.gender || 'Not specified'}
+                      {getEffectiveGenderEnhanced(patient)}
                     </dd>
                   </div>
                 </dl>
@@ -524,7 +607,7 @@ const PatientDetailPage = () => {
                           <Calendar className="h-5 w-5" />
                           <h3 className="text-lg font-medium leading-none">
                             {certificateSummary.lastExaminationDate ? 
-                              format(parseISO(certificateSummary.lastExaminationDate), 'PP') : 
+                              formatSafeDate(certificateSummary.lastExaminationDate, 'PP') : 
                               'N/A'}
                           </h3>
                         </div>
