@@ -1,6 +1,8 @@
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
+// Importing types and functions from SA ID parser
+import type { ParsedSAID } from "./sa-id-parser.ts";
 import { parseSouthAfricanIDNumber, normalizeIDNumber } from "./sa-id-parser.ts";
 
 // Process document with Landing AI API
@@ -178,13 +180,18 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
     const idNumber = patientInfo.employeeId || null;
     let idNumberData = null;
     
-    if (idNumber) {
-      const normalizedID = normalizeIDNumber(idNumber);
-      if (normalizedID) {
-        console.log('Found potential South African ID number:', normalizedID);
-        idNumberData = parseSouthAfricanIDNumber(normalizedID);
-        console.log('Parsed ID number data:', idNumberData);
+    try {
+      if (idNumber) {
+        const normalizedID = normalizeIDNumber(idNumber);
+        if (normalizedID) {
+          console.log('Found potential South African ID number:', normalizedID);
+          idNumberData = parseSouthAfricanIDNumber(normalizedID);
+          console.log('Parsed ID number data:', idNumberData);
+        }
       }
+    } catch (idParsingError) {
+      console.error('Error parsing South African ID number:', idParsingError);
+      // Continue with processing even if ID parsing fails
     }
     
     // Check if patient already exists with the same name and organization
@@ -233,30 +240,35 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       };
       
       // Add ID number data if available
-      if (idNumberData && idNumberData.isValid) {
-        updateData.id_number = idNumberData.original;
-        updateData.birthdate_from_id = idNumberData.birthdate;
-        updateData.gender_from_id = idNumberData.gender;
-        updateData.citizenship_status = idNumberData.citizenshipStatus;
-        updateData.id_number_valid = true;
-        
-        // Update date of birth and gender from ID number if applicable
-        if (idNumberData.birthdate && (!patientInfo.dateOfBirth || patientInfo.dateOfBirth === '')) {
-          updateData.date_of_birth = idNumberData.birthdate;
-          console.log('Using birthdate from ID number:', idNumberData.birthdate);
+      try {
+        if (idNumberData && idNumberData.isValid) {
+          updateData.id_number = idNumberData.original;
+          updateData.birthdate_from_id = idNumberData.birthdate;
+          updateData.gender_from_id = idNumberData.gender;
+          updateData.citizenship_status = idNumberData.citizenshipStatus;
+          updateData.id_number_valid = true;
+          
+          // Update date of birth and gender from ID number if applicable
+          if (idNumberData.birthdate && (!patientInfo.dateOfBirth || patientInfo.dateOfBirth === '')) {
+            updateData.date_of_birth = idNumberData.birthdate;
+            console.log('Using birthdate from ID number:', idNumberData.birthdate);
+          }
+          
+          if (idNumberData.gender && (patientInfo.gender === 'unknown' || patientInfo.gender === '')) {
+            updateData.gender = idNumberData.gender;
+            console.log('Using gender from ID number:', idNumberData.gender);
+          }
+        } else if (idNumber) {
+          // Store the ID even if invalid, but mark it as invalid
+          const normalizedID = normalizeIDNumber(idNumber);
+          if (normalizedID) {
+            updateData.id_number = normalizedID;
+            updateData.id_number_valid = false;
+          }
         }
-        
-        if (idNumberData.gender && (patientInfo.gender === 'unknown' || patientInfo.gender === '')) {
-          updateData.gender = idNumberData.gender;
-          console.log('Using gender from ID number:', idNumberData.gender);
-        }
-      } else if (idNumber) {
-        // Store the ID even if invalid, but mark it as invalid
-        const normalizedID = normalizeIDNumber(idNumber);
-        if (normalizedID) {
-          updateData.id_number = normalizedID;
-          updateData.id_number_valid = false;
-        }
+      } catch (idUpdateError) {
+        console.error('Error applying ID number data to patient update:', idUpdateError);
+        // Continue with update even if ID processing fails
       }
       
       // Update existing patient record
@@ -293,30 +305,35 @@ async function createOrUpdatePatientFromDocument(structuredData: any, documentTy
       };
       
       // Add ID number data if available
-      if (idNumberData && idNumberData.isValid) {
-        insertData.id_number = idNumberData.original;
-        insertData.birthdate_from_id = idNumberData.birthdate;
-        insertData.gender_from_id = idNumberData.gender;
-        insertData.citizenship_status = idNumberData.citizenshipStatus;
-        insertData.id_number_valid = true;
-        
-        // Use date of birth and gender from ID number if applicable
-        if (idNumberData.birthdate && (!patientInfo.dateOfBirth || patientInfo.dateOfBirth === '')) {
-          insertData.date_of_birth = idNumberData.birthdate;
-          console.log('Using birthdate from ID number:', idNumberData.birthdate);
+      try {
+        if (idNumberData && idNumberData.isValid) {
+          insertData.id_number = idNumberData.original;
+          insertData.birthdate_from_id = idNumberData.birthdate;
+          insertData.gender_from_id = idNumberData.gender;
+          insertData.citizenship_status = idNumberData.citizenshipStatus;
+          insertData.id_number_valid = true;
+          
+          // Use date of birth and gender from ID number if applicable
+          if (idNumberData.birthdate && (!patientInfo.dateOfBirth || patientInfo.dateOfBirth === '')) {
+            insertData.date_of_birth = idNumberData.birthdate;
+            console.log('Using birthdate from ID number:', idNumberData.birthdate);
+          }
+          
+          if (idNumberData.gender && (patientInfo.gender === 'unknown' || patientInfo.gender === '')) {
+            insertData.gender = idNumberData.gender;
+            console.log('Using gender from ID number:', idNumberData.gender);
+          }
+        } else if (idNumber) {
+          // Store the ID even if invalid, but mark it as invalid
+          const normalizedID = normalizeIDNumber(idNumber);
+          if (normalizedID) {
+            insertData.id_number = normalizedID;
+            insertData.id_number_valid = false;
+          }
         }
-        
-        if (idNumberData.gender && (patientInfo.gender === 'unknown' || patientInfo.gender === '')) {
-          insertData.gender = idNumberData.gender;
-          console.log('Using gender from ID number:', idNumberData.gender);
-        }
-      } else if (idNumber) {
-        // Store the ID even if invalid, but mark it as invalid
-        const normalizedID = normalizeIDNumber(idNumber);
-        if (normalizedID) {
-          insertData.id_number = normalizedID;
-          insertData.id_number_valid = false;
-        }
+      } catch (idInsertError) {
+        console.error('Error applying ID number data to patient insert:', idInsertError);
+        // Continue with insert even if ID processing fails
       }
       
       // Create new patient record

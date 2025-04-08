@@ -149,30 +149,69 @@ function extractCitizenshipStatus(idNumber: string): 'citizen' | 'permanent_resi
  * @returns ParsedSAID object with extracted information
  */
 export function parseSouthAfricanIDNumber(idNumber: string): ParsedSAID {
-  // Clean the ID number - remove spaces and non-numeric characters
-  const cleanedID = idNumber.replace(/\D/g, '');
-  
-  // Check if the ID number has the correct format (13 digits)
-  if (!cleanedID || cleanedID.length !== 13 || !/^\d{13}$/.test(cleanedID)) {
+  try {
+    // Clean the ID number - remove spaces and non-numeric characters
+    const cleanedID = String(idNumber).replace(/\D/g, '');
+    
+    // Check if the ID number has the correct format (13 digits)
+    if (!cleanedID || cleanedID.length !== 13 || !/^\d{13}$/.test(cleanedID)) {
+      return {
+        original: String(idNumber),
+        birthdate: null,
+        gender: null,
+        citizenshipStatus: null,
+        isValid: false
+      };
+    }
+
+    // Validate using Luhn algorithm
+    let isValid = false;
+    try {
+      isValid = validateSAIDChecksum(cleanedID);
+    } catch (checksumError) {
+      console.error('Error validating ID checksum:', checksumError);
+      isValid = false;
+    }
+    
+    // Extract components with individual try/catch blocks to prevent complete failure
+    let birthdate = null;
+    try {
+      birthdate = extractBirthdate(cleanedID);
+    } catch (birthdateError) {
+      console.error('Error extracting birthdate:', birthdateError);
+    }
+    
+    let gender = null;
+    try {
+      gender = extractGender(cleanedID);
+    } catch (genderError) {
+      console.error('Error extracting gender:', genderError);
+    }
+    
+    let citizenshipStatus = null;
+    try {
+      citizenshipStatus = extractCitizenshipStatus(cleanedID);
+    } catch (citizenshipError) {
+      console.error('Error extracting citizenship status:', citizenshipError);
+    }
+    
     return {
-      original: idNumber,
+      original: cleanedID,
+      birthdate: birthdate,
+      gender: gender,
+      citizenshipStatus: citizenshipStatus,
+      isValid: isValid
+    };
+  } catch (error) {
+    console.error('Unexpected error parsing South African ID number:', error);
+    return {
+      original: String(idNumber || ''),
       birthdate: null,
       gender: null,
       citizenshipStatus: null,
       isValid: false
     };
   }
-
-  // Validate using Luhn algorithm
-  const isValid = validateSAIDChecksum(cleanedID);
-  
-  return {
-    original: cleanedID,
-    birthdate: extractBirthdate(cleanedID),
-    gender: extractGender(cleanedID),
-    citizenshipStatus: extractCitizenshipStatus(cleanedID),
-    isValid
-  };
 }
 
 /**
@@ -182,15 +221,23 @@ export function parseSouthAfricanIDNumber(idNumber: string): ParsedSAID {
  * @returns Normalized ID number
  */
 export function normalizeIDNumber(idNumber: string | null | undefined): string | null {
-  if (!idNumber) return null;
-  
-  // Remove all non-numeric characters
-  const normalized = idNumber.replace(/\D/g, '');
-  
-  // Return null if the result is not exactly 13 digits
-  if (normalized.length !== 13) {
+  try {
+    if (!idNumber) return null;
+    
+    // Ensure we're working with a string
+    const idString = String(idNumber);
+    
+    // Remove all non-numeric characters
+    const normalized = idString.replace(/\D/g, '');
+    
+    // Return null if the result is not exactly 13 digits
+    if (normalized.length !== 13) {
+      return null;
+    }
+    
+    return normalized;
+  } catch (error) {
+    console.error('Error normalizing ID number:', error);
     return null;
   }
-  
-  return normalized;
 }
