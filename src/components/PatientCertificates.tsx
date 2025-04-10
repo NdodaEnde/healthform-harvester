@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { FileText, AlertCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import CertificateTemplate from '@/components/CertificateTemplate';
 import EnhancedCertificateGenerator from '@/components/certificates/EnhancedCertificateGenerator';
 import {
   Dialog,
