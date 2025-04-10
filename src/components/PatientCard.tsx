@@ -7,6 +7,7 @@ import { Eye, Edit, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { PatientInfo } from '@/types/patient';
+import { formatSafeDateEnhanced, calculateAgeEnhanced, getEffectiveGenderEnhanced } from '@/utils/date-utils';
 
 interface PatientCardProps {
   patient: PatientInfo;
@@ -15,19 +16,6 @@ interface PatientCardProps {
 
 const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }) => {
   const navigate = useNavigate();
-  
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDifference = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
 
   const handleViewPatient = () => {
     navigate(`/patients/${patient.id}`);
@@ -39,13 +27,6 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
 
   const handleViewRecords = () => {
     navigate(`/patients/${patient.id}/records`);
-  };
-
-  const getGenderLabel = (gender: string | null) => {
-    if (!gender) return 'Unknown';
-    
-    // Capitalize first letter
-    return gender.charAt(0).toUpperCase() + gender.slice(1);
   };
 
   // Get contact info with better type safety
@@ -116,7 +97,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
             )}
           </div>
           <p className="text-sm text-purple-600">
-            {getGenderLabel(patient.gender_from_id || patient.gender)} • {calculateAge(patient.birthdate_from_id || patient.date_of_birth)} years old
+            {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)} • {calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth)} years old
           </p>
         </div>
         <Badge className={`${status.color} border-0`}>
@@ -138,7 +119,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, showActions = true }
           )}
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-700">Date of Birth:</span>
-            <span className="text-gray-600">{format(new Date(patient.birthdate_from_id || patient.date_of_birth), 'PP')}</span>
+            <span className="text-gray-600">{formatSafeDateEnhanced(patient.birthdate_from_id || patient.date_of_birth, 'PP')}</span>
           </div>
           {contactInfo.email && (
             <div className="flex items-center justify-between text-sm">

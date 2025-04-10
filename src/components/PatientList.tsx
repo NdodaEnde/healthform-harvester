@@ -37,9 +37,10 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format as formatDate, subDays } from 'date-fns';
+import { format as formatDate, subDays, isValid, parseISO, parse, differenceInYears } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
+import { formatSafeDateEnhanced, calculateAgeEnhanced, getEffectiveGenderEnhanced } from '@/utils/date-utils';
 import {
   Pagination,
   PaginationContent,
@@ -61,6 +62,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -128,7 +131,8 @@ const PatientList = () => {
         console.log('Retrieved patients:', data.map(p => ({
           id: p.id, 
           name: `${p.first_name} ${p.last_name}`,
-          gender: p.gender
+          gender: p.gender,
+          dob: p.date_of_birth || p.birthdate_from_id
         })));
       }
       
@@ -260,7 +264,7 @@ const PatientList = () => {
         csvContent += headers.join(",") + "\n";
         
         patients.forEach(patient => {
-          const age = calculateAge(patient.date_of_birth);
+          const age = calculateAgeEnhanced(patient.date_of_birth || patient.birthdate_from_id);
           const email = patient.contact_info?.email || '';
           const phone = patient.contact_info?.phone || '';
           
@@ -281,9 +285,9 @@ const PatientList = () => {
             patient.id,
             patient.first_name,
             patient.last_name,
-            patient.gender || "Unknown",
-            patient.date_of_birth,
-            age.toString(),
+            getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender),
+            formatSafeDateEnhanced(patient.date_of_birth || patient.birthdate_from_id, 'yyyy-MM-dd'),
+            age || 'N/A',
             `"${email}"`,
             `"${phone}"`,
             status,
@@ -322,9 +326,38 @@ const PatientList = () => {
     }
   };
 
-  const calculateAge = (dateOfBirth: string) => {
+  // Improved age calculation with fallbacks and better date validation
+  const calculateAge = (dateOfBirth?: string) => {
+    if (!dateOfBirth) return 0;
+    
     const today = new Date();
-    const birthDate = new Date(dateOfBirth);
+    
+    // Try parsing with built-in Date constructor first
+    let birthDate = new Date(dateOfBirth);
+    
+    // If it's an invalid date, try parseISO from date-fns
+    if (isNaN(birthDate.getTime())) {
+      birthDate = parseISO(dateOfBirth);
+      
+      // If still invalid, return 0
+      if (!isValid(birthDate)) {
+        console.warn('Invalid date format for age calculation:', dateOfBirth);
+        return 0;
+      }
+    }
+    
+    // Make sure the parsed date is valid
+    if (!isValid(birthDate)) {
+      console.warn('Invalid date after parsing:', dateOfBirth);
+      return 0;
+    }
+    
+    // Check for dates in the future
+    if (birthDate > today) {
+      console.warn('Birth date is in the future:', dateOfBirth);
+      return 0;
+    }
+    
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDifference = today.getMonth() - birthDate.getMonth();
     
@@ -473,6 +506,12 @@ const PatientList = () => {
   };
 
   const reviewDeadlines = calculateReviewDeadlines();
+
+  // Helper function to get formatted date to display
+  const getFormattedDateOfBirth = (patient: PatientInfo) => {
+    const dateOfBirth = patient.birthdate_from_id || patient.date_of_birth;
+    return formatSafeDateEnhanced(dateOfBirth, 'MMM d, yyyy');
+  };
 
   return (
     <div className="space-y-6">
@@ -715,6 +754,9 @@ const PatientList = () => {
               </TableHeader>
               <TableBody>
                 {paginatedPatients.map((patient, index) => {
+                  // Calculate age for each patient using enhanced function
+                  const age = calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth);
+                  
                   return (
                     <TableRow key={patient.id}>
                       <TableCell className="font-medium">{(currentPage - 1) * pageSize + index + 1}</TableCell>
@@ -735,10 +777,10 @@ const PatientList = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {calculateAge(patient.birthdate_from_id || patient.date_of_birth)}
+                        {age}
                       </TableCell>
                       <TableCell className="capitalize">
-                        {patient.gender_from_id || patient.gender || 'Unknown'}
+                        {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
                       </TableCell>
                       <TableCell>{formatDate(new Date(patient.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>

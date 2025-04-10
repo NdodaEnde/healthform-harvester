@@ -1,13 +1,21 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { FileText, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import EnhancedCertificateGenerator from '@/components/certificates/EnhancedCertificateGenerator';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog';
 
 interface PatientCertificatesProps {
   patientId: string;
@@ -108,6 +116,8 @@ export const getExaminationDate = (validUntil: string | undefined): string | nul
 
 const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
   const navigate = useNavigate();
+  const [selectedCertificate, setSelectedCertificate] = useState<Document | null>(null);
+  const [isGeneratorDialogOpen, setIsGeneratorDialogOpen] = useState(false);
 
   // Query to fetch patient details to assist with matching
   const { data: patient } = useQuery({
@@ -219,8 +229,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId && !!organizationId && !!patient,
   });
 
-  const handleViewCertificate = (documentId: string) => {
-    navigate(`/documents/${documentId}`);
+  // State for direct certificate viewing
+  const [viewingCertificate, setViewingCertificate] = useState<Document | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  
+  const handleViewCertificate = (certificate: Document) => {
+    setViewingCertificate(certificate);
+    setIsViewDialogOpen(true);
   };
 
   // Filter for only reviewed certificates if needed
@@ -228,76 +243,131 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
   // const reviewedCertificates = certificates?.filter(cert => cert.reviewStatus === 'reviewed') || [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Certificates of Fitness</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-        ) : error ? (
-          <div className="text-center py-4 text-destructive">
-            <p>Error loading certificates: {error instanceof Error ? error.message : 'Unknown error'}</p>
-          </div>
-        ) : certificates && certificates.length > 0 ? (
-          <div className="space-y-4">
-            {certificates.map(cert => (
-              <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div>
-                    <h3 className="font-medium">{cert.file_name}</h3>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant="outline">
-                        {cert.processed_at 
-                          ? format(new Date(cert.processed_at), 'PP') 
-                          : format(new Date(cert.created_at), 'PP')}
-                      </Badge>
-                      
-                      <Badge variant={getFitnessStatusColor(cert)}>
-                        {getFitnessStatusText(cert)}
-                      </Badge>
-                      
-                      {cert.extracted_data?.structured_data?.certification?.valid_until && (
-                        <Badge variant="secondary">
-                          Valid until: {cert.extracted_data.structured_data.certification.valid_until}
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Certificates of Fitness</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-4 text-destructive">
+              <p>Error loading certificates: {error instanceof Error ? error.message : 'Unknown error'}</p>
+            </div>
+          ) : certificates && certificates.length > 0 ? (
+            <div className="space-y-4">
+              {certificates.map(cert => (
+                <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div>
+                      <h3 className="font-medium">{cert.file_name}</h3>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="outline">
+                          {cert.processed_at 
+                            ? format(new Date(cert.processed_at), 'PP') 
+                            : format(new Date(cert.created_at), 'PP')}
                         </Badge>
-                      )}
-                      
-                      {cert.reviewStatus === 'reviewed' ? (
-                        <Badge variant="success">Reviewed</Badge>
-                      ) : cert.reviewStatus === 'needs-correction' ? (
-                        <Badge variant="destructive">Needs Correction</Badge>
-                      ) : (
-                        <Badge variant="outline">Not Reviewed</Badge>
-                      )}
+                        
+                        <Badge variant={getFitnessStatusColor(cert)}>
+                          {getFitnessStatusText(cert)}
+                        </Badge>
+                        
+                        {cert.extracted_data?.structured_data?.certification?.valid_until && (
+                          <Badge variant="secondary">
+                            Valid until: {cert.extracted_data.structured_data.certification.valid_until}
+                          </Badge>
+                        )}
+                        
+                        {cert.reviewStatus === 'reviewed' ? (
+                          <Badge variant="success">Reviewed</Badge>
+                        ) : cert.reviewStatus === 'needs-correction' ? (
+                          <Badge variant="destructive">Needs Correction</Badge>
+                        ) : (
+                          <Badge variant="outline">Not Reviewed</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleViewCertificate(cert)}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          View Certificate
+                        </Button>
+                        <Button
+                          variant="default"
+                          onClick={() => {
+                            // Open a dialog to show the certificate with download options
+                            setSelectedCertificate(cert);
+                            setIsGeneratorDialogOpen(true);
+                          }}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download/Print
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleViewCertificate(cert.id)}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Certificate
-                    </Button>
-                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 border rounded-lg bg-muted/30">
+              <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+              <h3 className="text-lg font-medium mb-2">No certificates found</h3>
+              <p className="text-muted-foreground">
+                No certificates of fitness found for this patient.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Certificate Generator Dialog */}
+      <Dialog open={isGeneratorDialogOpen} onOpenChange={setIsGeneratorDialogOpen}>
+        <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Certificate Options</DialogTitle>
+            <DialogDescription>
+              Download, print, or email this certificate
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto">
+            {selectedCertificate && (
+              <EnhancedCertificateGenerator 
+                extractedData={selectedCertificate.extracted_data} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Certificate View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Certificate of Fitness</DialogTitle>
+            <DialogDescription>
+              {viewingCertificate?.file_name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto">
+            {viewingCertificate && (
+              <div className="p-4">
+                <CertificateTemplate extractedData={viewingCertificate.extracted_data} />
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          <div className="text-center py-8 border rounded-lg bg-muted/30">
-            <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium mb-2">No certificates found</h3>
-            <p className="text-muted-foreground">
-              No certificates of fitness found for this patient.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

@@ -440,7 +440,7 @@ const PatientDetailPage = () => {
                     </h1>
                   </div>
                   <p className="text-muted-foreground">
-                    {getEffectiveGenderEnhanced(patient)}
+                    {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
                     {' • '}
                     {calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth) 
                       ? `${calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth)} years old` 
@@ -451,7 +451,7 @@ const PatientDetailPage = () => {
                   <div>
                     <dt className="text-sm font-medium text-muted-foreground">Gender</dt>
                     <dd className="text-base capitalize mt-1">
-                      {getEffectiveGenderEnhanced(patient)}
+                      {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
                     </dd>
                   </div>
                 </dl>
