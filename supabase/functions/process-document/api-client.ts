@@ -41,7 +41,11 @@ export const apiClient = {
           controller.abort();
         }, 300000); // 5 minutes
         
+        // Log the request details for debugging
         console.log(`Sending request to SDK service at: ${new Date().toISOString()}`);
+        console.log(`Request destination: ${processingServiceUrl}`);
+        console.log(`Request payload contains file: ${file.name}`);
+        
         const response = await fetch(processingServiceUrl, {
           method: 'POST',
           body: formData,

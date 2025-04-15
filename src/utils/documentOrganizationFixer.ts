@@ -1,3 +1,6 @@
+
+import { supabase } from "@/integrations/supabase/client";
+
 /**
  * Check if a file will require SDK processing based on size and type
  * @param file The file to check
