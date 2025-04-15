@@ -2,10 +2,9 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import os
-from typing import Optional
 import tempfile
 import logging
-from landing_ai import DocumentExtraction
+from agentic_doc.parse import parse_documents
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -13,19 +12,33 @@ logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
     def __init__(self, api_key: str):
-        self.client = DocumentExtraction(api_key=api_key)
+        # Set the API key for agentic-doc
+        os.environ["LANDING_AI_API_KEY"] = api_key
     
     def process_file(self, file_path: str) -> dict:
         try:
             logger.info(f"Processing file: {file_path}")
-            result = self.client.extract_document(file_path)
-            return {"success": True, "data": result}
+            # Use agentic-doc to parse the document
+            results = parse_documents([file_path])
+            
+            return {
+                "success": True,
+                "data": {
+                    "markdown": results.markdown,
+                    "chunks": [
+                        {
+                            "text": chunk.text,
+                            "metadata": chunk.metadata
+                        } for chunk in results.chunks
+                    ]
+                }
+            }
         except Exception as e:
             logger.error(f"Error processing document: {str(e)}")
             return {"success": False, "error": str(e)}
 
 class handler(BaseHTTPRequestHandler):
-    def handle_file_upload(self) -> Optional[str]:
+    def handle_file_upload(self):
         """Handle file upload and return temporary file path"""
         content_type = self.headers.get('Content-Type', '')
         
