@@ -422,10 +422,12 @@ const EnhancedCertificateGenerator = ({
   });
 
   const printCertificate = (): Promise<void> => {
-    if (handlePrint) {
-      handlePrint();
-    }
-    return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      if (handlePrint) {
+        handlePrint();
+      }
+      resolve();
+    });
   };
 
   const handleEmailOpen = () => {
