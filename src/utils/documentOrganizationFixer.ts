@@ -1,113 +1,34 @@
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
 
 /**
- * Utility to associate orphaned documents (documents with null organization_id) 
- * with the specified organization
+ * Check if a file will require SDK processing based on size and type
+ * @param file The file to check
+ * @returns Boolean indicating if SDK processing will be used
  */
-export const associateOrphanedDocuments = async (organizationId: string) => {
-  try {
-    // First get a count of orphaned documents
-    const { count, error: countError } = await supabase
-      .from('documents')
-      .select('*', { count: 'exact', head: true })
-      .is('organization_id', null);
-    
-    if (countError) {
-      console.error("Error counting orphaned documents:", countError);
-      throw countError;
-    }
-    
-    if (!count || count === 0) {
-      toast({
-        title: "No orphaned documents found",
-        description: "All documents are already associated with an organization"
-      });
-      return { success: true, count: 0 };
-    }
-    
-    // Update all documents with null organization_id to be associated with the current organization
-    const { data, error } = await supabase
-      .from('documents')
-      .update({ organization_id: organizationId })
-      .is('organization_id', null)
-      .select();
-    
-    if (error) {
-      console.error("Error associating orphaned documents:", error);
-      throw error;
-    }
-    
-    toast({
-      title: "Documents associated successfully",
-      description: `${data?.length || 0} documents are now associated with your organization`
-    });
-    
-    return { success: true, count: data?.length || 0, data };
-  } catch (error: any) {
-    toast({
-      title: "Error associating documents",
-      description: error.message || "There was an error associating documents with your organization",
-      variant: "destructive"
-    });
-    
-    return { success: false, error };
-  }
-};
-
-/**
- * Utility to delete all files from the medical-documents storage bucket
- */
-export const deleteAllStorageFiles = async () => {
-  try {
-    // List all files in the medical-documents bucket
-    const { data: files, error } = await supabase
-      .storage
-      .from('medical-documents')
-      .list('', { limit: 1000 });
-    
-    if (error) {
-      throw error;
-    }
-    
-    if (!files || files.length === 0) {
-      return { success: true, count: 0, message: "No files found to delete" };
-    }
-    
-    // Get all file paths
-    const filePaths = files.map(file => file.name);
-    
-    // Delete all files
-    const { error: deleteError } = await supabase
-      .storage
-      .from('medical-documents')
-      .remove(filePaths);
-    
-    if (deleteError) {
-      throw deleteError;
-    }
-    
-    return { 
-      success: true, 
-      count: filePaths.length, 
-      message: `Successfully deleted ${filePaths.length} files` 
-    };
-  } catch (error: any) {
-    console.error("Error deleting storage files:", error);
-    return { 
-      success: false, 
-      error: error.message || "An unexpected error occurred" 
-    };
-  }
-};
-
-/**
- * Utility to check if a document is likely to require SDK processing
- */
-export const willRequireSDKProcessing = (file: File): boolean => {
-  // PDF files over 5MB or with potential for multiple pages
+export function willRequireSDKProcessing(file: File): boolean {
+  // Check if this is a large document that would require SDK processing
   const isPdf = file.type.includes('pdf');
   const isLargeDocument = file.size > 5000000; // 5MB threshold
   
   return isPdf && isLargeDocument;
-};
+}
+
+/**
+ * Get estimated processing time for a document
+ * @param file The file to process
+ * @returns Estimated seconds for processing
+ */
+export function getEstimatedProcessingTime(file: File): number {
+  const isPdf = file.type.includes('pdf');
+  const isLargeDocument = file.size > 5000000; // 5MB threshold
+  
+  if (isPdf && isLargeDocument) {
+    // For large PDFs that require SDK processing
+    return Math.min(300, Math.max(60, Math.floor(file.size / 50000))); // 60-300 seconds based on size
+  } else if (isPdf) {
+    // For normal PDFs
+    return Math.min(120, Math.max(30, Math.floor(file.size / 100000))); // 30-120 seconds based on size
+  } else {
+    // For images and other documents
+    return Math.min(60, Math.max(15, Math.floor(file.size / 200000))); // 15-60 seconds based on size
+  }
+}

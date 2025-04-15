@@ -4,27 +4,30 @@ export const apiClient = {
   // Call Landing AI API to process document
   async callLandingAI(file: File): Promise<any> {
     const landingAiApiKey = Deno.env.get('LANDING_AI_API_KEY') || 'bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5';
+    const processingServiceUrl = Deno.env.get('LANDING_AI_SDK_SERVICE_URL');
     
     if (!landingAiApiKey) {
+      console.error('Landing AI API key is not configured');
       throw new Error('Landing AI API key is not configured');
     }
     
-    console.log(`Processing file: ${file.name} (Size: ${file.size} bytes)`);
+    console.log(`Processing file: ${file.name} (Size: ${file.size} bytes, Type: ${file.type})`);
+    console.log(`SDK Processing URL configured: ${processingServiceUrl ? 'Yes' : 'No'}`);
     
     // Determine if this is a large document that requires SDK processing
     const isPdf = file.type.includes('pdf');
     const isLargeDocument = file.size > 5000000; // 5MB threshold
-    
-    // URL for processing service - this should point to your Python SDK service
-    const processingServiceUrl = Deno.env.get('LANDING_AI_SDK_SERVICE_URL') || 'https://your-landing-ai-sdk-service.com/process';
+    const forceSDK = Deno.env.get('FORCE_SDK_PROCESSING') === 'true';
     
     try {
       console.log(`Starting document processing at ${new Date().toISOString()}`);
+      console.log(`Using processing strategy: ${(isPdf && isLargeDocument) || forceSDK ? 'SDK Service' : 'Direct API'}`);
       const startTime = Date.now();
       
       // For large PDF documents or when specifically requested, use the SDK service
-      if ((isPdf && isLargeDocument) || Deno.env.get('FORCE_SDK_PROCESSING') === 'true') {
+      if (((isPdf && isLargeDocument) || forceSDK) && processingServiceUrl) {
         console.log('Document is large or complex. Using Landing AI SDK processing service.');
+        console.log(`SDK Service URL: ${processingServiceUrl}`);
         
         // Create form data for SDK service request
         const formData = new FormData();
@@ -38,6 +41,7 @@ export const apiClient = {
           controller.abort();
         }, 300000); // 5 minutes
         
+        console.log(`Sending request to SDK service at: ${new Date().toISOString()}`);
         const response = await fetch(processingServiceUrl, {
           method: 'POST',
           body: formData,
@@ -49,8 +53,22 @@ export const apiClient = {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`SDK Service Error: Status ${response.status}, Body: ${errorText}`);
-          throw new Error(`SDK Processing failed: ${errorText}`);
+          
+          // Enhanced error handling based on status code
+          if (response.status === 429) {
+            throw new Error(`SDK service rate limit exceeded. Please try again later.`);
+          } else if (response.status === 413) {
+            throw new Error(`File is too large for processing. Maximum file size is 50MB.`);
+          } else if (response.status >= 500) {
+            throw new Error(`SDK service server error (${response.status}). Please try again later.`);
+          } else {
+            throw new Error(`SDK Processing failed (${response.status}): ${errorText}`);
+          }
         }
+        
+        console.log(`SDK service response received at: ${new Date().toISOString()}`);
+        const responseContentType = response.headers.get('content-type');
+        console.log(`SDK response content type: ${responseContentType}`);
         
         const result = await response.json();
         const endTime = Date.now();
@@ -61,6 +79,10 @@ export const apiClient = {
       } else {
         // Fallback to direct API for smaller documents or non-PDFs
         console.log('Using direct Landing AI API for processing.');
+        
+        if (!processingServiceUrl && (isPdf && isLargeDocument)) {
+          console.warn('Large PDF detected but SDK service URL is not configured. Falling back to direct API which may fail for very large documents.');
+        }
         
         // API endpoint
         const apiUrl = 'https://api.va.landing.ai/v1/tools/agentic-document-analysis';
@@ -79,7 +101,7 @@ export const apiClient = {
         
         // Call Landing AI API with Basic Auth
         console.log(`Making request to Landing AI API with ${isPdf ? 'PDF' : 'image'} file`);
-        console.log(`File name: ${file.name}, File type: ${file.type}, File size: ${file.size} bytes`);
+        console.log(`API request started at: ${new Date().toISOString()}`);
         
         // Set longer timeout for large files (3 minutes)
         const controller = new AbortController();
@@ -122,6 +144,9 @@ export const apiClient = {
             throw new Error(`Landing AI API error (${response.status}): ${errorText}`);
           }
         }
+        
+        const responseContentType = response.headers.get('content-type');
+        console.log(`API response content type: ${responseContentType}`);
         
         const result = await response.json();
         console.log(`Successfully received response from Landing AI API for file: ${file.name}`);

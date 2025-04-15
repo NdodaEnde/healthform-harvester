@@ -1,3 +1,4 @@
+
 import { apiClient } from "./api-client.ts";
 import { processMedicalQuestionnaireData } from "./processors/medical-questionnaire.ts";
 import { processCertificateOfFitnessData } from "./processors/certificate-of-fitness.ts";
@@ -7,32 +8,61 @@ import { parseSouthAfricanIDNumber, normalizeIDNumber } from "./sa-id-parser.ts"
 
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
+  console.log(`=== STARTING DOCUMENT PROCESSING ===`);
+  console.log(`Document ID: ${documentId}`);
+  console.log(`Document Type: ${documentType}`);
+  console.log(`File Name: ${file.name}`);
+  console.log(`File Size: ${file.size} bytes`);
+  console.log(`File Type: ${file.type}`);
+  console.log(`Processing Start Time: ${new Date().toISOString()}`);
+  
   try {
-    console.log(`Starting document processing with Landing AI for document ID: ${documentId}`);
+    // Check if SDK Service URL is configured
+    const sdkServiceUrl = Deno.env.get('LANDING_AI_SDK_SERVICE_URL');
+    console.log(`SDK Service URL Configured: ${sdkServiceUrl ? 'Yes' : 'No'}`);
+    
+    // Check if API Key is configured
+    const apiKey = Deno.env.get('LANDING_AI_API_KEY');
+    console.log(`API Key Configured: ${apiKey ? 'Yes' : 'No'}`);
+    
+    console.log(`Calling Landing AI API for document ID: ${documentId}`);
     
     // Call Landing AI API
+    const startTime = Date.now();
     const result = await apiClient.callLandingAI(file);
-    console.log(`Landing AI API response received for document ID: ${documentId}`);
+    const endTime = Date.now();
+    const processingTime = (endTime - startTime) / 1000;
     
-    // Log the full API response for debugging
-    console.log('Raw API Response:', JSON.stringify(result, null, 2));
+    console.log(`Landing AI API response received for document ID: ${documentId}`);
+    console.log(`Processing time: ${processingTime.toFixed(2)} seconds`);
+    
+    // Log the full API response structure (not content) for debugging
+    console.log('API Response Structure:', Object.keys(result));
+    if (result.document_analysis) {
+      console.log('Document analysis fields:', Object.keys(result.document_analysis));
+    }
     
     // Process and structure the data based on document type
+    console.log(`Processing document type: ${documentType}`);
     let structuredData;
     if (documentType === 'medical-questionnaire') {
+      console.log('Using medical questionnaire processor');
       structuredData = processMedicalQuestionnaireData(result);
     } else {
+      console.log('Using certificate of fitness processor');
       structuredData = processCertificateOfFitnessData(result);
     }
     
-    console.log('Structured data extracted:', JSON.stringify(structuredData));
+    console.log('Structured data extracted with keys:', Object.keys(structuredData || {}));
     
     // Clean any problematic data in the structuredData
     cleanStructuredData(structuredData);
+    console.log('Data cleaned successfully');
     
     // Ensure certificate dates are properly processed
     if (documentType.includes('fitness') || documentType.includes('certificate')) {
       ensureCertificateDates(structuredData);
+      console.log('Certificate dates processed successfully');
     }
     
     // Try to update the document record multiple times if needed
@@ -41,6 +71,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     
     while (!updateSuccess && attempts < 3) {
       attempts++;
+      console.log(`Updating document record (attempt ${attempts})`);
       
       // Update the document record with the extracted data
       const { data: updateData, error: updateError } = await supabase
@@ -67,7 +98,6 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       } else {
         updateSuccess = true;
         console.log(`Document processing completed for document ID: ${documentId}`);
-        console.log('Updated document record:', updateData);
         
         // Force another update to ensure the status is set to processed
         await supabase
@@ -82,6 +112,7 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     
     // Additional verification step: explicitly verify the document is marked as processed
     for (let i = 0; i < 3; i++) {
+      console.log(`Verifying document status (check ${i+1})`);
       const { data: verifyData, error: verifyError } = await supabase
         .from('documents')
         .select('*')
@@ -111,11 +142,18 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
+    console.log(`=== DOCUMENT PROCESSING COMPLETED SUCCESSFULLY ===`);
+    
   } catch (error) {
-    console.error('Document processing error:', error);
+    console.error('=== DOCUMENT PROCESSING ERROR ===');
+    console.error(`Error processing document ID: ${documentId}`);
+    console.error(`Error type: ${error.name}`);
+    console.error(`Error message: ${error.message}`);
+    console.error(`Error stack: ${error.stack}`);
     
     // Update document status to failed with error message
     try {
+      console.log('Updating document status to failed');
       const { data, error: updateError } = await supabase
         .from('documents')
         .update({
@@ -128,11 +166,13 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
       if (updateError) {
         console.error('Error updating document status to failed:', updateError);
       } else {
-        console.log('Updated document status to failed:', data);
+        console.log('Updated document status to failed');
       }
     } catch (updateError) {
       console.error('Error updating document status after processing failure:', updateError);
     }
+    
+    console.error(`=== END OF ERROR REPORT ===`);
   }
 }
 
