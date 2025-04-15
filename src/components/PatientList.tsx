@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,13 +76,16 @@ interface PatientRaw {
   client_organization_id: string;
   created_at: string;
   updated_at: string;
-  // South African ID fields
+  // Added fields for South African ID
   id_number?: string;
   id_number_valid?: boolean;
   id_number_validated?: boolean; // For backwards compatibility
   birthdate_from_id?: string;
   gender_from_id?: 'male' | 'female' | null;
   citizenship_status?: 'citizen' | 'permanent_resident' | null;
+  // Also include older fields so TypeScript doesn't complain
+  age_at_registration?: number;
+  citizenship?: string;
 }
 
 const PatientList = () => {

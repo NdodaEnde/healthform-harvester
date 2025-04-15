@@ -423,7 +423,7 @@ const EnhancedCertificateGenerator = ({
 
   const printCertificate = () => {
     if (handlePrint) {
-      return Promise.resolve(handlePrint());
+      handlePrint();
     }
     return Promise.resolve();
   };
