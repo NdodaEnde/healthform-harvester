@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,7 +63,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Define the complete raw patient data interface to match database fields
 interface PatientRaw {
   id: string;
   first_name: string;
@@ -77,14 +75,12 @@ interface PatientRaw {
   client_organization_id: string;
   created_at: string;
   updated_at: string;
-  // Added fields for South African ID
   id_number?: string;
   id_number_valid?: boolean;
-  id_number_validated?: boolean; // For backwards compatibility
+  id_number_validated?: boolean;
   birthdate_from_id?: string;
   gender_from_id?: 'male' | 'female' | null;
   citizenship_status?: 'citizen' | 'permanent_resident' | null;
-  // Also include older fields so TypeScript doesn't complain
   age_at_registration?: number;
   citizenship?: string;
 }
@@ -484,5 +480,4 @@ const PatientList = () => {
   );
 };
 
-// Add default export for this component
 export default PatientList;
