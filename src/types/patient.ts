@@ -101,6 +101,10 @@ export interface PatientInfo {
   gender_from_id?: 'male' | 'female' | null;
   citizenship_status?: 'citizen' | 'permanent_resident' | null;
   id_number_valid?: boolean;
+  // For backwards compatibility
+  id_number_validated?: boolean;
+  age_at_registration?: number;
+  citizenship?: string;
 }
 
 export interface CertificateData {
