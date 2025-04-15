@@ -421,7 +421,7 @@ const EnhancedCertificateGenerator = ({
     content: () => certificateRef.current,
   });
 
-  const printCertificate = () => {
+  const printCertificate = (): Promise<void> => {
     if (handlePrint) {
       handlePrint();
     }
