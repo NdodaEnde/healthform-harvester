@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -91,7 +92,7 @@ const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
   return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
 };
 
-const getExaminationDate = (validUntil: string | undefined): string | null => {
+export const getExaminationDate = (validUntil: string | undefined): string | null => {
   if (!validUntil) return null;
   
   try {
@@ -112,6 +113,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
   const [selectedCertificate, setSelectedCertificate] = useState<Document | null>(null);
   const [isGeneratorDialogOpen, setIsGeneratorDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewingCertificate, setViewingCertificate] = useState<Document | null>(null);
 
   const { data: patient } = useQuery({
     queryKey: ['patient-details', patientId],
@@ -190,6 +192,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       });
       
       const docsWithReviewStatus = filteredDocs.map(doc => {
+        const extractedData = doc.extracted_data as ExtractedData | null;
         if (extractedData?.structured_data?.certification?.valid_until && 
             !extractedData?.structured_data?.certification?.examination_date && 
             !extractedData?.structured_data?.examination_results?.date) {

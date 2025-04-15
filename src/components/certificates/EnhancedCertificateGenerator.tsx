@@ -42,7 +42,6 @@ const EnhancedCertificateGenerator = ({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [printWithWatermark, setPrintWithWatermark] = useState(true);
   
-  // Reference to the certificate content for printing and PDF generation
   const certificateRef = useRef<HTMLDivElement>(null);
 
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
@@ -368,7 +367,6 @@ const EnhancedCertificateGenerator = ({
     exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
   };
 
-  // Generate a filename based on patient data
   const getFileName = () => {
     const patientName = getValue(patient, 'name') || getValue(patient, 'full_name') || 'Unknown';
     const examDate = getValue(examination, 'date') || new Date().toISOString().split('T')[0];
@@ -376,7 +374,6 @@ const EnhancedCertificateGenerator = ({
     return `Certificate_of_Fitness_${sanitizedName}_${examDate}`;
   };
 
-  // Handle PDF download
   const handleDownloadPdf = async () => {
     if (!certificateRef.current) return;
     
@@ -410,65 +407,50 @@ const EnhancedCertificateGenerator = ({
     }
   };
 
-  // Handle printing functionality
   const handlePrint = useReactToPrint({
+    documentTitle: 'Certificate of Fitness',
+    onBeforePrint: () => console.log('Preparing to print...'),
+    onAfterPrint: () => console.log('Print completed'),
+    removeAfterPrint: true,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+    `,
     content: () => certificateRef.current,
-    documentTitle: getFileName(),
-    onBeforeGetContent: () => {
-      // Add watermark before printing
-      setPrintWithWatermark(true);
-      
-      toast({
-        title: "Preparing to print...",
-        description: "Getting document ready.",
-      });
-      return Promise.resolve();
-    },
-    onAfterPrint: () => {
-      // Remove watermark after printing
-      setPrintWithWatermark(false);
-      
-      toast({
-        title: "Print job sent",
-        description: "Document has been sent to the printer.",
-      });
-    },
-    removeAfterPrint: true
   });
 
-  // Handle email dialog
+  const printCertificate = () => {
+    if (handlePrint) {
+      handlePrint();
+    }
+  };
+
   const handleEmailOpen = () => {
-    // Pre-populate email if patient has email
     if (patient.contact_info?.email) {
       setEmailData(prev => ({ ...prev, to: patient.contact_info.email }));
     }
     setIsEmailDialogOpen(true);
   };
 
-  // Handle email sending
   const handleSendEmail = async () => {
     if (!certificateRef.current || !emailData.to) return;
     
     try {
       setIsGeneratingPdf(true);
       
-      // Add watermark for email copies
       setPrintWithWatermark(true);
       
-      // Small delay to ensure watermark is applied before capturing
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Generate image of certificate for email attachment
       const dataUrl = await toPng(certificateRef.current, { quality: 0.95, pixelRatio: 2 });
       
-      // In a real implementation, you would send this to your backend
-      // Here we'll mock a successful email send
       console.log("Would send email to:", emailData.to);
       console.log("With subject:", emailData.subject);
       console.log("With message:", emailData.message);
       console.log("With attachment:", dataUrl.substring(0, 100) + "...");
       
-      // Mock API call
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({
@@ -485,7 +467,6 @@ const EnhancedCertificateGenerator = ({
         variant: "destructive"
       });
     } finally {
-      // Remove watermark after email is sent
       setPrintWithWatermark(false);
       setIsGeneratingPdf(false);
     }
@@ -498,7 +479,6 @@ const EnhancedCertificateGenerator = ({
         <p className="text-sm text-muted-foreground">Generate a printable certificate from the extracted data</p>
       </div>
       
-      {/* Action buttons - fixed at top */}
       <div className="sticky top-0 z-10 flex justify-center gap-3 py-3 bg-gray-50 border-b">
         <div className="flex">
           <Button 
@@ -553,10 +533,11 @@ const EnhancedCertificateGenerator = ({
         
         <Button 
           variant="outline" 
-          onClick={handlePrint} 
+          onClick={printCertificate}
+          disabled={false}
           className="flex items-center gap-2"
         >
-          <Printer size={16} />
+          <Printer className="mr-2 h-4 w-4" />
           Print
         </Button>
         <Button 
@@ -578,7 +559,6 @@ const EnhancedCertificateGenerator = ({
             </span>
           </div>
           
-          {/* Show watermark for copies */}
           {(showWatermark || printWithWatermark) && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10" aria-hidden="true">
               <span className="text-9xl font-extrabold text-red-500 opacity-20 rotate-45">
@@ -819,7 +799,7 @@ const EnhancedCertificateGenerator = ({
             </div>
             
             <div className="mb-4">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
+              <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-2">
                 Restrictions:
               </div>
               
@@ -867,7 +847,6 @@ const EnhancedCertificateGenerator = ({
               </div>
             </div>
             
-            {/* Moved Fitness Assessment to be before Comments section */}
             <div className="mb-2">
               <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-1">
                 FITNESS ASSESSMENT
@@ -903,7 +882,6 @@ const EnhancedCertificateGenerator = ({
               </div>
             </div>
             
-            {/* Moved Comments section to be the last section before the signature */}
             <div className="px-4 mb-1">
               <div className="font-semibold text-xs mb-0.5">Comments:</div>
               <div className="border border-gray-400 p-1 min-h-8 text-xs">
@@ -945,7 +923,6 @@ const EnhancedCertificateGenerator = ({
       </Card>
     </ScrollArea>
     
-    {/* Email Dialog */}
     <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
