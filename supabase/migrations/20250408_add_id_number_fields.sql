@@ -1,3 +1,4 @@
+
 -- Add ID number related fields to the patients table
 ALTER TABLE patients
 ADD COLUMN IF NOT EXISTS id_number TEXT,

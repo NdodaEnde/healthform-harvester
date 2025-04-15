@@ -63,7 +63,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-
+interface PatientRaw {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  contact_info: any;
+  medical_history: any;
+  organization_id: string;
+  client_organization_id: string;
+  created_at: string;
+  updated_at: string;
+  // South African ID fields
+  id_number?: string;
+  id_number_valid?: boolean;
+  id_number_validated?: boolean; // For backwards compatibility
+  birthdate_from_id?: string;
+  gender_from_id?: 'male' | 'female' | null;
+  citizenship_status?: 'citizen' | 'permanent_resident' | null;
+}
 
 const PatientList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,7 +155,7 @@ const PatientList = () => {
         })));
       }
       
-      return data || [];
+      return data || [] as PatientRaw[];
     },
     enabled: !!organizationId,
   });
@@ -199,7 +218,7 @@ const PatientList = () => {
       birthdate_from_id: p.birthdate_from_id,
       gender_from_id: p.gender_from_id,
       citizenship_status: p.citizenship_status,
-      id_number_valid: p.id_number_valid
+      id_number_valid: p.id_number_valid || p.id_number_validated || false
     };
   }) || [];
 
@@ -326,33 +345,27 @@ const PatientList = () => {
     }
   };
 
-  // Improved age calculation with fallbacks and better date validation
   const calculateAge = (dateOfBirth?: string) => {
     if (!dateOfBirth) return 0;
     
     const today = new Date();
     
-    // Try parsing with built-in Date constructor first
     let birthDate = new Date(dateOfBirth);
     
-    // If it's an invalid date, try parseISO from date-fns
     if (isNaN(birthDate.getTime())) {
       birthDate = parseISO(dateOfBirth);
       
-      // If still invalid, return 0
       if (!isValid(birthDate)) {
         console.warn('Invalid date format for age calculation:', dateOfBirth);
         return 0;
       }
     }
     
-    // Make sure the parsed date is valid
     if (!isValid(birthDate)) {
       console.warn('Invalid date after parsing:', dateOfBirth);
       return 0;
     }
     
-    // Check for dates in the future
     if (birthDate > today) {
       console.warn('Birth date is in the future:', dateOfBirth);
       return 0;
@@ -507,7 +520,6 @@ const PatientList = () => {
 
   const reviewDeadlines = calculateReviewDeadlines();
 
-  // Helper function to get formatted date to display
   const getFormattedDateOfBirth = (patient: PatientInfo) => {
     const dateOfBirth = patient.birthdate_from_id || patient.date_of_birth;
     return formatSafeDateEnhanced(dateOfBirth, 'MMM d, yyyy');
@@ -754,7 +766,6 @@ const PatientList = () => {
               </TableHeader>
               <TableBody>
                 {paginatedPatients.map((patient, index) => {
-                  // Calculate age for each patient using enhanced function
                   const age = calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth);
                   
                   return (
