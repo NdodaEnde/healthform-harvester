@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
@@ -100,4 +99,15 @@ export const deleteAllStorageFiles = async () => {
       error: error.message || "An unexpected error occurred" 
     };
   }
+};
+
+/**
+ * Utility to check if a document is likely to require SDK processing
+ */
+export const willRequireSDKProcessing = (file: File): boolean => {
+  // PDF files over 5MB or with potential for multiple pages
+  const isPdf = file.type.includes('pdf');
+  const isLargeDocument = file.size > 5000000; // 5MB threshold
+  
+  return isPdf && isLargeDocument;
 };

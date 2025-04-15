@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,7 +65,6 @@ interface Document {
 
 type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
-// Function to determine the fitness status color
 const getFitnessStatusColor = (document: Document) => {
   const certification = document.extracted_data?.structured_data?.certification;
   
@@ -77,7 +75,6 @@ const getFitnessStatusColor = (document: Document) => {
   return "secondary";
 };
 
-// Function to format fitness status text
 const getFitnessStatusText = (document: Document) => {
   const certification = document.extracted_data?.structured_data?.certification;
   const results = document.extracted_data?.structured_data?.examination_results;
@@ -87,25 +84,20 @@ const getFitnessStatusText = (document: Document) => {
   if (certification?.temporarily_unfit) return "Temporarily Unfit";
   if (certification?.unfit) return "Unfit";
   
-  // Fallback to examination_results if available
   return results?.fitness_status || "Unknown";
 };
 
-// Helper function to get document review status from localStorage
 const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
   return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
 };
 
-// Helper function to get examination date based on valid_until date
-// Assuming examination date is typically one year before expiry date
-export const getExaminationDate = (validUntil: string | undefined): string | null => {
+const getExaminationDate = (validUntil: string | undefined): string | null => {
   if (!validUntil) return null;
   
   try {
     const expiryDate = new Date(validUntil);
     if (isNaN(expiryDate.getTime())) return null;
     
-    // Get date one year before expiry
     const examDate = new Date(expiryDate);
     examDate.setFullYear(examDate.getFullYear() - 1);
     return examDate.toISOString().split('T')[0];
@@ -119,8 +111,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
   const navigate = useNavigate();
   const [selectedCertificate, setSelectedCertificate] = useState<Document | null>(null);
   const [isGeneratorDialogOpen, setIsGeneratorDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
-  // Query to fetch patient details to assist with matching
   const { data: patient } = useQuery({
     queryKey: ['patient-details', patientId],
     queryFn: async () => {
@@ -136,14 +128,12 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId,
   });
 
-  // Query certificates related to this patient with enhanced matching, showing all certificates
   const { data: certificates, isLoading, error } = useQuery({
     queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
     queryFn: async () => {
       console.log('Fetching certificates for patient:', patientId);
       console.log('Patient name:', patient?.first_name, patient?.last_name);
       
-      // Get all processed documents of certificate types
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -159,17 +149,14 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       console.log('Raw processed documents fetched:', data?.length);
       
-      // Enhanced multi-strategy matching without validation filter
       const filteredDocs = (data || []).filter(doc => {
         const extractedData = doc.extracted_data as ExtractedData | null;
         
-        // Strategy 1: Direct patient ID match in patient_info
         if (extractedData?.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
           return true;
         }
         
-        // Strategy 2: Patient name match in structured data
         const patientName = patient ? 
           `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
         
@@ -181,7 +168,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           return true;
         }
         
-        // Strategy 3: Patient name in filename (simplified)
         const fileName = doc.file_name.toLowerCase();
         
         if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
@@ -194,7 +180,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           return true;
         }
         
-        // Strategy 4: Patient ID in filename
         if (fileName.includes(patientId.toLowerCase())) {
           console.log('Match by patient ID in filename:', doc.id);
           return true;
@@ -204,10 +189,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         return false;
       });
       
-      // Add review status from localStorage to each document
       const docsWithReviewStatus = filteredDocs.map(doc => {
-        // Add calculated examination date if missing but has valid_until
-        const extractedData = doc.extracted_data as ExtractedData | null;
         if (extractedData?.structured_data?.certification?.valid_until && 
             !extractedData?.structured_data?.certification?.examination_date && 
             !extractedData?.structured_data?.examination_results?.date) {
@@ -230,18 +212,10 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
     enabled: !!patientId && !!organizationId && !!patient,
   });
 
-  // State for direct certificate viewing
-  const [viewingCertificate, setViewingCertificate] = useState<Document | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  
   const handleViewCertificate = (certificate: Document) => {
     setViewingCertificate(certificate);
     setIsViewDialogOpen(true);
   };
-
-  // Filter for only reviewed certificates if needed
-  // Uncomment this to show only reviewed certificates
-  // const reviewedCertificates = certificates?.filter(cert => cert.reviewStatus === 'reviewed') || [];
 
   return (
     <>
@@ -303,7 +277,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                         <Button
                           variant="default"
                           onClick={() => {
-                            // Open a dialog to show the certificate with download options
                             setSelectedCertificate(cert);
                             setIsGeneratorDialogOpen(true);
                           }}
@@ -329,7 +302,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         </CardContent>
       </Card>
       
-      {/* Certificate Generator Dialog */}
       <Dialog open={isGeneratorDialogOpen} onOpenChange={setIsGeneratorDialogOpen}>
         <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
           <DialogHeader>
@@ -349,7 +321,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         </DialogContent>
       </Dialog>
       
-      {/* Certificate View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
           <DialogHeader>

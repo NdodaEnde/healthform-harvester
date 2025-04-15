@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { willRequireSDKProcessing } from "@/utils/documentOrganizationFixer";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -33,10 +34,15 @@ const DocumentUploader = ({
   const [documentType, setDocumentType] = useState<string>("certificate-fitness");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [needsSDKProcessing, setNeedsSDKProcessing] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      
+      // Check if this file will require SDK processing
+      setNeedsSDKProcessing(willRequireSDKProcessing(selectedFile));
     }
   };
 
@@ -75,13 +81,21 @@ const DocumentUploader = ({
       formData.append('documentType', documentType);
       formData.append('userId', user.id);
 
-      // Simulate progress
+      // Adjust progress simulation based on expected processing time
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
-          if (prev < 60) return prev + 5;
-          return prev;
+          // Slower progress for large documents that need SDK processing
+          if (needsSDKProcessing) {
+            if (prev < 40) return prev + 2;
+            if (prev < 60) return prev + 1;
+            return prev;
+          } else {
+            // Regular progress for standard documents
+            if (prev < 60) return prev + 5;
+            return prev;
+          }
         });
-      }, 300);
+      }, needsSDKProcessing ? 500 : 300);
 
       // Call the Supabase Edge Function to process the document
       const { data, error } = await supabase.functions.invoke('process-document', {
@@ -116,7 +130,9 @@ const DocumentUploader = ({
       
       toast({
         title: "Upload successful",
-        description: "Your document has been uploaded and is being processed",
+        description: needsSDKProcessing 
+          ? "Your document has been uploaded and is being processed using advanced processing. This may take longer for large documents."
+          : "Your document has been uploaded and is being processed",
       });
       
       if (onUploadComplete) {
@@ -134,6 +150,7 @@ const DocumentUploader = ({
       setUploading(false);
       setFile(null);
       setUploadProgress(0);
+      setNeedsSDKProcessing(false);
     }
   };
 
@@ -173,6 +190,16 @@ const DocumentUploader = ({
         </p>
       </div>
 
+      {needsSDKProcessing && file && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-2 flex items-start space-x-2">
+          <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-800">
+            <p className="font-medium">Large document detected</p>
+            <p>This document may require advanced processing which could take longer than usual.</p>
+          </div>
+        </div>
+      )}
+
       {organizationId && (
         <div className="text-xs text-muted-foreground">
           {clientOrganizationId ? (
@@ -192,7 +219,8 @@ const DocumentUploader = ({
             ></div>
           </div>
           <p className="text-xs text-center text-muted-foreground">
-            {uploadProgress < 100 ? "Uploading..." : "Processing..."}
+            {uploadProgress < 40 ? "Uploading..." : uploadProgress < 80 ? "Processing..." : "Finalizing..."}
+            {needsSDKProcessing && uploadProgress >= 40 && uploadProgress < 80 && " (Advanced document processing)"}
           </p>
         </div>
       )}
@@ -205,7 +233,7 @@ const DocumentUploader = ({
         {uploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span>Uploading...</span>
+            <span>Uploading{needsSDKProcessing ? " (Advanced Processing)" : ""}...</span>
           </>
         ) : (
           <span>Upload Document</span>
