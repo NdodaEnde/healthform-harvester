@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -106,18 +107,21 @@ const PatientList = () => {
   const organizationId = currentOrganization?.id;
   const clientOrganizationId = currentClient?.id;
 
-  const { data: patientsData, isLoading, error, refetch } = useQuery(
-    ['patients', organizationId, clientOrganizationId, searchQuery, filterGender, filterCitizenship, sortColumn, sortDirection],
-    async () => {
+  const { data: patientsData, isLoading, error, refetch } = useQuery({
+    queryKey: ['patients', organizationId, clientOrganizationId, searchQuery, filterGender, filterCitizenship, sortColumn, sortDirection],
+    queryFn: async () => {
       if (!organizationId) {
         console.warn('Organization ID is missing.');
         return [];
       }
 
       let query = supabase
-        .from<PatientRaw>('patients')
-        .select('*')
-        .eq('organization_id', organizationId);
+        .from('patients')
+        .select('*');
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
 
       if (clientOrganizationId) {
         query = query.eq('client_organization_id', clientOrganizationId);
@@ -148,9 +152,10 @@ const PatientList = () => {
         throw new Error(error.message);
       }
 
-      return data || [];
-    }
-  );
+      return data as PatientRaw[] || [];
+    },
+    enabled: !!organizationId
+  });
 
   useEffect(() => {
     refetch();
@@ -236,7 +241,7 @@ const PatientList = () => {
   }
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div>Error: {(error as Error).message}</div>;
   }
 
   return (
@@ -346,7 +351,7 @@ const PatientList = () => {
       {isGridView ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {currentPatients.map((patient) => (
-            <PatientCard key={patient.id} patient={patient as PatientInfo} />
+            <PatientCard key={patient.id} patient={patient as unknown as PatientInfo} />
           ))}
         </div>
       ) : (
@@ -372,7 +377,7 @@ const PatientList = () => {
               const contactInfo = patient.contact_info as ContactInfo || {};
               const medicalHistory = patient.medical_history as MedicalHistoryData || {};
               const age = calculateAgeEnhanced(patient.date_of_birth);
-              const gender = getEffectiveGenderEnhanced(patient);
+              const gender = getEffectiveGenderEnhanced(patient as unknown as PatientInfo);
               const dobFormatted = formatSafeDateEnhanced(patient.date_of_birth);
 
               return (
@@ -438,10 +443,13 @@ const PatientList = () => {
       {totalPages > 1 && (
         <Pagination>
           <PaginationContent>
-            <PaginationPrevious
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            />
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => handlePageChange(currentPage - 1)}
+                aria-disabled={currentPage === 1}
+                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+              />
+            </PaginationItem>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => {
               if (pageNumber === 1 || pageNumber === totalPages || (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)) {
                 return (
@@ -462,10 +470,13 @@ const PatientList = () => {
                 return null;
               }
             })}
-            <PaginationNext
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            />
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => handlePageChange(currentPage + 1)}
+                aria-disabled={currentPage === totalPages}
+                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+              />
+            </PaginationItem>
           </PaginationContent>
         </Pagination>
       )}
