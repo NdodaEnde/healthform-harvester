@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -115,30 +116,36 @@ const PatientList = () => {
         .from('patients')
         .select('*');
 
+      // Apply organization filter if available
       if (organizationId) {
-        query = query.eq('organization_id', organizationId);
+        query = query.eq('organization_id', organizationId as string);
       }
 
+      // Apply client organization filter if available
       if (clientOrganizationId) {
-        query = query.eq('client_organization_id', clientOrganizationId);
+        query = query.eq('client_organization_id', clientOrganizationId as string);
       } else {
         query = query.is('client_organization_id', null);
       }
 
+      // Apply search filter if available
       if (searchQuery) {
         query = query.or(
           `first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,id_number.ilike.%${searchQuery}%`
         );
       }
 
+      // Apply gender filter if available
       if (filterGender) {
-        query = query.eq('gender', filterGender);
+        query = query.eq('gender', filterGender as string);
       }
 
+      // Apply citizenship filter if available
       if (filterCitizenship) {
-        query = query.eq('citizenship_status', filterCitizenship);
+        query = query.eq('citizenship_status', filterCitizenship as string);
       }
 
+      // Apply sorting
       query = query.order(sortColumn, { ascending: sortDirection === 'asc' });
 
       const { data, error } = await query;
@@ -442,7 +449,6 @@ const PatientList = () => {
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => handlePageChange(currentPage - 1)}
-                aria-disabled={currentPage === 1}
                 className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
               />
             </PaginationItem>
@@ -469,7 +475,6 @@ const PatientList = () => {
             <PaginationItem>
               <PaginationNext
                 onClick={() => handlePageChange(currentPage + 1)}
-                aria-disabled={currentPage === totalPages}
                 className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
               />
             </PaginationItem>

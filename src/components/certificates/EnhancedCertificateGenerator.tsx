@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; 
@@ -422,13 +421,14 @@ const EnhancedCertificateGenerator = ({
     content: () => certificateRef.current,
   });
 
-  // Fix: Ensure printCertificate returns a Promise<void>
-  const printCertificate = (): Promise<void> => {
+  const printCertificate = async (): Promise<void> => {
     return new Promise<void>((resolve) => {
       if (handlePrint) {
         handlePrint();
       }
-      resolve();
+      setTimeout(() => {
+        resolve();
+      }, 100);
     });
   };
 
