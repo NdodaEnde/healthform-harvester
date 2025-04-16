@@ -32,9 +32,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 
 interface CertificateGeneratorProps {
   initialCertificateId?: string;
+  extractedData?: any;
 }
 
-const EnhancedCertificateGenerator: React.FC<CertificateGeneratorProps> = ({ initialCertificateId }) => {
+const EnhancedCertificateGenerator: React.FC<CertificateGeneratorProps> = ({ initialCertificateId, extractedData }) => {
   const [certificateId, setCertificateId] = useState<string>(initialCertificateId || "");
   const debouncedCertificateId = useDebounce(certificateId, 500);
   const { certificate, isLoading, error, isValidCertificateId } = useCertificateData(debouncedCertificateId);
@@ -68,10 +69,10 @@ const EnhancedCertificateGenerator: React.FC<CertificateGeneratorProps> = ({ ini
   const [localProcessingProgress, setLocalProcessingProgress] = useState(0);
   const [isLocalDataVisible, setIsLocalDataVisible] = useState(false);
   const [localResults, setLocalResults] = useState<any>(null);
-	const [isLocalError, setIsLocalError] = useState(false);
-	const [localErrorMessage, setLocalErrorMessage] = useState<string>("");
+  const [isLocalError, setIsLocalError] = useState(false);
+  const [localErrorMessage, setLocalErrorMessage] = useState<string>("");
   const { toast } = useToast()
-	const { processDocument, isProcessing, processingProgress } = useDocumentProcessing();
+  const { processDocument, isProcessing, processingProgress } = useDocumentProcessing();
 
   const s3Client = new S3Client({
     region: process.env.NEXT_PUBLIC_AWS_REGION || '',
@@ -457,8 +458,8 @@ const EnhancedCertificateGenerator: React.FC<CertificateGeneratorProps> = ({ ini
     setIsLocalProcessing(true);
     setLocalProcessingProgress(0);
     setLocalResults(null);
-		setIsLocalError(false);
-		setLocalErrorMessage("");
+    setIsLocalError(false);
+    setLocalErrorMessage("");
 
     try {
       await handleDocumentProcessing(uploadedFile, aiQuery.length > 0 ? aiQuery : undefined);
@@ -472,8 +473,8 @@ const EnhancedCertificateGenerator: React.FC<CertificateGeneratorProps> = ({ ini
       
     } catch (error: any) {
       console.error("Error processing with SDK:", error);
-			setIsLocalError(true);
-			setLocalErrorMessage(error.message || "Failed to process document with SDK");
+      setIsLocalError(true);
+      setLocalErrorMessage(error.message || "Failed to process document with SDK");
       toast({
         title: "SDK Processing Failed",
         description: error instanceof Error ? error.message : "Failed to process document with SDK",
@@ -780,7 +781,7 @@ const EnhancedCertificateGenerator: React.FC<CertificateGeneratorProps> = ({ ini
             "Process Locally"
           )}
         </Button>
-				{isLocalError && (
+        {isLocalError && (
           <p className="text-red-500 mt-2">
             Local Error: {localErrorMessage}
           </p>

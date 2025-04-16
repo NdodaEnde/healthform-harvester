@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
@@ -38,6 +37,10 @@ interface ProcessingResult {
   error: string | null;
   isProcessing: boolean;
   processingProgress?: number;
+}
+
+export interface ExtractedData {
+  [key: string]: any;
 }
 
 export const useDocumentProcessing = () => {
