@@ -25,6 +25,14 @@ class DocumentProcessor:
         openai_api_key = os.environ.get("OPENAI_API_KEY")
         if openai_api_key:
             os.environ["OPENAI_API_KEY"] = openai_api_key
+            
+        # Configure SDK service URL if available
+        sdk_service_url = os.environ.get("LANDING_AI_SDK_SERVICE_URL")
+        if sdk_service_url:
+            os.environ["LANDING_AI_SDK_SERVICE_URL"] = sdk_service_url
+            logger.info(f"SDK service URL configured: {sdk_service_url}")
+        else:
+            logger.info("No SDK service URL configured, using direct API")
     
     def process_file(self, file_path: str) -> dict:
         try:
@@ -186,6 +194,12 @@ class handler(BaseHTTPRequestHandler):
                 params = urllib.parse.parse_qs(query_string)
                 query = params.get('query', [''])[0]
 
+            # Log processing details
+            logger.info("Starting document processing")
+            logger.info(f"SDK service URL configured: {'Yes' if os.environ.get('LANDING_AI_SDK_SERVICE_URL') else 'No'}")
+            logger.info(f"API Key configured: {'Yes' if api_key else 'No'}")
+            logger.info(f"Processing file at {file_path}")
+            
             # Process document
             processor = DocumentProcessor(api_key)
             result = processor.process_file(file_path)
@@ -198,9 +212,13 @@ class handler(BaseHTTPRequestHandler):
 
             # If processing was successful and there's a query, analyze with AI
             if result["success"] and query and os.environ.get('OPENAI_API_KEY'):
+                logger.info(f"Processing AI analysis with query: {query}")
                 analysis_result = processor.analyze_with_ai(query, result["data"])
                 if analysis_result["success"]:
                     result["data"]["ai_analysis"] = analysis_result["analysis"]
+                    logger.info("AI analysis completed successfully")
+                else:
+                    logger.error(f"AI analysis failed: {analysis_result.get('error')}")
 
             # Send response
             if result["success"]:

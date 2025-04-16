@@ -85,19 +85,37 @@ export const useDocumentProcessing = () => {
         endpoint += `?query=${encodeURIComponent(query)}`;
       }
 
+      console.log(`Processing document: ${file.name} (${file.size} bytes, ${file.type})`);
+      console.log(`Using endpoint: ${endpoint}`);
+      console.log(`Query included: ${query ? 'Yes' : 'No'}`);
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
 
       clearInterval(progressInterval);
-
+      
+      // Check if the request was successful
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process document');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          // If response isn't valid JSON
+          throw new Error(`Failed to process document: HTTP ${response.status}`);
+        }
+        throw new Error(errorData.error || `Failed to process document: HTTP ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format received from server');
       }
 
       const result = await response.json();
+      console.log('Document processing completed successfully');
+      
       setProcessingState({
         data: result,
         error: null,
@@ -115,7 +133,26 @@ export const useDocumentProcessing = () => {
       return;
     } catch (error) {
       clearInterval(progressInterval);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      // Enhance error handling with more specific messages
+      let errorMessage;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error('Document processing error:', error);
+      } else {
+        errorMessage = 'Unknown error occurred';
+        console.error('Unknown document processing error:', error);
+      }
+      
+      // Check for common error patterns
+      if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        errorMessage = 'Document processing timed out. Please try again with a smaller file.';
+      } else if (errorMessage.includes('too large')) {
+        errorMessage = 'Document file is too large. Maximum file size is 10MB.';
+      } else if (errorMessage.toLowerCase().includes('network') || errorMessage.includes('failed to fetch')) {
+        errorMessage = 'Network error while processing document. Please check your connection and try again.';
+      }
+      
       setProcessingState({
         data: null,
         error: errorMessage,
@@ -129,7 +166,7 @@ export const useDocumentProcessing = () => {
         variant: "destructive",
       });
       
-      throw error; // Rethrow so callers can handle it
+      throw new Error(errorMessage); // Rethrow so callers can handle it
     }
   };
 
