@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -51,11 +50,9 @@ const DocumentUploader = ({
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
       
-      // Check if this file will require SDK processing
       const requiresSDK = willRequireSDKProcessing(selectedFile);
       setNeedsSDKProcessing(requiresSDK);
       
-      // Reset processing attempts when a new file is selected
       setProcessingAttempts(0);
     }
   };
@@ -70,15 +67,13 @@ const DocumentUploader = ({
       return;
     }
     
-    // Increment processing attempts
     setProcessingAttempts(prev => prev + 1);
     
-    // If we've tried processing more than 3 times, suggest using a smaller file
     if (processingAttempts >= 3) {
       toast({
         title: "Multiple processing attempts",
         description: "We've tried processing this file multiple times. Try using a smaller or different file format.",
-        variant: "warning"
+        variant: "default"
       });
     }
 
@@ -86,8 +81,6 @@ const DocumentUploader = ({
       setUploading(true);
       setUploadProgress(10);
 
-      // For all document processing, we'll use the direct document processing hook
-      // This will ensure consistent processing and enable better error handling
       setIsLocalProcessing(true);
 
       try {
