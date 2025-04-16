@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
@@ -92,11 +93,17 @@ export const useDocumentProcessing = () => {
       console.log(`Using endpoint: ${endpoint}`);
       console.log(`Query included: ${query ? 'Yes' : 'No'}`);
       
+      // Set a longer timeout for the fetch request (30 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
+        signal: controller.signal
       });
-
+      
+      clearTimeout(timeoutId);
       clearInterval(progressInterval);
       
       // Check if the request was successful
@@ -118,6 +125,7 @@ export const useDocumentProcessing = () => {
 
       const result = await response.json();
       console.log('Document processing completed successfully');
+      console.log('Response data:', result);
       
       setProcessingState({
         data: result,
@@ -140,7 +148,11 @@ export const useDocumentProcessing = () => {
       // Enhance error handling with more specific messages
       let errorMessage;
       if (error instanceof Error) {
-        errorMessage = error.message;
+        if (error.name === 'AbortError') {
+          errorMessage = 'Document processing timed out after 60 seconds. Server might be overloaded or unreachable.';
+        } else {
+          errorMessage = error.message;
+        }
         console.error('Document processing error:', error);
       } else {
         errorMessage = 'Unknown error occurred';

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -41,8 +42,9 @@ const DocumentUploader = ({
   const [needsSDKProcessing, setNeedsSDKProcessing] = useState(false);
   const [aiQuery, setAIQuery] = useState("");
   const [isLocalProcessing, setIsLocalProcessing] = useState(false);
+  const [processingAttempts, setProcessingAttempts] = useState(0);
   
-  const { processDocument, isProcessing, processingProgress } = useDocumentProcessing();
+  const { processDocument, isProcessing, processingProgress, data: processedData } = useDocumentProcessing();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -52,6 +54,9 @@ const DocumentUploader = ({
       // Check if this file will require SDK processing
       const requiresSDK = willRequireSDKProcessing(selectedFile);
       setNeedsSDKProcessing(requiresSDK);
+      
+      // Reset processing attempts when a new file is selected
+      setProcessingAttempts(0);
     }
   };
 
@@ -64,100 +69,53 @@ const DocumentUploader = ({
       });
       return;
     }
+    
+    // Increment processing attempts
+    setProcessingAttempts(prev => prev + 1);
+    
+    // If we've tried processing more than 3 times, suggest using a smaller file
+    if (processingAttempts >= 3) {
+      toast({
+        title: "Multiple processing attempts",
+        description: "We've tried processing this file multiple times. Try using a smaller or different file format.",
+        variant: "warning"
+      });
+    }
 
     try {
       setUploading(true);
       setUploadProgress(10);
 
-      if (needsSDKProcessing) {
-        // If we need SDK processing, we'll use the direct document processing
-        // hook instead of going through Supabase functions
-        setIsLocalProcessing(true);
+      // For all document processing, we'll use the direct document processing hook
+      // This will ensure consistent processing and enable better error handling
+      setIsLocalProcessing(true);
 
-        try {
-          await processDocument(file, aiQuery.length > 0 ? aiQuery : undefined);
-          
-          setUploadProgress(100);
-          
-          toast({
-            title: "Document processed with SDK",
-            description: "Your document has been analyzed using the agentic-doc SDK",
-          });
-          
-          if (onUploadComplete) {
-            onUploadComplete();
-          }
-        } catch (error) {
-          console.error("Error processing with SDK:", error);
-          toast({
-            title: "SDK Processing Failed",
-            description: error instanceof Error ? error.message : "Failed to process document with SDK",
-            variant: "destructive"
-          });
-        } finally {
-          setIsLocalProcessing(false);
-        }
-      } else {
-        // Otherwise we'll use the standard upload flow through Supabase functions
-        // Get current user for folder path organization
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          throw new Error("User not authenticated");
-        }
+      try {
+        console.log(`Starting document processing (attempt ${processingAttempts + 1})`);
+        console.log(`File: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
+        console.log(`AI Query: ${aiQuery || "None"}`);
         
-        // Create a formData object
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('documentType', documentType);
-        formData.append('userId', user.id);
-
-        // Adjust progress simulation based on expected processing time
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            if (prev < 60) return prev + 5;
-            return prev;
-          });
-        }, 300);
-
-        // Call the Supabase Edge Function to process the document
-        const { data, error } = await supabase.functions.invoke('process-document', {
-          body: formData,
-        });
-
-        clearInterval(progressInterval);
-        
-        if (error) throw error;
-        
-        setUploadProgress(80);
-        
-        // First verify if the document has been properly created
-        if (!data?.documentId) {
-          throw new Error("No document ID returned from processing function");
-        }
-        
-        // Update the document record with organization context
-        const { error: updateError } = await supabase
-          .from('documents')
-          .update({
-            organization_id: organizationId,
-            client_organization_id: clientOrganizationId || null
-          })
-          .eq('id', data.documentId);
-          
-        if (updateError) {
-          throw updateError;
-        }
+        await processDocument(file, aiQuery.length > 0 ? aiQuery : undefined);
         
         setUploadProgress(100);
         
         toast({
-          title: "Upload successful",
-          description: "Your document has been uploaded and is being processed",
+          title: "Document processed successfully",
+          description: "Your document has been analyzed using the document processing pipeline.",
         });
         
         if (onUploadComplete) {
-          onUploadComplete(data);
+          onUploadComplete(processedData);
         }
+      } catch (error) {
+        console.error("Error processing document:", error);
+        toast({
+          title: "Processing Failed",
+          description: error instanceof Error ? error.message : "Failed to process document",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLocalProcessing(false);
       }
     } catch (error: any) {
       console.error("Error uploading document:", error);
@@ -230,7 +188,7 @@ const DocumentUploader = ({
         </div>
       )}
 
-      {enableAIQuery && needsSDKProcessing && file && (
+      {enableAIQuery && file && (
         <div className="space-y-2">
           <Label htmlFor="aiQuery">Ask AI about this document (optional)</Label>
           <Textarea
@@ -247,12 +205,12 @@ const DocumentUploader = ({
         </div>
       )}
 
-      {needsSDKProcessing && file && (
+      {file && file.size > 5 * 1024 * 1024 && (
         <div className="bg-amber-50 border border-amber-200 rounded-md p-2 flex items-start space-x-2">
           <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-amber-800">
-            <p className="font-medium">Document will use SDK processing</p>
-            <p>This document will be processed locally using the agentic-doc SDK for enhanced data extraction.</p>
+            <p className="font-medium">Large file detected</p>
+            <p>This document is larger than 5MB and may take longer to process. Consider using a smaller file if processing fails.</p>
           </div>
         </div>
       )}
@@ -273,8 +231,6 @@ const DocumentUploader = ({
           <p className="text-xs text-center text-muted-foreground">
             {getProgressPercentage() < 40 ? "Uploading..." : 
              getProgressPercentage() < 80 ? "Processing..." : "Finalizing..."}
-            {needsSDKProcessing && getProgressPercentage() >= 40 && getProgressPercentage() < 80 && 
-             " (SDK document processing)"}
           </p>
         </div>
       )}
@@ -287,14 +243,10 @@ const DocumentUploader = ({
         {uploading || isProcessing ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span>
-              {needsSDKProcessing ? 
-                "Processing with SDK..." :
-                "Uploading..."}
-            </span>
+            <span>Processing... ({getProgressPercentage()}%)</span>
           </>
         ) : (
-          <span>{needsSDKProcessing ? "Process with SDK" : "Upload Document"}</span>
+          <span>Process Document</span>
         )}
       </Button>
     </div>
