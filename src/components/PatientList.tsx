@@ -1,488 +1,304 @@
+import { useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2, AlertTriangle, FileText } from "lucide-react";
+import { willRequireSDKProcessing } from "@/utils/documentOrganizationFixer";
+import { useDocumentProcessing } from "@/hooks/useDocumentProcessing";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import PatientCard from './PatientCard';
-import { 
-  Search, 
-  Plus, 
-  Filter, 
-  RefreshCw, 
-  LayoutGrid, 
-  List as ListIcon,
-  Calendar,
-  Download,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Activity,
-  ChevronDown
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { format as formatDate, subDays, isValid, parseISO, parse, differenceInYears } from 'date-fns';
-import { toast } from '@/components/ui/use-toast';
-import { PatientInfo, ContactInfo, MedicalHistoryData } from '@/types/patient';
-import { formatSafeDateEnhanced, calculateAgeEnhanced, getEffectiveGenderEnhanced } from '@/utils/date-utils';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+const DOCUMENT_TYPES = [
+  { label: "Certificate of Fitness", value: "certificate-fitness" },
+  { label: "Medical Questionnaire", value: "medical-questionnaire" },
+  { label: "Medical Report", value: "medical-report" },
+  { label: "Audiogram", value: "audiogram" },
+  { label: "Spirometry", value: "spirometry" },
+  { label: "X-Ray Report", value: "xray-report" },
+  { label: "Other", value: "other" }
+];
 
-interface PatientRaw {
-  id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  gender: string;
-  contact_info: any;
-  medical_history: any;
-  organization_id: string;
-  client_organization_id: string;
-  created_at: string;
-  updated_at: string;
-  id_number?: string;
-  id_number_valid?: boolean;
-  id_number_validated?: boolean;
-  birthdate_from_id?: string;
-  gender_from_id?: 'male' | 'female' | null;
-  citizenship_status?: 'citizen' | 'permanent_resident' | null;
-  age_at_registration?: number;
-  citizenship?: string;
+export interface DocumentUploaderProps {
+  onUploadComplete?: (data?: any) => void;
+  organizationId?: string;
+  clientOrganizationId?: string;
+  enableAIQuery?: boolean;
 }
 
-const PatientList = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterGender, setFilterGender] = useState('');
-  const [filterCitizenship, setFilterCitizenship] = useState('');
-  const [sortColumn, setSortColumn] = useState('last_name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [patientsPerPage] = useState(10);
-  const [dateOfBirthRange, setDateOfBirthRange] = useState<Date | undefined>();
-  const [isGridView, setIsGridView] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+const DocumentUploader = ({ 
+  onUploadComplete,
+  organizationId,
+  clientOrganizationId,
+  enableAIQuery = false
+}: DocumentUploaderProps) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [documentType, setDocumentType] = useState<string>("certificate-fitness");
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [needsSDKProcessing, setNeedsSDKProcessing] = useState(false);
+  const [aiQuery, setAIQuery] = useState("");
+  const [isLocalProcessing, setIsLocalProcessing] = useState(false);
+  
+  const { processDocument, isProcessing, processingProgress } = useDocumentProcessing();
 
-  const navigate = useNavigate();
-  const { currentOrganization, currentClient } = useOrganization();
-  const organizationId = currentOrganization?.id;
-  const clientOrganizationId = currentClient?.id;
-
-  const { data: patientsData, isLoading, error, refetch } = useQuery({
-    queryKey: ['patients', organizationId, clientOrganizationId, searchQuery, filterGender, filterCitizenship, sortColumn, sortDirection],
-    queryFn: async () => {
-      if (!organizationId) {
-        console.warn('Organization ID is missing.');
-        return [];
-      }
-
-      let query = supabase
-        .from('patients')
-        .select('*');
-
-      // Apply organization filter if available
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId as string);
-      }
-
-      // Apply client organization filter if available
-      if (clientOrganizationId) {
-        query = query.eq('client_organization_id', clientOrganizationId as string);
-      } else {
-        query = query.is('client_organization_id', null);
-      }
-
-      // Apply search filter if available
-      if (searchQuery) {
-        query = query.or(
-          `first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,id_number.ilike.%${searchQuery}%`
-        );
-      }
-
-      // Apply gender filter if available
-      if (filterGender) {
-        query = query.eq('gender', filterGender as string);
-      }
-
-      // Apply citizenship filter if available
-      if (filterCitizenship) {
-        query = query.eq('citizenship_status', filterCitizenship as string);
-      }
-
-      // Apply sorting
-      query = query.order(sortColumn, { ascending: sortDirection === 'asc' });
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching patients:', error);
-        throw new Error(error.message);
-      }
-
-      return data as PatientRaw[] || [];
-    },
-    enabled: !!organizationId
-  });
-
-  useEffect(() => {
-    refetch();
-  }, [clientOrganizationId, refetch]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleGenderFilterChange = (value: string) => {
-    setFilterGender(value);
-    setCurrentPage(1);
-  };
-
-  const handleCitizenshipFilterChange = (value: string) => {
-    setFilterCitizenship(value);
-    setCurrentPage(1);
-  };
-
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      
+      // Check if this file will require SDK processing
+      const requiresSDK = willRequireSDKProcessing(selectedFile);
+      setNeedsSDKProcessing(requiresSDK);
     }
   };
 
-  const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date);
-    setDateOfBirthRange(date);
-  };
-
-  const clearDateFilter = () => {
-    setDateOfBirthRange(undefined);
-    setSelectedDate(undefined);
-  };
-
-  const filteredPatients = React.useMemo(() => {
-    if (!patientsData) return [];
-
-    let filtered = [...patientsData];
-
-    if (dateOfBirthRange) {
-      filtered = filtered.filter(patient => {
-        const dob = parseISO(patient.date_of_birth);
-        return isValid(dob) && formatDate(dob, 'yyyy-MM-dd') === formatDate(dateOfBirthRange, 'yyyy-MM-dd');
+  const handleUpload = async () => {
+    if (!file) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive"
       });
+      return;
     }
 
-    return filtered;
-  }, [patientsData, dateOfBirthRange]);
+    try {
+      setUploading(true);
+      setUploadProgress(10);
 
-  const indexOfLastPatient = currentPage * patientsPerPage;
-  const indexOfFirstPatient = indexOfLastPatient - patientsPerPage;
-  const currentPatients = filteredPatients.slice(indexOfFirstPatient, indexOfLastPatient);
+      if (needsSDKProcessing) {
+        // If we need SDK processing, we'll use the direct document processing
+        // hook instead of going through Supabase functions
+        setIsLocalProcessing(true);
 
-  const totalPages = Math.ceil(filteredPatients.length / patientsPerPage);
+        try {
+          await processDocument(file, aiQuery.length > 0 ? aiQuery : undefined);
+          
+          setUploadProgress(100);
+          
+          toast({
+            title: "Document processed with SDK",
+            description: "Your document has been analyzed using the agentic-doc SDK",
+          });
+          
+          if (onUploadComplete) {
+            onUploadComplete();
+          }
+        } catch (error) {
+          console.error("Error processing with SDK:", error);
+          toast({
+            title: "SDK Processing Failed",
+            description: error instanceof Error ? error.message : "Failed to process document with SDK",
+            variant: "destructive"
+          });
+        } finally {
+          setIsLocalProcessing(false);
+        }
+      } else {
+        // Otherwise we'll use the standard upload flow through Supabase functions
+        // Get current user for folder path organization
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+        
+        // Create a formData object
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('documentType', documentType);
+        formData.append('userId', user.id);
 
-  const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
+        // Adjust progress simulation based on expected processing time
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev < 60) return prev + 5;
+            return prev;
+          });
+        }, 300);
+
+        // Call the Supabase Edge Function to process the document
+        const { data, error } = await supabase.functions.invoke('process-document', {
+          body: formData,
+        });
+
+        clearInterval(progressInterval);
+        
+        if (error) throw error;
+        
+        setUploadProgress(80);
+        
+        // First verify if the document has been properly created
+        if (!data?.documentId) {
+          throw new Error("No document ID returned from processing function");
+        }
+        
+        // Update the document record with organization context
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({
+            organization_id: organizationId,
+            client_organization_id: clientOrganizationId || null
+          })
+          .eq('id', data.documentId);
+          
+        if (updateError) {
+          throw updateError;
+        }
+        
+        setUploadProgress(100);
+        
+        toast({
+          title: "Upload successful",
+          description: "Your document has been uploaded and is being processed",
+        });
+        
+        if (onUploadComplete) {
+          onUploadComplete(data);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error uploading document:", error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "There was an error uploading your document",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      setFile(null);
+      setUploadProgress(0);
+      setNeedsSDKProcessing(false);
+      setAIQuery("");
+    }
   };
 
-  const addPatient = () => {
-    navigate('/patients/new');
+  const getProgressPercentage = () => {
+    if (isLocalProcessing && processingProgress) {
+      return processingProgress;
+    }
+    return uploadProgress;
   };
-
-  const toggleView = () => {
-    setIsGridView(!isGridView);
-  };
-
-  const refreshData = () => {
-    refetch();
-    toast({
-      title: "Refreshing Data",
-      description: "The patient list is being updated.",
-    })
-  };
-
-  if (isLoading) {
-    return <div>Loading patients...</div>;
-  }
-
-  if (error) {
-    return <div>Error: {(error as Error).message}</div>;
-  }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <Input
-            type="text"
-            placeholder="Search patients..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="md:w-80"
-          />
-          <Search className="h-5 w-5 text-gray-500 -ml-8" />
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={refreshData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64">
-              <div className="space-y-3">
-                <Select onValueChange={handleGenderFilterChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Filter by Gender" defaultValue={filterGender} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All Genders</SelectItem>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select onValueChange={handleCitizenshipFilterChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Filter by Citizenship" defaultValue={filterCitizenship} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All Citizenships</SelectItem>
-                    <SelectItem value="citizen">Citizen</SelectItem>
-                    <SelectItem value="permanent_resident">Permanent Resident</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div>
-                  <p className="text-sm font-medium leading-none mb-2">Filter by Date of Birth</p>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={formatDate ? "w-full justify-start text-left font-normal" : "w-full justify-start font-normal"}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {selectedDate ? formatDate(selectedDate, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="center" side="bottom">
-                      <CalendarComponent
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={handleDateSelect}
-                        disabled={(date) =>
-                          date > new Date() || date < subDays(new Date(), 365 * 100)
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {dateOfBirthRange && (
-                    <Button variant="ghost" size="sm" className="mt-2" onClick={clearDateFilter}>
-                      Clear Date Filter
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="sm" onClick={toggleView}>
-            {isGridView ? (
-              <>
-                <ListIcon className="h-4 w-4 mr-2" />
-                List View
-              </>
-            ) : (
-              <>
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Grid View
-              </>
-            )}
-          </Button>
-          <Button size="sm" onClick={addPatient}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Patient
-          </Button>
-        </div>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="document-type">Document Type</Label>
+        <Select 
+          value={documentType} 
+          onValueChange={setDocumentType}
+          disabled={uploading || isProcessing}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select document type" />
+          </SelectTrigger>
+          <SelectContent>
+            {DOCUMENT_TYPES.map(type => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="file">Upload Document</Label>
+        <Input 
+          id="file" 
+          type="file" 
+          onChange={handleFileChange}
+          accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+          disabled={uploading || isProcessing}
+        />
+        <p className="text-xs text-muted-foreground">
+          Supported formats: PDF, PNG, JPG, JPEG, DOC, DOCX, TXT
+        </p>
       </div>
 
-      {isGridView ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {currentPatients.map((patient) => (
-            <PatientCard key={patient.id} patient={patient as unknown as PatientInfo} />
-          ))}
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('last_name')}>
-                Name
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('date_of_birth')}>
-                Date of Birth
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('gender')}>
-                Gender
-              </TableHead>
-              <TableHead>Contact Info</TableHead>
-              <TableHead>Medical Info</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {currentPatients.map((patient) => {
-              const contactInfo = patient.contact_info as ContactInfo || {};
-              const medicalHistory = patient.medical_history as MedicalHistoryData || {};
-              const age = calculateAgeEnhanced(patient.date_of_birth);
-              const gender = getEffectiveGenderEnhanced(patient as unknown as PatientInfo);
-              const dobFormatted = formatSafeDateEnhanced(patient.date_of_birth);
-
-              return (
-                <TableRow key={patient.id}>
-                  <TableCell>
-                    {patient.first_name} {patient.last_name}
-                    {patient.id_number_valid === false && (
-                      <Badge variant="destructive" className="ml-2">
-                        Invalid ID
-                      </Badge>
-                    )}
-                    {patient.id_number_valid === true && (
-                      <Badge variant="secondary" className="ml-2">
-                        Valid ID
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{dobFormatted} ({age} years)</TableCell>
-                  <TableCell>{gender}</TableCell>
-                  <TableCell>
-                    {contactInfo.email && <p>Email: {contactInfo.email}</p>}
-                    {contactInfo.phone && <p>Phone: {contactInfo.phone}</p>}
-                  </TableCell>
-                  <TableCell>
-                    {medicalHistory.has_allergies && <p>Allergies: Yes</p>}
-                    {medicalHistory.has_diabetes && <p>Diabetes: Yes</p>}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => navigate(`/patients/edit/${patient.id}`)}
-                        >
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => navigate(`/patients/detail/${patient.id}`)}
-                        >
-                          View Details
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
-
-      {filteredPatients.length === 0 && (
-        <div className="text-center py-4">
-          <p className="text-gray-500">No patients found.</p>
+      {file && (
+        <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+          <FileText className="h-5 w-5 text-primary" />
+          <div className="flex-1 truncate">
+            <p className="text-sm font-medium truncate">{file.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {(file.size / 1024 / 1024).toFixed(2)} MB
+            </p>
+          </div>
         </div>
       )}
 
-      {totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={() => handlePageChange(currentPage - 1)}
-                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => {
-              if (pageNumber === 1 || pageNumber === totalPages || (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)) {
-                return (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      isActive={currentPage === pageNumber}
-                      onClick={() => handlePageChange(pageNumber)}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              } else if (pageNumber === currentPage - 3 && currentPage > 4) {
-                return <PaginationEllipsis key={pageNumber} />;
-              } else if (pageNumber === currentPage + 3 && currentPage < totalPages - 3) {
-                return <PaginationEllipsis key={pageNumber} />;
-              } else {
-                return null;
-              }
-            })}
-            <PaginationItem>
-              <PaginationNext
-                onClick={() => handlePageChange(currentPage + 1)}
-                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+      {enableAIQuery && needsSDKProcessing && file && (
+        <div className="space-y-2">
+          <Label htmlFor="aiQuery">Ask AI about this document (optional)</Label>
+          <Textarea
+            id="aiQuery"
+            placeholder="e.g., What are the key recommendations in this report?"
+            value={aiQuery}
+            onChange={(e) => setAIQuery(e.target.value)}
+            disabled={uploading || isProcessing}
+            className="min-h-[80px]"
+          />
+          <p className="text-xs text-muted-foreground">
+            Ask a question about this document to get AI-powered analysis
+          </p>
+        </div>
       )}
+
+      {needsSDKProcessing && file && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-2 flex items-start space-x-2">
+          <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-800">
+            <p className="font-medium">Document will use SDK processing</p>
+            <p>This document will be processed locally using the agentic-doc SDK for enhanced data extraction.</p>
+          </div>
+        </div>
+      )}
+
+      {organizationId && (
+        <div className="text-xs text-muted-foreground">
+          {clientOrganizationId ? (
+            <p>This document will be uploaded for client organization</p>
+          ) : (
+            <p>This document will be uploaded to your organization</p>
+          )}
+        </div>
+      )}
+      
+      {(uploading || isProcessing) && (
+        <div className="space-y-2">
+          <Progress value={getProgressPercentage()} className="h-2" />
+          <p className="text-xs text-center text-muted-foreground">
+            {getProgressPercentage() < 40 ? "Uploading..." : 
+             getProgressPercentage() < 80 ? "Processing..." : "Finalizing..."}
+            {needsSDKProcessing && getProgressPercentage() >= 40 && getProgressPercentage() < 80 && 
+             " (SDK document processing)"}
+          </p>
+        </div>
+      )}
+      
+      <Button 
+        onClick={handleUpload} 
+        disabled={!file || uploading || isProcessing} 
+        className="w-full"
+      >
+        {uploading || isProcessing ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <span>
+              {needsSDKProcessing ? 
+                "Processing with SDK..." :
+                "Uploading..."}
+            </span>
+          </>
+        ) : (
+          <span>{needsSDKProcessing ? "Process with SDK" : "Upload Document"}</span>
+        )}
+      </Button>
     </div>
   );
 };
 
-export default PatientList;
+export default DocumentUploader;
