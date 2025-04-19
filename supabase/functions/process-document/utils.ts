@@ -1,5 +1,6 @@
+
 // Helper utilities for document processing
-import { parseSouthAfricanIDNumber, normalizeIDNumber } from './sa-id-parser.ts';
+import { parseSouthAfricanIDNumber, normalizeIDNumber } from '../../../src/utils/sa-id-parser';
 
 // Helper function to safely extract nested properties from an object
 export function extractPath(obj: any, path: string): any {

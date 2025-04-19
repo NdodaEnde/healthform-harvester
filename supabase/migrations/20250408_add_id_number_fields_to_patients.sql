@@ -1,10 +1,9 @@
-
 -- Add new columns to the patients table for South African ID number data
-ALTER TABLE patients ADD COLUMN IF NOT EXISTS id_number text;
-ALTER TABLE patients ADD COLUMN IF NOT EXISTS birthdate_from_id date;
-ALTER TABLE patients ADD COLUMN IF NOT EXISTS gender_from_id text;
-ALTER TABLE patients ADD COLUMN IF NOT EXISTS citizenship_status text;
-ALTER TABLE patients ADD COLUMN IF NOT EXISTS id_number_valid boolean;
+ALTER TABLE patients ADD COLUMN id_number text;
+ALTER TABLE patients ADD COLUMN birthdate_from_id date;
+ALTER TABLE patients ADD COLUMN gender_from_id text;
+ALTER TABLE patients ADD COLUMN citizenship_status text;
+ALTER TABLE patients ADD COLUMN id_number_valid boolean;
 
 -- Add comment descriptions to the columns
 COMMENT ON COLUMN patients.id_number IS 'South African ID number (13 digits)';
