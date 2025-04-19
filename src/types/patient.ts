@@ -1,4 +1,3 @@
-
 import { Json } from "@/integrations/supabase/types";
 
 export interface ContactInfo {
@@ -98,7 +97,7 @@ export interface PatientInfo {
   // Fields from database columns
   age_at_registration?: number | null;
   citizenship?: string | null;
-  // South African ID number fields
+  // New ID number related fields
   id_number?: string;
   birthdate_from_id?: string;
   gender_from_id?: 'male' | 'female' | null;
