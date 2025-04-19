@@ -12,16 +12,19 @@ import { toast } from '@/components/ui/use-toast';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
-import { MedicalHistoryData, ContactInfo } from '@/types/patient';
+import { MedicalHistoryData, ContactInfo, PatientInfo } from '@/types/patient';
 import PatientSAIDInfo from '@/components/PatientSAIDInfo';
 import { processIDNumberForPatient, doesIDNumberNeedProcessing } from '@/utils/id-number-processor';
 
 interface PatientFormState {
+  id?: string;
   first_name: string;
   last_name: string;
   date_of_birth: string;
   gender: string;
   contact_info: ContactInfo;
+  created_at?: string;
+  updated_at?: string;
   id_number?: string;
   id_number_valid?: boolean;
   birthdate_from_id?: string;
@@ -71,8 +74,12 @@ const PatientEditPage = () => {
           ? data.contact_info as ContactInfo 
           : { email: '', phone: '' };
       
+      // Handle field mapping between old and new ID number fields
+      const idNumberValid = data.id_number_valid !== undefined ? data.id_number_valid : data.id_number_validated;
+      
       // Update form state with existing patient data
       setFormState({
+        id: data.id,
         first_name: data.first_name || '',
         last_name: data.last_name || '',
         date_of_birth: data.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : '',
@@ -82,10 +89,12 @@ const PatientEditPage = () => {
           phone: contactInfo.phone || ''
         },
         id_number: data.id_number || '',
-        id_number_valid: data.id_number_valid || false,
+        id_number_valid: idNumberValid || false,
         birthdate_from_id: data.birthdate_from_id || '',
         gender_from_id: data.gender_from_id || null,
-        citizenship_status: data.citizenship_status || null
+        citizenship_status: data.citizenship_status || null,
+        created_at: data.created_at,
+        updated_at: data.updated_at
       });
       
       // Show validation if ID number exists
@@ -99,8 +108,16 @@ const PatientEditPage = () => {
   // Update patient mutation
   const { mutate, isPending } = useMutation({
     mutationFn: async (patientData: PatientFormState) => {
+      // Create full patient object with required fields
+      const patientForProcessing: PatientInfo = {
+        id: id!,
+        ...patientData,
+        created_at: patientData.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
       // Process ID number if changed or added
-      let processedPatientData = { ...patientData };
+      let processedPatientData = { ...patientForProcessing };
       
       if (doesIDNumberNeedProcessing(processedPatientData, patientData.id_number || '')) {
         processedPatientData = processIDNumberForPatient(processedPatientData, patientData.id_number || '');
@@ -214,7 +231,7 @@ const PatientEditPage = () => {
     });
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     
     if (name.startsWith('contact_info.')) {
@@ -241,23 +258,23 @@ const PatientEditPage = () => {
         [name]: value
       }));
     }
-  };
+  }
 
-  const handleGenderChange = (value: string) => {
+  function handleGenderChange(value: string) {
     setFormState(prev => ({
       ...prev,
       gender: value
     }));
-  };
+  }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     mutate(formState);
-  };
+  }
 
-  const handleCancel = () => {
+  function handleCancel() {
     navigate(`/patients/${id}`);
-  };
+  }
 
   if (isLoading) {
     return (

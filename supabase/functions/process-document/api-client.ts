@@ -1,3 +1,4 @@
+
 // API client for Document Processing Service and Landing AI
 export const apiClient = {
   // Call SDK Microservice for document processing
@@ -68,11 +69,14 @@ export const apiClient = {
   },
 
   // Call Landing AI API for document processing
-  async callLandingAI(file: File): Promise<any> {
+  async callLandingAI(file: File, documentType?: string, documentId?: string): Promise<any> {
     const landingAiApiKey = Deno.env.get('LANDING_AI_API_KEY') || 'bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5';
     
-    if (!landingAiApiKey) {
-      throw new Error('Landing AI API key is not configured');
+    // If SDK_MICROSERVICE_URL is configured, use the SDK service instead
+    const sdkServiceUrl = Deno.env.get('SDK_MICROSERVICE_URL');
+    if (sdkServiceUrl) {
+      console.log('SDK microservice URL found, redirecting to SDK service');
+      return this.callSDKService(file, documentType || 'unknown', documentId);
     }
     
     console.log(`Calling Landing AI API for file: ${file.name} (Size: ${file.size} bytes)`);

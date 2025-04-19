@@ -95,12 +95,16 @@ export interface PatientInfo {
   client_organization_id?: string | null;
   created_at: string;
   updated_at: string;
+  // Fields from database columns
+  age_at_registration?: number | null;
+  citizenship?: string | null;
   // South African ID number fields
   id_number?: string;
   birthdate_from_id?: string;
   gender_from_id?: 'male' | 'female' | null;
   citizenship_status?: 'citizen' | 'permanent_resident' | null;
   id_number_valid?: boolean;
+  id_number_validated?: boolean; // For backward compatibility
 }
 
 export interface CertificateData {
