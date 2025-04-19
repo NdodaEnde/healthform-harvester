@@ -1,7 +1,73 @@
-
-// API client for Landing AI and other services
+// API client for Document Processing Service and Landing AI
 export const apiClient = {
-  // Call Landing AI API to process document
+  // Call SDK Microservice for document processing
+  async callSDKService(file: File, documentType: string, documentId?: string): Promise<any> {
+    const sdkServiceUrl = Deno.env.get('SDK_MICROSERVICE_URL');
+    
+    if (!sdkServiceUrl) {
+      throw new Error('SDK Microservice URL is not configured');
+    }
+    
+    console.log(`Calling SDK Microservice for file: ${file.name} (Size: ${file.size} bytes)`);
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("document_type", documentType);
+    
+    if (documentId) {
+      formData.append("document_id", documentId);
+    }
+    
+    try {
+      // Set longer timeout for large files (3 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error(`API call timed out after 3 minutes for file: ${file.name}`);
+        controller.abort();
+      }, 180000);
+      
+      console.log(`Starting SDK service call at ${new Date().toISOString()}`);
+      const startTime = Date.now();
+      
+      const response = await fetch(`${sdkServiceUrl}/process-document`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
+      
+      const endTime = Date.now();
+      const requestDuration = (endTime - startTime) / 1000;
+      console.log(`SDK service request completed in ${requestDuration.toFixed(2)} seconds`);
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`SDK Service Error: Status ${response.status}, Body: ${errorText}`);
+        throw new Error(`SDK Service error (${response.status}): ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log(`Successfully received response from SDK service for file: ${file.name}`);
+      return result;
+      
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error(`Request was aborted due to timeout for file ${file.name}`);
+        throw new Error(`Request timeout: Processing took too long for file ${file.name}. Try with a smaller file or try again later.`);
+      }
+      
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error(`Network error when calling SDK service for file ${file.name}`);
+        throw new Error(`Network error: Unable to connect to SDK service. Please check service availability and try again.`);
+      }
+      
+      console.error(`Error calling SDK service for file ${file.name}:`, error);
+      throw error;
+    }
+  },
+
+  // Call Landing AI API for document processing
   async callLandingAI(file: File): Promise<any> {
     const landingAiApiKey = Deno.env.get('LANDING_AI_API_KEY') || 'bHQ2cjl2b2l2Nmx2Nm4xemsxMHJhOk5QVXh1cjR2TngxMHJCZ2dtNWl2dEh5emk5cXMxNVM5';
     
