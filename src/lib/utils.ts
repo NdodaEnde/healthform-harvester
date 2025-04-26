@@ -60,6 +60,49 @@ export function mapExtractedDataToValidatorFormat(extractedData: any): { structu
     console.log("Returning already structured data with ensured fields:", structuredData);
     return structuredData;
   }
+  
+  // Check if the data is nested in raw_response.structured_data
+  if (extractedData.raw_response && 
+      extractedData.raw_response.structured_data && 
+      typeof extractedData.raw_response.structured_data === 'object') {
+    console.log("Found structured_data inside raw_response, using that");
+    return {
+      structured_data: {
+        patient: extractedData.raw_response.structured_data.patient || {},
+        certification: extractedData.raw_response.structured_data.certification || {},
+        examination_results: {
+          test_results: extractedData.raw_response.structured_data.examination_results?.test_results || {},
+          type: extractedData.raw_response.structured_data.examination_results?.type || {},
+          date: extractedData.raw_response.structured_data.examination_results?.date || ""
+        } as ExaminationResults,
+        restrictions: extractedData.raw_response.structured_data.restrictions || {}
+      }
+    };
+  }
+  
+  // Check if the data might be directly in a raw_response result field
+  if (extractedData.raw_response && 
+      extractedData.raw_response.result && 
+      typeof extractedData.raw_response.result === 'object') {
+    const result = extractedData.raw_response.result;
+    
+    // If result contains the expected fields directly, structure it properly
+    if (result.patient || result.examination_results || result.certification || result.restrictions) {
+      console.log("Found data fields directly in raw_response.result, structuring them");
+      return {
+        structured_data: {
+          patient: result.patient || {},
+          certification: result.certification || {},
+          examination_results: {
+            test_results: result.examination_results?.test_results || {},
+            type: result.examination_results?.type || {},
+            date: result.examination_results?.date || ""
+          } as ExaminationResults,
+          restrictions: result.restrictions || {}
+        }
+      };
+    }
+  }
 
   // Create a properly structured object
   const structuredData = {
@@ -176,6 +219,41 @@ export function mapExtractedDataToValidatorFormat(extractedData: any): { structu
       remain_on_treatment_for_chronic_conditions: extractedData.restrictions.remain_on_treatment_for_chronic_conditions || 
                                                 extractedData.restrictions.chronic_treatment || false
     };
+  }
+
+  // Special case: if all fields are empty, try looking for raw_content and extract from markdown
+  if (Object.keys(structuredData.structured_data.patient).length === 0 && 
+      extractedData.raw_content && 
+      typeof extractedData.raw_content === 'string') {
+    console.log("Using raw_content to extract data from markdown");
+    const markdown = extractedData.raw_content;
+    
+    // Extract patient name
+    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
+    if (nameMatch && nameMatch[1]) {
+      structuredData.structured_data.patient.name = nameMatch[1].trim();
+    }
+    
+    // Extract ID Number
+    const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
+    if (idMatch && idMatch[1]) {
+      structuredData.structured_data.patient.id_number = idMatch[1].trim();
+    }
+    
+    // Extract Company
+    const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
+    if (companyMatch && companyMatch[1]) {
+      structuredData.structured_data.patient.company = companyMatch[1].trim();
+    }
+    
+    // Extract Job Title
+    const jobMatch = markdown.match(/\*\*Job Title\*\*:\s*(.*?)(?=\n|\r|$)/i);
+    if (jobMatch && jobMatch[1]) {
+      structuredData.structured_data.patient.occupation = jobMatch[1].trim();
+    }
+    
+    // Add raw_content to structuredData for fallback extraction
+    structuredData.structured_data.raw_content = markdown;
   }
 
   console.log("Mapped data result:", structuredData);

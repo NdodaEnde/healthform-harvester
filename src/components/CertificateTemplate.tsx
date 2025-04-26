@@ -261,20 +261,45 @@ const CertificateTemplate = ({
 
   let structuredData: any = {};
 
+  // Log detailed structure to debug extraction issues
+  console.log("Full extracted data structure received:", JSON.stringify(extractedData, null, 2));
+
   if (extractedData?.structured_data) {
     console.log("Using existing structured_data");
     structuredData = extractedData.structured_data;
   } else if (extractedData?.extracted_data?.structured_data) {
     console.log("Using structured_data from extracted_data");
     structuredData = extractedData.extracted_data.structured_data;
+  } else if (extractedData?.raw_response?.structured_data) {
+    console.log("Using structured_data from raw_response");
+    structuredData = extractedData.raw_response.structured_data;
   } else {
-    const markdown = getMarkdown(extractedData);
-    if (markdown) {
-      console.log("Extracting from markdown content");
-      structuredData = extractDataFromMarkdown(markdown);
-    } else {
-      console.log("No markdown found, using extractedData as is");
-      structuredData = extractedData || {};
+    // Try to find structured_data in any nested location by checking common paths
+    const possiblePaths = [
+      'raw_response.structured_data',
+      'raw_response.result.structured_data',
+      'result.structured_data'
+    ];
+    
+    for (const path of possiblePaths) {
+      const data = getValue(extractedData, path);
+      if (data && typeof data === 'object') {
+        console.log(`Found structured data at path: ${path}`);
+        structuredData = data;
+        break;
+      }
+    }
+    
+    // If we still don't have structured data, try extracting from markdown
+    if (Object.keys(structuredData).length === 0) {
+      const markdown = getMarkdown(extractedData);
+      if (markdown) {
+        console.log("Extracting from markdown content");
+        structuredData = extractDataFromMarkdown(markdown);
+      } else {
+        console.log("No markdown found, using extractedData as is");
+        structuredData = extractedData || {};
+      }
     }
   }
 

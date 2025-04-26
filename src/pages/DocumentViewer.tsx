@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -172,6 +172,141 @@ const DocumentViewer = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
   const [originalData, setOriginalData] = useState<any>(null);
+  
+  // Zoom and drag controls for the original document
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const zoomStep = 0.25; // How much to zoom in/out with each click
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
+  const documentContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Zoom functions
+  const zoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + zoomStep, 3)); // Max zoom: 3x
+  };
+  
+  const zoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - zoomStep, 0.5)); // Min zoom: 0.5x
+  };
+  
+  const resetZoom = () => {
+    setZoomLevel(1); // Reset to default zoom
+    // Reset scroll position when zoom is reset
+    if (documentContainerRef.current) {
+      documentContainerRef.current.scrollTop = 0;
+      documentContainerRef.current.scrollLeft = 0;
+    }
+  };
+  
+  // Using useCallback to memoize our event handlers
+  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+    
+    e.preventDefault(); // Prevent text selection during drag
+    
+    // Calculate how far the mouse has moved from the starting point
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    
+    if (documentContainerRef.current) {
+      // IMPORTANT: For natural feeling dragging, we move the view in the OPPOSITE 
+      // direction of the mouse movement (hence the minus sign)
+      const newScrollLeft = scrollPosition.x - dx;
+      const newScrollTop = scrollPosition.y - dy;
+      
+      documentContainerRef.current.scrollLeft = newScrollLeft;
+      documentContainerRef.current.scrollTop = newScrollTop;
+      
+      // Debug info to help diagnose dragging issues
+      console.log('Dragging:', {
+        dx, 
+        dy, 
+        scrollLeft: documentContainerRef.current.scrollLeft,
+        scrollTop: documentContainerRef.current.scrollTop,
+        newScrollLeft,
+        newScrollTop
+      });
+    }
+  }, [isDragging, dragStart.x, dragStart.y, scrollPosition.x, scrollPosition.y]);
+  
+  const handleGlobalMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      if (documentContainerRef.current) {
+        documentContainerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+      }
+    }
+  }, [isDragging, zoomLevel]);
+  
+  // Set up and clean up global event listeners whenever dragging state changes
+  useEffect(() => {
+    if (isDragging) {
+      // Add listeners when dragging starts
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+    }
+    
+    // Clean up listeners when dragging ends or component unmounts
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isDragging, handleGlobalMouseMove, handleGlobalMouseUp]);
+  
+  // Drag handlers for the container
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only enable dragging when zoomed in
+    if (zoomLevel > 1) {
+      e.preventDefault(); // Prevent default browser behavior
+      
+      // Store the initial mouse position when the drag starts
+      setDragStart({ x: e.clientX, y: e.clientY });
+      
+      if (documentContainerRef.current) {
+        // Store the initial scroll position of the container
+        setScrollPosition({
+          x: documentContainerRef.current.scrollLeft,
+          y: documentContainerRef.current.scrollTop
+        });
+        
+        // Change cursor to indicate dragging
+        documentContainerRef.current.style.cursor = 'grabbing';
+        
+        // Log initial state for debugging
+        console.log('Starting drag:', {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          scrollLeft: documentContainerRef.current.scrollLeft,
+          scrollTop: documentContainerRef.current.scrollTop
+        });
+      }
+      
+      // Set dragging state - this will trigger the effect to add global listeners
+      setIsDragging(true);
+    }
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Container-level handler, mostly just prevents default behavior
+    if (isDragging) {
+      e.preventDefault();
+    }
+  };
+  
+  const handleMouseUp = () => {
+    // Container-level handler, mostly just resets dragging state
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  };
+  
+  // Set initial cursor style when zoom level changes
+  useEffect(() => {
+    if (documentContainerRef.current) {
+      documentContainerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+    }
+  }, [zoomLevel]);
 
   const toggleEditMode = () => {
     if (!isEditing) {
@@ -346,6 +481,7 @@ const DocumentViewer = () => {
       return "Unknown";
     }
     
+    // Direct path for structured data
     if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
       const patientData = extractedData.structured_data.patient;
       if (patientData && typeof patientData === 'object') {
@@ -354,14 +490,40 @@ const DocumentViewer = () => {
       }
     }
     
-    if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
-      const markdown = extractedData.raw_response.data.markdown;
-      if (markdown) {
+    // Try finding from raw_response.data.markdown
+    if (extractedData.raw_response && typeof extractedData.raw_response === 'object') {
+      // Check in data.markdown
+      if (extractedData.raw_response.data && extractedData.raw_response.data.markdown) {
+        const markdown = extractedData.raw_response.data.markdown;
+        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
+        if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
+      }
+      
+      // Check in raw_response.structured_data path
+      if (extractedData.raw_response.structured_data && 
+          extractedData.raw_response.structured_data.patient &&
+          extractedData.raw_response.structured_data.patient.name) {
+        return extractedData.raw_response.structured_data.patient.name;
+      }
+      
+      // Check in result path
+      if (extractedData.raw_response.result && 
+          extractedData.raw_response.result.patient &&
+          extractedData.raw_response.result.patient.name) {
+        return extractedData.raw_response.result.patient.name;
+      }
+    }
+    
+    // Look for raw_content in structured_data
+    if (extractedData.structured_data && extractedData.structured_data.raw_content) {
+      const markdown = extractedData.structured_data.raw_content;
+      if (typeof markdown === 'string') {
         const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
       }
     }
     
+    // Recursively search the object for patient name
     if (typeof extractedData === 'object') {
       const findPatientName = (obj: any): string | null => {
         if (!obj || typeof obj !== 'object') return null;
@@ -400,6 +562,7 @@ const DocumentViewer = () => {
       return "No ID";
     }
     
+    // Direct path for structured data
     if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
       const patientData = extractedData.structured_data.patient;
       if (patientData && typeof patientData === 'object') {
@@ -409,14 +572,57 @@ const DocumentViewer = () => {
       }
     }
     
-    if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
-      const markdown = extractedData.raw_response.data.markdown;
-      if (markdown) {
+    // Try finding from raw_response
+    if (extractedData.raw_response && typeof extractedData.raw_response === 'object') {
+      // Check in data.markdown
+      if (extractedData.raw_response.data && extractedData.raw_response.data.markdown) {
+        const markdown = extractedData.raw_response.data.markdown;
+        
         const idPatterns = [
           /\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i,
           /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i,
           /ID No[.:]\s*(.*?)(?=\n|\r|$)/i,
-          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i
+          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i,
+          /\*\*ID Number\*\*:\s*(.*?)(?=\n|\r|$)/i,
+          /\*\*Identity Number\*\*:\s*(.*?)(?=\n|\r|$)/i
+        ];
+        
+        for (const pattern of idPatterns) {
+          const idMatch = markdown.match(pattern);
+          if (idMatch && idMatch[1]) return idMatch[1].trim();
+        }
+      }
+      
+      // Check in raw_response.structured_data path
+      if (extractedData.raw_response.structured_data && 
+          extractedData.raw_response.structured_data.patient) {
+        const patientData = extractedData.raw_response.structured_data.patient;
+        if (patientData.id_number) return patientData.id_number;
+        if (patientData.employee_id) return patientData.employee_id;
+        if (patientData.id) return patientData.id;
+      }
+      
+      // Check in result path
+      if (extractedData.raw_response.result && 
+          extractedData.raw_response.result.patient) {
+        const patientData = extractedData.raw_response.result.patient;
+        if (patientData.id_number) return patientData.id_number;
+        if (patientData.employee_id) return patientData.employee_id;
+        if (patientData.id) return patientData.id;
+      }
+    }
+    
+    // Look for raw_content in structured_data
+    if (extractedData.structured_data && extractedData.structured_data.raw_content) {
+      const markdown = extractedData.structured_data.raw_content;
+      if (typeof markdown === 'string') {
+        const idPatterns = [
+          /\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i,
+          /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i,
+          /ID No[.:]\s*(.*?)(?=\n|\r|$)/i,
+          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i,
+          /\*\*ID Number\*\*:\s*(.*?)(?=\n|\r|$)/i,
+          /\*\*Identity Number\*\*:\s*(.*?)(?=\n|\r|$)/i
         ];
         
         for (const pattern of idPatterns) {
@@ -426,6 +632,7 @@ const DocumentViewer = () => {
       }
     }
     
+    // Recursively search for ID
     if (typeof extractedData === 'object') {
       const findPatientId = (obj: any): string | null => {
         if (!obj || typeof obj !== 'object') return null;
@@ -931,22 +1138,7 @@ const DocumentViewer = () => {
         <Separator />
         {renderCommentsSection()}
         
-        <div className="mt-6 flex justify-end space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsEditing(false);
-              setEditableData(null);
-            }}
-          >
-            <X className="h-4 w-4 mr-2" />
-            Cancel
-          </Button>
-          <Button onClick={handleSaveEdits}>
-            <Save className="h-4 w-4 mr-2" />
-            Save Changes
-          </Button>
-        </div>
+        {/* Buttons moved to main document viewer UI */}
       </div>
     );
   };
@@ -1420,18 +1612,152 @@ const DocumentViewer = () => {
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Original Document</h2>
-                <Badge variant="outline" className="text-xs">
-                  {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center border rounded-md">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={zoomOut}
+                      disabled={zoomLevel <= 0.5}
+                      className="h-8 px-2 rounded-none rounded-l-md"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 7.5H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </Button>
+                    <div className="px-2 text-xs font-medium">
+                      {Math.round(zoomLevel * 100)}%
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={zoomIn}
+                      disabled={zoomLevel >= 3}
+                      className="h-8 px-2 rounded-none rounded-r-md"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.5 3V12M3 7.5H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetZoom}
+                    className="h-8 text-xs"
+                  >
+                    Reset
+                  </Button>
+                  <Badge variant="outline" className="text-xs">
+                    {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
+                  </Badge>
+                </div>
               </div>
               <Card className="overflow-hidden h-[calc(100vh-220px)]">
-                <div className="relative w-full h-full">
+                <div 
+                  ref={documentContainerRef}
+                  className="relative w-full h-full overflow-auto"
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                  style={{ 
+                    userSelect: isDragging ? 'none' : 'auto',
+                    touchAction: 'none', // Disable browser's touch actions
+                    scrollBehavior: 'auto',
+                    overscrollBehavior: 'none' // Prevent browser pull-to-refresh and bouncing
+                  }}
+                >
+                  {/* Drag overlay - only visible when zoomed in */}
+                  {zoomLevel > 1 && (
+                    <>
+                      {/* Drag hint tooltip */}
+                      <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs py-1 px-2 rounded-md z-10 pointer-events-none">
+                        Drag to move
+                      </div>
+                      
+                      {/* Transparent overlay for easier dragging - active for all document types */}
+                      <div 
+                        className="absolute inset-0 z-10"
+                        style={{ 
+                          cursor: isDragging ? 'grabbing' : 'grab',
+                          backgroundColor: 'rgba(0,0,0,0.01)', // Nearly invisible but still captures events
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          width: '100%',
+                          height: '100%'
+                        }}
+                        onMouseDown={(e) => {
+                          // Direct mouseDown handler for overlay to ensure dragging works
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleMouseDown(e);
+                        }}
+                      />
+                    </>
+                  )}
+                  
                   {imageUrl ? (
-                    <img 
-                      src={imageUrl} 
-                      alt="Document preview" 
-                      className="w-full h-full object-contain"
-                    />
+                    document.name?.toLowerCase().endsWith('.pdf') ? (
+                      // For PDF files, use an iframe with content scaling
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div style={{ 
+                          transform: `scale(${zoomLevel})`, 
+                          transformOrigin: 'center',
+                          width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+                          height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+                          transition: 'transform 0.2s ease',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}>
+                          <iframe 
+                            src={`${imageUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                            title="PDF document preview"
+                            className="w-full h-full border-0"
+                            style={{ 
+                              minHeight: '500px',
+                              maxHeight: '100%',
+                              pointerEvents: isDragging ? 'none' : 'auto',
+                              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      // For image files, use optimized image display with proper centering and padding
+                      <div className="w-full h-full flex items-center justify-center relative">
+                        <div 
+                          style={{ 
+                            transform: `scale(${zoomLevel})`,
+                            transformOrigin: 'center center', 
+                            transition: 'transform 0.2s ease',
+                            width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+                            height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+                            padding: '20px', // Add some padding around the image
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <img 
+                            src={imageUrl} 
+                            alt="Document preview" 
+                            className="max-w-full h-auto"
+                            draggable="false"
+                            style={{ 
+                              pointerEvents: isDragging ? 'none' : 'auto',
+                              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)', // Add subtle shadow to the image
+                              maxWidth: zoomLevel > 1 ? 'none' : '100%',
+                              maxHeight: zoomLevel > 1 ? 'none' : '100%',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
                   ) : (
                     <div className="flex items-center justify-center h-full">
                       <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
@@ -1487,7 +1813,7 @@ const DocumentViewer = () => {
                   {renderExtractedData()}
                 </CardContent>
               ) : isEditing ? (
-                <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
+                <CardContent className="p-6 h-[calc(100vh-330px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
               ) : (
@@ -1520,7 +1846,7 @@ const DocumentViewer = () => {
             )}
             
             {isEditing && (
-              <div className="flex justify-end space-x-2">
+              <div className="flex justify-end space-x-2 mt-4">
                 <Button
                   variant="outline"
                   onClick={() => {

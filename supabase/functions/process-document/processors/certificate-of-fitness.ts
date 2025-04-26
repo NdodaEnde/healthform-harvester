@@ -3,45 +3,99 @@ import { extractPath, cleanValue, isChecked } from "../utils.ts";
 // Process certificate of fitness data from Landing AI response
 export function processCertificateOfFitnessData(apiResponse: any) {
   try {
-    // Extract fields from AI response
+    // Extract potential fields from AI response
     const extractedData = apiResponse.result || {};
-    const markdown = apiResponse.data?.markdown || '';
-
-    console.log('Processing certificate of fitness data from API response');
     
-    // Build structured data object from API response and markdown
+    // Try to get markdown from different possible locations
+    let markdown = '';
+    if (apiResponse.data?.markdown) {
+      markdown = apiResponse.data.markdown;
+    } else if (apiResponse.raw_response?.data?.markdown) {
+      markdown = apiResponse.raw_response.data.markdown;
+    } else if (apiResponse.structured_data?.full_text) {
+      // Use full_text from SDK if markdown not available
+      markdown = apiResponse.structured_data.full_text;
+    } else if (apiResponse.raw_response?.document_analysis?.text) {
+      // Use document analysis text if available
+      markdown = apiResponse.raw_response.document_analysis.text;
+    }
+    
+    console.log('Processing certificate of fitness data, text length:', markdown?.length || 0);
+    console.log('Text sample:', markdown?.substring(0, 200) || 'No text available');
+    
+    // Check if form fields are available from SDK extraction
+    const formFields = apiResponse.structured_data?.form_fields || {};
+    
+    // Extract patient name from form fields or direct paths
+    let patientName = formFields['Initials & Surname'] || 
+                      cleanValue(extractPath(extractedData, 'patient.name')) || 
+                      cleanValue(extractPath(extractedData, 'employee.name'));
+    
+    // Extract ID from form fields or direct paths  
+    let patientId = formFields['ID No'] || formFields['ID NO'] ||
+                    cleanValue(extractPath(extractedData, 'patient.id')) || 
+                    cleanValue(extractPath(extractedData, 'patient.id_number')) || 
+                    cleanValue(extractPath(extractedData, 'employee.id'));
+                    
+    // Extract company from form fields or direct paths
+    let company = formFields['Company Name'] ||
+                  cleanValue(extractPath(extractedData, 'company')) || 
+                  cleanValue(extractPath(extractedData, 'employer')) || 
+                  cleanValue(extractPath(extractedData, 'patient.company'));
+                  
+    // Extract job title from form fields or direct paths
+    let occupation = formFields['Job Title'] ||
+                     cleanValue(extractPath(extractedData, 'patient.occupation')) || 
+                     cleanValue(extractPath(extractedData, 'patient.job_title')) || 
+                     cleanValue(extractPath(extractedData, 'occupation')) || 
+                     cleanValue(extractPath(extractedData, 'job_title'));
+                     
+    // Extract dates from form fields or direct paths
+    let examDate = formFields['Date of Examination'] ||
+                  cleanValue(extractPath(extractedData, 'examination.date')) || 
+                  cleanValue(extractPath(extractedData, 'date')) || 
+                  cleanValue(extractPath(extractedData, 'date_of_examination'));
+                  
+    let expiryDate = formFields['Expiry Date'] ||
+                    cleanValue(extractPath(extractedData, 'examination.next_date')) || 
+                    cleanValue(extractPath(extractedData, 'valid_until')) || 
+                    cleanValue(extractPath(extractedData, 'expiry_date'));
+    
+    // Fall back to extracting from markdown if needed
+    if (!patientName || !patientId || !company || !occupation || !examDate || !expiryDate) {
+      if (markdown) {
+        console.log('Using markdown to extract missing fields');
+      }
+    }
+                  
+    // Build structured data object from API response and extracted fields
     let structuredData = {
       patient: {
-        name: cleanValue(extractPath(extractedData, 'patient.name')) || 
-              cleanValue(extractPath(extractedData, 'employee.name')) || 'Unknown',
+        name: patientName || 'Unknown',
         date_of_birth: cleanValue(extractPath(extractedData, 'patient.date_of_birth')) || 
                       cleanValue(extractPath(extractedData, 'patient.dob')) || '',
-        employee_id: cleanValue(extractPath(extractedData, 'patient.id')) || 
-                    cleanValue(extractPath(extractedData, 'patient.id_number')) || 
-                    cleanValue(extractPath(extractedData, 'employee.id')) || '',
-        company: cleanValue(extractPath(extractedData, 'company')) || 
-                cleanValue(extractPath(extractedData, 'employer')) || 
-                cleanValue(extractPath(extractedData, 'patient.company')) || '',
-        occupation: cleanValue(extractPath(extractedData, 'patient.occupation')) || 
-                  cleanValue(extractPath(extractedData, 'patient.job_title')) || 
-                  cleanValue(extractPath(extractedData, 'occupation')) || 
-                  cleanValue(extractPath(extractedData, 'job_title')) || '',
+        employee_id: patientId || '',
+        company: company || '',
+        occupation: occupation || '',
         gender: cleanValue(extractPath(extractedData, 'patient.gender')) || 
                cleanValue(extractPath(extractedData, 'gender')) || 
                inferGenderFromMarkdown(markdown) || 'unknown'
       },
       examination_results: {
-        date: cleanValue(extractPath(extractedData, 'examination.date')) || 
+        date: examDate || 
+              cleanValue(extractPath(extractedData, 'examination.date')) || 
               cleanValue(extractPath(extractedData, 'date')) || 
               cleanValue(extractPath(extractedData, 'date_of_examination')) || 
               new Date().toISOString().split('T')[0],
-        physician: cleanValue(extractPath(extractedData, 'examination.physician')) || 
+        physician: formFields['Physician'] ||
+                  cleanValue(extractPath(extractedData, 'examination.physician')) || 
                   cleanValue(extractPath(extractedData, 'physician')) || '',
         fitness_status: cleanValue(extractPath(extractedData, 'examination.fitness_status')) || 
                        cleanValue(extractPath(extractedData, 'fitness_status')) || 'Unknown',
         restrictions: cleanValue(extractPath(extractedData, 'examination.restrictions')) || 
                      cleanValue(extractPath(extractedData, 'restrictions')) || 'None',
-        next_examination_date: cleanValue(extractPath(extractedData, 'examination.next_date')) || 
+        next_examination_date: expiryDate ||
+                             cleanValue(extractPath(extractedData, 'examination.next_date')) || 
                              cleanValue(extractPath(extractedData, 'valid_until')) || 
                              cleanValue(extractPath(extractedData, 'expiry_date')) || '',
         type: {
@@ -57,18 +111,70 @@ export function processCertificateOfFitnessData(apiResponse: any) {
         fit_with_condition: false,
         temporarily_unfit: false,
         unfit: false,
-        follow_up: '',
-        review_date: '',
-        comments: '',
-        examination_date: cleanValue(extractPath(extractedData, 'examination.date')) || 
+        follow_up: formFields['Referred or follow up actions'] || '',
+        review_date: formFields['Review Date'] || '',
+        comments: formFields['Comments'] || '',
+        examination_date: examDate || 
+                        cleanValue(extractPath(extractedData, 'examination.date')) || 
                         cleanValue(extractPath(extractedData, 'date_of_examination')) || '',
-        valid_until: cleanValue(extractPath(extractedData, 'examination.next_date')) || 
+        valid_until: expiryDate ||
+                    cleanValue(extractPath(extractedData, 'examination.next_date')) || 
                     cleanValue(extractPath(extractedData, 'valid_until')) || 
                     cleanValue(extractPath(extractedData, 'expiry_date')) || ''
       },
       restrictions: {},
       raw_content: markdown || null
     };
+    
+    // Process checkboxes if available from SDK
+    const checkboxes = apiResponse.structured_data?.checkboxes || [];
+    if (checkboxes.length > 0) {
+      console.log('Processing checkboxes from SDK, count:', checkboxes.length);
+      
+      // Process examination type checkboxes
+      structuredData.examination_results.type.pre_employment = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase().includes('pre-employment') && cb.checked);
+        
+      structuredData.examination_results.type.periodical = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase().includes('periodical') && cb.checked);
+        
+      structuredData.examination_results.type.exit = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase().includes('exit') && cb.checked);
+      
+      // Process fitness assessment checkboxes
+      structuredData.certification.fit = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase() === 'fit' && cb.checked);
+        
+      structuredData.certification.fit_with_restrictions = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase().includes('fit with restriction') && cb.checked);
+        
+      structuredData.certification.fit_with_condition = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase().includes('fit with condition') && cb.checked);
+        
+      structuredData.certification.temporarily_unfit = checkboxes.some(cb => 
+        cb.text && (cb.text.toLowerCase().includes('temporary unfit') || 
+                   cb.text.toLowerCase().includes('temporarily unfit')) && cb.checked);
+        
+      structuredData.certification.unfit = checkboxes.some(cb => 
+        cb.text && cb.text.toLowerCase() === 'unfit' && cb.checked);
+      
+      // Process restrictions checkboxes
+      const restrictionTypes = [
+        {key: 'heights', text: 'heights'},
+        {key: 'dust_exposure', text: 'dust exposure'},
+        {key: 'motorized_equipment', text: 'motorized equipment'},
+        {key: 'wear_hearing_protection', text: 'hearing protection'},
+        {key: 'confined_spaces', text: 'confined spaces'},
+        {key: 'chemical_exposure', text: 'chemical exposure'},
+        {key: 'wear_spectacles', text: 'spectacles'},
+        {key: 'remain_on_treatment_for_chronic_conditions', text: 'remain on treatment'}
+      ];
+      
+      for (const restriction of restrictionTypes) {
+        structuredData.restrictions[restriction.key] = checkboxes.some(cb => 
+          cb.text && cb.text.toLowerCase().includes(restriction.text) && cb.checked);
+      }
+    }
     
     // If we have markdown, extract more detailed data
     if (markdown) {
