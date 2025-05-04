@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
 import Index from './pages/Index';
@@ -23,7 +23,7 @@ import { EditOrganizationPage } from './pages/admin';
 import { OrganizationUsersPage } from './pages/admin';
 import OrganizationClientsPage from './pages/admin/OrganizationClientsPage';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { DashboardLayout } from './components/DashboardLayout';
 import PatientsPage from './pages/PatientsPage';

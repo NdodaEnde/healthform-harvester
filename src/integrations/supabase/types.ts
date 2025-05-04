@@ -9,6 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          new_state: Json | null
+          organization_id: string | null
+          previous_state: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          organization_id?: string | null
+          previous_state?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          organization_id?: string | null
+          previous_state?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificate_expirations: {
         Row: {
           certificate_id: string | null
@@ -817,6 +874,17 @@ export type Database = {
       }
     }
     Functions: {
+      add_audit_log: {
+        Args: {
+          p_action_type: string
+          p_entity_type: string
+          p_entity_id: string
+          p_previous_state?: Json
+          p_new_state?: Json
+          p_organization_id?: string
+        }
+        Returns: string
+      }
       add_user_to_organization: {
         Args: { user_id: string; org_id: string; user_role?: string }
         Returns: string
@@ -867,6 +935,10 @@ export type Database = {
       }
       user_belongs_to_organization: {
         Args: { org_id: string }
+        Returns: boolean
+      }
+      user_has_role: {
+        Args: { org_id: string; required_role: string }
         Returns: boolean
       }
     }

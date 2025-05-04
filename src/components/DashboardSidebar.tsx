@@ -67,7 +67,7 @@ export function DashboardSidebar() {
       href: "/certificates/templates",
       icon: ScrollText
     },
-    ...(isServiceProvider() ? [
+    ...(isServiceProvider ? [
       { 
         name: "Organizations", 
         href: "/admin/organizations", 
@@ -138,3 +138,5 @@ export function DashboardSidebar() {
     </div>
   );
 }
+
+export default DashboardSidebar;
