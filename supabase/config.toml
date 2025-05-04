@@ -1,0 +1,30 @@
+
+project_id = "wgkbsiczgyaqmgoyirjs"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[auth]
+enabled = true
+
+[storage]
+enabled = true
+
+[storage.buckets]
+medical-documents = { public = false, file_size_limit = "50MiB", allowed_mime_types = ["application/pdf", "image/png", "image/jpeg"] }
+
+[functions]
+[functions.send-invitation-email]
+verify_jwt = true
+

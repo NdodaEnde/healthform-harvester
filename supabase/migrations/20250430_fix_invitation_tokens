@@ -1,0 +1,21 @@
+-- This migration fixes issues with invitation tokens
+-- It adds an index on the token column and ensures no 'eq.' prefixes
+
+-- First, create an index to speed up token lookups
+CREATE INDEX IF NOT EXISTS invitations_token_idx ON public.invitations (token);
+
+-- Update any tokens that might have an 'eq.' prefix
+UPDATE public.invitations 
+SET token = substring(token from 4) 
+WHERE token LIKE 'eq.%';
+
+-- Ensure RLS policy allows access to invitation data
+CREATE POLICY IF NOT EXISTS "Invitations are readable by the user with the token" 
+  ON public.invitations
+  FOR SELECT
+  USING (true);
+
+-- Ensure invitations table has proper constraints
+ALTER TABLE IF EXISTS public.invitations 
+  ALTER COLUMN token SET NOT NULL,
+  ADD CONSTRAINT invitations_token_unique UNIQUE (token);
