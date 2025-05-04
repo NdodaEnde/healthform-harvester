@@ -20,6 +20,7 @@ const Auth = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [confirmationRequired, setConfirmationRequired] = useState(false);
+  const [activeTab, setActiveTab] = useState("signin");
 
   // Check if user is already logged in
   useEffect(() => {
@@ -147,6 +148,8 @@ const Auth = () => {
         toast.error("Sign up failed", {
           description: "This email is already registered. Please sign in instead."
         });
+        // Switch to sign in tab automatically
+        setActiveTab("signin");
       } else {
         toast.error("Sign up failed", {
           description: error.message || "Please try again with a different email"
@@ -301,7 +304,7 @@ const Auth = () => {
                 </p>
               </div>
               
-              <Tabs defaultValue="signin" className="space-y-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList className="grid grid-cols-2 w-full">
                   <TabsTrigger value="signin">Sign In</TabsTrigger>
                   <TabsTrigger value="signup">Sign Up</TabsTrigger>

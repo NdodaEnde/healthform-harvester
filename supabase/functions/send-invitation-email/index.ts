@@ -20,14 +20,14 @@ async function sendEmail(payload: EmailPayload) {
     
     // Get Resend API key from environment variables
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    const emailFrom = Deno.env.get("EMAIL_FROM") || "noreply@medicdata.co.za";
+    const emailFromAddress = Deno.env.get("EMAIL_FROM") || "noreply@medicdata.co.za";
     
     // Log configuration for debugging
     console.log("Email Configuration:");
     console.log("- Using Resend API");
     console.log("- API Key exists:", !!resendApiKey);
     console.log("- Sending to:", email);
-    console.log("- Using from email:", emailFrom);
+    console.log("- Using from email:", emailFromAddress);
     console.log("- Token:", token);
     console.log("- Invitation URL:", inviteUrl);
     
@@ -64,7 +64,7 @@ async function sendEmail(payload: EmailPayload) {
       </html>
     `;
     
-    // Use Resend API to send the email with the verified domain
+    // Use Resend API to send the email
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -72,7 +72,7 @@ async function sendEmail(payload: EmailPayload) {
         "Authorization": `Bearer ${resendApiKey}`
       },
       body: JSON.stringify({
-        from: `HealthForm Harvester <${emailFrom}>`,
+        from: `HealthForm Harvester <${emailFromAddress}>`,
         to: [email],
         subject: `Invitation to join ${organizationName} on HealthForm Harvester`,
         html: htmlContent
@@ -133,29 +133,18 @@ serve(async (req) => {
     // Send the email
     const result = await sendEmail(payload);
     
-    if (!result.success) {
-      console.error("Email sending failed:", result.message);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: result.message,
-          inviteUrl: payload.inviteUrl, // Include the invite URL so it can be shared manually
-          manualSharing: result.manualSharing || false
-        }),
-        { 
-          status: 200, // Return 200 even if email failed but we have the invite URL
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
-    }
-    
+    // Always return 200 with appropriate data, even if sending failed
+    // This makes it easier for clients to handle the response
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        message: "Invitation email sent successfully" 
+        success: result.success,
+        message: result.message,
+        inviteUrl: payload.inviteUrl,
+        manualSharing: result.manualSharing || false,
+        emailId: result.emailId
       }),
       { 
-        status: 200, 
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );

@@ -101,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("Using redirect URL for signup:", redirectTo);
     
     try {
+      // First, attempt to sign up the user
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -119,15 +120,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log("Sign up response:", data);
       
-      // For email confirmation mode, we should wait for verification before creating profile
-      const emailConfirmRequired = data.session === null && data.user?.identities?.length === 1;
+      // Important: With Supabase's behavior, we need to wait for the user to confirm their email
+      // The auth.users record won't exist until the email is confirmed, which prevents profile creation
       
-      if (data.user && !emailConfirmRequired) {
-        // If email confirmation is not required, attempt to create profile right away
+      // Check if email confirmation is required (the typical case)
+      const emailConfirmRequired = data.session === null && data.user;
+      
+      if (emailConfirmRequired) {
+        console.log("Email confirmation is required. A confirmation email has been sent.");
+        // Return early without trying to create a profile yet
+        return { data, error: null };
+      }
+      
+      // In the rare case where email confirmation is disabled, user is immediately created
+      // and we can attempt to create a profile
+      if (data.user && data.session) {
+        console.log("Email confirmation not required. Creating profile for user:", data.user.id);
         try {
-          await createUserProfile(data.user.id, email);
-        } catch (profileErr) {
-          console.error("Failed to create profile, but sign-up completed:", profileErr);
+          // We use the handle_new_user trigger function which should create the profile
+          // automatically, but just in case, we'll make a direct attempt too
+          await createUserProfileSafe(data.user.id, email);
+        } catch (profileError) {
+          console.error("Failed to create profile, but sign-up completed:", profileError);
           // We don't fail the signup if profile creation fails
         }
       }
@@ -139,45 +153,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Helper function to create a user profile
-  const createUserProfile = async (userId: string, email: string) => {
+  // Helper function for safer profile creation
+  const createUserProfileSafe = async (userId: string, email: string) => {
     const fullName = email.split('@')[0];
+    console.log("Attempting to create profile for new user:", userId);
     
-    // Try using the create_user_profile function if it exists
+    // First try: Use the create_user_profile function
     try {
-      const { error: profileError } = await supabase.rpc('create_user_profile', {
+      const { error } = await supabase.rpc('create_user_profile', {
         user_id: userId,
         email: email,
         full_name: fullName
       });
       
-      if (!profileError) {
+      if (!error) {
         console.log("Profile created successfully via create_user_profile RPC");
         return;
       }
-      console.error("Error with create_user_profile:", profileError);
+      
+      console.error("Error with create_user_profile:", error);
     } catch (e) {
       console.warn("create_user_profile function might not exist:", e);
     }
-    
-    // Fallback to direct insert if the function doesn't exist
-    try {
-      const { error: insertError } = await supabase.from('profiles').insert({
-        id: userId,
-        email: email,
-        full_name: fullName,
-        updated_at: new Date().toISOString()
-      });
-      
-      if (!insertError) {
-        console.log("Profile created successfully via direct insert");
-        return;
-      }
-      
-      console.error("Error with direct profile insert:", insertError);
-    } catch (e) {
-      console.error("Failed to insert profile directly:", e);
-    }
+
+    // Second try: Use the handle_new_user trigger directly
+    // We don't actually need to do this manually since the trigger should fire automatically
+    // This is just a fallback
   };
 
   const signOut = async () => {
