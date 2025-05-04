@@ -100,73 +100,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     console.log("Using redirect URL for signup:", redirectTo);
     
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
-      password,
-      options: {
-        emailRedirectTo: redirectTo,
-        data: {
-          full_name: email.split('@')[0] // Set a default name from email
+    try {
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: redirectTo,
+          data: {
+            full_name: email.split('@')[0] // Set a default name from email
+          }
         }
+      });
+      
+      if (error) {
+        console.error("Sign up error:", error);
+        return { data: null, error };
       }
-    });
-    
-    if (error) {
-      console.error("Sign up error:", error);
-    } else {
+      
       console.log("Sign up response:", data);
       
-      // Create a profile regardless of email confirmation status
-      if (data.user) {
+      // For email confirmation mode, we should wait for verification before creating profile
+      const emailConfirmRequired = data.session === null && data.user?.identities?.length === 1;
+      
+      if (data.user && !emailConfirmRequired) {
+        // If email confirmation is not required, attempt to create profile right away
         try {
-          console.log("Attempting to create profile for new user:", data.user.id);
-          
-          // Try direct RPC call first
-          const { error: profileError } = await supabase.rpc('direct_insert_profile', {
-            p_id: data.user.id,
-            p_email: email,
-            p_full_name: email.split('@')[0]
-          });
-          
-          if (profileError) {
-            console.error("Error creating profile with direct_insert_profile:", profileError);
-            
-            // Fallback to direct insert
-            const { error: insertError } = await supabase.from('profiles').insert({
-              id: data.user.id,
-              email: email,
-              full_name: email.split('@')[0],
-              updated_at: new Date().toISOString()
-            });
-            
-            if (insertError) {
-              console.error("Error with direct profile insert:", insertError);
-            } else {
-              console.log("Profile created successfully via direct insert");
-            }
-          } else {
-            console.log("Profile created successfully via RPC");
-          }
-          
-          // Use the ensure_profile_exists function as another fallback
-          const { error: ensureError } = await supabase.rpc('ensure_profile_exists', {
-            p_user_id: data.user.id,
-            p_email: email,
-            p_full_name: email.split('@')[0]
-          });
-          
-          if (ensureError) {
-            console.error("Error ensuring profile exists:", ensureError);
-          } else {
-            console.log("Profile existence ensured");
-          }
+          await createUserProfile(data.user.id, email);
         } catch (profileErr) {
-          console.error("Failed to create profile:", profileErr);
+          console.error("Failed to create profile, but sign-up completed:", profileErr);
+          // We don't fail the signup if profile creation fails
         }
       }
+      
+      return { data, error: null };
+    } catch (error: any) {
+      console.error("Unexpected error during signup:", error);
+      return { data: null, error };
+    }
+  };
+
+  // Helper function to create a user profile
+  const createUserProfile = async (userId: string, email: string) => {
+    const fullName = email.split('@')[0];
+    
+    // Try using the create_user_profile function if it exists
+    try {
+      const { error: profileError } = await supabase.rpc('create_user_profile', {
+        user_id: userId,
+        email: email,
+        full_name: fullName
+      });
+      
+      if (!profileError) {
+        console.log("Profile created successfully via create_user_profile RPC");
+        return;
+      }
+      console.error("Error with create_user_profile:", profileError);
+    } catch (e) {
+      console.warn("create_user_profile function might not exist:", e);
     }
     
-    return { data, error };
+    // Fallback to direct insert if the function doesn't exist
+    try {
+      const { error: insertError } = await supabase.from('profiles').insert({
+        id: userId,
+        email: email,
+        full_name: fullName,
+        updated_at: new Date().toISOString()
+      });
+      
+      if (!insertError) {
+        console.log("Profile created successfully via direct insert");
+        return;
+      }
+      
+      console.error("Error with direct profile insert:", insertError);
+    } catch (e) {
+      console.error("Failed to insert profile directly:", e);
+    }
   };
 
   const signOut = async () => {

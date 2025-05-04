@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -137,40 +138,20 @@ const Auth = () => {
             console.error("Auto sign-in after signup failed:", err);
           }
         }
-        
-        // Create user profile
-        try {
-          const { error: profileError } = await supabase.rpc('direct_insert_profile', {
-            p_id: data.user.id,
-            p_email: email,
-            p_full_name: email.split('@')[0]
-          });
-          
-          if (profileError) {
-            console.error("Error creating profile with direct_insert_profile:", profileError);
-            
-            // Fallback: Try creating profile directly
-            const { error: insertError } = await supabase.from('profiles').insert({
-              id: data.user.id,
-              email: email,
-              full_name: email.split('@')[0],
-              updated_at: new Date().toISOString()
-            });
-            
-            if (insertError) {
-              console.error("Error with direct profile insert:", insertError);
-            }
-          }
-        } catch (profileErr) {
-          console.error("Failed to create profile:", profileErr);
-        }
       }
     } catch (error: any) {
       console.error("Sign up error:", error);
       setAuthError(error.message || "Failed to sign up");
-      toast.error("Sign up failed", {
-        description: error.message || "Please try again with a different email"
-      });
+      
+      if (error.message.includes("User already registered")) {
+        toast.error("Sign up failed", {
+          description: "This email is already registered. Please sign in instead."
+        });
+      } else {
+        toast.error("Sign up failed", {
+          description: error.message || "Please try again with a different email"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
