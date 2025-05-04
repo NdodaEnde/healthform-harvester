@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -15,6 +16,7 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -83,11 +85,18 @@ const Auth = () => {
     setAuthError(null);
 
     try {
+      // Fix: Use the correct origin URL to ensure proper redirect
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth/callback`;
+      
+      console.log("Signing up with email:", email);
+      console.log("Redirect URL:", redirectTo);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectTo,
         }
       });
 
@@ -95,10 +104,29 @@ const Auth = () => {
         throw error;
       }
 
+      console.log("Sign up response:", data);
+      
       if (data.user) {
+        // Set signup success state to show confirmation message
+        setSignupSuccess(true);
+        
         toast.success("Sign up successful", {
           description: "Please check your email to confirm your account"
         });
+        
+        // Create user profile if necessary
+        try {
+          const { error: profileError } = await supabase.rpc('ensure_profile_exists', {
+            p_user_id: data.user.id,
+            p_email: email,
+          });
+          
+          if (profileError) {
+            console.error("Error creating profile:", profileError);
+          }
+        } catch (profileErr) {
+          console.error("Failed to ensure profile exists:", profileErr);
+        }
       }
     } catch (error: any) {
       console.error("Sign up error:", error);
@@ -110,6 +138,71 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  // Show a different UI when signup is successful
+  if (signupSuccess) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center justify-between">
+            <div className="flex items-center space-x-2" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+              <FileText className="h-6 w-6" />
+              <span className="font-medium text-lg">HealthForm Harvester</span>
+            </div>
+          </div>
+        </header>
+        
+        <main className="flex-1 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md"
+          >
+            <div className="border rounded-lg shadow-sm overflow-hidden bg-card p-6 sm:p-8">
+              <div className="text-center mb-6">
+                <div className="mx-auto bg-green-100 text-green-800 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+                  <Mail className="h-6 w-6" />
+                </div>
+                <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>
+                <p className="text-sm text-muted-foreground mt-2">
+                  We've sent a confirmation email to <strong>{email}</strong>
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-sm">
+                  Click the link in the email to verify your account and complete the sign-up process.
+                </p>
+                
+                <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+                  <p className="flex items-start">
+                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>If you don't see the email, check your spam folder.</span>
+                  </p>
+                </div>
+                
+                <div className="pt-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full" 
+                    onClick={() => {
+                      setEmail("");
+                      setPassword("");
+                      setConfirmPassword("");
+                      setSignupSuccess(false);
+                    }}
+                  >
+                    Back to sign in
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -250,6 +343,13 @@ const Auth = () => {
                         <span>{authError}</span>
                       </div>
                     )}
+                    
+                    <div className="text-xs text-muted-foreground">
+                      By signing up, you agree to our 
+                      <Link to="/terms" className="text-primary hover:underline mx-1">Terms</Link> 
+                      and 
+                      <Link to="/privacy" className="text-primary hover:underline mx-1">Privacy Policy</Link>
+                    </div>
                     
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? (
