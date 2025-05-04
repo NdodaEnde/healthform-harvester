@@ -18,6 +18,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [confirmationRequired, setConfirmationRequired] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -31,6 +32,16 @@ const Auth = () => {
     
     checkAuthState();
   }, [navigate]);
+
+  useEffect(() => {
+    // Check if the URL contains a confirmation success message
+    const urlParams = new URLSearchParams(window.location.search);
+    const confirmSuccess = urlParams.get("confirmation");
+    
+    if (confirmSuccess === "success") {
+      toast.success("Email confirmed successfully! You can now sign in.");
+    }
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +68,11 @@ const Auth = () => {
         toast.error("Authentication failed", {
           description: "Invalid email or password. Please check your credentials and try again."
         });
+      } else if (error.message.includes("Email not confirmed")) {
+        toast.error("Email not confirmed", {
+          description: "Please check your email and confirm your account before signing in."
+        });
+        setConfirmationRequired(true);
       } else {
         toast.error("Authentication failed", {
           description: error.message || "Please check your credentials and try again"
@@ -92,14 +108,37 @@ const Auth = () => {
       console.log("Sign up response:", data);
       
       if (data?.user) {
+        // Check if email confirmation is required
+        const emailConfirmRequired = data.session === null && data.user.identities?.length === 1;
+        setConfirmationRequired(emailConfirmRequired);
+        
         // Set signup success state to show confirmation message
         setSignupSuccess(true);
         
-        toast.success("Sign up successful", {
-          description: "Please check your email to confirm your account"
-        });
+        if (emailConfirmRequired) {
+          toast.success("Sign up successful", {
+            description: "Please check your email to confirm your account"
+          });
+          
+          // Log to help with debugging
+          console.log("Email confirmation is required. Confirmation email should be sent.");
+        } else {
+          // If email confirmation is disabled in Supabase settings
+          toast.success("Sign up successful!");
+          
+          // Try to automatically sign in the user
+          try {
+            const { error: signInError } = await signIn(email, password);
+            if (!signInError) {
+              navigate("/dashboard");
+              return;
+            }
+          } catch (err) {
+            console.error("Auto sign-in after signup failed:", err);
+          }
+        }
         
-        // Create user profile using direct_insert_profile RPC call
+        // Create user profile
         try {
           const { error: profileError } = await supabase.rpc('direct_insert_profile', {
             p_id: data.user.id,
@@ -137,7 +176,36 @@ const Auth = () => {
     }
   };
 
-  // Show a different UI when signup is successful
+  // Handle resend confirmation email
+  const handleResendConfirmation = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success("Confirmation email sent", {
+        description: "Please check your inbox for the confirmation link"
+      });
+    } catch (error: any) {
+      console.error("Failed to resend confirmation email:", error);
+      toast.error("Failed to resend email", {
+        description: error.message || "Please try again later"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show a different UI when signup is successful and confirmation is required
   if (signupSuccess) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -164,31 +232,54 @@ const Auth = () => {
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>
                 <p className="text-sm text-muted-foreground mt-2">
-                  We've sent a confirmation email to <strong>{email}</strong>
+                  {confirmationRequired ? 
+                    `We've sent a confirmation email to ${email}` : 
+                    `Account created successfully for ${email}`}
                 </p>
               </div>
               
               <div className="space-y-4">
-                <p className="text-sm">
-                  Click the link in the email to verify your account and complete the sign-up process.
-                </p>
-                
-                <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
-                  <p className="flex items-start">
-                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                    <span>If you don't see the email, check your spam folder.</span>
+                {confirmationRequired ? (
+                  <>
+                    <p className="text-sm">
+                      Click the link in the email to verify your account and complete the sign-up process.
+                    </p>
+                    
+                    <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+                      <p className="flex items-start">
+                        <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                        <span>If you don't see the email, check your spam folder.</span>
+                      </p>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleResendConfirmation}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Sending..." : "Resend confirmation email"}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm">
+                    You can now sign in to your account.
                   </p>
-                </div>
+                )}
                 
                 <div className="pt-4">
                   <Button 
-                    variant="outline" 
+                    variant="default" 
                     className="w-full" 
                     onClick={() => {
                       setEmail("");
                       setPassword("");
                       setConfirmPassword("");
                       setSignupSuccess(false);
+                      setConfirmationRequired(false);
                     }}
                   >
                     Back to sign in

@@ -91,17 +91,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string) => {
     console.log("Signing up with:", email);
     
-    // Generate the correct redirect URL based on actual deployment
+    // Get the actual deployment URL for better email redirects
     const origin = window.location.origin;
+    console.log("Current origin:", origin);
+    
+    // Generate a redirect URL that will work in production environments
     const redirectTo = `${origin}/auth/callback`;
     
-    console.log("Using redirect URL:", redirectTo);
+    console.log("Using redirect URL for signup:", redirectTo);
     
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
       options: {
-        emailRedirectTo: redirectTo
+        emailRedirectTo: redirectTo,
+        data: {
+          full_name: email.split('@')[0] // Set a default name from email
+        }
       }
     });
     
@@ -110,10 +116,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       console.log("Sign up response:", data);
       
-      // Attempt to create the profile
+      // Create a profile regardless of email confirmation status
       if (data.user) {
-        // Handle profile creation at a higher level to ensure proper error handling
-        console.log("User created successfully with ID:", data.user.id);
+        try {
+          console.log("Attempting to create profile for new user:", data.user.id);
+          
+          // Try direct RPC call first
+          const { error: profileError } = await supabase.rpc('direct_insert_profile', {
+            p_id: data.user.id,
+            p_email: email,
+            p_full_name: email.split('@')[0]
+          });
+          
+          if (profileError) {
+            console.error("Error creating profile with direct_insert_profile:", profileError);
+            
+            // Fallback to direct insert
+            const { error: insertError } = await supabase.from('profiles').insert({
+              id: data.user.id,
+              email: email,
+              full_name: email.split('@')[0],
+              updated_at: new Date().toISOString()
+            });
+            
+            if (insertError) {
+              console.error("Error with direct profile insert:", insertError);
+            } else {
+              console.log("Profile created successfully via direct insert");
+            }
+          } else {
+            console.log("Profile created successfully via RPC");
+          }
+          
+          // Use the ensure_profile_exists function as another fallback
+          const { error: ensureError } = await supabase.rpc('ensure_profile_exists', {
+            p_user_id: data.user.id,
+            p_email: email,
+            p_full_name: email.split('@')[0]
+          });
+          
+          if (ensureError) {
+            console.error("Error ensuring profile exists:", ensureError);
+          } else {
+            console.log("Profile existence ensured");
+          }
+        } catch (profileErr) {
+          console.error("Failed to create profile:", profileErr);
+        }
       }
     }
     

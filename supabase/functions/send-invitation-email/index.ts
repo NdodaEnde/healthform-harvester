@@ -20,7 +20,7 @@ async function sendEmail(payload: EmailPayload) {
     
     // Get Resend API key from environment variables
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    const emailFrom = Deno.env.get("EMAIL_FROM") || "noreply@invite.medicdata.co.za";
+    const emailFrom = Deno.env.get("EMAIL_FROM") || "noreply@medicdata.co.za";
     
     // Log configuration for debugging
     console.log("Email Configuration:");
