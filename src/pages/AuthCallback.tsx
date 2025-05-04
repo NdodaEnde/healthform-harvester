@@ -22,14 +22,23 @@ export default function AuthCallback() {
         // Get query parameters
         const queryParams = new URLSearchParams(window.location.search);
         const inviteToken = queryParams.get("token");
+        const confirmation = queryParams.get("confirmation");
+        
+        if (confirmation === "success") {
+          toast.success("Email confirmed successfully! You can now sign in.");
+        }
         
         if (accessToken && refreshToken) {
           // If we have tokens in the URL, set the session
           console.log("Setting session from URL parameters");
-          await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
+          try {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+          } catch (sessionError) {
+            console.error("Error setting session:", sessionError);
+          }
         }
         
         // Get the current session
@@ -49,7 +58,8 @@ export default function AuthCallback() {
           console.log("Session authenticated:", data.session.user.email);
           toast.success("Successfully authenticated");
           
-          // First check if the user has a profile created
+          // First check if the user has a profile created - this should happen automatically 
+          // thanks to our trigger and deferred foreign key
           const { data: profileData, error: profileError } = await supabase
             .from("profiles")
             .select("*")
@@ -58,34 +68,42 @@ export default function AuthCallback() {
             
           if (profileError && !profileError.message.includes("No rows found")) {
             console.error("Error checking user profile:", profileError);
-          }
-          
-          if (!profileData) {
-            // Create profile if it doesn't exist
-            console.log("Creating user profile");
-            // Use direct_insert_profile function instead
-            const { error: createError } = await supabase.rpc(
-              'direct_insert_profile', 
-              { 
-                p_id: data.session.user.id,
-                p_email: data.session.user.email,
-                p_full_name: data.session.user.email.split('@')[0]
-              }
-            );
             
-            if (createError) {
-              console.error("Error creating profile:", createError);
-              // Try alternative method as fallback
-              const { error: directInsertError } = await supabase.from('profiles').insert({
-                id: data.session.user.id,
-                email: data.session.user.email,
-                full_name: data.session.user.email.split('@')[0],
-                updated_at: new Date().toISOString()
-              });
+            // Try to create the profile if the check failed for another reason
+            try {
+              const { error: createError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.session.user.id,
+                  email: data.session.user.email,
+                  full_name: data.session.user.email?.split('@')[0] || 'User',
+                  updated_at: new Date().toISOString()
+                });
               
-              if (directInsertError) {
-                console.error("Error with direct insert:", directInsertError);
+              if (createError) {
+                console.error("Error creating profile directly:", createError);
               }
+            } catch (insertError) {
+              console.error("Exception during profile creation:", insertError);
+            }
+          } else if (!profileData) {
+            console.log("No profile found, creating one now");
+            // Create profile if it doesn't exist
+            try {
+              const { error: createError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.session.user.id,
+                  email: data.session.user.email,
+                  full_name: data.session.user.email?.split('@')[0] || 'User',
+                  updated_at: new Date().toISOString()
+                });
+              
+              if (createError) {
+                console.error("Error creating profile:", createError);
+              }
+            } catch (insertError) {
+              console.error("Exception during profile creation:", insertError);
             }
           }
           
@@ -139,7 +157,7 @@ export default function AuthCallback() {
           }
         } else {
           setError("No session data found");
-          navigate("/auth");
+          navigate("/auth?confirmation=success");
         }
       } catch (err: any) {
         console.error("Unexpected error during authentication:", err);

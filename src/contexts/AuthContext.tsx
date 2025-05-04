@@ -120,10 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log("Sign up response:", data);
       
-      // Important: With Supabase's behavior, we need to wait for the user to confirm their email
-      // The auth.users record won't exist until the email is confirmed, which prevents profile creation
-      
-      // Check if email confirmation is required (the typical case)
+      // Check if email confirmation is required
       const emailConfirmRequired = data.session === null && data.user;
       
       if (emailConfirmRequired) {
@@ -132,18 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { data, error: null };
       }
       
-      // In the rare case where email confirmation is disabled, user is immediately created
-      // and we can attempt to create a profile
+      // The SQL changes we've made (DEFERRABLE INITIALLY DEFERRED) should help with the profile creation
+      // when the auth.users record exists, but we'll still handle the case where email confirmation
+      // isn't required and we can create a profile now
+      
       if (data.user && data.session) {
-        console.log("Email confirmation not required. Creating profile for user:", data.user.id);
-        try {
-          // We use the handle_new_user trigger function which should create the profile
-          // automatically, but just in case, we'll make a direct attempt too
-          await createUserProfileSafe(data.user.id, email);
-        } catch (profileError) {
-          console.error("Failed to create profile, but sign-up completed:", profileError);
-          // We don't fail the signup if profile creation fails
-        }
+        console.log("Email confirmation not required. User created with session.");
       }
       
       return { data, error: null };
@@ -151,34 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Unexpected error during signup:", error);
       return { data: null, error };
     }
-  };
-
-  // Helper function for safer profile creation
-  const createUserProfileSafe = async (userId: string, email: string) => {
-    const fullName = email.split('@')[0];
-    console.log("Attempting to create profile for new user:", userId);
-    
-    // First try: Use the create_user_profile function
-    try {
-      const { error } = await supabase.rpc('create_user_profile', {
-        user_id: userId,
-        email: email,
-        full_name: fullName
-      });
-      
-      if (!error) {
-        console.log("Profile created successfully via create_user_profile RPC");
-        return;
-      }
-      
-      console.error("Error with create_user_profile:", error);
-    } catch (e) {
-      console.warn("create_user_profile function might not exist:", e);
-    }
-
-    // Second try: Use the handle_new_user trigger directly
-    // We don't actually need to do this manually since the trigger should fire automatically
-    // This is just a fallback
   };
 
   const signOut = async () => {
