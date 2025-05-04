@@ -90,6 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     console.log("Signing up with:", email);
+    
+    // Generate the correct redirect URL based on actual deployment
     const origin = window.location.origin;
     const redirectTo = `${origin}/auth/callback`;
     
@@ -107,6 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Sign up error:", error);
     } else {
       console.log("Sign up response:", data);
+      
+      // Attempt to create the profile
+      if (data.user) {
+        // Handle profile creation at a higher level to ensure proper error handling
+        console.log("User created successfully with ID:", data.user.id);
+      }
     }
     
     return { data, error };

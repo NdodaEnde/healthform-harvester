@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -8,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,21 +39,15 @@ const Auth = () => {
 
     try {
       console.log("Attempting to sign in with email:", email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await signIn(email, password);
 
       if (error) {
         console.error("Sign in error:", error);
         throw error;
       }
 
-      if (data.session) {
-        console.log("Successfully signed in");
-        toast.success("Signed in successfully");
-        navigate("/dashboard");
-      }
+      toast.success("Signed in successfully");
+      navigate("/dashboard");
     } catch (error: any) {
       console.error("Sign in error:", error);
       setAuthError(error.message || "Failed to sign in");
@@ -85,20 +80,10 @@ const Auth = () => {
     setAuthError(null);
 
     try {
-      // Fix: Use the correct origin URL to ensure proper redirect
-      const origin = window.location.origin;
-      const redirectTo = `${origin}/auth/callback`;
-      
       console.log("Signing up with email:", email);
-      console.log("Redirect URL:", redirectTo);
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectTo,
-        }
-      });
+      // Use the signUp function from AuthContext
+      const { error, data } = await signUp(email, password);
 
       if (error) {
         throw error;
@@ -106,7 +91,7 @@ const Auth = () => {
 
       console.log("Sign up response:", data);
       
-      if (data.user) {
+      if (data?.user) {
         // Set signup success state to show confirmation message
         setSignupSuccess(true);
         
@@ -114,18 +99,31 @@ const Auth = () => {
           description: "Please check your email to confirm your account"
         });
         
-        // Create user profile if necessary
+        // Create user profile using direct_insert_profile RPC call
         try {
-          const { error: profileError } = await supabase.rpc('ensure_profile_exists', {
-            p_user_id: data.user.id,
+          const { error: profileError } = await supabase.rpc('direct_insert_profile', {
+            p_id: data.user.id,
             p_email: email,
+            p_full_name: email.split('@')[0]
           });
           
           if (profileError) {
-            console.error("Error creating profile:", profileError);
+            console.error("Error creating profile with direct_insert_profile:", profileError);
+            
+            // Fallback: Try creating profile directly
+            const { error: insertError } = await supabase.from('profiles').insert({
+              id: data.user.id,
+              email: email,
+              full_name: email.split('@')[0],
+              updated_at: new Date().toISOString()
+            });
+            
+            if (insertError) {
+              console.error("Error with direct profile insert:", insertError);
+            }
           }
         } catch (profileErr) {
-          console.error("Failed to ensure profile exists:", profileErr);
+          console.error("Failed to create profile:", profileErr);
         }
       }
     } catch (error: any) {

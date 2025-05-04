@@ -27,4 +27,3 @@ medical-documents = { public = false, file_size_limit = "50MiB", allowed_mime_ty
 [functions]
 [functions.send-invitation-email]
 verify_jwt = true
-

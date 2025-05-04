@@ -1,3 +1,4 @@
+
 -- This migration fixes issues with invitation tokens
 -- It adds an index on the token column and ensures no 'eq.' prefixes
 
@@ -18,4 +19,37 @@ CREATE POLICY IF NOT EXISTS "Invitations are readable by the user with the token
 -- Ensure invitations table has proper constraints
 ALTER TABLE IF EXISTS public.invitations 
   ALTER COLUMN token SET NOT NULL,
-  ADD CONSTRAINT invitations_token_unique UNIQUE (token);
+  ADD CONSTRAINT IF NOT EXISTS invitations_token_unique UNIQUE (token);
+
+-- Add trigger function to handle profile creation from auth.users if not exists
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (
+    NEW.id, 
+    NEW.email, 
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1))
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(EXCLUDED.full_name, profiles.full_name),
+    updated_at = now();
+    
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'on_auth_user_created'
+  ) THEN
+    CREATE TRIGGER on_auth_user_created
+      AFTER INSERT ON auth.users
+      FOR EACH ROW
+      EXECUTE PROCEDURE public.handle_new_user();
+  END IF;
+END
+$$;
