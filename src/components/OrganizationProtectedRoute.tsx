@@ -1,3 +1,4 @@
+
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useOrganizationEnforcer, isPublicRoute } from "@/utils/organizationContextEnforcer";
@@ -84,10 +85,15 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // EMERGENCY FIX FOR INVITATION LOOP: Skip enforcer for organization handling
-  // Instead of showing loading and expecting enforcer to redirect, just redirect to setup directly
+  // Handle organization setup routes
+  if (location.pathname === "/setup") {
+    console.log("On setup page, allowing access");
+    return <>{children}</>;
+  }
+  
+  // For all protected routes except setup, enforce organization context
   if (!currentOrganization && !isPublicRoute(location.pathname)) {
-    console.log("EMERGENCY FIX: Authenticated but no org context, redirecting to setup");
+    console.log("No organization context, redirecting to setup");
     return <Navigate to="/setup" state={{ from: location }} replace />;
   }
   

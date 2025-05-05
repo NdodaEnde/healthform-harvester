@@ -7,15 +7,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import LoadingFallback from "@/components/LoadingFallback";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { AlertCircle, Mail } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { PendingInvitationsCard } from "@/components/PendingInvitationsCard";
 
 const FirstTimeSetupPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasOrganizations, setHasOrganizations] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -57,12 +56,23 @@ const FirstTimeSetupPage = () => {
         
         // If user already has organizations, redirect to dashboard
         if (orgUsers && orgUsers.length > 0) {
-          console.log("User already has organizations, redirecting to dashboard");
-          navigate("/dashboard");
-          return;
+          console.log("User already has organizations");
+          setHasOrganizations(true);
+          
+          // Only redirect to dashboard automatically if we're not in the middle of account setup
+          const justCreatedAccount = localStorage.getItem("just_created_account");
+          if (!justCreatedAccount) {
+            console.log("Redirecting to dashboard");
+            navigate("/dashboard");
+            return;
+          } else {
+            console.log("Just created account, not redirecting automatically");
+            // Clear the flag after use
+            localStorage.removeItem("just_created_account");
+          }
+        } else {
+          console.log("User has no organizations, showing setup page");
         }
-        
-        console.log("User has no organizations, showing setup page");
       } catch (error: any) {
         console.error("Setup page error:", error);
         setError(error.message || "An unexpected error occurred");
@@ -106,11 +116,20 @@ const FirstTimeSetupPage = () => {
             {/* Display pending invitations at the top if there are any */}
             <PendingInvitationsCard />
             
-            <Separator className="my-6" />
-            
-            <h2 className="text-lg font-semibold mb-4">Or create your own organization:</h2>
-            
-            <CreateFirstOrganization />
+            {hasOrganizations ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Organization Already Created</AlertTitle>
+                <AlertDescription>
+                  You already have an organization. You can access it from the dashboard.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold mb-4">Create your organization:</h2>
+                <CreateFirstOrganization />
+              </>
+            )}
           </motion.div>
         )}
       </main>

@@ -151,6 +151,9 @@ const CreateFirstOrganization = () => {
         description: `${name} has been created successfully.`,
       });
       
+      // Set a flag to indicate successful organization creation
+      localStorage.setItem("organization_created", "true");
+      
       navigate("/dashboard");
       
     } catch (error: any) {

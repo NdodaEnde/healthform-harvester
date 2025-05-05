@@ -15,8 +15,17 @@ export const useOrganizationEnforcer = () => {
   } = useOrganization();
 
   useEffect(() => {
+    // Track if we've initiated a navigation to avoid redirection loops
+    let isNavigating = false;
+    
     const checkAuthAndOrg = async () => {
       console.log("Checking auth and org status");
+      
+      // Skip if we've already initiated navigation
+      if (isNavigating) {
+        console.log("Navigation already in progress, skipping additional checks");
+        return;
+      }
       
       // EMERGENCY FIX: Skip enforcer if we're on setup or accept-invite pages
       // This prevents the invitation loop bug completely
@@ -39,18 +48,28 @@ export const useOrganizationEnforcer = () => {
       // If not authenticated, redirect to auth page
       if (!session) {
         console.log("No session found, redirecting to auth");
+        isNavigating = true;
         navigate("/auth");
         return;
       }
       
+      // Wait until organization data is fully loaded
+      if (loading) {
+        console.log("Organizations still loading, waiting...");
+        return;
+      }
+      
       // If authenticated but no organization context is available (after loading is complete)
-      if (!loading && !currentOrganization && userOrganizations.length === 0) {
-        console.log("Authenticated but no organization context");
-        
-        // EMERGENCY FIX: Skipping invitation check completely to prevent redirection loops
-        // Just redirect to setup page directly without checking invitations
-        console.log("EMERGENCY FIX: Bypassing invitation check, sending to setup");
+      if (!currentOrganization && userOrganizations.length === 0) {
+        console.log("Authenticated but no organization context, redirecting to setup");
+        isNavigating = true;
         navigate("/setup");
+        return;
+      } else if (!currentOrganization && userOrganizations.length > 0) {
+        console.log("User has organizations but none selected, redirecting to dashboard");
+        isNavigating = true;
+        navigate("/dashboard");
+        return;
       }
     };
     

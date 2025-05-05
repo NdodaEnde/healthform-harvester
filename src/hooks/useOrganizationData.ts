@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -53,6 +54,7 @@ export function useOrganizationData() {
       })) || [];
       
       setUserOrganizations(orgs);
+      console.log("User organizations loaded:", orgs.length);
       
       // Get the current organization from localStorage or use the first one
       const storedOrgId = localStorage.getItem("currentOrganizationId");
@@ -64,17 +66,22 @@ export function useOrganizationData() {
       
       if (!currentOrg && orgs.length > 0) {
         currentOrg = orgs[0];
+        // Store the first organization as current if none was previously selected
+        localStorage.setItem("currentOrganizationId", orgs[0].id);
       }
       
       if (currentOrg) {
+        console.log("Setting current organization:", currentOrg.name);
         setCurrentOrganization(currentOrg);
-        localStorage.setItem("currentOrganizationId", currentOrg.id);
         
         // If service provider, load client organizations
         if (currentOrg.organization_type === "service_provider") {
           await loadClientOrganizations(currentOrg.id);
+        } else {
+          setClientOrganizations([]);
         }
       } else {
+        setCurrentOrganization(null);
         setClientOrganizations([]);
       }
     } catch (error: any) {
@@ -197,11 +204,18 @@ export function useOrganizationData() {
   };
 
   useEffect(() => {
+    // Load organization data once when the hook is first used
     loadOrganizationData();
     
     // Listen for auth state changes to reload org data when user logs in/out
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      loadOrganizationData();
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      console.log("Auth state changed:", event);
+      // Load organization data after slight delay to ensure auth state is settled
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        setTimeout(() => {
+          loadOrganizationData();
+        }, 100);
+      }
     });
     
     return () => {
