@@ -15,6 +15,7 @@ const FirstTimeSetupPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasOrganizations, setHasOrganizations] = useState(false);
+  const [orgDetails, setOrgDetails] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -43,7 +44,7 @@ const FirstTimeSetupPage = () => {
         // Check if user already has organizations
         const { data: orgUsers, error } = await supabase
           .from("organization_users")
-          .select("organization_id")
+          .select("organization_id, organizations:organization_id(id, name)")
           .eq("user_id", session.user.id);
           
         if (error) {
@@ -54,17 +55,23 @@ const FirstTimeSetupPage = () => {
         
         console.log("User organizations:", orgUsers);
         
-        // If user already has organizations, redirect to dashboard
-        if (orgUsers && orgUsers.length > 0) {
+        // If user already has organizations, provide option to join existing one
+        if (orgUsers && orgUsers.length > 0 && orgUsers[0].organizations) {
           console.log("User already has organizations");
           setHasOrganizations(true);
+          
+          const orgData = orgUsers[0].organizations as {id: string, name: string};
+          setOrgDetails({
+            id: orgData.id,
+            name: orgData.name
+          });
           
           // Only redirect to dashboard automatically if we're not in the middle of account setup
           const justCreatedAccount = localStorage.getItem("just_created_account");
           if (!justCreatedAccount) {
-            console.log("Redirecting to dashboard");
-            navigate("/dashboard");
-            return;
+            // Instead of redirecting, we'll provide a button to join the existing org
+            // This way the user can choose what to do and avoid redirect loops
+            console.log("Not redirecting automatically, showing join option");
           } else {
             console.log("Just created account, not redirecting automatically");
             // Clear the flag after use
@@ -121,7 +128,7 @@ const FirstTimeSetupPage = () => {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Organization Already Created</AlertTitle>
                 <AlertDescription>
-                  You already have an organization. You can access it from the dashboard.
+                  You already have access to an organization. You can access it from the dashboard.
                 </AlertDescription>
               </Alert>
             ) : (

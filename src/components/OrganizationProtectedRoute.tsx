@@ -85,7 +85,7 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // Handle organization setup routes
+  // Always allow access to setup page when authenticated
   if (location.pathname === "/setup") {
     console.log("On setup page, allowing access");
     return <>{children}</>;

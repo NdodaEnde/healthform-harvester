@@ -12,6 +12,7 @@ export const useOrganizationEnforcer = () => {
     currentOrganization, 
     userOrganizations, 
     loading,
+    switchOrganization
   } = useOrganization();
 
   useEffect(() => {
@@ -19,19 +20,16 @@ export const useOrganizationEnforcer = () => {
     let isNavigating = false;
     
     const checkAuthAndOrg = async () => {
-      console.log("Checking auth and org status");
-      
-      // Skip if we've already initiated navigation
       if (isNavigating) {
+        // Skip if we've already initiated navigation
         console.log("Navigation already in progress, skipping additional checks");
         return;
       }
       
       // EMERGENCY FIX: Skip enforcer if we're on setup or accept-invite pages
-      // This prevents the invitation loop bug completely
       const currentPath = window.location.pathname;
       if (currentPath === "/setup" || currentPath.startsWith("/accept-invite")) {
-        console.log("EMERGENCY FIX: On setup or accept-invite page, skipping enforcer");
+        console.log("On setup or accept-invite page, skipping enforcer");
         return;
       }
       
@@ -40,7 +38,7 @@ export const useOrganizationEnforcer = () => {
       if (justAcceptedInvitation === "true") {
         console.log("Invitation was just accepted, skipping enforcer checks");
         localStorage.removeItem("invitation_just_accepted"); // Clear the flag
-        return; // Skip the rest of the checks to avoid loops
+        return;
       }
       
       const { data: { session } } = await supabase.auth.getSession();
@@ -61,20 +59,23 @@ export const useOrganizationEnforcer = () => {
       
       // If authenticated but no organization context is available (after loading is complete)
       if (!currentOrganization && userOrganizations.length === 0) {
-        console.log("Authenticated but no organization context, redirecting to setup");
+        console.log("Authenticated but no organizations, redirecting to setup");
         isNavigating = true;
         navigate("/setup");
         return;
-      } else if (!currentOrganization && userOrganizations.length > 0) {
-        console.log("User has organizations but none selected, redirecting to dashboard");
-        isNavigating = true;
-        navigate("/dashboard");
+      } 
+      
+      // If user has organizations but none is selected, select the first one
+      if (!currentOrganization && userOrganizations.length > 0) {
+        console.log("User has organizations but none selected, selecting first one");
+        // Instead of just redirecting, we need to actually set the current organization
+        switchOrganization(userOrganizations[0].id);
         return;
       }
     };
     
     checkAuthAndOrg();
-  }, [currentOrganization, userOrganizations, loading, navigate]);
+  }, [currentOrganization, userOrganizations, loading, navigate, switchOrganization]);
   
   return { currentOrganization, loading };
 };

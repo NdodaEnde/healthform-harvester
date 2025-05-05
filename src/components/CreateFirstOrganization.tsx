@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Building, Briefcase } from "lucide-react";
 
 const CreateFirstOrganization = () => {
@@ -89,6 +89,10 @@ const CreateFirstOrganization = () => {
         description: `You've been connected to ${existingOrg.name}.`,
       });
       
+      // Clear any previous organization creation flags
+      localStorage.removeItem("organization_created");
+      localStorage.removeItem("just_created_account");
+      
       navigate("/dashboard");
     } catch (err: any) {
       console.error("Error joining organization:", err);
@@ -151,8 +155,9 @@ const CreateFirstOrganization = () => {
         description: `${name} has been created successfully.`,
       });
       
-      // Set a flag to indicate successful organization creation
+      // Set a flag to indicate successful organization creation and clear other flags
       localStorage.setItem("organization_created", "true");
+      localStorage.removeItem("just_created_account");
       
       navigate("/dashboard");
       
