@@ -11,9 +11,11 @@ import { AlertCircle } from "lucide-react";
 import { PendingInvitationsCard } from "@/components/PendingInvitationsCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 const FirstTimeSetupPage = () => {
   const navigate = useNavigate();
+  const { userOrganizations } = useOrganization();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasOrganizations, setHasOrganizations] = useState(false);
@@ -43,32 +45,18 @@ const FirstTimeSetupPage = () => {
         
         console.log("User authenticated:", session.user.id);
         
-        // Check if user already has organizations
-        const { data: orgUsers, error } = await supabase
-          .from("organization_users")
-          .select("organization_id, organizations:organization_id(id, name)")
-          .eq("user_id", session.user.id);
-          
-        if (error) {
-          console.error("Error checking organizations:", error);
-          setError(`Failed to check organizations: ${error.message}`);
-          return;
-        }
-        
-        console.log("User organizations:", orgUsers);
-        
-        // If user already has organizations, provide option to join existing one
-        if (orgUsers && orgUsers.length > 0 && orgUsers[0].organizations) {
-          console.log("User already has organizations");
+        // If this component is mounted but user already has organizations, 
+        // they should be redirected to dashboard, but provide a safety check
+        if (userOrganizations.length > 0) {
+          const firstOrg = userOrganizations[0];
           setHasOrganizations(true);
-          
-          const orgData = orgUsers[0].organizations as {id: string, name: string};
           setOrgDetails({
-            id: orgData.id,
-            name: orgData.name
+            id: firstOrg.id,
+            name: firstOrg.name
           });
-        } else {
-          console.log("User has no organizations, showing setup page");
+          
+          // Don't redirect here - we'll just show the "access dashboard" option
+          // and let the OrganizationProtectedRoute handle redirects
         }
       } catch (error: any) {
         console.error("Setup page error:", error);
@@ -79,7 +67,7 @@ const FirstTimeSetupPage = () => {
     };
     
     checkAuth();
-  }, [navigate]);
+  }, [navigate, userOrganizations]);
 
   // Function to handle joining an existing organization
   const handleJoinExistingOrg = () => {

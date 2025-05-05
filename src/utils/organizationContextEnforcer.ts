@@ -28,8 +28,8 @@ export const useOrganizationEnforcer = () => {
       
       // Skip enforcer if we're on setup or accept-invite pages
       const currentPath = window.location.pathname;
-      if (currentPath === "/setup" || currentPath.startsWith("/accept-invite")) {
-        console.log("On setup or accept-invite page, skipping enforcer");
+      if (currentPath.startsWith("/accept-invite")) {
+        console.log("On accept-invite page, skipping enforcer");
         return;
       }
       
@@ -72,9 +72,9 @@ export const useOrganizationEnforcer = () => {
         return;
       }
 
-      // If we're on the setup page but already have an organization, redirect to dashboard
-      if (currentPath === "/setup" && currentOrganization) {
-        console.log("Already have organization but on setup page, redirecting to dashboard");
+      // Key change: If on setup page but user has organizations, redirect to dashboard
+      if (currentPath === "/setup" && userOrganizations.length > 0) {
+        console.log("User has organizations but on setup page, redirecting to dashboard");
         isNavigating = true;
         navigate("/dashboard");
         return;

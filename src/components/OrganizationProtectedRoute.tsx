@@ -5,6 +5,7 @@ import { useOrganizationEnforcer, isPublicRoute } from "@/utils/organizationCont
 import LoadingFallback from "./LoadingFallback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface OrganizationProtectedRouteProps {
   children: ReactNode;
@@ -13,6 +14,7 @@ interface OrganizationProtectedRouteProps {
 const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProps) => {
   const location = useLocation();
   const { currentOrganization, loading } = useOrganizationEnforcer();
+  const { userOrganizations } = useOrganization();
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
@@ -85,16 +87,31 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // Special handling for setup page - always allow access when authenticated
+  // Important change: Redirect users with organizations away from setup page
+  if (location.pathname === "/setup" && userOrganizations.length > 0) {
+    console.log("User has organizations but is on setup page, redirecting to dashboard");
+    return <Navigate to="/dashboard" state={{ from: location }} replace />;
+  }
+  
+  // Special handling for setup page - only allow when user has no organizations
   if (location.pathname === "/setup") {
-    console.log("On setup page, allowing access");
-    return <>{children}</>;
+    if (userOrganizations.length === 0) {
+      console.log("On setup page with no organizations, allowing access");
+      return <>{children}</>;
+    }
   }
   
   // For all protected routes except setup, enforce organization context
   if (!currentOrganization && !isPublicRoute(location.pathname)) {
-    console.log("No organization context, redirecting to setup");
-    return <Navigate to="/setup" state={{ from: location }} replace />;
+    if (userOrganizations.length > 0) {
+      // This shouldn't happen as the enforcer should have selected an organization,
+      // but just in case, redirect to dashboard
+      console.log("No current organization but has organizations, redirecting to dashboard");
+      return <Navigate to="/dashboard" state={{ from: location }} replace />;
+    } else {
+      console.log("No organization context, redirecting to setup");
+      return <Navigate to="/setup" state={{ from: location }} replace />;
+    }
   }
   
   // User is authenticated and has organization context (or is on a public route)
