@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,14 +17,32 @@ export default function AuthCallback() {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
+        const type = hashParams.get("type");
         
         // Get query parameters
         const queryParams = new URLSearchParams(window.location.search);
         const inviteToken = queryParams.get("token");
-        const confirmation = queryParams.get("confirmation");
         
-        if (confirmation === "success") {
-          toast.success("Email confirmed successfully! You can now sign in.");
+        // Check if this is an email confirmation
+        // For email confirmations, Supabase typically includes type=signup or recovery
+        const isEmailConfirmation = type === "signup" || queryParams.get("confirmation") === "success";
+        
+        console.log("Auth callback params:", { 
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          type,
+          isEmailConfirmation,
+          inviteToken: inviteToken || "none"
+        });
+        
+        if (isEmailConfirmation) {
+          console.log("This is an email confirmation callback");
+          
+          // For email confirmations, redirect to auth page with success param
+          // This is better than trying to automatically sign in here
+          toast.success("Email verified successfully!");
+          navigate("/auth?confirmation=success");
+          return;
         }
         
         if (accessToken && refreshToken) {
@@ -36,12 +53,56 @@ export default function AuthCallback() {
               access_token: accessToken,
               refresh_token: refreshToken
             });
+            
+            // Get the current session to confirm it worked
+            const { data: sessionData } = await supabase.auth.getSession();
+            
+            if (sessionData?.session) {
+              console.log("Session established after setting tokens");
+              
+              // Ensure profile exists
+              await ensureUserProfile(sessionData.session.user);
+              
+              // Check for invitations
+              if (inviteToken) {
+                navigate(`/accept-invite?token=${inviteToken}`);
+                return;
+              }
+              
+              // Check for pending invitations by email
+              const { data: invitesByEmail } = await supabase
+                .from("invitations")
+                .select("token")
+                .eq("email", sessionData.session.user.email)
+                .is("accepted_at", null)
+                .limit(1);
+                
+              if (invitesByEmail && invitesByEmail.length > 0) {
+                navigate(`/accept-invite?token=${invitesByEmail[0].token}`);
+                return;
+              }
+              
+              // Check if user already has an organization
+              const { data: orgData } = await supabase
+                .from("organization_users")
+                .select("organization_id")
+                .eq("user_id", sessionData.session.user.id)
+                .limit(1);
+                
+              if (orgData && orgData.length > 0) {
+                navigate("/dashboard");
+              } else {
+                navigate("/setup");
+              }
+              return;
+            }
           } catch (sessionError) {
             console.error("Error setting session:", sessionError);
           }
         }
         
-        // Get the current session
+        // If we reach here without redirecting, there's likely an issue
+        // Get the current session one more time to check state
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -55,108 +116,12 @@ export default function AuthCallback() {
         }
 
         if (data?.session) {
-          console.log("Session authenticated:", data.session.user.email);
-          toast.success("Successfully authenticated");
-          
-          // First check if the user has a profile created - this should happen automatically 
-          // thanks to our trigger and deferred foreign key
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", data.session.user.id)
-            .single();
-            
-          if (profileError && !profileError.message.includes("No rows found")) {
-            console.error("Error checking user profile:", profileError);
-            
-            // Try to create the profile if the check failed for another reason
-            try {
-              const { error: createError } = await supabase
-                .from('profiles')
-                .insert({
-                  id: data.session.user.id,
-                  email: data.session.user.email,
-                  full_name: data.session.user.email?.split('@')[0] || 'User',
-                  updated_at: new Date().toISOString()
-                });
-              
-              if (createError) {
-                console.error("Error creating profile directly:", createError);
-              }
-            } catch (insertError) {
-              console.error("Exception during profile creation:", insertError);
-            }
-          } else if (!profileData) {
-            console.log("No profile found, creating one now");
-            // Create profile if it doesn't exist
-            try {
-              const { error: createError } = await supabase
-                .from('profiles')
-                .insert({
-                  id: data.session.user.id,
-                  email: data.session.user.email,
-                  full_name: data.session.user.email?.split('@')[0] || 'User',
-                  updated_at: new Date().toISOString()
-                });
-              
-              if (createError) {
-                console.error("Error creating profile:", createError);
-              }
-            } catch (insertError) {
-              console.error("Exception during profile creation:", insertError);
-            }
-          }
-          
-          // Check for the specific invitation if token is provided
-          if (inviteToken) {
-            console.log("Processing invite token:", inviteToken);
-            const { data: inviteData, error: inviteError } = await supabase
-              .from("invitations")
-              .select("id, organization_id, token, role")
-              .eq("token", inviteToken)
-              .is("accepted_at", null)
-              .single();
-              
-            if (inviteError) {
-              console.error("Error fetching invitation:", inviteError);
-            } else if (inviteData) {
-              console.log("Found invitation, navigating to accept invite page");
-              navigate(`/accept-invite?token=${inviteToken}`);
-              return;
-            }
-          }
-          
-          // Check for pending invitations by email
-          const { data: invitesByEmail } = await supabase
-            .from("invitations")
-            .select("id, organization_id, token, role")
-            .eq("email", data.session.user.email)
-            .is("accepted_at", null);
-            
-          if (invitesByEmail && invitesByEmail.length > 0) {
-            // User has pending invitations, redirect to accept first invitation
-            console.log("User has pending invitations, navigating to accept invite");
-            navigate(`/accept-invite?token=${invitesByEmail[0].token}`);
-            return;
-          }
-          
-          // Check if the user already has an organization
-          const { data: orgData } = await supabase
-            .from("organization_users")
-            .select("organization_id")
-            .eq("user_id", data.session.user.id);
-            
-          if (orgData && orgData.length > 0) {
-            // User already has an organization, redirect to dashboard
-            console.log("User already has an organization, redirecting to dashboard");
-            navigate("/dashboard");
-          } else {
-            // No organizations and no invitations, go to setup page
-            console.log("No organizations or invitations, redirecting to setup");
-            navigate("/setup");
-          }
+          // We have a session after all
+          console.log("Session found after all checks");
+          navigate("/dashboard");
         } else {
-          setError("No session data found");
+          // No session established
+          setError("No session could be established");
           navigate("/auth?confirmation=success");
         }
       } catch (err: any) {
@@ -166,6 +131,40 @@ export default function AuthCallback() {
           description: "An unexpected error occurred"
         });
         setTimeout(() => navigate("/auth"), 3000);
+      }
+    };
+    
+    // Helper function to ensure user profile exists
+    const ensureUserProfile = async (user) => {
+      if (!user) return;
+      
+      try {
+        // Check if profile exists
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", user.id)
+          .maybeSingle();
+          
+        if (!profileData && (!profileError || !profileError.message.includes("found"))) {
+          console.log("Creating user profile");
+          
+          // Try to create profile
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              full_name: user.email?.split('@')[0] || 'User',
+              updated_at: new Date().toISOString()
+            });
+            
+          if (createError) {
+            console.error("Error creating profile:", createError);
+          }
+        }
+      } catch (err) {
+        console.error("Error ensuring user profile:", err);
       }
     };
 
