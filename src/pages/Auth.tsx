@@ -46,30 +46,38 @@ const Auth = () => {
   }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setAuthError(null);
+  e.preventDefault();
+  setIsLoading(true);
+  setAuthError(null);
 
-    try {
-      console.log("Attempting to sign in with email:", email);
-      const { error } = await signIn(email, password);
+  try {
+    console.log("Attempting to sign in with email:", email);
+    
+    // Check if the URL has the confirmation=success parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const confirmationSuccess = urlParams.get("confirmation") === "success";
+    
+    // If the confirmation was successful, show a toast before signing in
+    if (confirmationSuccess) {
+      toast.success("Email confirmed successfully! Signing you in...");
+    }
+    
+    const { error } = await signIn(email, password);
 
-      if (error) {
-        console.error("Sign in error:", error);
-        throw error;
-      }
-
-      toast.success("Signed in successfully");
-      navigate("/dashboard");
-    } catch (error: any) {
+    if (error) {
       console.error("Sign in error:", error);
-      setAuthError(error.message || "Failed to sign in");
       
-      // Detailed error message for debugging
-      if (error.message.includes("Invalid login")) {
-        toast.error("Authentication failed", {
-          description: "Invalid email or password. Please check your credentials and try again."
-        });
+      if (error.message.includes("Invalid login credentials")) {
+        // More specific handling for invalid credentials
+        if (confirmationSuccess) {
+          toast.error("Sign in failed after confirmation", {
+            description: "Please double-check your password and try again."
+          });
+        } else {
+          toast.error("Authentication failed", {
+            description: "Invalid email or password. Please check your credentials and try again."
+          });
+        }
       } else if (error.message.includes("Email not confirmed")) {
         toast.error("Email not confirmed", {
           description: "Please check your email and confirm your account before signing in."
@@ -80,10 +88,21 @@ const Auth = () => {
           description: error.message || "Please check your credentials and try again"
         });
       }
-    } finally {
-      setIsLoading(false);
+      
+      throw error;
     }
-  };
+
+    // Successful sign-in
+    console.log("Sign in successful");
+    toast.success("Signed in successfully");
+    navigate("/dashboard");
+  } catch (error: any) {
+    console.error("Sign in error:", error);
+    setAuthError(error.message || "Failed to sign in");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
