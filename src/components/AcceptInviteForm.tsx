@@ -61,7 +61,7 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
           // Additional check if the token was already accepted
           const { data: acceptedData } = await supabase
             .from("invitations")
-            .select("accepted_at")
+            .select("accepted_at, organization_id")
             .eq("token", token)
             .maybeSingle();
               
@@ -220,6 +220,7 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
             data: {
               full_name: fullName,
             },
+            // For testing, we can disable email verification to see the full workflow
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });

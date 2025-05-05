@@ -31,6 +31,18 @@ async function sendEmail(payload: EmailPayload) {
     console.log("- Token:", token);
     console.log("- Invitation URL:", inviteUrl);
     
+    // Check if we should bypass email sending for testing
+    const bypassEmail = Deno.env.get("BYPASS_EMAIL_SENDING") === "true";
+    if (bypassEmail) {
+      console.log("Email sending bypassed due to BYPASS_EMAIL_SENDING environment variable");
+      return {
+        success: false,
+        message: "Email sending bypassed - Please share the invitation link manually",
+        inviteUrl,
+        manualSharing: true
+      };
+    }
+    
     // If no API key is available, return invitation URL for manual sharing
     if (!resendApiKey) {
       console.warn("Resend API key not configured. Returning invitation URL for manual sharing.");
@@ -64,6 +76,11 @@ async function sendEmail(payload: EmailPayload) {
       </html>
     `;
     
+    // Fix the from address format
+    const fromAddress = emailFromAddress.includes("<") 
+      ? emailFromAddress 
+      : `HealthForm Harvester <${emailFromAddress}>`;
+    
     // Use Resend API to send the email
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -72,7 +89,7 @@ async function sendEmail(payload: EmailPayload) {
         "Authorization": `Bearer ${resendApiKey}`
       },
       body: JSON.stringify({
-        from: `HealthForm Harvester <${emailFromAddress}>`,
+        from: fromAddress,
         to: [email],
         subject: `Invitation to join ${organizationName} on HealthForm Harvester`,
         html: htmlContent
