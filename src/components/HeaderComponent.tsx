@@ -1,8 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import {
@@ -21,12 +20,46 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Toggle } from '@/components/ui/toggle';
+import { isPublicRoute } from '@/utils/organizationContextEnforcer';
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [organizationContext, setOrganizationContext] = useState<{
+    currentOrganization: any | null;
+  } | null>(null);
+
+  // Import useOrganization only if we're not on a public route
+  useEffect(() => {
+    // Check if we're on a public route
+    const currentPathIsPublic = isPublicRoute(location.pathname);
+    
+    if (!currentPathIsPublic) {
+      // Dynamically import to prevent usage outside provider
+      const importOrganizationContext = async () => {
+        try {
+          const { useOrganization } = await import('@/contexts/OrganizationContext');
+          // Only attempt to use the context if we're on a non-public route
+          if (typeof useOrganization === 'function') {
+            try {
+              const orgContext = useOrganization();
+              setOrganizationContext(orgContext);
+            } catch (error) {
+              console.error("Failed to use Organization context:", error);
+              // Gracefully handle the error - no need to set state
+            }
+          }
+        } catch (error) {
+          console.error("Failed to import organization context:", error);
+        }
+      };
+      
+      // Only try to use the organization context on non-public routes
+      importOrganizationContext();
+    }
+  }, [location.pathname]);
 
   // Check for user's preferred color scheme and saved preference
   useEffect(() => {
@@ -67,15 +100,25 @@ const HeaderComponent: React.FC = () => {
     return user.email.substring(0, 2).toUpperCase();
   };
 
+  // Get current organization logo if available
+  const getCurrentOrgLogo = () => {
+    return organizationContext?.currentOrganization?.logo_url || null;
+  };
+
+  // Get current organization name if available
+  const getCurrentOrgName = () => {
+    return organizationContext?.currentOrganization?.name || 'DocManager';
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-50">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         <div className="flex items-center">
           <Link to="/" className="flex items-center mr-4">
-            {currentOrganization?.logo_url ? (
+            {getCurrentOrgLogo() ? (
               <img 
-                src={currentOrganization.logo_url} 
-                alt={`${currentOrganization.name} logo`}
+                src={getCurrentOrgLogo()} 
+                alt={`${getCurrentOrgName()} logo`}
                 className="h-8 w-auto mr-2"
               />
             ) : (
@@ -101,7 +144,8 @@ const HeaderComponent: React.FC = () => {
 
           {user ? (
             <>
-              {currentOrganization && (
+              {/* Only show OrganizationSwitcher on protected routes and when context is available */}
+              {organizationContext?.currentOrganization && !isPublicRoute(location.pathname) && (
                 <OrganizationSwitcher />
               )}
               <DropdownMenu>

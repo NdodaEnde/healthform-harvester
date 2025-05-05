@@ -8,6 +8,7 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 export function useOrganization() {
   const context = useContext(OrganizationContext);
   if (context === undefined) {
+    console.error("useOrganization must be used within an OrganizationProvider");
     throw new Error("useOrganization must be used within an OrganizationProvider");
   }
   return context;

@@ -1,27 +1,29 @@
 
 import React from 'react';
-import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface OrganizationLogoProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   fallbackText?: string;
+  organization?: {
+    name?: string;
+    logo_url?: string;
+  } | null;
 }
 
 const OrganizationLogo: React.FC<OrganizationLogoProps> = ({ 
   size = 'md', 
   className = '', 
-  fallbackText = 'DocManager' 
+  fallbackText = 'DocManager',
+  organization = null
 }) => {
-  const { currentOrganization } = useOrganization();
-  
   const sizeClasses = {
     sm: 'h-6 w-auto',
     md: 'h-8 w-auto',
     lg: 'h-12 w-auto'
   };
   
-  if (!currentOrganization?.logo_url) {
+  if (!organization?.logo_url) {
     return (
       <div className={`font-bold text-gray-900 dark:text-gray-100 ${className}`}>
         {fallbackText}
@@ -31,8 +33,8 @@ const OrganizationLogo: React.FC<OrganizationLogoProps> = ({
   
   return (
     <img 
-      src={currentOrganization.logo_url} 
-      alt={`${currentOrganization.name || 'Organization'} logo`}
+      src={organization.logo_url} 
+      alt={`${organization.name || 'Organization'} logo`}
       className={`${sizeClasses[size]} ${className}`}
     />
   );

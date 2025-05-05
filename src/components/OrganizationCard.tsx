@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import OrganizationLogo from './OrganizationLogo';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +16,14 @@ interface OrganizationCardProps {
     variant?: "default" | "secondary" | "destructive" | "outline";
     className?: string;
   }[];
+  organization?: {
+    name?: string;
+    logo_url?: string;
+  } | null;
+  client?: {
+    name?: string;
+    logo_url?: string;
+  } | null;
 }
 
 const OrganizationCard: React.FC<OrganizationCardProps> = ({ 
@@ -26,12 +33,12 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
   showLogo = true,
   actions,
   subtitle,
-  badges
+  badges,
+  organization = null,
+  client = null
 }) => {
-  const { currentOrganization, currentClient } = useOrganization();
-  
   // Determine which organization to display (client takes precedence if selected)
-  const displayOrganization = currentClient || currentOrganization;
+  const displayOrganization = client || organization;
   
   return (
     <Card className={className}>
@@ -54,9 +61,9 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             )}
           </div>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-          {displayOrganization && (
+          {displayOrganization?.name && (
             <p className="text-xs text-muted-foreground">
-              {currentClient 
+              {client 
                 ? `Client: ${displayOrganization.name}` 
                 : displayOrganization.name
               }
@@ -65,7 +72,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
         </div>
         <div className="flex items-center gap-2">
           {actions}
-          {showLogo && <OrganizationLogo size="sm" />}
+          {showLogo && <OrganizationLogo size="sm" organization={displayOrganization} />}
         </div>
       </CardHeader>
       <CardContent className="pt-4">

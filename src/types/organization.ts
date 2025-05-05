@@ -1,3 +1,4 @@
+
 import { Json } from "@/integrations/supabase/types";
 
 export interface Address {
@@ -11,7 +12,7 @@ export interface Address {
 export interface Organization {
   id: string;
   name: string;
-  organization_type: 'direct_client' | 'service_provider';
+  organization_type: 'direct_client' | 'service_provider' | string;  // Added string to support other values
   logo_url?: string;
   contact_email?: string;
   contact_phone?: string;
@@ -31,7 +32,7 @@ export interface OrganizationContextType {
   userOrganizations: Organization[];
   clientOrganizations: Organization[];
   loading: boolean;
-  initialLoadComplete: boolean; // Add this new property
+  initialLoadComplete: boolean;
   switchOrganization: (organizationId: string) => Promise<void>;
   switchClient: (clientId: string) => void;
   isServiceProvider: () => boolean;
