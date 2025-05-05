@@ -14,7 +14,7 @@ interface OrganizationProtectedRouteProps {
 const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProps) => {
   const location = useLocation();
   const { currentOrganization, loading } = useOrganizationEnforcer();
-  const { userOrganizations } = useOrganization();
+  const { userOrganizations, initialLoadComplete } = useOrganization();
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
@@ -85,6 +85,12 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   if (!isAuthenticated) {
     console.log("Not authenticated, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+  
+  // We can only enforce organization requirements once data has loaded
+  if (!initialLoadComplete) {
+    console.log("Organization data still loading...");
+    return <LoadingFallback />;
   }
   
   // Important change: Redirect users with organizations away from setup page

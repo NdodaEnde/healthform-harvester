@@ -12,10 +12,17 @@ export const useOrganizationEnforcer = () => {
     currentOrganization, 
     userOrganizations, 
     loading,
+    initialLoadComplete,
     switchOrganization
   } = useOrganization();
 
   useEffect(() => {
+    // Skip if data hasn't loaded yet
+    if (!initialLoadComplete) {
+      console.log("Organization data still initializing, waiting...");
+      return;
+    }
+
     // Track if we've initiated a navigation to avoid redirection loops
     let isNavigating = false;
     
@@ -51,28 +58,24 @@ export const useOrganizationEnforcer = () => {
         return;
       }
       
-      // Skip if organization data is still loading
-      if (loading) {
-        console.log("Organizations still loading, waiting...");
-        return;
-      }
-      
-      // If authenticated but no organization data (after loading is complete)
-      if (!currentOrganization && userOrganizations.length === 0) {
-        console.log("Authenticated but no organizations, redirecting to setup");
-        isNavigating = true;
-        navigate("/setup");
-        return;
-      } 
-      
       // If user has organizations but none is selected, select the first one
       if (!currentOrganization && userOrganizations.length > 0) {
         console.log("User has organizations but none selected, selecting first one");
         switchOrganization(userOrganizations[0].id);
         return;
       }
+      
+      // If authenticated but no organization data (after loading is complete)
+      if (!currentOrganization && userOrganizations.length === 0 && !loading) {
+        if (currentPath !== "/setup") {
+          console.log("Authenticated but no organizations, redirecting to setup");
+          isNavigating = true;
+          navigate("/setup");
+        }
+        return;
+      } 
 
-      // Key change: If on setup page but user has organizations, redirect to dashboard
+      // If on setup page but user has organizations, redirect to dashboard
       if (currentPath === "/setup" && userOrganizations.length > 0) {
         console.log("User has organizations but on setup page, redirecting to dashboard");
         isNavigating = true;
@@ -82,7 +85,7 @@ export const useOrganizationEnforcer = () => {
     };
     
     checkAuthAndOrg();
-  }, [currentOrganization, userOrganizations, loading, navigate, switchOrganization]);
+  }, [currentOrganization, userOrganizations, loading, initialLoadComplete, navigate, switchOrganization]);
   
   return { currentOrganization, loading };
 };

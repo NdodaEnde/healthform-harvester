@@ -15,7 +15,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 
 const FirstTimeSetupPage = () => {
   const navigate = useNavigate();
-  const { userOrganizations } = useOrganization();
+  const { userOrganizations, initialLoadComplete } = useOrganization();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasOrganizations, setHasOrganizations] = useState(false);
@@ -45,18 +45,27 @@ const FirstTimeSetupPage = () => {
         
         console.log("User authenticated:", session.user.id);
         
+        // Wait for organization data to load
+        if (!initialLoadComplete) {
+          console.log("Waiting for organization data to load...");
+          return;
+        }
+        
         // If this component is mounted but user already has organizations, 
-        // they should be redirected to dashboard, but provide a safety check
+        // they should be redirected to dashboard
         if (userOrganizations.length > 0) {
-          const firstOrg = userOrganizations[0];
+          console.log("User already has organizations, redirecting to dashboard");
           setHasOrganizations(true);
+          const firstOrg = userOrganizations[0];
           setOrgDetails({
             id: firstOrg.id,
             name: firstOrg.name
           });
           
-          // Don't redirect here - we'll just show the "access dashboard" option
-          // and let the OrganizationProtectedRoute handle redirects
+          // Set a small delay before redirecting to ensure component is mounted
+          setTimeout(() => {
+            navigate("/dashboard");
+          }, 100);
         }
       } catch (error: any) {
         console.error("Setup page error:", error);
@@ -67,7 +76,7 @@ const FirstTimeSetupPage = () => {
     };
     
     checkAuth();
-  }, [navigate, userOrganizations]);
+  }, [navigate, userOrganizations, initialLoadComplete]);
 
   // Function to handle joining an existing organization
   const handleJoinExistingOrg = () => {

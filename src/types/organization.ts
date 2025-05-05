@@ -11,13 +11,13 @@ export interface Address {
 export interface Organization {
   id: string;
   name: string;
-  organization_type: string;
+  organization_type: 'direct_client' | 'service_provider';
   logo_url?: string;
   contact_email?: string;
   contact_phone?: string;
   industry?: string;
   address?: Json;
-  settings?: Json;
+  settings?: Record<string, any>;
   updated_at?: string;
   created_at?: string;
   is_active?: boolean;
@@ -31,6 +31,7 @@ export interface OrganizationContextType {
   userOrganizations: Organization[];
   clientOrganizations: Organization[];
   loading: boolean;
+  initialLoadComplete: boolean; // Add this new property
   switchOrganization: (organizationId: string) => Promise<void>;
   switchClient: (clientId: string) => void;
   isServiceProvider: () => boolean;

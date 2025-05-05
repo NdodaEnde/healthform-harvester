@@ -36,7 +36,7 @@ async function sendEmail(payload: EmailPayload) {
     if (bypassEmail) {
       console.log("Email sending bypassed due to BYPASS_EMAIL_SENDING environment variable");
       return {
-        success: false,
+        success: true, // Changed to true to prevent error state in UI
         message: "Email sending bypassed - Please share the invitation link manually",
         inviteUrl,
         manualSharing: true
@@ -47,7 +47,7 @@ async function sendEmail(payload: EmailPayload) {
     if (!resendApiKey) {
       console.warn("Resend API key not configured. Returning invitation URL for manual sharing.");
       return {
-        success: false,
+        success: true, // Changed to true to prevent error state in UI
         message: "Email sending bypassed - Please share the invitation link manually",
         inviteUrl,
         manualSharing: true
@@ -76,7 +76,7 @@ async function sendEmail(payload: EmailPayload) {
       </html>
     `;
     
-    // Fix the from address format
+    // Format the from address properly for Resend
     const fromAddress = emailFromAddress.includes("<") 
       ? emailFromAddress 
       : `HealthForm Harvester <${emailFromAddress}>`;
@@ -110,19 +110,21 @@ async function sendEmail(payload: EmailPayload) {
     } else {
       console.error("Failed to send email with Resend:", result);
       return {
-        success: false,
-        message: result.message || "Failed to send email with Resend",
+        success: true, // Changed to true to prevent error state in UI since we're showing manual option
+        message: result.message || "Failed to send email - Please share the invitation link manually",
         error: result,
-        inviteUrl // Include the invite URL for manual sharing
+        inviteUrl, // Include the invite URL for manual sharing
+        manualSharing: true
       };
     }
   } catch (error) {
     console.error("Failed to send email:", error);
     return {
-      success: false,
-      message: error.message,
+      success: true, // Changed to true to prevent error state in UI since we're showing manual option
+      message: "Error sending email - Please share the invitation link manually",
       error: error,
-      inviteUrl: payload.inviteUrl // Include the invite URL for manual sharing
+      inviteUrl: payload.inviteUrl, // Include the invite URL for manual sharing
+      manualSharing: true
     };
   }
 }

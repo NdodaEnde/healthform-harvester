@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -10,9 +9,11 @@ export function useOrganizationData() {
   const [userOrganizations, setUserOrganizations] = useState<Organization[]>([]);
   const [clientOrganizations, setClientOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
   const loadOrganizationData = async () => {
     try {
+      console.log("Loading organization data...");
       setLoading(true);
       
       const { data: { user } } = await supabase.auth.getUser();
@@ -24,8 +25,12 @@ export function useOrganizationData() {
         setUserOrganizations([]);
         setClientOrganizations([]);
         setLoading(false);
+        setInitialLoadComplete(true);
+        console.log("No authenticated user, cleared organization data");
         return;
       }
+      
+      console.log("Loading organizations for user:", user.id);
       
       // Get all organizations for the current user
       const { data: orgUsers, error: orgUsersError } = await supabase
@@ -45,6 +50,7 @@ export function useOrganizationData() {
         .eq("user_id", user.id);
         
       if (orgUsersError) {
+        console.error("Error fetching organizations:", orgUsersError);
         throw orgUsersError;
       }
       
@@ -53,8 +59,8 @@ export function useOrganizationData() {
         userRole: ou.role
       })) || [];
       
-      setUserOrganizations(orgs);
       console.log("User organizations loaded:", orgs.length);
+      setUserOrganizations(orgs);
       
       // Get the current organization from localStorage or use the first one
       const storedOrgId = localStorage.getItem("currentOrganizationId");
@@ -62,12 +68,14 @@ export function useOrganizationData() {
       
       if (storedOrgId) {
         currentOrg = orgs.find(org => org.id === storedOrgId) || null;
+        console.log("Found stored organization:", currentOrg?.name || "None");
       }
       
       if (!currentOrg && orgs.length > 0) {
         currentOrg = orgs[0];
         // Store the first organization as current if none was previously selected
         localStorage.setItem("currentOrganizationId", orgs[0].id);
+        console.log("Using first organization:", orgs[0].name);
       }
       
       if (currentOrg) {
@@ -81,6 +89,7 @@ export function useOrganizationData() {
           setClientOrganizations([]);
         }
       } else {
+        console.log("No organization available");
         setCurrentOrganization(null);
         setClientOrganizations([]);
       }
@@ -93,6 +102,8 @@ export function useOrganizationData() {
       });
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
+      console.log("Organization data loading complete");
     }
   };
   
@@ -229,6 +240,7 @@ export function useOrganizationData() {
     userOrganizations,
     clientOrganizations,
     loading,
+    initialLoadComplete,
     switchOrganization,
     switchClient,
     isServiceProvider,
