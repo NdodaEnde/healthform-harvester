@@ -18,7 +18,7 @@ export interface Organization {
   contact_phone?: string;
   industry?: string;
   address?: Json;
-  settings?: Record<string, any>;
+  settings?: Json | Record<string, any>;  // Updated to accept both types
   updated_at?: string;
   created_at?: string;
   is_active?: boolean;

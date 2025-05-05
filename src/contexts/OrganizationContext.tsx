@@ -1,5 +1,5 @@
 
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useState } from "react";
 import { useOrganizationData } from "@/hooks/useOrganizationData";
 import { OrganizationContextType } from "@/types/organization";
 
@@ -12,6 +12,10 @@ export function useOrganization() {
     throw new Error("useOrganization must be used within an OrganizationProvider");
   }
   return context;
+}
+
+export function useOptionalOrganization() {
+  return useContext(OrganizationContext);
 }
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {

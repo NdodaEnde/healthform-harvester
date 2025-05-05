@@ -8,6 +8,7 @@ export const sendInvitationEmail = async (
 ) => {
   try {
     // Generate the full invitation URL with the correct path
+    // Add the origin dynamically to work in both development and production
     const inviteUrl = `${window.location.origin}/accept-invite?token=${token}`;
     console.log(`Sending invitation email to ${email} for organization ${organizationName}`);
     console.log(`Invitation URL: ${inviteUrl}`);
