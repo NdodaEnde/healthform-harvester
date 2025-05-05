@@ -89,60 +89,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    console.log("Signing up with:", email);
-    
-    // Get the actual deployment URL for better email redirects
-    const origin = window.location.origin;
-    console.log("Current origin:", origin);
-    
-    // Generate a redirect URL that will work in production environments
-    const redirectTo = `${origin}/auth/callback`;
-    
-    console.log("Using redirect URL for signup:", redirectTo);
-    
-    try {
-      // First, attempt to sign up the user
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          emailRedirectTo: redirectTo,
-          data: {
-            full_name: email.split('@')[0] // Set a default name from email
-          }
+  console.log("Signing up with email:", email);
+  
+  // Get the actual deployment URL for better email redirects
+  const origin = window.location.origin;
+  console.log("Current origin:", origin);
+  
+  // Generate a redirect URL that will work in production environments
+  const redirectTo = `${origin}/auth/callback`;
+  
+  console.log("Using redirect URL for signup:", redirectTo);
+  
+  try {
+    // First, attempt to sign up the user
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: redirectTo,
+        data: {
+          full_name: email.split('@')[0] // Set a default name from email
         }
-      });
-      
-      if (error) {
-        console.error("Sign up error:", error);
-        return { data: null, error };
       }
-      
-      console.log("Sign up response:", data);
-      
-      // Check if email confirmation is required
-      const emailConfirmRequired = data.session === null && data.user;
-      
-      if (emailConfirmRequired) {
-        console.log("Email confirmation is required. A confirmation email has been sent.");
-        // Return early without trying to create a profile yet
-        return { data, error: null };
-      }
-      
-      // The SQL changes we've made (DEFERRABLE INITIALLY DEFERRED) should help with the profile creation
-      // when the auth.users record exists, but we'll still handle the case where email confirmation
-      // isn't required and we can create a profile now
-      
-      if (data.user && data.session) {
-        console.log("Email confirmation not required. User created with session.");
-      }
-      
-      return { data, error: null };
-    } catch (error: any) {
-      console.error("Unexpected error during signup:", error);
+    });
+    
+    if (error) {
+      console.error("Sign up error:", error);
       return { data: null, error };
     }
-  };
+    
+    console.log("Sign up response:", data);
+    
+    // Check if email confirmation is required
+    const emailConfirmRequired = data.session === null && data.user;
+    
+    if (emailConfirmRequired) {
+      console.log("Email confirmation is required. A confirmation email has been sent.");
+      
+      // This is important: we do NOT try to sign in or create a profile here
+      // The user must first verify their email by clicking the link
+      return { data, error: null };
+    }
+    
+    // If email confirmation is not required (rare in production)
+    // we can create a profile and continue with the process
+    if (data.user && data.session) {
+      console.log("Email confirmation not required. User created with session.");
+      
+      try {
+        // Try to create a profile for the user
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: email,
+            full_name: email.split('@')[0] || 'User',
+            updated_at: new Date().toISOString()
+          });
+          
+        if (profileError) {
+          console.warn("Non-critical error creating profile:", profileError);
+          // Continue anyway - profile will be created later if needed
+        }
+      } catch (profileErr) {
+        console.warn("Error attempting to create profile:", profileErr);
+        // Continue anyway - this error shouldn't block the signup process
+      }
+    }
+    
+    return { data, error: null };
+  } catch (error: any) {
+    console.error("Unexpected error during signup:", error);
+    return { data: null, error };
+  }
+};
 
   const signOut = async () => {
     await supabase.auth.signOut();
