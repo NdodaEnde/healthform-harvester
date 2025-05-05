@@ -9,6 +9,8 @@ import LoadingFallback from "@/components/LoadingFallback";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { PendingInvitationsCard } from "@/components/PendingInvitationsCard";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const FirstTimeSetupPage = () => {
   const navigate = useNavigate();
@@ -65,18 +67,6 @@ const FirstTimeSetupPage = () => {
             id: orgData.id,
             name: orgData.name
           });
-          
-          // Only redirect to dashboard automatically if we're not in the middle of account setup
-          const justCreatedAccount = localStorage.getItem("just_created_account");
-          if (!justCreatedAccount) {
-            // Instead of redirecting, we'll provide a button to join the existing org
-            // This way the user can choose what to do and avoid redirect loops
-            console.log("Not redirecting automatically, showing join option");
-          } else {
-            console.log("Just created account, not redirecting automatically");
-            // Clear the flag after use
-            localStorage.removeItem("just_created_account");
-          }
         } else {
           console.log("User has no organizations, showing setup page");
         }
@@ -90,6 +80,24 @@ const FirstTimeSetupPage = () => {
     
     checkAuth();
   }, [navigate]);
+
+  // Function to handle joining an existing organization
+  const handleJoinExistingOrg = () => {
+    if (!orgDetails) return;
+    
+    // Set organization ID in localStorage
+    localStorage.setItem("currentOrganizationId", orgDetails.id);
+    
+    // Clear any previous flags
+    localStorage.removeItem("organization_created");
+    localStorage.removeItem("just_created_account");
+    
+    toast.success("Organization connected", {
+      description: `You've been connected to ${orgDetails.name}.`
+    });
+    
+    navigate("/dashboard");
+  };
 
   if (isLoading) {
     return <LoadingFallback />;
@@ -124,13 +132,21 @@ const FirstTimeSetupPage = () => {
             <PendingInvitationsCard />
             
             {hasOrganizations ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Organization Already Created</AlertTitle>
-                <AlertDescription>
-                  You already have access to an organization. You can access it from the dashboard.
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Organization Already Created</AlertTitle>
+                  <AlertDescription>
+                    You already have access to an organization: <strong>{orgDetails?.name}</strong>
+                  </AlertDescription>
+                </Alert>
+                <Button 
+                  className="w-full" 
+                  onClick={handleJoinExistingOrg}
+                >
+                  Access Dashboard
+                </Button>
+              </div>
             ) : (
               <>
                 <h2 className="text-lg font-semibold mb-4">Create your organization:</h2>

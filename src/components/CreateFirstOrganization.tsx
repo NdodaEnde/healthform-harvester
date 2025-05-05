@@ -84,9 +84,8 @@ const CreateFirstOrganization = () => {
     try {
       localStorage.setItem("currentOrganizationId", existingOrg.id);
       
-      toast({
-        title: "Organization connected",
-        description: `You've been connected to ${existingOrg.name}.`,
+      toast.success("Organization connected", {
+        description: `You've been connected to ${existingOrg.name}.`
       });
       
       // Clear any previous organization creation flags
@@ -98,10 +97,8 @@ const CreateFirstOrganization = () => {
       console.error("Error joining organization:", err);
       setError(err.message || "Failed to join organization");
       
-      toast({
-        title: "Error",
-        description: "Failed to join organization",
-        variant: "destructive",
+      toast.error("Error", {
+        description: "Failed to join organization"
       });
     } finally {
       setIsSubmitting(false);
@@ -118,10 +115,8 @@ const CreateFirstOrganization = () => {
     }
     
     if (!name.trim()) {
-      toast({
-        title: "Organization name required",
-        description: "Please enter a name for your organization",
-        variant: "destructive",
+      toast.error("Organization name required", {
+        description: "Please enter a name for your organization"
       });
       return;
     }
@@ -150,9 +145,8 @@ const CreateFirstOrganization = () => {
       console.log("Organization created with ID:", orgId);
       localStorage.setItem("currentOrganizationId", orgId);
       
-      toast({
-        title: "Organization created",
-        description: `${name} has been created successfully.`,
+      toast.success("Organization created", {
+        description: `${name} has been created successfully.`
       });
       
       // Set a flag to indicate successful organization creation and clear other flags
@@ -165,10 +159,8 @@ const CreateFirstOrganization = () => {
       console.error("Error creating organization:", error);
       setError(error.message || "Failed to create organization. Please try again later.");
       
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create organization",
-        variant: "destructive",
+      toast.error("Error", {
+        description: error.message || "Failed to create organization"
       });
     } finally {
       setIsSubmitting(false);

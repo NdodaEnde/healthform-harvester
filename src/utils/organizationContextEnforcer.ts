@@ -20,13 +20,13 @@ export const useOrganizationEnforcer = () => {
     let isNavigating = false;
     
     const checkAuthAndOrg = async () => {
+      // Skip if we're already navigating
       if (isNavigating) {
-        // Skip if we've already initiated navigation
         console.log("Navigation already in progress, skipping additional checks");
         return;
       }
       
-      // EMERGENCY FIX: Skip enforcer if we're on setup or accept-invite pages
+      // Skip enforcer if we're on setup or accept-invite pages
       const currentPath = window.location.pathname;
       if (currentPath === "/setup" || currentPath.startsWith("/accept-invite")) {
         console.log("On setup or accept-invite page, skipping enforcer");
@@ -51,13 +51,13 @@ export const useOrganizationEnforcer = () => {
         return;
       }
       
-      // Wait until organization data is fully loaded
+      // Skip if organization data is still loading
       if (loading) {
         console.log("Organizations still loading, waiting...");
         return;
       }
       
-      // If authenticated but no organization context is available (after loading is complete)
+      // If authenticated but no organization data (after loading is complete)
       if (!currentOrganization && userOrganizations.length === 0) {
         console.log("Authenticated but no organizations, redirecting to setup");
         isNavigating = true;
@@ -68,8 +68,15 @@ export const useOrganizationEnforcer = () => {
       // If user has organizations but none is selected, select the first one
       if (!currentOrganization && userOrganizations.length > 0) {
         console.log("User has organizations but none selected, selecting first one");
-        // Instead of just redirecting, we need to actually set the current organization
         switchOrganization(userOrganizations[0].id);
+        return;
+      }
+
+      // If we're on the setup page but already have an organization, redirect to dashboard
+      if (currentPath === "/setup" && currentOrganization) {
+        console.log("Already have organization but on setup page, redirecting to dashboard");
+        isNavigating = true;
+        navigate("/dashboard");
         return;
       }
     };
