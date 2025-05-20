@@ -1,4 +1,3 @@
-
 import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -136,7 +135,7 @@ export function DashboardSidebar() {
           </nav>
         </div>
         
-        {/* Added organization switcher at the bottom of sidebar */}
+        {/* Keep organization switcher at the bottom of sidebar */}
         <div className={cn(
           "p-4 border-t", 
           collapsed ? "items-center justify-center" : ""
@@ -146,7 +145,7 @@ export function DashboardSidebar() {
               ORGANIZATION
             </div>
           )}
-          <OrganizationSwitcher />
+          {!collapsed && <OrganizationSwitcher />}
         </div>
       </div>
     </div>

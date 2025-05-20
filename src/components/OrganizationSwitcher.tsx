@@ -38,22 +38,23 @@ export default function OrganizationSwitcher() {
   } = useOrganization();
   
   const [isSelectOpen, setIsSelectOpen] = useState(false);
+  const [location] = useState(window.location.pathname);
   
   // Debug logging to check component rendering and data
   useEffect(() => {
-    console.log("OrganizationSwitcher rendered:");
+    console.log("OrganizationSwitcher rendered at:", location);
     console.log("Current organization:", currentOrganization);
     console.log("Current client:", currentClient);
     console.log("Is service provider:", isServiceProvider());
     console.log("Client organizations:", clientOrganizations);
-  }, [currentOrganization, currentClient, clientOrganizations]);
+  }, [currentOrganization, currentClient, clientOrganizations, location]);
   
   if (!currentOrganization) {
     return null;
   }
   
   return (
-    <div className="flex flex-col space-y-3 w-full" data-testid="organization-switcher">
+    <div className="flex flex-col space-y-3 w-full min-w-[200px]" data-testid="organization-switcher">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -68,7 +69,7 @@ export default function OrganizationSwitcher() {
           </Button>
         </DropdownMenuTrigger>
         {userOrganizations.length > 1 && (
-          <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuContent align="start" className="w-56 z-50 bg-white dark:bg-gray-800 shadow-lg">
             <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {userOrganizations.map(org => (
@@ -108,7 +109,10 @@ export default function OrganizationSwitcher() {
               open={isSelectOpen}
               onOpenChange={setIsSelectOpen}
             >
-              <SelectTrigger className="w-full flex items-center gap-2 bg-blue-100 border-blue-300 shadow-sm">
+              <SelectTrigger 
+                className="w-full flex items-center gap-2 bg-blue-100 border-blue-300 shadow-sm 
+                  dark:bg-blue-900/30 dark:border-blue-800"
+              >
                 <div className="flex items-center gap-2">
                   {currentClient ? (
                     <Building2 className="h-4 w-4" />
@@ -120,7 +124,7 @@ export default function OrganizationSwitcher() {
                   </SelectValue>
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-popover border border-border shadow-md">
+              <SelectContent className="bg-popover border border-border shadow-md z-50 w-[200px] min-w-full">
                 <SelectItem value="all_clients" className="flex items-center gap-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 inline" />

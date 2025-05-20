@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import OrganizationLogo from './OrganizationLogo';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import { DashboardSidebar } from './DashboardSidebar';
+import OrganizationSwitcher from './OrganizationSwitcher';
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -42,6 +43,13 @@ const HeaderComponent: React.FC = () => {
             )}
           </Link>
         </div>
+        
+        {/* For medium screens and up, show the organization switcher in the header */}
+        {!isPublicPath && user && orgContext?.currentOrganization && (
+          <div className="hidden md:flex md:items-center md:border md:border-red-500 md:p-2 md:rounded-md md:z-50">
+            <OrganizationSwitcher />
+          </div>
+        )}
         
         {user && (
           <div className="flex items-center gap-4">
