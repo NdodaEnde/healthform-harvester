@@ -46,8 +46,10 @@ const HeaderComponent: React.FC = () => {
         
         {/* For medium screens and up, show the organization switcher in the header */}
         {!isPublicPath && user && orgContext?.currentOrganization && (
-          <div className="hidden md:flex md:items-center md:border md:border-red-500 md:p-2 md:rounded-md md:z-50">
-            <OrganizationSwitcher />
+          <div className="hidden md:block absolute left-1/2 transform -translate-x-1/2">
+            <div className="bg-white dark:bg-gray-900 shadow-md rounded-md p-2 border border-gray-200 dark:border-gray-700 z-50">
+              <OrganizationSwitcher />
+            </div>
           </div>
         )}
         

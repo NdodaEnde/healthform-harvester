@@ -54,7 +54,7 @@ export default function OrganizationSwitcher() {
   }
   
   return (
-    <div className="flex flex-col space-y-3 w-full min-w-[200px]" data-testid="organization-switcher">
+    <div className="flex flex-col space-y-3 w-full min-w-[220px] max-w-[280px]" data-testid="organization-switcher">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -69,7 +69,7 @@ export default function OrganizationSwitcher() {
           </Button>
         </DropdownMenuTrigger>
         {userOrganizations.length > 1 && (
-          <DropdownMenuContent align="start" className="w-56 z-50 bg-white dark:bg-gray-800 shadow-lg">
+          <DropdownMenuContent align="start" className="w-56 z-[100] bg-white dark:bg-gray-800 shadow-lg">
             <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {userOrganizations.map(org => (
@@ -124,7 +124,7 @@ export default function OrganizationSwitcher() {
                   </SelectValue>
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-popover border border-border shadow-md z-50 w-[200px] min-w-full">
+              <SelectContent className="bg-popover border border-border shadow-md z-[100] w-[220px] min-w-full">
                 <SelectItem value="all_clients" className="flex items-center gap-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 inline" />
