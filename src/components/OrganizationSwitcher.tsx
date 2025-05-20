@@ -9,8 +9,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Building, ChevronDown, Users } from "lucide-react";
+import { 
+  Building, 
+  ChevronDown, 
+  Users,
+  Building2
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export default function OrganizationSwitcher() {
   const { 
@@ -23,12 +37,14 @@ export default function OrganizationSwitcher() {
     isServiceProvider
   } = useOrganization();
   
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
+  
   if (!currentOrganization) {
     return null;
   }
   
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -64,55 +80,59 @@ export default function OrganizationSwitcher() {
       </DropdownMenu>
       
       {/* Client selector (only for service providers) */}
-      {isServiceProvider() && clientOrganizations.length > 0 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2 max-w-[200px]">
-              <Users className="h-4 w-4" />
-              <span className="truncate">
-                {currentClient ? currentClient.name : "All Clients"}
-              </span>
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>Switch Client</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="flex justify-between items-center cursor-pointer"
-              onClick={() => {
-                console.log("Switching to all clients");
-                switchClient("all_clients");
+      {isServiceProvider() && (
+        <div className="relative">
+          {clientOrganizations.length > 0 ? (
+            <Select
+              value={currentClient ? currentClient.id : "all_clients"}
+              onValueChange={(value) => {
+                console.log("Switching to client:", value);
+                switchClient(value);
+                toast.success(
+                  value === "all_clients"
+                    ? "Switched to all clients view"
+                    : `Switched to ${clientOrganizations.find(c => c.id === value)?.name}`
+                );
               }}
+              open={isSelectOpen}
+              onOpenChange={setIsSelectOpen}
             >
-              <div className="flex items-center">
-                <Users className="h-4 w-4 mr-2 opacity-70" />
-                <span>All Clients</span>
-              </div>
-              {!currentClient && (
-                <Badge variant="secondary" className="ml-2">Current</Badge>
-              )}
-            </DropdownMenuItem>
-            {clientOrganizations.map(client => (
-              <DropdownMenuItem 
-                key={client.id}
-                className="flex justify-between items-center cursor-pointer"
-                onClick={() => {
-                  console.log("OrganizationSwitcher - Switching to client:", client.id);
-                  switchClient(client.id);
-                }}
-              >
-                <div className="flex items-center truncate">
-                  <Building className="h-4 w-4 mr-2 opacity-70" />
-                  <span className="truncate">{client.name}</span>
+              <SelectTrigger className="w-full md:w-[200px] flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  {currentClient ? (
+                    <Building2 className="h-4 w-4" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
+                  <SelectValue placeholder="Select client">
+                    {currentClient ? currentClient.name : "All Clients"}
+                  </SelectValue>
                 </div>
-                {currentClient?.id === client.id && (
-                  <Badge variant="secondary" className="ml-2">Current</Badge>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="all_clients" className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 inline" />
+                    <span>All Clients</span>
+                  </div>
+                </SelectItem>
+                {clientOrganizations.map(client => (
+                  <SelectItem key={client.id} value={client.id} className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 inline" />
+                      <span className="truncate">{client.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Button variant="outline" disabled className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="truncate">No Clients</span>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
