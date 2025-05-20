@@ -82,20 +82,59 @@ serve(async (req) => {
     const documentId = documentData.id;
     
     try {
-      // Create a copy of the file for processing to avoid streaming issues
-      // This is crucial because the formData entries can only be read once
-      const fileArrayBuffer = await file.arrayBuffer();
-      const fileBlob = new Blob([fileArrayBuffer], { type: file.type });
-      const fileCopy = new File([fileBlob], file.name, { type: file.type });
+      // Get the SDK microservice URL from environment variable
+      const sdkMicroserviceUrl = Deno.env.get('SDK_MICROSERVICE_URL');
       
-      // Start background task for document processing with the copy of the file
-      console.log(`Starting background processing for document ${documentId} (${fileName})`);
-      const processingPromise = processDocumentWithLandingAI(fileCopy, documentType, documentId, supabase);
+      if (!sdkMicroserviceUrl) {
+        throw new Error('SDK_MICROSERVICE_URL environment variable not set');
+      }
       
-      // Use EdgeRuntime.waitUntil to ensure the processing continues even after response is sent
-      // @ts-ignore - Deno specific API
-      EdgeRuntime.waitUntil(processingPromise.catch(error => {
-        console.error(`Error in background processing for document ${documentId}:`, error);
+      // Create a signed URL for the file to allow the microservice to access it
+      const { data: signedUrlData, error: signedUrlError } = await supabase
+        .storage
+        .from('medical-documents')
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
+        
+      if (signedUrlError) {
+        throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
+      }
+      
+      // Prepare payload for the microservice
+      const payload = {
+        documentId,
+        documentType,
+        fileUrl: signedUrlData.signedUrl,
+        fileName,
+        mimeType: file.type,
+        supabaseUrl,
+        supabaseServiceKey,
+        callbackEndpoint: `${supabaseUrl}/functions/v1/process-document-callback`
+      };
+      
+      console.log(`Starting microservice processing for document ${documentId} (${fileName})`);
+      
+      // Start background task for document processing with the microservice
+      const processingPromise = fetch(sdkMicroserviceUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SDK_MICROSERVICE_API_KEY') || ''}`
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(text => {
+            throw new Error(`Microservice responded with status ${response.status}: ${text}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log(`Microservice accepted document ${documentId} for processing:`, data);
+      })
+      .catch(error => {
+        console.error(`Error in microservice processing for document ${documentId}:`, error);
         // Try to update document status to failed if there's an error
         return supabase
           .from('documents')
@@ -105,12 +144,16 @@ serve(async (req) => {
           })
           .eq('id', documentId)
           .then(() => {
-            console.error(`Updated document ${documentId} status to failed due to background processing error`);
+            console.error(`Updated document ${documentId} status to failed due to processing error`);
           })
           .catch(updateError => {
             console.error(`Failed to update document ${documentId} status after processing error:`, updateError);
           });
-      }));
+      });
+      
+      // Use EdgeRuntime.waitUntil to ensure the processing continues even after response is sent
+      // @ts-ignore - Deno specific API
+      EdgeRuntime.waitUntil(processingPromise);
     } catch (processingSetupError) {
       console.error(`Error setting up document processing for ${documentId}:`, processingSetupError);
       // Don't fail the request, but log the error
