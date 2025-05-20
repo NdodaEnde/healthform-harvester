@@ -97,19 +97,19 @@ export default function OrganizationSwitcher() {
               open={isSelectOpen}
               onOpenChange={setIsSelectOpen}
             >
-              <SelectTrigger className="w-full md:w-[200px] flex items-center gap-2">
+              <SelectTrigger className="w-full md:w-[200px] flex items-center gap-2 bg-background border-input">
                 <div className="flex items-center gap-2">
                   {currentClient ? (
                     <Building2 className="h-4 w-4" />
                   ) : (
                     <Users className="h-4 w-4" />
                   )}
-                  <SelectValue placeholder="Select client">
+                  <SelectValue placeholder="Select client" className="text-foreground">
                     {currentClient ? currentClient.name : "All Clients"}
                   </SelectValue>
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-popover">
+              <SelectContent className="bg-popover border border-border">
                 <SelectItem value="all_clients" className="flex items-center gap-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 inline" />
