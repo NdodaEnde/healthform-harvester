@@ -1,3 +1,4 @@
+
 /**
  * Utils barrel file for exporting utility functions
  */
@@ -17,6 +18,9 @@ export * from './email-utils';
 
 // Organization context utilities
 export * from './organizationContextEnforcer';
+
+// Organization assets utilities
+export * from './organization-assets';
 
 // Debugging utilities
 export * from './rls-tester';

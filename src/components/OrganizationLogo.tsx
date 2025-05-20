@@ -61,7 +61,7 @@ const OrganizationLogo: React.FC<OrganizationLogoProps> = ({
   return (
     <img 
       src={imageUrl} 
-      alt={`${organization.name || 'Organization'} ${variant}`}
+      alt={`${organization?.name || 'Organization'} ${variant}`}
       className={`${sizeClasses[size]} ${className}`}
     />
   );
