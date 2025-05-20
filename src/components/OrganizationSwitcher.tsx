@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 export default function OrganizationSwitcher() {
@@ -39,16 +39,25 @@ export default function OrganizationSwitcher() {
   
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   
+  // Debug logging to check component rendering and data
+  useEffect(() => {
+    console.log("OrganizationSwitcher rendered:");
+    console.log("Current organization:", currentOrganization);
+    console.log("Current client:", currentClient);
+    console.log("Is service provider:", isServiceProvider());
+    console.log("Client organizations:", clientOrganizations);
+  }, [currentOrganization, currentClient, clientOrganizations]);
+  
   if (!currentOrganization) {
     return null;
   }
   
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap" data-testid="organization-switcher">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="flex items-center gap-2 max-w-[200px]">
+          <Button variant="outline" className="flex items-center gap-2 max-w-[200px] border-gray-300">
             <Building className="h-4 w-4" />
             <span className="truncate">{currentOrganization.name}</span>
             {userOrganizations.length > 1 && (
@@ -79,9 +88,9 @@ export default function OrganizationSwitcher() {
         )}
       </DropdownMenu>
       
-      {/* Client selector (only for service providers) */}
+      {/* Client selector (only for service providers) - with enhanced visibility */}
       {isServiceProvider() && (
-        <div className="relative">
+        <div className="relative min-w-[140px]">
           {clientOrganizations.length > 0 ? (
             <Select
               value={currentClient ? currentClient.id : "all_clients"}
@@ -97,7 +106,7 @@ export default function OrganizationSwitcher() {
               open={isSelectOpen}
               onOpenChange={setIsSelectOpen}
             >
-              <SelectTrigger className="w-full md:w-[200px] flex items-center gap-2 bg-background border-input shadow-sm">
+              <SelectTrigger className="w-full md:w-[200px] flex items-center gap-2 bg-blue-50 border-blue-300 shadow-sm">
                 <div className="flex items-center gap-2">
                   {currentClient ? (
                     <Building2 className="h-4 w-4" />

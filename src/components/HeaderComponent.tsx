@@ -48,8 +48,10 @@ const HeaderComponent: React.FC = () => {
           <div className="flex items-center gap-4">
             {!isPublicPath && orgContext && (
               <>
-                {/* Increased visibility and always showing on all screen sizes */}
-                <OrganizationSwitcher />
+                {/* Make sure the organization switcher is visible on all screens */}
+                <div className="flex items-center">
+                  <OrganizationSwitcher />
+                </div>
                 <Sheet>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="sm" className="md:hidden">
