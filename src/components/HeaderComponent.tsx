@@ -37,10 +37,10 @@ const HeaderComponent: React.FC = () => {
               <OrganizationLogo 
                 organization={orgContext.currentClient || orgContext.currentOrganization} 
                 size="sm" 
-                fallbackText="HealthForm Harvester"
+                fallbackText="SurgiScan"
               />
             ) : (
-              <span className="font-semibold text-lg">HealthForm Harvester</span>
+              <span className="font-semibold text-lg">SurgiScan</span>
             )}
           </Link>
         </div>

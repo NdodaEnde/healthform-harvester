@@ -43,7 +43,7 @@ const Index = () => {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-2">
             <FileText className="h-6 w-6" />
-            <span className="font-medium text-lg">HealthForm Harvester</span>
+            <span className="font-medium text-lg">SurgiScan</span>
           </div>
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
@@ -68,10 +68,10 @@ const Index = () => {
             className="max-w-3xl mx-auto space-y-6"
           >
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
-              Digitize Health Documents with AI
+              Digitize Medical Documents with AI
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Upload medical forms and certificates to extract, analyze, and store critical health data using advanced AI processing.
+              Upload surgical forms and medical records to extract, analyze, and store critical health data using advanced AI processing.
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
               <Button 
@@ -139,7 +139,7 @@ const Index = () => {
       <footer className="py-6 bg-secondary/10">
         <div className="container text-center text-muted-foreground">
           <p className="text-sm">
-            &copy; {new Date().getFullYear()} HealthForm Harvester. All rights reserved.
+            &copy; {new Date().getFullYear()} SurgiScan. All rights reserved.
           </p>
         </div>
       </footer>

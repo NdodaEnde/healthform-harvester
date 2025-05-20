@@ -14,7 +14,7 @@ interface OrganizationLogoProps {
 const OrganizationLogo: React.FC<OrganizationLogoProps> = ({ 
   size = 'md', 
   className = '', 
-  fallbackText = 'DocManager',
+  fallbackText = 'SurgiScan',
   organization = null
 }) => {
   const sizeClasses = {
