@@ -14,6 +14,8 @@ export interface Organization {
   name: string;
   organization_type: 'direct_client' | 'service_provider' | string;  // Added string to support other values
   logo_url?: string;
+  signature_url?: string;
+  stamp_url?: string;
   contact_email?: string;
   contact_phone?: string;
   industry?: string;

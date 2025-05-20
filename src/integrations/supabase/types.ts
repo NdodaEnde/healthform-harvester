@@ -587,6 +587,8 @@ export type Database = {
           name: string
           organization_type: string
           settings: Json | null
+          signature_url: string | null
+          stamp_url: string | null
           updated_at: string | null
         }
         Insert: {
@@ -601,6 +603,8 @@ export type Database = {
           name: string
           organization_type: string
           settings?: Json | null
+          signature_url?: string | null
+          stamp_url?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -615,6 +619,8 @@ export type Database = {
           name?: string
           organization_type?: string
           settings?: Json | null
+          signature_url?: string | null
+          stamp_url?: string | null
           updated_at?: string | null
         }
         Relationships: []
