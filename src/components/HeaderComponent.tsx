@@ -4,7 +4,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionalOrganization } from '@/contexts/OrganizationContext';
 import UserMenu from '@/components/UserMenu';
-import OrganizationSwitcher from '@/components/OrganizationSwitcher';
 import { User, Menu } from 'lucide-react';
 import { Button } from './ui/button';
 import OrganizationLogo from './OrganizationLogo';
@@ -47,22 +46,16 @@ const HeaderComponent: React.FC = () => {
         {user && (
           <div className="flex items-center gap-4">
             {!isPublicPath && orgContext && (
-              <>
-                {/* Make sure the organization switcher is visible on all screens */}
-                <div className="flex items-center">
-                  <OrganizationSwitcher />
-                </div>
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" className="md:hidden">
-                      <Menu className="h-5 w-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left">
-                    <DashboardSidebar />
-                  </SheetContent>
-                </Sheet>
-              </>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left">
+                  <DashboardSidebar />
+                </SheetContent>
+              </Sheet>
             )}
             <UserMenu />
           </div>

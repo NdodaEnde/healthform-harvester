@@ -53,15 +53,17 @@ export default function OrganizationSwitcher() {
   }
   
   return (
-    <div className="flex items-center gap-2 flex-wrap" data-testid="organization-switcher">
+    <div className="flex flex-col space-y-3 w-full" data-testid="organization-switcher">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="flex items-center gap-2 max-w-[200px] border-gray-300">
-            <Building className="h-4 w-4" />
-            <span className="truncate">{currentOrganization.name}</span>
+          <Button variant="outline" className="flex items-center gap-2 w-full border-gray-300 justify-between">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Building className="h-4 w-4 shrink-0" />
+              <span className="truncate">{currentOrganization.name}</span>
+            </div>
             {userOrganizations.length > 1 && (
-              <ChevronDown className="h-4 w-4 opacity-50" />
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
             )}
           </Button>
         </DropdownMenuTrigger>
@@ -90,7 +92,7 @@ export default function OrganizationSwitcher() {
       
       {/* Client selector (only for service providers) - with enhanced visibility */}
       {isServiceProvider() && (
-        <div className="relative min-w-[140px]">
+        <div className="w-full">
           {clientOrganizations.length > 0 ? (
             <Select
               value={currentClient ? currentClient.id : "all_clients"}
@@ -106,7 +108,7 @@ export default function OrganizationSwitcher() {
               open={isSelectOpen}
               onOpenChange={setIsSelectOpen}
             >
-              <SelectTrigger className="w-full md:w-[200px] flex items-center gap-2 bg-blue-50 border-blue-300 shadow-sm">
+              <SelectTrigger className="w-full flex items-center gap-2 bg-blue-100 border-blue-300 shadow-sm">
                 <div className="flex items-center gap-2">
                   {currentClient ? (
                     <Building2 className="h-4 w-4" />
@@ -136,7 +138,7 @@ export default function OrganizationSwitcher() {
               </SelectContent>
             </Select>
           ) : (
-            <Button variant="outline" disabled className="flex items-center gap-2">
+            <Button variant="outline" disabled className="w-full flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="truncate">No Clients</span>
             </Button>

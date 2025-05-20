@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import OrganizationSwitcher from "@/components/OrganizationSwitcher";
 
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
@@ -133,6 +134,19 @@ export function DashboardSidebar() {
               </NavLink>
             ))}
           </nav>
+        </div>
+        
+        {/* Added organization switcher at the bottom of sidebar */}
+        <div className={cn(
+          "p-4 border-t", 
+          collapsed ? "items-center justify-center" : ""
+        )}>
+          {!collapsed && (
+            <div className="mb-2 text-xs font-semibold text-muted-foreground">
+              ORGANIZATION
+            </div>
+          )}
+          <OrganizationSwitcher />
         </div>
       </div>
     </div>
