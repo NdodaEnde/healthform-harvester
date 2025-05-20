@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionalOrganization } from '@/contexts/OrganizationContext';
 import UserMenu from '@/components/UserMenu';
-import OrganizationSwitcher from './OrganizationSwitcher';
+import OrganizationSwitcher from '@/components/OrganizationSwitcher';
 import { User, Menu } from 'lucide-react';
 import { Button } from './ui/button';
 import OrganizationLogo from './OrganizationLogo';
@@ -48,9 +48,8 @@ const HeaderComponent: React.FC = () => {
           <div className="flex items-center gap-4">
             {!isPublicPath && orgContext && (
               <>
-                <div className="hidden md:flex">
-                  <OrganizationSwitcher />
-                </div>
+                {/* Increased visibility and always showing on all screen sizes */}
+                <OrganizationSwitcher />
                 <Sheet>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="sm" className="md:hidden">
