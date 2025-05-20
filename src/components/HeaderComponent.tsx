@@ -10,6 +10,7 @@ import OrganizationLogo from './OrganizationLogo';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import { DashboardSidebar } from './DashboardSidebar';
 import OrganizationSwitcher from './OrganizationSwitcher';
+import ThemeToggle from './ThemeToggle';
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -55,6 +56,8 @@ const HeaderComponent: React.FC = () => {
         
         {user && (
           <div className="flex items-center gap-4">
+            <ThemeToggle />
+            
             {!isPublicPath && orgContext && (
               <Sheet>
                 <SheetTrigger asChild>
@@ -73,6 +76,8 @@ const HeaderComponent: React.FC = () => {
         
         {!user && (
           <div className="flex items-center gap-2">
+            <ThemeToggle />
+            
             <Link to="/auth">
               <Button variant="ghost" size="sm" className="hidden md:inline-flex">
                 Login
