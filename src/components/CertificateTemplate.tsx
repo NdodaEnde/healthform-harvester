@@ -1,7 +1,7 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import OrganizationLogo from "./OrganizationLogo";
 
 type CertificateTemplateProps = {
   extractedData: any;
@@ -521,6 +521,13 @@ const CertificateTemplate = ({
     restrictionsData
   });
 
+  // Extract organization information for signatures and stamps
+  const organization = extractedData?.organization || {};
+  const physician = getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi';
+  const practiceNumber = getValue(examination, 'practice_number') || '0404160';
+  const nurse = getValue(examination, 'nurse') || 'Sibongile Mahlangu';
+  const nurseNumber = getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91';
+
   return (
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
@@ -859,6 +866,15 @@ const CertificateTemplate = ({
               <div className="flex justify-between items-end">
                 <div className="flex-1">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56">
+                    {/* Display the signature image if available */}
+                    <div className="min-h-16 flex items-center justify-center">
+                      <OrganizationLogo
+                        variant="signature"
+                        organization={organization}
+                        size="lg"
+                        className="max-h-12 w-auto object-contain"
+                      />
+                    </div>
                     <div className="text-center font-semibold text-[0.6rem]">SIGNATURE</div>
                   </div>
                 </div>
@@ -866,15 +882,24 @@ const CertificateTemplate = ({
                 <div className="flex-1 px-2 flex justify-center">
                   <div className="w-fit max-w-md text-center">
                     <p className="text-[0.6rem] leading-tight font-semibold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
-                    <p className="text-[0.6rem] leading-tight italic">Dr {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No. {getValue(examination, 'practice_number') || '0404160'}</p>
-                    <p className="text-[0.6rem] leading-tight">Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'}</p>
+                    <p className="text-[0.6rem] leading-tight italic">Dr {physician} / Practice No. {practiceNumber}</p>
+                    <p className="text-[0.6rem] leading-tight">Sr. {nurse}</p>
                     <p className="text-[0.6rem] leading-tight">SANC No: 14262133; SASOHN No: AR 2136</p>
-                    <p className="text-[0.6rem] leading-tight">Practice Number: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}</p>
+                    <p className="text-[0.6rem] leading-tight">Practice Number: {nurseNumber}</p>
                   </div>
                 </div>
                 
                 <div className="flex-1 text-right">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56 ml-auto">
+                    {/* Display the stamp image if available */}
+                    <div className="min-h-16 flex items-center justify-center">
+                      <OrganizationLogo
+                        variant="stamp"
+                        organization={organization}
+                        size="lg"
+                        className="max-h-16 w-auto object-contain"
+                      />
+                    </div>
                     <div className="text-center font-semibold text-[0.6rem]">STAMP</div>
                   </div>
                 </div>
