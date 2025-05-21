@@ -1,6 +1,6 @@
 
 import { motion } from "framer-motion";
-import { FileText, Upload, Shield, Zap } from "lucide-react";
+import { FileText, Upload, Shield, Zap, FileSearch, Database, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -84,6 +84,65 @@ const Index = () => {
               </Button>
             </div>
           </motion.div>
+        </section>
+        
+        {/* How It Works Section */}
+        <section className="py-16 bg-muted">
+          <div className="container">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold mb-4">How It Works</h2>
+              <p className="text-muted-foreground max-w-xl mx-auto">
+                Our advanced document processing pipeline makes extracting information from medical documents simple and efficient.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="bg-card rounded-lg p-6 shadow-sm flex flex-col items-center text-center"
+              >
+                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                  <Upload className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-medium mb-2">Upload Documents</h3>
+                <p className="text-muted-foreground">
+                  Upload any medical document including certificates of fitness, medical questionnaires, and reports.
+                </p>
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="bg-card rounded-lg p-6 shadow-sm flex flex-col items-center text-center"
+              >
+                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                  <Cpu className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-medium mb-2">AI Processing</h3>
+                <p className="text-muted-foreground">
+                  Our AI engine analyzes the documents, extracting key medical data and structured information automatically.
+                </p>
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="bg-card rounded-lg p-6 shadow-sm flex flex-col items-center text-center"
+              >
+                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                  <Database className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-medium mb-2">Access & Manage</h3>
+                <p className="text-muted-foreground">
+                  View, search, and manage the extracted data through an intuitive dashboard with built-in reporting tools.
+                </p>
+              </motion.div>
+            </div>
+          </div>
         </section>
         
         <section className="py-12 bg-secondary/50">

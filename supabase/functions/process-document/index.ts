@@ -1,179 +1,174 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { processDocumentWithLandingAI } from "./document-processor.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET'
 };
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Use environment variable for API endpoint or default to the Render service URL
+const microserviceUrl = Deno.env.get('DOCUMENT_PROCESSOR_URL') || 'https://document-processor.onrender.com';
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders,
+    });
   }
 
   try {
+    // Parse the request body
     const formData = await req.formData();
     const file = formData.get('file');
-    const documentType = formData.get('documentType');
+    const documentType = formData.get('documentType') || 'unknown';
     const userId = formData.get('userId');
 
-    if (!file) {
-      return new Response(
-        JSON.stringify({ error: 'No file uploaded' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+    if (!file || !(file instanceof File)) {
+      throw new Error('No file provided');
     }
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // 1. Upload file to Supabase Storage - organize by user ID for security
-    const fileName = file.name;
-    const fileExt = fileName.split('.').pop();
-    
-    // Generate a folder structure based on userID
-    const userFolder = userId ? `${userId}` : 'anonymous';
-    const filePath = `${userFolder}/documents/${crypto.randomUUID()}.${fileExt}`;
-    
-    const { data: storageData, error: storageError } = await supabase
-      .storage
-      .from('medical-documents')
-      .upload(filePath, file, {
-        contentType: file.type,
-        upsert: false
-      });
-
-    if (storageError) {
-      console.error('Storage error:', storageError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to upload file to storage', details: storageError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+    if (!userId) {
+      throw new Error('User ID is required');
     }
 
-    // 2. Create document record in the database
-    const { data: documentData, error: documentError } = await supabase
+    console.log(`Processing document of type: ${documentType}`);
+    console.log(`File name: ${file.name}, size: ${file.size} bytes`);
+
+    // Create a new form data to send to the microservice
+    const forwardFormData = new FormData();
+    forwardFormData.append('files', file);
+    
+    console.log("Sending document to microservice for processing...");
+    
+    // Step 1: Send the file to the microservice
+    const initialResponse = await fetch(`${microserviceUrl}/process-documents`, {
+      method: 'POST',
+      body: forwardFormData
+    });
+
+    if (!initialResponse.ok) {
+      const errorText = await initialResponse.text();
+      console.error("Microservice error:", errorText);
+      throw new Error(`Microservice error: ${initialResponse.status} - ${errorText}`);
+    }
+
+    const initialResult = await initialResponse.json();
+    console.log("Initial processing complete. Batch ID:", initialResult.batch_id);
+    
+    // Step 2: Retrieve the processed data using the batch ID
+    const dataResponse = await fetch(`${microserviceUrl}/get-document-data/${initialResult.batch_id}`);
+    
+    if (!dataResponse.ok) {
+      const errorText = await dataResponse.text();
+      console.error("Error retrieving document data:", errorText);
+      throw new Error(`Data retrieval error: ${dataResponse.status} - ${errorText}`);
+    }
+
+    const documentData = await dataResponse.json();
+    console.log("Document data retrieved successfully");
+    
+    // Extract the first document result (assuming single file upload)
+    const documentResult = documentData.result && documentData.result.length > 0 
+      ? documentData.result[0] 
+      : null;
+      
+    if (!documentResult) {
+      throw new Error("No document processing results returned");
+    }
+    
+    // Store file in Storage
+    const timestamp = new Date().getTime();
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${userId}/${timestamp}_${documentType}.${fileExt}`;
+    
+    console.log(`Uploading file to storage: ${filePath}`);
+    const { error: uploadError } = await supabase.storage
       .from('documents')
-      .insert({
-        file_name: fileName,
-        file_path: filePath,
-        document_type: documentType,
-        mime_type: file.type,
-        status: 'processing'
-      })
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      throw new Error(`Storage error: ${uploadError.message}`);
+    }
+    
+    // Get public URL for the file
+    const { data: { publicUrl } } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+      
+    // Create document record in database
+    const documentRecord = {
+      user_id: userId,
+      organization_id: null, // Will be updated after insertion
+      file_path: filePath,
+      file_name: file.name,
+      file_type: file.type,
+      file_size: file.size,
+      public_url: publicUrl,
+      document_type: documentType,
+      status: 'processing',
+      extracted_data: {
+        raw_content: documentResult.markdown,
+        structured_data: documentResult.data,
+        metadata: documentResult.metadata,
+      }
+    };
+    
+    console.log("Creating document record in database");
+    const { data: insertedDoc, error: insertError } = await supabase
+      .from('documents')
+      .insert(documentRecord)
       .select()
       .single();
-
-    if (documentError) {
-      console.error('Document insert error:', documentError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create document record', details: documentError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+      
+    if (insertError) {
+      console.error("Database insert error:", insertError);
+      throw new Error(`Database error: ${insertError.message}`);
     }
-
-    // 3. Start document processing in the background
-    const documentId = documentData.id;
     
-    try {
-      // Get the SDK microservice URL from environment variable
-      const sdkMicroserviceUrl = Deno.env.get('SDK_MICROSERVICE_URL');
-      
-      if (!sdkMicroserviceUrl) {
-        throw new Error('SDK_MICROSERVICE_URL environment variable not set');
-      }
-      
-      // Create a signed URL for the file to allow the microservice to access it
-      const { data: signedUrlData, error: signedUrlError } = await supabase
-        .storage
-        .from('medical-documents')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
-        
-      if (signedUrlError) {
-        throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
-      }
-      
-      // Prepare payload for the microservice
-      const payload = {
-        documentId,
-        documentType,
-        fileUrl: signedUrlData.signedUrl,
-        fileName,
-        mimeType: file.type,
-        supabaseUrl,
-        supabaseServiceKey,
-        callbackEndpoint: `${supabaseUrl}/functions/v1/process-document-callback`
-      };
-      
-      console.log(`Starting microservice processing for document ${documentId} (${fileName})`);
-      
-      // Start background task for document processing with the microservice
-      const processingPromise = fetch(sdkMicroserviceUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SDK_MICROSERVICE_API_KEY') || ''}`
-        },
-        body: JSON.stringify(payload)
-      })
-      .then(response => {
-        if (!response.ok) {
-          return response.text().then(text => {
-            throw new Error(`Microservice responded with status ${response.status}: ${text}`);
-          });
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log(`Microservice accepted document ${documentId} for processing:`, data);
-      })
-      .catch(error => {
-        console.error(`Error in microservice processing for document ${documentId}:`, error);
-        // Try to update document status to failed if there's an error
-        return supabase
-          .from('documents')
-          .update({
-            status: 'failed',
-            processing_error: error.message || 'Unknown error during processing'
-          })
-          .eq('id', documentId)
-          .then(() => {
-            console.error(`Updated document ${documentId} status to failed due to processing error`);
-          })
-          .catch(updateError => {
-            console.error(`Failed to update document ${documentId} status after processing error:`, updateError);
-          });
-      });
-      
-      // Use EdgeRuntime.waitUntil to ensure the processing continues even after response is sent
-      // @ts-ignore - Deno specific API
-      EdgeRuntime.waitUntil(processingPromise);
-    } catch (processingSetupError) {
-      console.error(`Error setting up document processing for ${documentId}:`, processingSetupError);
-      // Don't fail the request, but log the error
-    }
-
-    // 4. Return immediate success response with document ID
+    console.log("Document processed and stored successfully:", insertedDoc.id);
+    
+    // Cleanup on the microservice side (in background)
+    fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
+      method: 'DELETE'
+    }).catch(error => {
+      console.error("Error cleaning up temporary files:", error);
+    });
+    
     return new Response(
-      JSON.stringify({ 
-        message: 'Document upload started', 
-        documentId: documentId,
-        status: 'processing'
+      JSON.stringify({
+        success: true,
+        documentId: insertedDoc.id,
+        message: "Document processed successfully",
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        }
+      }
     );
-    
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error("Error processing document:", error);
+    
     return new Response(
-      JSON.stringify({ error: 'An unexpected error occurred', details: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({
+        success: false,
+        error: error.message || "Unknown error occurred",
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        }
+      }
     );
   }
 });
