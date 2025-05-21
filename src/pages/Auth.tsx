@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -213,10 +214,10 @@ const Auth = () => {
       <div className="min-h-screen flex flex-col">
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between">
-            <div className="flex items-center space-x-2" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+            <Link to="/" className="flex items-center space-x-2">
               <FileText className="h-6 w-6" />
               <span className="font-medium text-lg">SurgiScan</span>
-            </div>
+            </Link>
           </div>
         </header>
         
@@ -299,10 +300,10 @@ const Auth = () => {
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-2" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+          <Link to="/" className="flex items-center space-x-2">
             <FileText className="h-6 w-6" />
             <span className="font-medium text-lg">SurgiScan</span>
-          </div>
+          </Link>
         </div>
       </header>
       
