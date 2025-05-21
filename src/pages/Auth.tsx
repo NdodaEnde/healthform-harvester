@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -216,7 +215,7 @@ const Auth = () => {
           <div className="container flex h-16 items-center justify-between">
             <div className="flex items-center space-x-2" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
               <FileText className="h-6 w-6" />
-              <span className="font-medium text-lg">HealthForm Harvester</span>
+              <span className="font-medium text-lg">SurgiScan</span>
             </div>
           </div>
         </header>
@@ -302,7 +301,7 @@ const Auth = () => {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-2" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
             <FileText className="h-6 w-6" />
-            <span className="font-medium text-lg">HealthForm Harvester</span>
+            <span className="font-medium text-lg">SurgiScan</span>
           </div>
         </div>
       </header>
