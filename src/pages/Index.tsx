@@ -80,7 +80,7 @@ const Index = () => {
                 className="shadow-md"
               >
                 <Upload className="h-5 w-5 mr-2" />
-                Upload Documents
+                Scrub In to SurgiScan
               </Button>
             </div>
           </motion.div>
