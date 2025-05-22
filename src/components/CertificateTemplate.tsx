@@ -479,6 +479,36 @@ const CertificateTemplate = ({
     }
   };
 
+  console.log("Medical tests data:", medicalTests);ideDepth: {
+      done: isChecked(testResults.side_depth_done),
+      results: getValue(testResults, 'side_depth_results', 'N/A')
+    },
+    nightVision: {
+      done: isChecked(testResults.night_vision_done),
+      results: getValue(testResults, 'night_vision_results', 'N/A')
+    },
+    hearing: {
+      done: isChecked(testResults.hearing_done),
+      results: getValue(testResults, 'hearing_results', 'N/A')
+    },
+    heights: {
+      done: isChecked(testResults.heights_done),
+      results: getValue(testResults, 'heights_results', 'N/A')
+    },
+    lungFunction: {
+      done: isChecked(testResults.lung_function_done),
+      results: getValue(testResults, 'lung_function_results', 'N/A')
+    },
+    xRay: {
+      done: isChecked(testResults.x_ray_done),
+      results: getValue(testResults, 'x_ray_results', 'N/A')
+    },
+    drugScreen: {
+      done: isChecked(testResults.drug_screen_done),
+      results: getValue(testResults, 'drug_screen_results', 'N/A')
+    }
+  };
+
   const restrictionsData = {
     heights: isChecked(restrictions.heights),
     dustExposure: isChecked(restrictions.dust_exposure),
@@ -644,7 +674,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.bloods.done ? '✓' : ''}
+                            {medicalTests.bloods.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.bloods.results}
@@ -653,7 +683,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.farNearVision.done ? '✓' : ''}
+                            {medicalTests.farNearVision.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.farNearVision.results}
@@ -662,7 +692,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.sideDepth.done ? '✓' : ''}
+                            {medicalTests.sideDepth.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.sideDepth.results}
@@ -671,7 +701,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.nightVision.done ? '✓' : ''}
+                            {medicalTests.nightVision.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.nightVision.results}
@@ -684,7 +714,7 @@ const CertificateTemplate = ({
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Hearing</th>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
                           <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
                           <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
@@ -693,7 +723,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.hearing.done ? '✓' : ''}
+                            {medicalTests.hearing.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.hearing.results}
@@ -702,7 +732,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.heights.done ? '✓' : ''}
+                            {medicalTests.heights.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.heights.results}
@@ -711,7 +741,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.lungFunction.done ? '✓' : ''}
+                            {medicalTests.lungFunction.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.lungFunction.results}
@@ -720,7 +750,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.xRay.done ? '✓' : ''}
+                            {medicalTests.xRay.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.xRay.results}
@@ -729,7 +759,7 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.drugScreen.done ? '✓' : ''}
+                            {medicalTests.drugScreen.done ? '✓' : 'X'}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {medicalTests.drugScreen.results}
