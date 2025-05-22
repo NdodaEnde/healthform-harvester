@@ -342,8 +342,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
           <div className="flex-1 overflow-auto">
             {selectedCertificate && (
               <EnhancedCertificateGenerator 
-                document={selectedCertificate} 
+                documentId={selectedCertificate.id} 
                 onClose={() => setIsGeneratorDialogOpen(false)}
+          />
               />
             )}
           </div>
