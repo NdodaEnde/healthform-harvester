@@ -16,7 +16,15 @@ interface Document {
   public_url: string;
   status: string;
   document_type: string;
-  extracted_data: any;
+  extracted_data: {
+    raw_content?: string;
+    structured_data?: {
+      certificate_info?: Record<string, any>;
+      [key: string]: any;
+    };
+    chunks?: any[];
+    [key: string]: any;
+  };
   created_at: string;
 }
 
@@ -43,19 +51,26 @@ const DocumentViewer: React.FC = () => {
         .single();
 
       if (error) throw error;
-      setDocument(data);
-      console.log("Document data:", data);
+      
+      // Ensure we're working with a properly structured document
+      const processedData: Document = {
+        ...data,
+        extracted_data: data.extracted_data || {}
+      };
+      
+      setDocument(processedData);
+      console.log("Document data:", processedData);
       
       // Log the extracted_data specifically to help with debugging
-      console.log("Extracted data:", data.extracted_data);
+      console.log("Extracted data:", processedData.extracted_data);
       
       // If structured_data exists, log it as well
-      if (data.extracted_data?.structured_data) {
-        console.log("Structured data:", data.extracted_data.structured_data);
+      if (processedData.extracted_data?.structured_data) {
+        console.log("Structured data:", processedData.extracted_data.structured_data);
         
         // Also log certificate info if it exists
-        if (data.extracted_data.structured_data.certificate_info) {
-          console.log("Certificate info:", data.extracted_data.structured_data.certificate_info);
+        if (processedData.extracted_data.structured_data.certificate_info) {
+          console.log("Certificate info:", processedData.extracted_data.structured_data.certificate_info);
         }
       }
     } catch (err) {
@@ -144,7 +159,11 @@ const DocumentViewer: React.FC = () => {
                 Structured Data
               </Button>
               {document.public_url && (
-                <Button variant="outline" onClick={downloadDocument} size="sm">
+                <Button variant="outline" onClick={() => {
+                  if (document?.public_url) {
+                    window.open(document.public_url, '_blank');
+                  }
+                }} size="sm">
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </Button>
