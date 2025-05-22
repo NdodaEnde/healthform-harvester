@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -73,7 +72,7 @@ serve(async (req) => {
 
     const documentData = await dataResponse.json();
     console.log("Document data retrieved successfully");
-    console.log("Document data content:", JSON.stringify(documentData).substring(0, 200) + "...");
+    console.log("Document data content:", JSON.stringify(documentData).substring(0, 500) + "...");
     
     // Extract the first document result (assuming single file upload)
     const documentResult = documentData.result && documentData.result.length > 0 
@@ -115,71 +114,119 @@ serve(async (req) => {
       // Continue without public URL
     }
     
-    // Determine document status based on extracted data
-    // Check if we have meaningful structured data
-    const rawContent = typeof documentResult.markdown === 'string' ? documentResult.markdown : 
-                      (documentResult.data && typeof documentResult.data.markdown === 'string' ? 
-                        documentResult.data.markdown : "");
+    // Extract data properly from the microservice response
+    const rawContent = documentResult.markdown || "";
+    const chunks = documentResult.chunks || [];
+    const extractedText = documentResult.markdown || "";
     
-    // Build structured data object carefully
-    let structuredData = documentResult.data || documentResult.structured_data || {};
+    // Process chunks to create structured data
+    const structuredData: any = {};
     
-    // Convert to proper object if it's a string
-    if (typeof structuredData === 'string') {
-      try {
-        structuredData = JSON.parse(structuredData);
-      } catch (e) {
-        console.warn("Failed to parse structured data string:", e);
-        structuredData = {};
+    // Group chunks by type for easier access
+    const chunksByType = chunks.reduce((acc: any, chunk: any) => {
+      const type = chunk.chunk_type || chunk.type || 'unknown';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push({
+        text: chunk.text || chunk.content || '',
+        chunk_id: chunk.chunk_id || '',
+        grounding: chunk.grounding || []
+      });
+      return acc;
+    }, {});
+    
+    // Extract specific information based on chunk types
+    if (chunksByType.form) {
+      structuredData.forms = chunksByType.form;
+    }
+    
+    if (chunksByType.table) {
+      structuredData.tables = chunksByType.table;
+    }
+    
+    if (chunksByType.figure) {
+      structuredData.figures = chunksByType.figure;
+    }
+    
+    // For certificate documents, extract specific fields
+    if (documentType === 'certificate-fitness' || documentType === 'certificate') {
+      // Try to extract structured information from the text
+      const certificateInfo: any = {};
+      
+      // Extract employee info
+      const nameMatch = rawContent.match(/Initials\s*&\s*Surname:\s*([^\n]+)/i);
+      if (nameMatch) certificateInfo.employee_name = nameMatch[1].trim();
+      
+      const idMatch = rawContent.match(/ID\s*No:\s*([^\n]+)/i);
+      if (idMatch) certificateInfo.id_number = idMatch[1].trim();
+      
+      const companyMatch = rawContent.match(/Company\s*Name:\s*([^\n]+)/i);
+      if (companyMatch) certificateInfo.company_name = companyMatch[1].trim();
+      
+      const jobMatch = rawContent.match(/Job\s*Title:\s*([^\n]+)/i);
+      if (jobMatch) certificateInfo.job_title = jobMatch[1].trim();
+      
+      const examDateMatch = rawContent.match(/Date\s*of\s*Examination:\s*([^\n]+)/i);
+      if (examDateMatch) certificateInfo.examination_date = examDateMatch[1].trim();
+      
+      const expiryMatch = rawContent.match(/Expiry\s*Date:\s*([^\n]+)/i);
+      if (expiryMatch) certificateInfo.expiry_date = expiryMatch[1].trim();
+      
+      if (Object.keys(certificateInfo).length > 0) {
+        structuredData.certificate_info = certificateInfo;
       }
     }
     
-    // Final check to ensure structuredData is an object
-    if (typeof structuredData !== 'object' || structuredData === null) {
-      structuredData = {};
-    }
-    
+    // Determine document status based on extracted data
     const hasStructuredData = Object.keys(structuredData).length > 0;
+    const hasValidContent = rawContent && rawContent.length > 50; // Minimum threshold
+    const hasChunks = chunks && chunks.length > 0;
     
-    // Set status based on data quality
     let documentStatus = 'pending';
     
-    if (hasStructuredData) {
+    if (hasStructuredData && hasValidContent) {
       documentStatus = 'processed';
-      console.log("Document has structured data, marking as 'processed'");
-    } else if (rawContent && rawContent.length > 0) {
+      console.log("Document has structured data and content, marking as 'processed'");
+    } else if (hasValidContent && hasChunks) {
       documentStatus = 'extracted';
-      console.log("Document has raw content but no structured data, marking as 'extracted'");
+      console.log("Document has content and chunks but limited structured data, marking as 'extracted'");
+    } else if (hasValidContent) {
+      documentStatus = 'extracted';
+      console.log("Document has basic content, marking as 'extracted'");
     } else {
       documentStatus = 'failed';
-      console.log("Document has no meaningful data, marking as 'failed'");
+      console.log("Document has insufficient data, marking as 'failed'");
     }
     
     // Create document record in database
     const documentRecord = {
       user_id: userId,
-      owner_id: userId, // Also set owner_id for backward compatibility
-      organization_id: null, // Will be updated after insertion
       file_path: filePath,
       file_name: file.name,
+      file_size: file.size,
       mime_type: file.type,
       document_type: documentType,
-      status: documentStatus, // Set status based on data quality
-      public_url: publicUrl, // Add the public URL if available
+      status: documentStatus,
+      public_url: publicUrl,
       extracted_data: {
         raw_content: rawContent,
         structured_data: structuredData,
-        metadata: documentResult.metadata || {}
+        chunks: chunks,
+        metadata: documentResult.metadata || {},
+        processing_info: {
+          batch_id: initialResult.batch_id,
+          processing_time: initialResult.processing_time_seconds || 0,
+          chunk_count: chunks.length
+        }
       }
     };
     
     console.log(`Creating document record in database with status '${documentStatus}'`);
-    console.log("Extracted data preview:", 
-      JSON.stringify({
-        raw_content_length: documentRecord.extracted_data.raw_content?.length || 0,
-        structured_data_keys: Object.keys(documentRecord.extracted_data.structured_data || {})
-      })
-    );
+    console.log("Extracted data preview:", {
+      raw_content_length: rawContent.length,
+      structured_data_keys: Object.keys(structuredData),
+      chunk_count: chunks.length,
+      has_structured_data: hasStructuredData
+    });
     
     const { data: insertedDoc, error: insertError } = await supabase
       .from('documents')
@@ -193,22 +240,6 @@ serve(async (req) => {
     }
     
     console.log("Document processed and stored successfully:", insertedDoc.id);
-    console.log("Document status:", insertedDoc.status);
-    console.log("Extracted data present:", !!insertedDoc.extracted_data);
-    
-    // Verification step to ensure the document status is correct
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('documents')
-      .select('status, extracted_data')
-      .eq('id', insertedDoc.id)
-      .single();
-      
-    if (verifyError) {
-      console.error("Verification error:", verifyError);
-    } else {
-      console.log("Final document status:", verifyData.status);
-      console.log("Final extracted data present:", !!verifyData.extracted_data);
-    }
     
     // Cleanup on the microservice side (in background)
     fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
@@ -217,13 +248,30 @@ serve(async (req) => {
       console.error("Error cleaning up temporary files:", error);
     });
     
+    // Return the expected JSON format
     return new Response(
       JSON.stringify({
         success: true,
-        documentId: insertedDoc.id,
-        status: documentStatus,
-        message: `Document ${documentStatus}`,
-        hasStructuredData: hasStructuredData,
+        document: {
+          id: insertedDoc.id,
+          status: documentStatus,
+          file_name: file.name,
+          file_size: file.size,
+          document_type: documentType,
+          public_url: publicUrl,
+          extracted_data: {
+            markdown: rawContent,
+            chunks: chunks,
+            structured_data: structuredData
+          },
+          processing_info: {
+            batch_id: initialResult.batch_id,
+            processing_time_seconds: initialResult.processing_time_seconds || 0,
+            chunk_count: chunks.length,
+            has_structured_data: hasStructuredData
+          }
+        },
+        message: `Document ${documentStatus} successfully`
       }),
       {
         headers: {
