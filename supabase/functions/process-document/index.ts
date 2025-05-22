@@ -119,6 +119,12 @@ serve(async (req) => {
     const chunks = documentResult.chunks || [];
     const extractedText = documentResult.markdown || "";
     
+    console.log("=== DEBUGGING DATA EXTRACTION ===");
+    console.log("Raw content length:", rawContent.length);
+    console.log("Raw content first 200 chars:", rawContent.substring(0, 200));
+    console.log("Document type:", documentType);
+    console.log("Chunks count:", chunks.length);
+    
     // Process chunks to create structured data
     const structuredData: any = {};
     
@@ -134,125 +140,102 @@ serve(async (req) => {
       return acc;
     }, {});
     
+    console.log("Chunks by type:", Object.keys(chunksByType));
+    
     // Extract specific information based on chunk types
     if (chunksByType.form) {
       structuredData.forms = chunksByType.form;
+      console.log("Added forms to structured data, count:", chunksByType.form.length);
     }
     
     if (chunksByType.table) {
       structuredData.tables = chunksByType.table;
+      console.log("Added tables to structured data, count:", chunksByType.table.length);
     }
     
     if (chunksByType.figure) {
       structuredData.figures = chunksByType.figure;
+      console.log("Added figures to structured data, count:", chunksByType.figure.length);
+    }
+    
+    // NEW: Handle the consolidated chunk types from agentic-doc v0.2.1
+    if (chunksByType.text) {
+      structuredData.text_chunks = chunksByType.text;
+      console.log("Added text chunks to structured data, count:", chunksByType.text.length);
+    }
+    
+    if (chunksByType.marginalia) {
+      structuredData.marginalia = chunksByType.marginalia;
+      console.log("Added marginalia to structured data, count:", chunksByType.marginalia.length);
     }
     
     // For certificate documents, extract specific fields
-    if (documentType === 'certificate-fitness' || documentType === 'certificate') {
+    console.log("Checking if document type matches certificate patterns...");
+    if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
+      console.log("Processing as certificate document");
+      
       // Try to extract structured information from the text
       const certificateInfo: any = {};
       
-      console.log("Extracting certificate info from text...");
-      console.log("Raw content preview:", rawContent.substring(0, 500));
+      console.log("=== CERTIFICATE EXTRACTION DEBUG ===");
+      console.log("Raw content preview (first 500 chars):");
+      console.log(rawContent.substring(0, 500));
+      
+      // Simple test extraction first
+      if (rawContent.includes('NKOSI')) {
+        certificateInfo.test_field = 'Found NKOSI in document';
+        console.log("✓ Test extraction successful: Found NKOSI");
+      }
       
       // Extract employee info - more flexible patterns
-      const nameMatch = rawContent.match(/Initials\s*&?\s*Surname:\s*([^\n\r]+)/i);
+      const namePattern = /Initials\s*&?\s*Surname:\s*([^\n\r]+)/i;
+      const nameMatch = rawContent.match(namePattern);
       if (nameMatch) {
         certificateInfo.employee_name = nameMatch[1].trim();
-        console.log("Found employee name:", certificateInfo.employee_name);
+        console.log("✓ Found employee name:", certificateInfo.employee_name);
+      } else {
+        console.log("✗ Employee name pattern not found");
+        console.log("Looking for 'Initials' in text:", rawContent.includes('Initials'));
+        console.log("Looking for 'Surname' in text:", rawContent.includes('Surname'));
       }
       
-      const idMatch = rawContent.match(/ID\s*No:?\s*([^\n\r]+)/i);
+      const idPattern = /ID\s*No:?\s*([^\n\r]+)/i;
+      const idMatch = rawContent.match(idPattern);
       if (idMatch) {
         certificateInfo.id_number = idMatch[1].trim();
-        console.log("Found ID number:", certificateInfo.id_number);
+        console.log("✓ Found ID number:", certificateInfo.id_number);
+      } else {
+        console.log("✗ ID number pattern not found");
+        console.log("Looking for 'ID No' in text:", rawContent.includes('ID No'));
       }
       
-      const companyMatch = rawContent.match(/Company\s*Name:\s*([^\n\r]+)/i);
+      const companyPattern = /Company\s*Name:\s*([^\n\r]+)/i;
+      const companyMatch = rawContent.match(companyPattern);
       if (companyMatch) {
         certificateInfo.company_name = companyMatch[1].trim();
-        console.log("Found company name:", certificateInfo.company_name);
+        console.log("✓ Found company name:", certificateInfo.company_name);
+      } else {
+        console.log("✗ Company name pattern not found");
+        console.log("Looking for 'Company Name' in text:", rawContent.includes('Company Name'));
       }
       
-      const jobMatch = rawContent.match(/Job\s*Title:\s*([^\n\r]+)/i);
-      if (jobMatch) {
-        certificateInfo.job_title = jobMatch[1].trim();
-        console.log("Found job title:", certificateInfo.job_title);
-      }
-      
-      const examDateMatch = rawContent.match(/Date\s*of\s*Examination:\s*([^\n\r]+)/i);
-      if (examDateMatch) {
-        certificateInfo.examination_date = examDateMatch[1].trim();
-        console.log("Found examination date:", certificateInfo.examination_date);
-      }
-      
-      const expiryMatch = rawContent.match(/Expiry\s*Date:\s*([^\n\r]+)/i);
-      if (expiryMatch) {
-        certificateInfo.expiry_date = expiryMatch[1].trim();
-        console.log("Found expiry date:", certificateInfo.expiry_date);
-      }
-      
-      // Try to extract doctor/practitioner info
-      const doctorMatch = rawContent.match(/Dr\.?\s*([^\/\n\r]+)/i);
-      if (doctorMatch) {
-        certificateInfo.doctor_name = doctorMatch[1].trim();
-        console.log("Found doctor name:", certificateInfo.doctor_name);
-      }
-      
-      // Extract practice number
-      const practiceMatch = rawContent.match(/Practice\s*No:?\s*([^\n\r\/]+)/i);
-      if (practiceMatch) {
-        certificateInfo.practice_number = practiceMatch[1].trim();
-        console.log("Found practice number:", certificateInfo.practice_number);
-      }
-      
-      // Extract examination type (PRE-EMPLOYMENT, PERIODICAL, EXIT)
-      if (rawContent.includes('PRE-EMPLOYMENT: [x]') || rawContent.includes('PRE-EMPLOYMENT: ✓')) {
-        certificateInfo.examination_type = 'PRE-EMPLOYMENT';
-      } else if (rawContent.includes('PERIODICAL: [x]') || rawContent.includes('PERIODICAL: ✓')) {
-        certificateInfo.examination_type = 'PERIODICAL';
-      } else if (rawContent.includes('EXIT: [x]') || rawContent.includes('EXIT: ✓')) {
-        certificateInfo.examination_type = 'EXIT';
-      }
-      
-      // Extract medical test results from tables
-      const medicalTests: any = {};
-      
-      // Vision tests
-      if (rawContent.includes('FAR, NEAR VISION')) {
-        const visionMatch = rawContent.match(/FAR,\s*NEAR\s*VISION[^✓]*✓[^0-9]*([0-9\/]+)/i);
-        if (visionMatch) {
-          medicalTests.vision = visionMatch[1].trim();
-        }
-      }
-      
-      // Hearing test
-      if (rawContent.includes('Hearing')) {
-        const hearingMatch = rawContent.match(/Hearing[^✓]*✓[^0-9]*([0-9\.]+)/i);
-        if (hearingMatch) {
-          medicalTests.hearing = hearingMatch[1].trim();
-        }
-      }
-      
-      // Lung function
-      if (rawContent.includes('Lung Function')) {
-        const lungMatch = rawContent.match(/Lung\s*Function[^✓]*✓[^A-Za-z]*([A-Za-z\s]+)/i);
-        if (lungMatch) {
-          medicalTests.lung_function = lungMatch[1].trim();
-        }
-      }
-      
-      if (Object.keys(medicalTests).length > 0) {
-        certificateInfo.medical_tests = medicalTests;
-      }
-      
-      console.log("Final certificate info extracted:", certificateInfo);
-      console.log("Certificate info keys:", Object.keys(certificateInfo));
+      console.log("Final certificate info keys:", Object.keys(certificateInfo));
       
       if (Object.keys(certificateInfo).length > 0) {
         structuredData.certificate_info = certificateInfo;
+        console.log("✓ Added certificate_info to structured data");
+      } else {
+        console.log("✗ No certificate info extracted");
       }
+    } else {
+      console.log("Document type does not match certificate patterns");
+      console.log("Document type:", documentType);
+      console.log("Contains 'certificate':", rawContent.toLowerCase().includes('certificate'));
     }
+    
+    console.log("=== FINAL STRUCTURED DATA ===");
+    console.log("Structured data keys:", Object.keys(structuredData));
+    console.log("Structured data:", JSON.stringify(structuredData, null, 2).substring(0, 1000));
     
     // Determine document status based on extracted data
     const hasStructuredData = Object.keys(structuredData).length > 0;
