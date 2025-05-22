@@ -9,6 +9,7 @@ import { extractCertificateData } from "@/lib/utils";
 
 // Sample data for the enhanced certificate generator
 const sampleDocument = {
+  id: "sample-doc-id", // Added ID here for the document
   extracted_data: {
     structured_data: {
       patient: {
@@ -48,7 +49,6 @@ const sampleDocument = {
       }
     }
   },
-  id: "sample-doc-id",
   file_name: "Sample Certificate"
 };
 
@@ -82,7 +82,7 @@ export default function CertificateTemplatesPage() {
         
         <TabsContent value="generate" className="pt-4">
           <div className="bg-white rounded-lg shadow p-6">
-            <EnhancedCertificateGenerator documentId={documentObject.id} />
+            <EnhancedCertificateGenerator documentId={sampleDocument.id} document={sampleDocument} />
           </div>
         </TabsContent>
       </Tabs>

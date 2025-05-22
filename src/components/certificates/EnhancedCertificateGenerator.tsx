@@ -9,32 +9,46 @@ export interface EnhancedCertificateGeneratorProps {
   documentId?: string;
   patientId?: string;
   certificateData?: any;
+  document?: any;
+  extractedData?: any;
   onGenerate?: () => Promise<void>;
+  onClose?: () => void;
 }
 
 const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> = ({
   documentId,
   patientId,
   certificateData,
-  onGenerate = async () => { /* Default empty async function */ }
+  document,
+  extractedData,
+  onGenerate = async () => { /* Default empty async function */ },
+  onClose
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [fitnessStatus, setFitnessStatus] = useState<string>('unknown');
   
+  // Handle different data sources: direct extractedData, document with extracted_data, or certificateData
+  const dataToUse = extractedData || 
+                   (document?.extracted_data) || 
+                   certificateData;
+                  
   // Extract and prepare certificate data
-  const extractedData = certificateData ? extractCertificateData(certificateData) : null;
-  const formattedData = extractedData ? formatCertificateData(extractedData) : null;
+  const extractedCertData = dataToUse ? extractCertificateData(dataToUse) : null;
+  const formattedData = extractedCertData ? formatCertificateData(extractedCertData) : null;
+  
+  // Get document ID from props or from document object
+  const effectiveDocumentId = documentId || document?.id;
   
   // Determine fitness status if we have data
   React.useEffect(() => {
-    if (extractedData) {
-      const status = determineFitnessStatus(extractedData);
+    if (extractedCertData) {
+      const status = determineFitnessStatus(extractedCertData);
       setFitnessStatus(status);
     }
-  }, [extractedData]);
+  }, [extractedCertData]);
 
   const handleGenerate = async () => {
-    if (!documentId || !patientId) {
+    if (!effectiveDocumentId || !patientId) {
       toast.error("Missing required information to generate certificate");
       return;
     }
@@ -44,6 +58,11 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
       // Call the onGenerate prop which is expected to return a Promise
       await onGenerate();
       toast.success("Certificate generated successfully");
+      
+      // Close dialog after successful generation if onClose is provided
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error("Error generating certificate:", error);
       toast.error("Failed to generate certificate");
@@ -52,7 +71,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
     }
   };
 
-  if (!extractedData || !formattedData) {
+  if (!extractedCertData || !formattedData) {
     return (
       <Card>
         <CardHeader>
