@@ -68,12 +68,12 @@ import {
 const PatientList = ({ 
   filters, 
   sortOptions, 
-  currentPage: initialPage 
+  currentPage: propCurrentPage 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState<string>("all");
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
-  const [currentPage, setCurrentPage] = useState(initialPage || 1);
+  const [currentPage, setCurrentPage] = useState(propCurrentPage || 1);
   const [pageSize, setPageSize] = useState(9);
   const [dateFilter, setDateFilter] = useState<{
     label: string;
