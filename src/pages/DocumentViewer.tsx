@@ -1221,7 +1221,7 @@ const DocumentViewer = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Use the options below to download, print or email this certificate.
                   </p>
-                  <EnhancedCertificateGenerator extractedData={extractedData} />
+                  <EnhancedCertificateGenerator documentId={documentId} />
                 </CardContent>
               </Card>
             </TabsContent>
