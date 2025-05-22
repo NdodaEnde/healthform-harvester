@@ -165,7 +165,7 @@ const DocumentViewer: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Structured Data View */}
+          {/* Structured Data or Certificate Preview */}
           <Card className="lg:h-[calc(100vh-220px)] overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle>
