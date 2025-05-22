@@ -33,6 +33,148 @@ const CertificateTemplate = ({
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
+  // Enhanced extraction function that handles your specific data structure
+  const extractCertificateData = (data: any): any => {
+    console.log("Starting certificate data extraction...");
+    
+    // Initialize the result structure
+    const result = {
+      patient: {
+        name: '',
+        id_number: '',
+        company: '',
+        occupation: ''
+      },
+      examination_results: {
+        date: '',
+        type: {
+          pre_employment: false,
+          periodical: false,
+          exit: false
+        },
+        test_results: {}
+      },
+      certification: {
+        valid_until: '',
+        examination_date: '',
+        fit: false,
+        fit_with_restrictions: false,
+        fit_with_condition: false,
+        temporarily_unfit: false,
+        unfit: false,
+        comments: '',
+        follow_up: '',
+        review_date: ''
+      },
+      restrictions: {}
+    };
+
+    // First, try to get data from the structured_data.certificate_info if it exists
+    const certificateInfo = getValue(data, 'structured_data.certificate_info') || 
+                           getValue(data, 'extracted_data.structured_data.certificate_info') ||
+                           getValue(data, 'certificate_info');
+
+    if (certificateInfo) {
+      console.log("Found certificate_info:", certificateInfo);
+      
+      // Map the certificate_info fields to our result structure
+      result.patient.name = getValue(certificateInfo, 'employee_name') || '';
+      result.patient.id_number = getValue(certificateInfo, 'id_number') || '';
+      result.patient.company = getValue(certificateInfo, 'company_name') || '';
+      result.patient.occupation = getValue(certificateInfo, 'job_title') || '';
+      
+      result.examination_results.date = getValue(certificateInfo, 'examination_date') || '';
+      result.certification.examination_date = getValue(certificateInfo, 'examination_date') || '';
+      result.certification.valid_until = getValue(certificateInfo, 'expiry_date') || '';
+      
+      // Map examination type
+      result.examination_results.type.pre_employment = getValue(certificateInfo, 'pre_employment_checked') === true;
+      result.examination_results.type.periodical = getValue(certificateInfo, 'periodical_checked') === true;
+      result.examination_results.type.exit = getValue(certificateInfo, 'exit_checked') === true;
+      
+      // Map medical tests if available
+      const medicalTests = getValue(certificateInfo, 'medical_tests');
+      if (medicalTests && typeof medicalTests === 'object') {
+        result.examination_results.test_results = medicalTests;
+      }
+    }
+
+    // Next, try to extract from raw_content if we have it
+    const rawContent = getValue(data, 'raw_content') || 
+                      getValue(data, 'structured_data.raw_content') ||
+                      getValue(data, 'extracted_data.raw_content') ||
+                      getValue(data, 'extracted_data.structured_data.raw_content');
+
+    if (rawContent && typeof rawContent === 'string') {
+      console.log("Found raw_content, extracting additional data...");
+      const enhancedData = extractDataFromMarkdown(rawContent);
+      
+      // Merge enhanced data, but don't overwrite existing good data
+      if (!result.patient.name && enhancedData.patient?.name) {
+        result.patient.name = enhancedData.patient.name;
+      }
+      if (!result.patient.id_number && enhancedData.patient?.id_number) {
+        result.patient.id_number = enhancedData.patient.id_number;
+      }
+      if (!result.patient.company && enhancedData.patient?.company) {
+        result.patient.company = enhancedData.patient.company;
+      }
+      if (!result.patient.occupation && enhancedData.patient?.occupation) {
+        result.patient.occupation = enhancedData.patient.occupation;
+      }
+      
+      // Merge examination data
+      if (enhancedData.examination_results) {
+        if (!result.examination_results.date && enhancedData.examination_results.date) {
+          result.examination_results.date = enhancedData.examination_results.date;
+          result.certification.examination_date = enhancedData.examination_results.date;
+        }
+        
+        if (enhancedData.examination_results.type) {
+          Object.keys(enhancedData.examination_results.type).forEach(key => {
+            if (enhancedData.examination_results.type[key] === true) {
+              result.examination_results.type[key] = true;
+            }
+          });
+        }
+        
+        if (enhancedData.examination_results.test_results) {
+          result.examination_results.test_results = {
+            ...result.examination_results.test_results,
+            ...enhancedData.examination_results.test_results
+          };
+        }
+      }
+      
+      // Merge certification data
+      if (enhancedData.certification) {
+        if (!result.certification.valid_until && enhancedData.certification.valid_until) {
+          result.certification.valid_until = enhancedData.certification.valid_until;
+        }
+        
+        // Merge fitness status
+        Object.keys(enhancedData.certification).forEach(key => {
+          if (enhancedData.certification[key] === true) {
+            result.certification[key] = true;
+          } else if (enhancedData.certification[key] && !result.certification[key]) {
+            result.certification[key] = enhancedData.certification[key];
+          }
+        });
+      }
+      
+      // Merge restrictions
+      if (enhancedData.restrictions) {
+        result.restrictions = {
+          ...result.restrictions,
+          ...enhancedData.restrictions
+        };
+      }
+    }
+
+    console.log("Final extracted certificate data:", result);
+    return result;
+  };
+
   const extractDataFromMarkdown = (markdown: string): any => {
     if (!markdown) return {};
     console.log("Extracting data from markdown");
@@ -46,448 +188,294 @@ const CertificateTemplate = ({
       restrictions: {}
     };
 
-    const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (nameMatch && nameMatch[1]) extracted.patient.name = nameMatch[1].trim();
-    const idMatch = markdown.match(/\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (idMatch && idMatch[1]) extracted.patient.id_number = idMatch[1].trim();
-    const companyMatch = markdown.match(/\*\*Company Name\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (companyMatch && companyMatch[1]) extracted.patient.company = companyMatch[1].trim();
-    const jobTitleMatch = markdown.match(/Job Title:\s*(.*?)(?=\n|\r|$)/i);
-    if (jobTitleMatch && jobTitleMatch[1]) extracted.patient.occupation = jobTitleMatch[1].trim();
-    const examDateMatch = markdown.match(/\*\*Date of Examination\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (examDateMatch && examDateMatch[1]) extracted.examination_results.date = examDateMatch[1].trim();
-    const expiryDateMatch = markdown.match(/\*\*Expiry Date\*\*:\s*(.*?)(?=\n|\r|$)/i);
-    if (expiryDateMatch && expiryDateMatch[1]) extracted.certification.valid_until = expiryDateMatch[1].trim();
+    // Extract patient information with more flexible patterns
+    const namePatterns = [
+      /Initials\s*&?\s*Surname:\s*([^\n\r]+)/i,
+      /Employee[:\s]*([^\n\r]+)/i,
+      /Name[:\s]*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of namePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.name = match[1].trim();
+        break;
+      }
+    }
 
-    extracted.examination_results.type.pre_employment = markdown.includes('**Pre-Employment**: [x]') || markdown.match(/PRE-EMPLOYMENT.*?\[\s*x\s*\]/is) !== null;
-    extracted.examination_results.type.periodical = markdown.includes('**Periodical**: [x]') || markdown.match(/PERIODICAL.*?\[\s*x\s*\]/is) !== null;
-    extracted.examination_results.type.exit = markdown.includes('**Exit**: [x]') || markdown.match(/EXIT.*?\[\s*x\s*\]/is) !== null;
+    const idPatterns = [
+      /ID\s*No:?\s*([^\n\r]+)/i,
+      /ID\s*Number:?\s*([^\n\r]+)/i,
+      /Identity:?\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of idPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.id_number = match[1].trim();
+        break;
+      }
+    }
 
-    const testsMap = [{
-      name: 'BLOODS',
-      key: 'bloods'
-    }, {
-      name: 'FAR, NEAR VISION',
-      key: 'far_near_vision'
-    }, {
-      name: 'SIDE & DEPTH',
-      key: 'side_depth'
-    }, {
-      name: 'NIGHT VISION',
-      key: 'night_vision'
-    }, {
-      name: 'Hearing',
-      key: 'hearing'
-    }, {
-      name: 'Working at Heights',
-      key: 'heights'
-    }, {
-      name: 'Lung Function',
-      key: 'lung_function'
-    }, {
-      name: 'X-Ray',
-      key: 'x_ray'
-    }, {
-      name: 'Drug Screen',
-      key: 'drug_screen'
-    }];
+    const companyPatterns = [
+      /Company\s*Name:\s*([^\n\r]+)/i,
+      /Employer:\s*([^\n\r]+)/i,
+      /Organization:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of companyPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.company = match[1].trim();
+        break;
+      }
+    }
+
+    const jobPatterns = [
+      /Job\s*Title:\s*([^\n\r]+)/i,
+      /Position:\s*([^\n\r]+)/i,
+      /Occupation:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of jobPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.occupation = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract dates
+    const examDatePatterns = [
+      /Date\s*of\s*Examination:\s*([^\n\r]+)/i,
+      /Examination\s*Date:\s*([^\n\r]+)/i,
+      /Date\s*Examined:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of examDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.examination_results.date = match[1].trim();
+        break;
+      }
+    }
+
+    const expiryPatterns = [
+      /Expiry\s*Date:\s*([^\n\r]+)/i,
+      /Valid\s*Until:\s*([^\n\r]+)/i,
+      /Expires:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of expiryPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.certification.valid_until = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract examination type with more flexible patterns
+    extracted.examination_results.type.pre_employment = 
+      /PRE-?EMPLOYMENT[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /PRE-?EMPLOYMENT[^[\]]*:\s*[xX✓]/i.test(markdown);
+      
+    extracted.examination_results.type.periodical = 
+      /PERIODICAL[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /PERIODICAL[^[\]]*:\s*[xX✓]/i.test(markdown);
+      
+    extracted.examination_results.type.exit = 
+      /EXIT[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /EXIT[^[\]]*:\s*[xX✓]/i.test(markdown);
+
+    // Extract medical test results with more flexible patterns
+    const testsMap = [
+      { names: ['BLOODS', 'BLOOD TEST', 'BLOOD WORK'], key: 'bloods' },
+      { names: ['FAR, NEAR VISION', 'VISION TEST', 'EYE TEST'], key: 'far_near_vision' },
+      { names: ['SIDE & DEPTH', 'PERIPHERAL VISION'], key: 'side_depth' },
+      { names: ['NIGHT VISION'], key: 'night_vision' },
+      { names: ['HEARING', 'AUDIOMETRY'], key: 'hearing' },
+      { names: ['WORKING AT HEIGHTS', 'HEIGHTS'], key: 'heights' },
+      { names: ['LUNG FUNCTION', 'SPIROMETRY'], key: 'lung_function' },
+      { names: ['X-RAY', 'CHEST X-RAY'], key: 'x_ray' },
+      { names: ['DRUG SCREEN', 'DRUG TEST'], key: 'drug_screen' }
+    ];
     
     testsMap.forEach(test => {
-      const tableRegex = new RegExp(`\\| ${test.name}\\s*\\| \\[(x| )\\]\\s*\\| (.*?)\\|`, 'is');
-      const tableMatch = markdown.match(tableRegex);
-      const listRegex = new RegExp(`${test.name}.*?\\[(x| )\\].*?(\\d+\\/\\d+|Normal|N\\/A|\\d+-\\d+)`, 'is');
-      const listMatch = markdown.match(listRegex);
-      const htmlTableRegex = new RegExp(`<td>${test.name}</td>\\s*<td>\\[(x| )\\]</td>\\s*<td>(.*?)</td>`, 'is');
-      const htmlTableMatch = markdown.match(htmlTableRegex);
       let isDone = false;
       let results = '';
-      if (tableMatch) {
-        isDone = tableMatch[1].trim() === 'x';
-        results = tableMatch[2] ? tableMatch[2].trim() : '';
-      } else if (listMatch) {
-        isDone = listMatch[1].trim() === 'x';
-        results = listMatch[2] ? listMatch[2].trim() : '';
-      } else if (htmlTableMatch) {
-        isDone = htmlTableMatch[1].trim() === 'x';
-        results = htmlTableMatch[2] ? htmlTableMatch[2].trim() : '';
+      
+      for (const testName of test.names) {
+        // Try various patterns for each test name
+        const patterns = [
+          new RegExp(`${testName}[^|]*\\|[^|]*([xX✓])[^|]*\\|[^|]*([^|\\n\\r]+)`, 'i'),
+          new RegExp(`${testName}[^:]*:[^:]*([xX✓])[^:]*:[^:]*([^:\\n\\r]+)`, 'i'),
+          new RegExp(`<td[^>]*>${testName}[^<]*</td>[^<]*<td[^>]*>([xX✓])[^<]*</td>[^<]*<td[^>]*>([^<]+)</td>`, 'i')
+        ];
+        
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isDone = match[1] && /[xX✓]/.test(match[1]);
+            results = match[2] ? match[2].trim() : '';
+            break;
+          }
+        }
+        
+        if (isDone || results) break;
       }
+      
       if (isDone || results) {
         extracted.examination_results.test_results[`${test.key}_done`] = isDone;
         extracted.examination_results.test_results[`${test.key}_results`] = results;
       }
     });
 
-    const fitnessOptions = [{
-      name: 'FIT',
-      key: 'fit'
-    }, {
-      name: 'Fit with Restriction',
-      key: 'fit_with_restrictions'
-    }, {
-      name: 'Fit with Condition',
-      key: 'fit_with_condition'
-    }, {
-      name: 'Temporary Unfit',
-      key: 'temporarily_unfit'
-    }, {
-      name: 'UNFIT',
-      key: 'unfit'
-    }];
+    // Extract fitness status
+    const fitnessOptions = [
+      { names: ['FIT'], key: 'fit' },
+      { names: ['FIT WITH RESTRICTION', 'FIT WITH RESTRICTIONS'], key: 'fit_with_restrictions' },
+      { names: ['FIT WITH CONDITION'], key: 'fit_with_condition' },
+      { names: ['TEMPORARY UNFIT', 'TEMPORARILY UNFIT'], key: 'temporarily_unfit' },
+      { names: ['UNFIT', 'PERMANENTLY UNFIT'], key: 'unfit' }
+    ];
     
     fitnessOptions.forEach(option => {
-      const patterns = [
-        new RegExp(`\\*\\*${option.name}\\*\\*: \\[(x| )\\]`, 'is'), 
-        new RegExp(`<th>${option.name}</th>[\\s\\S]*?<td>\\[(x| )\\]</td>`, 'is'), 
-        new RegExp(`\\| ${option.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-
       let isSelected = false;
-      for (const pattern of patterns) {
-        const match = markdown.match(pattern);
-        if (match && match[0].includes('[x]')) {
-          isSelected = true;
-          break;
+      
+      for (const optionName of option.names) {
+        const patterns = [
+          new RegExp(`${optionName}[^|\\[]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i'),
+          new RegExp(`<th[^>]*>${optionName}[^<]*</th>[\\s\\S]*?<td[^>]*>\\[[^\\]]*[xX✓][^\\]]*\\]</td>`, 'i'),
+          new RegExp(`\\|[^|]*${optionName}[^|]*\\|[^|]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i')
+        ];
+
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isSelected = true;
+            break;
+          }
         }
+        
+        if (isSelected) break;
       }
+      
       extracted.certification[option.key] = isSelected;
     });
 
-    const restrictions = [{
-      name: 'Heights',
-      key: 'heights'
-    }, {
-      name: 'Dust Exposure',
-      key: 'dust_exposure'
-    }, {
-      name: 'Motorized Equipment',
-      key: 'motorized_equipment'
-    }, {
-      name: 'Wear Hearing Protection',
-      key: 'wear_hearing_protection'
-    }, {
-      name: 'Confined Spaces',
-      key: 'confined_spaces'
-    }, {
-      name: 'Chemical Exposure',
-      key: 'chemical_exposure'
-    }, {
-      name: 'Wear Spectacles',
-      key: 'wear_spectacles'
-    }, {
-      name: 'Remain on Treatment for Chronic Conditions',
-      key: 'remain_on_treatment_for_chronic_conditions'
-    }];
+    // Extract restrictions
+    const restrictions = [
+      { names: ['HEIGHTS'], key: 'heights' },
+      { names: ['DUST EXPOSURE'], key: 'dust_exposure' },
+      { names: ['MOTORIZED EQUIPMENT'], key: 'motorized_equipment' },
+      { names: ['WEAR HEARING PROTECTION', 'HEARING PROTECTION'], key: 'wear_hearing_protection' },
+      { names: ['CONFINED SPACES'], key: 'confined_spaces' },
+      { names: ['CHEMICAL EXPOSURE'], key: 'chemical_exposure' },
+      { names: ['WEAR SPECTACLES', 'SPECTACLES'], key: 'wear_spectacles' },
+      { names: ['REMAIN ON TREATMENT FOR CHRONIC CONDITIONS', 'CHRONIC CONDITIONS'], key: 'remain_on_treatment_for_chronic_conditions' }
+    ];
     
     restrictions.forEach(restriction => {
-      const patterns = [
-        new RegExp(`\\*\\*${restriction.name}\\*\\*: \\[(x| )\\]`, 'is'), 
-        new RegExp(`<td>${restriction.name}</td>\\s*<td>\\[(x| )\\]</td>`, 'is'), 
-        new RegExp(`\\| ${restriction.name}\\s*\\| \\[(x| )\\]`, 'is')
-      ];
-
       let isSelected = false;
-      for (const pattern of patterns) {
-        const match = markdown.match(pattern);
-        if (match && match[0].includes('[x]')) {
-          isSelected = true;
-          break;
+      
+      for (const restrictionName of restriction.names) {
+        const patterns = [
+          new RegExp(`${restrictionName}[^|\\[]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i'),
+          new RegExp(`<td[^>]*>${restrictionName}[^<]*</td>[^<]*<td[^>]*>\\[[^\\]]*[xX✓][^\\]]*\\]</td>`, 'i'),
+          new RegExp(`\\|[^|]*${restrictionName}[^|]*\\|[^|]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i')
+        ];
+
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isSelected = true;
+            break;
+          }
         }
+        
+        if (isSelected) break;
       }
+      
       extracted.restrictions[restriction.key] = isSelected;
     });
 
-    const followUpMatch = markdown.match(/Referred or follow up actions:(.*?)(?=\n|\r|$|<)/i);
-    if (followUpMatch && followUpMatch[1]) extracted.certification.follow_up = followUpMatch[1].trim();
-    const reviewDateMatch = markdown.match(/Review Date:(.*?)(?=\n|\r|$|<)/i);
-    if (reviewDateMatch && reviewDateMatch[1]) extracted.certification.review_date = reviewDateMatch[1].trim();
-    const commentsMatch = markdown.match(/Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is);
+    // Extract additional information
+    const followUpMatch = markdown.match(/Referred\s+or\s+follow\s+up\s+actions:\s*([^\n\r]+)/i);
+    if (followUpMatch && followUpMatch[1]) {
+      extracted.certification.follow_up = followUpMatch[1].trim();
+    }
+
+    const reviewDateMatch = markdown.match(/Review\s+Date:\s*([^\n\r]+)/i);
+    if (reviewDateMatch && reviewDateMatch[1]) {
+      extracted.certification.review_date = reviewDateMatch[1].trim();
+    }
+
+    const commentsMatch = markdown.match(/Comments:\s*([^<\n\r]+)/i);
     if (commentsMatch && commentsMatch[1]) {
       let comments = commentsMatch[1].trim();
-      if (comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "N/A" || comments.replace(/<\/?[^>]+(>|$)/g, "").trim() === "") {
-        extracted.certification.comments = "N/A";
-      } else {
-        extracted.certification.comments = comments;
-      }
+      extracted.certification.comments = comments === "N/A" ? "N/A" : comments;
     }
+
     console.log("Extracted data from markdown:", extracted);
     return extracted;
   };
 
-  const getMarkdown = (data: any): string | null => {
-    if (!data) return null;
-    console.log("Attempting to extract markdown from data structure");
-
-    const possiblePaths = ['raw_response.data.markdown', 'extracted_data.raw_response.data.markdown', 'markdown', 'raw_markdown'];
-    for (const path of possiblePaths) {
-      const value = getValue(data, path);
-      if (value && typeof value === 'string') {
-        console.log(`Found markdown at path: ${path}`);
-        return value;
-      }
-    }
-
-    const searchForMarkdown = (obj: any, path = ''): string | null => {
-      if (!obj || typeof obj !== 'object') return null;
-      if (obj.markdown && typeof obj.markdown === 'string') {
-        console.log(`Found markdown at deep path: ${path}.markdown`);
-        return obj.markdown;
-      }
-      if (obj.raw_response && obj.raw_response.data && obj.raw_response.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.raw_response.data.markdown`);
-        return obj.raw_response.data.markdown;
-      }
-      if (obj.data && obj.data.markdown) {
-        console.log(`Found markdown at deep path: ${path}.data.markdown`);
-        return obj.data.markdown;
-      }
-      for (const key in obj) {
-        if (typeof obj[key] === 'object' && obj[key] !== null) {
-          const result = searchForMarkdown(obj[key], `${path}.${key}`);
-          if (result) return result;
-        }
-      }
-      return null;
-    };
-    
-    const deepMarkdown = searchForMarkdown(data);
-    if (deepMarkdown) return deepMarkdown;
-
-    if (data.structured_data && data.structured_data.raw_content) {
-      console.log("Found structured_data.raw_content, using as markdown");
-      return data.structured_data.raw_content;
-    }
-    console.log("Could not find markdown in provided data");
-    return null;
-  };
-
-  let structuredData: any = {};
-
   // Log detailed structure to debug extraction issues
   console.log("Full extracted data structure received:", JSON.stringify(extractedData, null, 2));
 
-  if (extractedData?.structured_data) {
-    console.log("Using existing structured_data");
-    structuredData = extractedData.structured_data;
-  } else if (extractedData?.extracted_data?.structured_data) {
-    console.log("Using structured_data from extracted_data");
-    structuredData = extractedData.extracted_data.structured_data;
-  } else if (extractedData?.raw_response?.structured_data) {
-    console.log("Using structured_data from raw_response");
-    structuredData = extractedData.raw_response.structured_data;
-  } else {
-    // Try to find structured_data in any nested location by checking common paths
-    const possiblePaths = [
-      'raw_response.structured_data',
-      'raw_response.result.structured_data',
-      'result.structured_data'
-    ];
-    
-    for (const path of possiblePaths) {
-      const data = getValue(extractedData, path);
-      if (data && typeof data === 'object') {
-        console.log(`Found structured data at path: ${path}`);
-        structuredData = data;
-        break;
-      }
-    }
-    
-    // If we still don't have structured data, try extracting from markdown
-    if (Object.keys(structuredData).length === 0) {
-      const markdown = getMarkdown(extractedData);
-      if (markdown) {
-        console.log("Extracting from markdown content");
-        structuredData = extractDataFromMarkdown(markdown);
-      } else {
-        console.log("No markdown found, using extractedData as is");
-        structuredData = extractedData || {};
-      }
-    }
-  }
-
-  // ENHANCED EXTRACTION FROM API RESPONSE
-  // Additional extraction method if we're still missing key data
-  if ((!structuredData.patient?.name || structuredData.patient?.name === 'Unknown') && 
-      extractedData?.raw_response?.data?.markdown) {
-    console.log("Using enhanced extraction from raw_response.data.markdown");
-    const markdown = extractedData.raw_response.data.markdown;
-    const enhancedData = extractDataFromMarkdown(markdown);
-    
-    // Override or supplement missing data
-    structuredData.patient = {
-      ...structuredData.patient,
-      name: enhancedData.patient.name || structuredData.patient?.name || 'Unknown',
-      id_number: enhancedData.patient.id_number || structuredData.patient?.id_number || '',
-      company: enhancedData.patient.company || structuredData.patient?.company || '',
-      occupation: enhancedData.patient.occupation || structuredData.patient?.occupation || ''
-    };
-    
-    // If we have dates in the enhanced data, use them
-    if (enhancedData.examination_results?.date) {
-      structuredData.examination_results = structuredData.examination_results || {};
-      structuredData.examination_results.date = enhancedData.examination_results.date;
-      
-      structuredData.certification = structuredData.certification || {};
-      structuredData.certification.examination_date = enhancedData.examination_results.date;
-    }
-    
-    if (enhancedData.certification?.valid_until) {
-      structuredData.certification = structuredData.certification || {};
-      structuredData.certification.valid_until = enhancedData.certification.valid_until;
-    }
-    
-    // Copy examination type data if available
-    if (enhancedData.examination_results?.type) {
-      structuredData.examination_results = structuredData.examination_results || {};
-      structuredData.examination_results.type = {
-        ...structuredData.examination_results.type,
-        ...enhancedData.examination_results.type
-      };
-    }
-    
-    // Copy test results if available
-    if (enhancedData.examination_results?.test_results) {
-      structuredData.examination_results = structuredData.examination_results || {};
-      structuredData.examination_results.test_results = {
-        ...structuredData.examination_results.test_results,
-        ...enhancedData.examination_results.test_results
-      };
-    }
-    
-    // Copy fitness status if available
-    if (enhancedData.certification) {
-      structuredData.certification = structuredData.certification || {};
-      Object.keys(enhancedData.certification).forEach(key => {
-        if (enhancedData.certification[key] !== false && 
-            enhancedData.certification[key] !== null && 
-            enhancedData.certification[key] !== undefined &&
-            enhancedData.certification[key] !== '') {
-          structuredData.certification[key] = enhancedData.certification[key];
-        }
-      });
-    }
-    
-    // Copy restrictions if available
-    if (enhancedData.restrictions) {
-      structuredData.restrictions = structuredData.restrictions || {};
-      Object.keys(enhancedData.restrictions).forEach(key => {
-        if (enhancedData.restrictions[key] === true) {
-          structuredData.restrictions[key] = true;
-        }
-      });
-    }
-  }
-
-  // DIRECT EXTRACTION FROM API
-  // Try getting data directly from directExtraction if available
-  if (extractedData?.raw_response?.directExtraction) {
-    console.log("Using direct extraction data from API client");
-    const directData = extractedData.raw_response.directExtraction;
-    
-    // Update patient data
-    if (directData.patient) {
-      structuredData.patient = structuredData.patient || {};
-      structuredData.patient.name = directData.patient.name || structuredData.patient.name;
-      structuredData.patient.id_number = directData.patient.id_number || structuredData.patient.id_number;
-      structuredData.patient.company = directData.patient.company || structuredData.patient.company;
-      structuredData.patient.occupation = directData.patient.occupation || structuredData.patient.occupation;
-    }
-    
-    // Update certification data
-    if (directData.certification) {
-      structuredData.certification = structuredData.certification || {};
-      structuredData.certification.examination_date = directData.certification.examination_date || structuredData.certification.examination_date;
-      structuredData.certification.valid_until = directData.certification.valid_until || structuredData.certification.valid_until;
-      
-      // Update fitness status
-      if (directData.certification.fit !== undefined) structuredData.certification.fit = directData.certification.fit;
-      if (directData.certification.fit_with_restrictions !== undefined) structuredData.certification.fit_with_restrictions = directData.certification.fit_with_restrictions;
-      if (directData.certification.fit_with_condition !== undefined) structuredData.certification.fit_with_condition = directData.certification.fit_with_condition;
-      if (directData.certification.temporarily_unfit !== undefined) structuredData.certification.temporarily_unfit = directData.certification.temporarily_unfit;
-      if (directData.certification.unfit !== undefined) structuredData.certification.unfit = directData.certification.unfit;
-    }
-    
-    // Update examination data
-    if (directData.examination) {
-      structuredData.examination_results = structuredData.examination_results || {};
-      
-      if (directData.examination.type) {
-        structuredData.examination_results.type = structuredData.examination_results.type || {};
-        structuredData.examination_results.type.pre_employment = directData.examination.type.pre_employment || structuredData.examination_results.type.pre_employment;
-        structuredData.examination_results.type.periodical = directData.examination.type.periodical || structuredData.examination_results.type.periodical;
-        structuredData.examination_results.type.exit = directData.examination.type.exit || structuredData.examination_results.type.exit;
-      }
-      
-      if (directData.examination.tests) {
-        structuredData.examination_results.test_results = structuredData.examination_results.test_results || {};
-        Object.keys(directData.examination.tests).forEach(key => {
-          structuredData.examination_results.test_results[key] = directData.examination.tests[key];
-        });
-      }
-    }
-    
-    // Update restrictions
-    if (directData.restrictions) {
-      structuredData.restrictions = structuredData.restrictions || {};
-      Object.keys(directData.restrictions).forEach(key => {
-        if (directData.restrictions[key] === true) {
-          structuredData.restrictions[key] = true;
-        }
-      });
-    }
-  }
-
-  console.log("Final structured data for certificate template:", structuredData);
+  // Use the enhanced extraction function
+  const structuredData = extractCertificateData(extractedData);
 
   const patient = structuredData.patient || {};
-  const examination = structuredData.examination_results || structuredData.medical_details || {};
+  const examination = structuredData.examination_results || {};
   const restrictions = structuredData.restrictions || {};
-  const certification = structuredData.certification || structuredData.fitness_assessment || {};
-  const testResults = examination.test_results || examination.tests || {};
+  const certification = structuredData.certification || {};
+  const testResults = examination.test_results || {};
 
   const fitnessStatus = {
-    fit: isChecked(certification.fit_for_duty) || isChecked(certification.fit),
+    fit: isChecked(certification.fit),
     fitWithRestriction: isChecked(certification.fit_with_restrictions),
     fitWithCondition: isChecked(certification.fit_with_condition),
     temporarilyUnfit: isChecked(certification.temporarily_unfit),
-    unfit: isChecked(certification.permanently_unfit) || isChecked(certification.unfit)
+    unfit: isChecked(certification.unfit)
   };
 
   const medicalTests = {
     bloods: {
-      done: isChecked(testResults.bloods_done) || isChecked(testResults.blood_test),
-      results: getValue(testResults, 'bloods_results') || getValue(testResults, 'blood_test_results')
+      done: isChecked(testResults.bloods_done),
+      results: getValue(testResults, 'bloods_results', 'N/A')
     },
     farNearVision: {
-      done: isChecked(testResults.far_near_vision_done) || isChecked(testResults.vision_test),
-      results: getValue(testResults, 'far_near_vision_results') || getValue(testResults, 'vision_results')
+      done: isChecked(testResults.far_near_vision_done),
+      results: getValue(testResults, 'far_near_vision_results', 'N/A')
     },
     sideDepth: {
-      done: isChecked(testResults.side_depth_done) || isChecked(testResults.peripheral_vision),
-      results: getValue(testResults, 'side_depth_results') || getValue(testResults, 'peripheral_vision_results')
+      done: isChecked(testResults.side_depth_done),
+      results: getValue(testResults, 'side_depth_results', 'N/A')
     },
     nightVision: {
-      done: isChecked(testResults.night_vision_done) || isChecked(testResults.night_vision_test),
-      results: getValue(testResults, 'night_vision_results')
+      done: isChecked(testResults.night_vision_done),
+      results: getValue(testResults, 'night_vision_results', 'N/A')
     },
     hearing: {
-      done: isChecked(testResults.hearing_done) || isChecked(testResults.hearing_test),
-      results: getValue(testResults, 'hearing_results') || getValue(testResults, 'hearing_test_results')
+      done: isChecked(testResults.hearing_done),
+      results: getValue(testResults, 'hearing_results', 'N/A')
     },
     heights: {
-      done: isChecked(testResults.heights_done) || isChecked(testResults.working_at_heights),
-      results: getValue(testResults, 'heights_results') || getValue(testResults, 'working_at_heights_results')
+      done: isChecked(testResults.heights_done),
+      results: getValue(testResults, 'heights_results', 'N/A')
     },
     lungFunction: {
-      done: isChecked(testResults.lung_function_done) || isChecked(testResults.pulmonary_function),
-      results: getValue(testResults, 'lung_function_results') || getValue(testResults, 'pulmonary_function_results')
+      done: isChecked(testResults.lung_function_done),
+      results: getValue(testResults, 'lung_function_results', 'N/A')
     },
     xRay: {
-      done: isChecked(testResults.x_ray_done) || isChecked(testResults.chest_x_ray),
-      results: getValue(testResults, 'x_ray_results') || getValue(testResults, 'chest_x_ray_results')
+      done: isChecked(testResults.x_ray_done),
+      results: getValue(testResults, 'x_ray_results', 'N/A')
     },
     drugScreen: {
-      done: isChecked(testResults.drug_screen_done) || isChecked(testResults.drug_screen_test),
-      results: getValue(testResults, 'drug_screen_results')
+      done: isChecked(testResults.drug_screen_done),
+      results: getValue(testResults, 'drug_screen_results', 'N/A')
     }
   };
 
@@ -495,26 +483,26 @@ const CertificateTemplate = ({
     heights: isChecked(restrictions.heights),
     dustExposure: isChecked(restrictions.dust_exposure),
     motorizedEquipment: isChecked(restrictions.motorized_equipment),
-    hearingProtection: isChecked(restrictions.hearing_protection) || isChecked(restrictions.wear_hearing_protection),
+    hearingProtection: isChecked(restrictions.wear_hearing_protection),
     confinedSpaces: isChecked(restrictions.confined_spaces),
     chemicalExposure: isChecked(restrictions.chemical_exposure),
     wearSpectacles: isChecked(restrictions.wear_spectacles),
-    chronicConditions: isChecked(restrictions.chronic_conditions) || isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
+    chronicConditions: isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
   };
 
   const examinationType = {
-    preEmployment: isChecked(examination.pre_employment) || isChecked(examination.type?.pre_employment),
-    periodical: isChecked(examination.periodical) || isChecked(examination.type?.periodical),
-    exit: isChecked(examination.exit) || isChecked(examination.type?.exit)
+    preEmployment: isChecked(examination.type?.pre_employment),
+    periodical: isChecked(examination.type?.periodical),
+    exit: isChecked(examination.type?.exit)
   };
 
   console.log("Certificate template using data:", {
-    name: getValue(patient, 'name'),
-    id: getValue(patient, 'id_number'),
-    company: getValue(patient, 'company'),
-    occupation: getValue(patient, 'occupation'),
-    examDate: getValue(examination, 'date'),
-    expiryDate: getValue(certification, 'valid_until'),
+    name: patient.name,
+    id: patient.id_number,
+    company: patient.company,
+    occupation: patient.occupation,
+    examDate: examination.date,
+    expiryDate: certification.valid_until,
     examinationType,
     fitnessStatus,
     medicalTests,
@@ -523,10 +511,10 @@ const CertificateTemplate = ({
 
   // Extract organization information for signatures and stamps
   const organization = extractedData?.organization || {};
-  const physician = getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi';
-  const practiceNumber = getValue(examination, 'practice_number') || '0404160';
-  const nurse = getValue(examination, 'nurse') || 'Sibongile Mahlangu';
-  const nurseNumber = getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91';
+  const physician = 'MJ Mphuthi';
+  const practiceNumber = '0404160';
+  const nurse = 'Sibongile Mahlangu';
+  const nurseNumber = '999 088 0000 8177 91';
 
   return (
     <ScrollArea className="h-full">
@@ -564,7 +552,7 @@ const CertificateTemplate = ({
             
             <div className="text-center text-xs px-4 mb-3">
               <p>
-                Dr. {getValue(examination, 'physician') || getValue(certification, 'certifying_physician') || 'MJ Mphuthi'} / Practice No: {getValue(examination, 'practice_number') || '0404160'} / Sr. {getValue(examination, 'nurse') || 'Sibongile Mahlangu'} / Practice No: {getValue(examination, 'nurse_practice_number') || '999 088 0000 8177 91'}
+                Dr. {physician} / Practice No: {practiceNumber} / Sr. {nurse} / Practice No: {nurseNumber}
               </p>
               <p>certify that the following employee:</p>
             </div>
@@ -574,40 +562,40 @@ const CertificateTemplate = ({
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Initials & Surname:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'name') || getValue(patient, 'full_name')}</span>
+                    <span className="border-b border-gray-400 flex-1">{patient.name || 'Not Provided'}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">ID NO:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(patient, 'id_number') || getValue(patient, 'employee_id') || getValue(patient, 'id')}</span>
+                    <span className="border-b border-gray-400 flex-1">{patient.id_number || 'Not Provided'}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Company Name:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'company') || getValue(patient, 'employer') || getValue(patient, 'employment.employer')}</span>
+                <span className="border-b border-gray-400 flex-1">{patient.company || 'Not Provided'}</span>
               </div>
               
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(examination, 'date') || getValue(certification, 'examination_date') || getValue(extractedData, 'examination_date')}</span>
+                    <span className="border-b border-gray-400 flex-1">{examination.date || certification.examination_date || 'Not Provided'}</span>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{getValue(certification, 'valid_until') || getValue(certification, 'expiration_date')}</span>
+                    <span className="border-b border-gray-400 flex-1">{certification.valid_until || 'Not Provided'}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Job Title:</span>
-                <span className="border-b border-gray-400 flex-1">{getValue(patient, 'occupation') || getValue(patient, 'job_title') || getValue(patient, 'employment.occupation')}</span>
+                <span className="border-b border-gray-400 flex-1">{patient.occupation || 'Not Provided'}</span>
               </div>
             </div>
             
@@ -758,12 +746,12 @@ const CertificateTemplate = ({
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
                 <div className="border-b border-gray-400 flex-1">
-                  {getValue(certification, 'follow_up') || getValue(certification, 'referral')}
+                  {certification.follow_up || ''}
                 </div>
                 <div className="ml-2">
                   <div className="text-sm">
                     <span className="font-semibold mr-1">Review Date:</span>
-                    <span className="text-red-600">{getValue(certification, 'review_date')}</span>
+                    <span className="text-red-600">{certification.review_date || ''}</span>
                   </div>
                 </div>
               </div>
@@ -818,7 +806,6 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Moved Fitness Assessment to be before Comments section */}
             <div className="mb-2">
               <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-1">
                 FITNESS ASSESSMENT
@@ -854,11 +841,10 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Moved Comments section to be the last section before the signature */}
             <div className="px-4 mb-1">
               <div className="font-semibold text-xs mb-0.5">Comments:</div>
               <div className="border border-gray-400 p-1 min-h-8 text-xs">
-                {getValue(certification, 'comments')}
+                {certification.comments || 'N/A'}
               </div>
             </div>
             
@@ -866,7 +852,6 @@ const CertificateTemplate = ({
               <div className="flex justify-between items-end">
                 <div className="flex-1">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56">
-                    {/* Display the signature image if available */}
                     <div className="min-h-16 flex items-center justify-center">
                       <OrganizationLogo
                         variant="signature"
@@ -891,7 +876,6 @@ const CertificateTemplate = ({
                 
                 <div className="flex-1 text-right">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56 ml-auto">
-                    {/* Display the stamp image if available */}
                     <div className="min-h-16 flex items-center justify-center">
                       <OrganizationLogo
                         variant="stamp"
