@@ -45,6 +45,19 @@ const DocumentViewer: React.FC = () => {
       if (error) throw error;
       setDocument(data);
       console.log("Document data:", data);
+      
+      // Log the extracted_data specifically to help with debugging
+      console.log("Extracted data:", data.extracted_data);
+      
+      // If structured_data exists, log it as well
+      if (data.extracted_data?.structured_data) {
+        console.log("Structured data:", data.extracted_data.structured_data);
+        
+        // Also log certificate info if it exists
+        if (data.extracted_data.structured_data.certificate_info) {
+          console.log("Certificate info:", data.extracted_data.structured_data.certificate_info);
+        }
+      }
     } catch (err) {
       console.error('Error fetching document:', err);
       setError(err instanceof Error ? err.message : 'Failed to load document');

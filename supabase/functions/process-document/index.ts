@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -469,9 +468,9 @@ serve(async (req) => {
           document_type: documentType,
           public_url: publicUrl,
           extracted_data: {
-            markdown: rawContent,
-            chunks: chunks,
-            structured_data: structuredData
+            raw_content: rawContent,
+            structured_data: structuredData,
+            chunks: chunks
           },
           processing_info: {
             batch_id: initialResult.batch_id,
