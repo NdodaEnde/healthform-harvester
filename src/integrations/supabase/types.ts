@@ -240,6 +240,7 @@ export type Database = {
           owner_id: string | null
           processed_at: string | null
           processing_error: string | null
+          public_url: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -257,6 +258,7 @@ export type Database = {
           owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          public_url?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -274,6 +276,7 @@ export type Database = {
           owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          public_url?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null

@@ -89,13 +89,29 @@ serve(async (req) => {
     const filePath = `${userId}/${timestamp}_${documentType}.${fileExt}`;
     
     console.log(`Uploading file to storage: ${filePath}`);
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('documents')
       .upload(filePath, file);
 
     if (uploadError) {
       console.error("Storage upload error:", uploadError);
       throw new Error(`Storage error: ${uploadError.message}`);
+    }
+    
+    // Generate public URL if needed
+    let publicUrl = null;
+    try {
+      const { data: urlData } = await supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+      
+      if (urlData) {
+        publicUrl = urlData.publicUrl;
+        console.log("Generated public URL:", publicUrl);
+      }
+    } catch (urlError) {
+      console.warn("Could not generate public URL:", urlError);
+      // Continue without public URL
     }
     
     // Create document record in database
@@ -108,6 +124,7 @@ serve(async (req) => {
       mime_type: file.type,
       document_type: documentType,
       status: 'processing',
+      public_url: publicUrl, // Add the public URL if available
       extracted_data: {
         raw_content: documentResult.markdown,
         structured_data: documentResult.data,
