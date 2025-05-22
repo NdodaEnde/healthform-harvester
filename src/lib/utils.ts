@@ -1,156 +1,200 @@
+
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { format } from 'date-fns';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function formatDate(input: string | number): string {
+  const date = new Date(input)
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
 }
 
 export function absoluteUrl(path: string) {
   return `${process.env.NEXT_PUBLIC_APP_URL}${path}`
 }
 
-export function isMacOs() {
-  return navigator.userAgent.toLowerCase().includes("mac")
+export function titleCase(str: string) {
+  if (!str) return '';
+  return str.toLowerCase().split(' ').map(function (word) {
+    return (word.charAt(0).toUpperCase() + word.slice(1));
+  }).join(' ');
 }
 
-// Extract certificate data from various data structures
-export function extractCertificateData(data: any): any {
-  if (!data) return null;
-  
-  // Check for structured certificate data in different locations
-  if (data.structured_data?.certificate_info) {
-    return data.structured_data.certificate_info;
+export function truncate(str: string, n: number){
+  return (str.length > n) ? str.slice(0, n-1) + '...' : str;
+};
+
+export function formatTimestamp(timestamp: string | number | Date): string {
+  try {
+    const date = new Date(timestamp);
+    return format(date, 'yyyy-MM-dd HH:mm:ss');
+  } catch (error) {
+    console.error("Error formatting timestamp:", error);
+    return 'Invalid Date';
   }
-  
-  if (data.certificate_info) {
-    return data.certificate_info;
-  }
-  
-  // Check for fitness data or restrictions
-  if (data.structured_data?.fitness_status || data.fitness_status) {
-    return data.structured_data?.fitness_status || data.fitness_status;
-  }
-  
-  // If no structured data, return null
-  return null;
 }
 
-// Format certificate data for display and editing
-export function formatCertificateData(certData: any): {
+// Define the structure of the certificate data
+export interface CertificateData {
+  patient: any;
+  certification: any;
+  examination_results: any;
+  restrictions: any;
+  raw_content?: string;
+}
+
+export interface FormattedCertificateData {
   patientName: string;
   patientId: string;
   companyName: string;
   occupation: string;
-  validUntil: string;
   examinationDate: string;
+  validUntil: string;
   restrictionsText: string;
-  comments?: string;
-  followUpActions?: string;
-  reviewDate?: string;
-} {
-  if (!certData) return {
-    patientName: '',
-    patientId: '',
-    companyName: '',
-    occupation: '',
-    validUntil: '',
-    examinationDate: '',
-    restrictionsText: '',
-  };
-  
-  // Extract patient name from employee_name, name, or patient_name
-  const patientName = 
-    certData.employee_name || 
-    certData.name || 
-    certData.patient_name || 
-    '';
-    
-  // Extract ID from id_number, identity_number, or patient_id
-  const patientId = 
-    certData.id_number || 
-    certData.identity_number || 
-    certData.patient_id || 
-    '';
-    
-  // Extract company name
-  const companyName = 
-    certData.company_name || 
-    certData.employer || 
-    '';
-    
-  // Extract occupation/job title
-  const occupation = 
-    certData.job_title || 
-    certData.occupation || 
-    certData.position || 
-    '';
-    
-  // Extract validity date
-  const validUntil = 
-    certData.expiry_date || 
-    certData.valid_until || 
-    '';
-    
-  // Extract examination date
-  const examinationDate = 
-    certData.examination_date || 
-    certData.exam_date || 
-    certData.date_examined || 
-    '';
-    
-  // Format restrictions text
-  let restrictionsText = 'None';
-  
-  if (certData.restrictions) {
-    const restrictions = certData.restrictions;
-    const activeRestrictions = Object.keys(restrictions)
-      .filter(key => restrictions[key] === true)
-      .map(key => key.replace(/_/g, ' '))
-      .map(text => text.charAt(0).toUpperCase() + text.slice(1));
-      
-    if (activeRestrictions.length > 0) {
-      restrictionsText = activeRestrictions.join(', ');
-    }
+  rawContent: string;
+}
+
+export type FitnessStatus = 'fit' | 'fit-with-restrictions' | 'fit-with-condition' | 'temporarily-unfit' | 'unfit' | 'unknown';
+
+export function extractCertificateData(document: any): CertificateData {
+  // Handle null or undefined document
+  if (!document || !document.extracted_data) {
+    return {
+      patient: {},
+      certification: {},
+      examination_results: {
+        date: '',
+        type: {
+          pre_employment: false,
+          periodical: false,
+          exit: false
+        }
+      },
+      restrictions: {}
+    };
   }
+
+  // Try to extract data from document
+  try {
+    const data = document.extracted_data;
+    const structuredData = data.structured_data || {};
+    
+    // Initialize with safe defaults
+    const result: CertificateData = {
+      patient: structuredData.patient || {},
+      certification: structuredData.certification || {},
+      examination_results: {
+        date: '',
+        type: {
+          pre_employment: false,
+          periodical: false,
+          exit: false
+        }
+      },
+      restrictions: structuredData.restrictions || {},
+      raw_content: data.raw_content || ''
+    };
+    
+    // Set examination results if available
+    if (structuredData.examination_results) {
+      result.examination_results = structuredData.examination_results;
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error extracting certificate data:', error);
+    // Return default structure on error
+    return {
+      patient: {},
+      certification: {},
+      examination_results: {
+        date: '',
+        type: {
+          pre_employment: false,
+          periodical: false,
+          exit: false
+        }
+      },
+      restrictions: {},
+      raw_content: ''
+    };
+  }
+}
+
+export function formatCertificateData(certificateData: CertificateData): FormattedCertificateData {
+  const { patient, certification, examination_results, restrictions, raw_content } = certificateData;
   
-  // Extract any comments, follow-up actions, and review date
-  const comments = certData.comments || '';
-  const followUpActions = certData.follow_up || '';
-  const reviewDate = certData.review_date || '';
+  // Use safe type checking and defaults
+  const patientObj = patient || {};
+  const certificationObj = certification || {};
+  const restrictionsObj = restrictions || {};
   
   return {
-    patientName,
-    patientId,
-    companyName,
-    occupation,
-    validUntil,
-    examinationDate,
-    restrictionsText,
-    comments,
-    followUpActions,
-    reviewDate
+    patientName: patientObj.name?.toString() || 'N/A',
+    patientId: patientObj.id_number?.toString() || 'N/A',
+    companyName: patientObj.company?.toString() || 'N/A',
+    occupation: patientObj.occupation?.toString() || 'N/A',
+    examinationDate: certificationObj.examination_date?.toString() || 'N/A',
+    validUntil: certificationObj.valid_until?.toString() || 'N/A',
+    restrictionsText: Array.isArray(restrictions) 
+      ? restrictions.join(', ') 
+      : (typeof restrictionsObj === 'string' ? restrictionsObj : 'None'),
+    rawContent: raw_content || ''
   };
 }
 
-// Determine fitness status from certificate data
-export function determineFitnessStatus(certData: any): string {
-  if (!certData) return 'unknown';
-  
-  // Check if fitness_status object exists
-  if (certData.fitness_status) {
-    const fs = certData.fitness_status;
+export function determineFitnessStatus(certificateData: CertificateData): FitnessStatus {
+  try {
+    const examinationResults = certificateData.examination_results || {};
     
-    if (fs.fit || fs.fit === true) return 'fit';
-    if (fs.fit_with_restrictions || fs.fit_with_condition) return 'fit-with-restrictions';
-    if (fs.temporarily_unfit) return 'temporarily-unfit';
-    if (fs.unfit) return 'unfit';
+    // Create a safe reference to fitness data
+    const fitness = examinationResults.fitness || {};
+    
+    // Check each fitness status with safe property access
+    if ((fitness as any)?.fit === true) return 'fit';
+    if ((fitness as any)?.fit_with_restrictions === true) return 'fit-with-restrictions';
+    if ((fitness as any)?.fit_with_condition === true) return 'fit-with-condition';
+    if ((fitness as any)?.temporarily_unfit === true) return 'temporarily-unfit';
+    if ((fitness as any)?.unfit === true) return 'unfit';
+    
+    // If we have raw content but no structured data
+    if (certificateData.raw_content) {
+      const rawContent = certificateData.raw_content.toLowerCase();
+      
+      if (rawContent.includes('fit for work') || rawContent.includes('medically fit')) return 'fit';
+      if (rawContent.includes('fit with restrictions')) return 'fit-with-restrictions';
+      if (rawContent.includes('temporarily unfit')) return 'temporarily-unfit';
+      if (rawContent.includes('unfit for work') || rawContent.includes('medically unfit')) return 'unfit';
+    }
+    
+    // Default
+    return 'unknown';
+  } catch (error) {
+    console.error('Error determining fitness status:', error);
+    return 'unknown';
   }
+}
+
+// Add the missing function that's causing the import error
+export function mapExtractedDataToValidatorFormat(extractedData: any) {
+  if (!extractedData) return null;
   
-  // Infer from other data
-  if (certData.restrictions && Object.values(certData.restrictions).some(v => v === true)) {
-    return 'fit-with-restrictions';
-  }
+  // Create a safe extraction of the data
+  const structuredData = extractedData.structured_data || {};
+  const rawContent = extractedData.raw_content || '';
   
-  // Default to fit if no negative indicators
-  return 'fit';
+  return {
+    patient: structuredData.patient || {},
+    certification: structuredData.certification || {},
+    examination_results: structuredData.examination_results || {},
+    restrictions: structuredData.restrictions || {},
+    raw_content: rawContent
+  };
 }

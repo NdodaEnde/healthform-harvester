@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, FileText, Download, Eye, EyeOff } from 'lucide-react';
-import EnhancedCertificateGenerator from '@/components/certificates/EnhancedCertificateGenerator';
+import CertificateTemplate from '@/components/CertificateTemplate';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 
@@ -252,14 +252,10 @@ const DocumentViewer: React.FC = () => {
             <CardContent className="overflow-auto h-full pb-6">
               {viewMode === 'structured' ? (
                 <div className="overflow-auto">
-                  <EnhancedCertificateGenerator 
+                  <CertificateTemplate 
                     extractedData={document.extracted_data}
                     documentId={id || ''}
-                    document={document}
-                    onGenerate={async () => {
-                      toast.success("Certificate data validated and saved");
-                      return Promise.resolve();
-                    }}
+                    editable={true}
                   />
                 </div>
               ) : (
