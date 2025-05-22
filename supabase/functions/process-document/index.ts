@@ -11,8 +11,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Use environment variable for API endpoint or default to the Render service URL
-const microserviceUrl = Deno.env.get('DOCUMENT_PROCESSOR_URL') || 'https://document-processor.onrender.com';
+// Use environment variable for API endpoint with the correct name
+const microserviceUrl = Deno.env.get('SDK_MICROSERVICE_URL') || 'https://document-processing-service.onrender.com';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -45,6 +45,7 @@ serve(async (req) => {
     forwardFormData.append('files', file);
     
     console.log("Sending document to microservice for processing...");
+    console.log("Using microservice URL:", microserviceUrl);
     
     // Step 1: Send the file to the microservice
     const initialResponse = await fetch(`${microserviceUrl}/process-documents`, {

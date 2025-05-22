@@ -3,4 +3,3 @@ project_id = "wgkbsiczgyaqmgoyirjs"
 
 [functions.process-document]
 verify_jwt = true
-
