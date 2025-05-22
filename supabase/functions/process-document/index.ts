@@ -110,7 +110,7 @@ serve(async (req) => {
       file_path: filePath,
       file_name: file.name,
       file_type: file.type,
-      file_size: file.size,
+      // Remove file_size field as it doesn't exist in the schema
       public_url: publicUrl,
       document_type: documentType,
       status: 'processing',
