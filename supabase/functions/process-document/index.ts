@@ -324,9 +324,11 @@ serve(async (req) => {
     });
     
     // Return the expected JSON format
+    // FIXED: Added documentId at the top level to match frontend expectations
     return new Response(
       JSON.stringify({
         success: true,
+        documentId: insertedDoc.id, // Add documentId at the root level
         document: {
           id: insertedDoc.id,
           status: documentStatus,

@@ -121,14 +121,20 @@ const DocumentUploader = ({
       
       if (error) throw error;
       
+      // FIXED: Check that the response contains the expected documentId
+      if (!data?.documentId) {
+        throw new Error("No document ID returned from processing function");
+      }
+      
       setUploadProgress(90);
       setProcessingStatus("Finalizing...");
-      setDocumentStatus(data?.status || "unknown");
+      setDocumentStatus(data?.document?.status || "unknown");
       
       console.log("Document processing response:", data);
       
       // First verify if the document has been properly created
-      if (!data?.document?.id) {
+      const documentId = data.documentId;
+      if (!documentId) {
         throw new Error("No document ID returned from processing function");
       }
       
@@ -139,7 +145,7 @@ const DocumentUploader = ({
           organization_id: organizationId,
           client_organization_id: clientOrganizationId || null
         })
-        .eq('id', data.document.id);
+        .eq('id', documentId);
         
       if (updateError) {
         throw updateError;
@@ -151,7 +157,7 @@ const DocumentUploader = ({
       const { data: verifyData, error: verifyError } = await supabase
         .from('documents')
         .select('status, extracted_data')
-        .eq('id', data.document.id)
+        .eq('id', documentId)
         .single();
         
       if (verifyError) {
@@ -193,7 +199,7 @@ const DocumentUploader = ({
       let toastMessage = "";
       let toastVariant: "default" | "destructive" = "default";
       
-      switch (verifyData?.status || data?.status) {
+      switch (verifyData?.status || data?.document?.status) {
         case "processed":
           toastMessage = "Your document has been uploaded and fully processed";
           break;
