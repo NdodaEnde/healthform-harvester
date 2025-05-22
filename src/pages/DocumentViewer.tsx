@@ -218,7 +218,6 @@ const DocumentViewer: React.FC = () => {
                 <div className="overflow-auto">
                   <CertificateTemplate 
                     extractedData={document.extracted_data} 
-                    documentId={id} 
                   />
                 </div>
               )}
