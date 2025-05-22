@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -90,7 +91,8 @@ const PatientRecordsPage = () => {
       // Apply validation filter if enabled
       if (showOnlyValidated) {
         query = query.eq('status', 'processed');
-        query = query.filter('extracted_data->structured_data->validated', 'eq', true);
+        // Handle cases where structured_data or validated might not exist
+        query = query.not('extracted_data', 'is', null);
       }
       
       const { data, error } = await query;
@@ -100,12 +102,20 @@ const PatientRecordsPage = () => {
         throw error;
       }
       
-      console.log('Documents fetched in PatientRecordsPage:', data?.length, 'with filters:', {
+      // Further filter in JS for complex validation status check
+      let filteredData = data || [];
+      if (showOnlyValidated) {
+        filteredData = filteredData.filter(doc => {
+          return doc.extracted_data?.structured_data?.validated === true;
+        });
+      }
+      
+      console.log('Documents fetched in PatientRecordsPage:', filteredData?.length, 'with filters:', {
         documentType,
         showOnlyValidated
       });
       
-      return data as Document[] || [];
+      return filteredData as Document[] || [];
     },
     enabled: !!id && !!organizationId,
   });
@@ -153,6 +163,11 @@ const PatientRecordsPage = () => {
       </div>
     );
   }
+
+  // Helper function to check validation status safely
+  const isDocumentValidated = (doc: Document) => {
+    return doc.extracted_data?.structured_data?.validated === true;
+  };
 
   return (
     <div className="space-y-6">
@@ -237,7 +252,7 @@ const PatientRecordsPage = () => {
                             >
                               {doc.status}
                             </Badge>
-                            {doc.extracted_data?.structured_data?.validated ? (
+                            {isDocumentValidated(doc) ? (
                               <Badge variant="success">Validated</Badge>
                             ) : (
                               <Badge variant="warning">Not Validated</Badge>

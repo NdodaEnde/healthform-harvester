@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -34,6 +33,7 @@ const DocumentUploader = ({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [documentStatus, setDocumentStatus] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -64,6 +64,7 @@ const DocumentUploader = ({
       setUploading(true);
       setUploadProgress(10);
       setProcessingStatus("Preparing upload...");
+      setDocumentStatus(null);
 
       // Get current user for folder path organization
       const { data: { user } } = await supabase.auth.getUser();
@@ -106,6 +107,7 @@ const DocumentUploader = ({
       
       setUploadProgress(90);
       setProcessingStatus("Finalizing...");
+      setDocumentStatus(data?.status || "unknown");
       
       console.log("Document processing response:", data);
       
@@ -119,8 +121,7 @@ const DocumentUploader = ({
         .from('documents')
         .update({
           organization_id: organizationId,
-          client_organization_id: clientOrganizationId || null,
-          status: 'processed' // Force status to processed again
+          client_organization_id: clientOrganizationId || null
         })
         .eq('id', data.documentId);
         
@@ -129,7 +130,6 @@ const DocumentUploader = ({
       }
       
       setUploadProgress(100);
-      setProcessingStatus("Complete!");
       
       // Verify the document status after updating
       const { data: verifyData, error: verifyError } = await supabase
@@ -143,11 +143,48 @@ const DocumentUploader = ({
       } else {
         console.log("Final document status:", verifyData.status);
         console.log("Extracted data present:", !!verifyData.extracted_data);
+        
+        // Update UI with verified status
+        setDocumentStatus(verifyData.status);
+        
+        const hasStructuredData = verifyData.extracted_data?.structured_data && 
+          Object.keys(verifyData.extracted_data.structured_data).length > 0;
+        
+        const hasRawContent = verifyData.extracted_data?.raw_content && 
+          verifyData.extracted_data.raw_content.length > 0;
+          
+        if (hasStructuredData) {
+          setProcessingStatus("Document processed completely with structured data!");
+        } else if (hasRawContent) {
+          setProcessingStatus("Document uploaded with raw text but no structured data");
+        } else {
+          setProcessingStatus("Document uploaded but no text could be extracted");
+        }
+      }
+      
+      let toastMessage = "";
+      let toastVariant: "default" | "destructive" = "default";
+      
+      switch (verifyData?.status || data?.status) {
+        case "processed":
+          toastMessage = "Your document has been uploaded and fully processed";
+          break;
+        case "extracted":
+          toastMessage = "Your document has been uploaded but only raw text was extracted";
+          toastVariant = "destructive";
+          break;
+        case "failed":
+          toastMessage = "Your document was uploaded but data extraction failed";
+          toastVariant = "destructive";
+          break;
+        default:
+          toastMessage = "Your document has been uploaded";
       }
       
       toast({
-        title: "Upload successful",
-        description: "Your document has been uploaded and processed",
+        title: "Upload complete",
+        description: toastMessage,
+        variant: toastVariant
       });
       
       if (onUploadComplete) {
@@ -161,13 +198,50 @@ const DocumentUploader = ({
         description: error.message || "There was an error uploading your document",
         variant: "destructive"
       });
+      setDocumentStatus("failed");
+      setProcessingStatus("Upload failed: " + (error.message || "Unknown error"));
     } finally {
       setTimeout(() => {
         setUploading(false);
         setFile(null);
         setUploadProgress(0);
-        setProcessingStatus(null);
-      }, 2000); // Keep success message visible for 2 seconds
+        // Keep the status message visible
+      }, 2000); // Keep success/failure message visible for 2 seconds
+    }
+  };
+
+  const getStatusDisplay = () => {
+    if (!documentStatus) return null;
+    
+    switch (documentStatus) {
+      case "processed":
+        return (
+          <div className="flex items-center text-sm text-green-600 mt-2">
+            <CheckCircle className="h-4 w-4 mr-1" />
+            <span>Document processed successfully with structured data!</span>
+          </div>
+        );
+      case "extracted":
+        return (
+          <div className="flex items-center text-sm text-amber-600 mt-2">
+            <Info className="h-4 w-4 mr-1" />
+            <span>Document text extracted but no structured data available</span>
+          </div>
+        );
+      case "failed":
+        return (
+          <div className="flex items-center text-sm text-red-600 mt-2">
+            <AlertTriangle className="h-4 w-4 mr-1" />
+            <span>Document processing failed - no data could be extracted</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center text-sm text-muted-foreground mt-2">
+            <Info className="h-4 w-4 mr-1" />
+            <span>Document status: {documentStatus}</span>
+          </div>
+        );
     }
   };
 
@@ -231,12 +305,7 @@ const DocumentUploader = ({
             </p>
             <p className="text-xs font-medium">{uploadProgress}%</p>
           </div>
-          {uploadProgress === 100 && (
-            <div className="flex items-center text-sm text-green-600 mt-2">
-              <CheckCircle className="h-4 w-4 mr-1" />
-              <span>Document processed successfully!</span>
-            </div>
-          )}
+          {uploadProgress === 100 && getStatusDisplay()}
         </div>
       )}
       

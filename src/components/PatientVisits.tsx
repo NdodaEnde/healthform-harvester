@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Calendar, Plus } from 'lucide-react';
+import { FileText, Calendar, Plus, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,6 +29,7 @@ interface ExtractedData {
     id?: string;
     [key: string]: any;
   };
+  raw_content?: string;
   [key: string]: any;
 }
 
@@ -83,6 +84,22 @@ const groupDocumentsByDate = (documents: Document[]) => {
   );
 };
 
+// Helper function to check if a document has structured data
+const hasStructuredData = (doc: Document): boolean => {
+  const structData = doc.extracted_data?.structured_data;
+  return !!structData && Object.keys(structData).length > 0;
+};
+
+// Helper function to check if document has raw content
+const hasRawContent = (doc: Document): boolean => {
+  return !!doc.extracted_data?.raw_content && doc.extracted_data.raw_content.length > 0;
+};
+
+// Helper function to check if a document is validated
+const isDocumentValidated = (doc: Document): boolean => {
+  return doc.extracted_data?.structured_data?.validated === true;
+};
+
 const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId, showOnlyValidated = false }) => {
   const navigate = useNavigate();
 
@@ -114,7 +131,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         .from('documents')
         .select('*')
         .eq('organization_id', organizationId)
-        .eq('status', 'processed')
+        .not('status', 'eq', 'failed') // Skip failed documents
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -181,10 +198,10 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     enabled: !!patientId && !!organizationId && !!patient,
   });
 
-  // Filter documents based on review status if needed
+  // Filter documents based on review status or validation status if needed
   const filteredDocuments = documents ? documents.filter(doc => {
     if (showOnlyValidated) {
-      return doc.reviewStatus === 'reviewed';
+      return doc.reviewStatus === 'reviewed' || isDocumentValidated(doc);
     }
     return true;
   }) : [];
@@ -206,6 +223,42 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   const getDocumentTypeLabel = (type: string | null) => {
     if (!type) return 'Unknown';
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Get appropriate status badge for a document
+  const getStatusBadge = (doc: Document & { reviewStatus: ReviewStatus }) => {
+    // First check review status
+    if (doc.reviewStatus === 'reviewed') {
+      return <Badge variant="success">Reviewed</Badge>;
+    }
+    
+    if (doc.reviewStatus === 'needs-correction') {
+      return <Badge variant="destructive">Needs Correction</Badge>;
+    }
+    
+    // Then check processing status
+    switch (doc.status) {
+      case 'processed':
+        if (isDocumentValidated(doc)) {
+          return <Badge variant="success">Validated</Badge>;
+        }
+        if (hasStructuredData(doc)) {
+          return <Badge variant="outline">Processed</Badge>;
+        }
+        if (hasRawContent(doc)) {
+          return <Badge variant="warning">Extracted</Badge>;
+        }
+        return <Badge variant="outline">Processed</Badge>;
+        
+      case 'extracted':
+        return <Badge variant="warning">Text Only</Badge>;
+        
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>;
+        
+      default:
+        return <Badge variant="outline">Not Reviewed</Badge>;
+    }
   };
 
   return (
@@ -260,16 +313,14 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                                 {getDocumentTypeLabel(doc.document_type)}
                               </Badge>
                             )}
-                            <Badge variant={doc.status === 'processed' ? 'success' : 'warning'} className="capitalize">
+                            <Badge variant={
+                              doc.status === 'processed' ? 'success' : 
+                              doc.status === 'extracted' ? 'warning' : 
+                              'outline'
+                            } className="capitalize">
                               {doc.status}
                             </Badge>
-                            {doc.reviewStatus === 'reviewed' ? (
-                              <Badge variant="success">Reviewed</Badge>
-                            ) : doc.reviewStatus === 'needs-correction' ? (
-                              <Badge variant="destructive">Needs Correction</Badge>
-                            ) : (
-                              <Badge variant="outline">Not Reviewed</Badge>
-                            )}
+                            {getStatusBadge(doc)}
                           </div>
                         </div>
                         <Button

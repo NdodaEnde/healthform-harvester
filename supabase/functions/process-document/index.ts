@@ -115,6 +115,26 @@ serve(async (req) => {
       // Continue without public URL
     }
     
+    // Determine document status based on extracted data
+    // Check if we have meaningful structured data
+    const rawContent = documentResult.markdown || documentResult.data?.markdown || "";
+    const structuredData = documentResult.data || documentResult.structured_data || {};
+    const hasStructuredData = Object.keys(structuredData).length > 0;
+    
+    // Set status based on data quality
+    let documentStatus = 'pending';
+    
+    if (hasStructuredData) {
+      documentStatus = 'processed';
+      console.log("Document has structured data, marking as 'processed'");
+    } else if (rawContent && rawContent.length > 0) {
+      documentStatus = 'extracted';
+      console.log("Document has raw content but no structured data, marking as 'extracted'");
+    } else {
+      documentStatus = 'failed';
+      console.log("Document has no meaningful data, marking as 'failed'");
+    }
+    
     // Create document record in database
     const documentRecord = {
       user_id: userId,
@@ -124,16 +144,16 @@ serve(async (req) => {
       file_name: file.name,
       mime_type: file.type,
       document_type: documentType,
-      status: 'processed', // Set status to processed immediately
+      status: documentStatus, // Set status based on data quality
       public_url: publicUrl, // Add the public URL if available
       extracted_data: {
-        raw_content: documentResult.markdown || documentResult.data?.markdown || "No content extracted",
-        structured_data: documentResult.data || documentResult.structured_data || {},
+        raw_content: rawContent,
+        structured_data: structuredData,
         metadata: documentResult.metadata || {}
       }
     };
     
-    console.log("Creating document record in database with status 'processed'");
+    console.log(`Creating document record in database with status '${documentStatus}'`);
     console.log("Extracted data preview:", 
       JSON.stringify({
         raw_content_length: documentRecord.extracted_data.raw_content?.length || 0,
@@ -156,7 +176,7 @@ serve(async (req) => {
     console.log("Document status:", insertedDoc.status);
     console.log("Extracted data present:", !!insertedDoc.extracted_data);
     
-    // Verification step to ensure the document is properly marked as processed
+    // Verification step to ensure the document status is correct
     const { data: verifyData, error: verifyError } = await supabase
       .from('documents')
       .select('status, extracted_data')
@@ -181,8 +201,9 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         documentId: insertedDoc.id,
-        status: "processed",
-        message: "Document processed successfully",
+        status: documentStatus,
+        message: `Document ${documentStatus}`,
+        hasStructuredData: hasStructuredData,
       }),
       {
         headers: {
