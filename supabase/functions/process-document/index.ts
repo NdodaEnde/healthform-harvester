@@ -152,24 +152,102 @@ serve(async (req) => {
       // Try to extract structured information from the text
       const certificateInfo: any = {};
       
-      // Extract employee info
-      const nameMatch = rawContent.match(/Initials\s*&\s*Surname:\s*([^\n]+)/i);
-      if (nameMatch) certificateInfo.employee_name = nameMatch[1].trim();
+      console.log("Extracting certificate info from text...");
+      console.log("Raw content preview:", rawContent.substring(0, 500));
       
-      const idMatch = rawContent.match(/ID\s*No:\s*([^\n]+)/i);
-      if (idMatch) certificateInfo.id_number = idMatch[1].trim();
+      // Extract employee info - more flexible patterns
+      const nameMatch = rawContent.match(/Initials\s*&?\s*Surname:\s*([^\n\r]+)/i);
+      if (nameMatch) {
+        certificateInfo.employee_name = nameMatch[1].trim();
+        console.log("Found employee name:", certificateInfo.employee_name);
+      }
       
-      const companyMatch = rawContent.match(/Company\s*Name:\s*([^\n]+)/i);
-      if (companyMatch) certificateInfo.company_name = companyMatch[1].trim();
+      const idMatch = rawContent.match(/ID\s*No:?\s*([^\n\r]+)/i);
+      if (idMatch) {
+        certificateInfo.id_number = idMatch[1].trim();
+        console.log("Found ID number:", certificateInfo.id_number);
+      }
       
-      const jobMatch = rawContent.match(/Job\s*Title:\s*([^\n]+)/i);
-      if (jobMatch) certificateInfo.job_title = jobMatch[1].trim();
+      const companyMatch = rawContent.match(/Company\s*Name:\s*([^\n\r]+)/i);
+      if (companyMatch) {
+        certificateInfo.company_name = companyMatch[1].trim();
+        console.log("Found company name:", certificateInfo.company_name);
+      }
       
-      const examDateMatch = rawContent.match(/Date\s*of\s*Examination:\s*([^\n]+)/i);
-      if (examDateMatch) certificateInfo.examination_date = examDateMatch[1].trim();
+      const jobMatch = rawContent.match(/Job\s*Title:\s*([^\n\r]+)/i);
+      if (jobMatch) {
+        certificateInfo.job_title = jobMatch[1].trim();
+        console.log("Found job title:", certificateInfo.job_title);
+      }
       
-      const expiryMatch = rawContent.match(/Expiry\s*Date:\s*([^\n]+)/i);
-      if (expiryMatch) certificateInfo.expiry_date = expiryMatch[1].trim();
+      const examDateMatch = rawContent.match(/Date\s*of\s*Examination:\s*([^\n\r]+)/i);
+      if (examDateMatch) {
+        certificateInfo.examination_date = examDateMatch[1].trim();
+        console.log("Found examination date:", certificateInfo.examination_date);
+      }
+      
+      const expiryMatch = rawContent.match(/Expiry\s*Date:\s*([^\n\r]+)/i);
+      if (expiryMatch) {
+        certificateInfo.expiry_date = expiryMatch[1].trim();
+        console.log("Found expiry date:", certificateInfo.expiry_date);
+      }
+      
+      // Try to extract doctor/practitioner info
+      const doctorMatch = rawContent.match(/Dr\.?\s*([^\/\n\r]+)/i);
+      if (doctorMatch) {
+        certificateInfo.doctor_name = doctorMatch[1].trim();
+        console.log("Found doctor name:", certificateInfo.doctor_name);
+      }
+      
+      // Extract practice number
+      const practiceMatch = rawContent.match(/Practice\s*No:?\s*([^\n\r\/]+)/i);
+      if (practiceMatch) {
+        certificateInfo.practice_number = practiceMatch[1].trim();
+        console.log("Found practice number:", certificateInfo.practice_number);
+      }
+      
+      // Extract examination type (PRE-EMPLOYMENT, PERIODICAL, EXIT)
+      if (rawContent.includes('PRE-EMPLOYMENT: [x]') || rawContent.includes('PRE-EMPLOYMENT: ✓')) {
+        certificateInfo.examination_type = 'PRE-EMPLOYMENT';
+      } else if (rawContent.includes('PERIODICAL: [x]') || rawContent.includes('PERIODICAL: ✓')) {
+        certificateInfo.examination_type = 'PERIODICAL';
+      } else if (rawContent.includes('EXIT: [x]') || rawContent.includes('EXIT: ✓')) {
+        certificateInfo.examination_type = 'EXIT';
+      }
+      
+      // Extract medical test results from tables
+      const medicalTests: any = {};
+      
+      // Vision tests
+      if (rawContent.includes('FAR, NEAR VISION')) {
+        const visionMatch = rawContent.match(/FAR,\s*NEAR\s*VISION[^✓]*✓[^0-9]*([0-9\/]+)/i);
+        if (visionMatch) {
+          medicalTests.vision = visionMatch[1].trim();
+        }
+      }
+      
+      // Hearing test
+      if (rawContent.includes('Hearing')) {
+        const hearingMatch = rawContent.match(/Hearing[^✓]*✓[^0-9]*([0-9\.]+)/i);
+        if (hearingMatch) {
+          medicalTests.hearing = hearingMatch[1].trim();
+        }
+      }
+      
+      // Lung function
+      if (rawContent.includes('Lung Function')) {
+        const lungMatch = rawContent.match(/Lung\s*Function[^✓]*✓[^A-Za-z]*([A-Za-z\s]+)/i);
+        if (lungMatch) {
+          medicalTests.lung_function = lungMatch[1].trim();
+        }
+      }
+      
+      if (Object.keys(medicalTests).length > 0) {
+        certificateInfo.medical_tests = medicalTests;
+      }
+      
+      console.log("Final certificate info extracted:", certificateInfo);
+      console.log("Certificate info keys:", Object.keys(certificateInfo));
       
       if (Object.keys(certificateInfo).length > 0) {
         structuredData.certificate_info = certificateInfo;
