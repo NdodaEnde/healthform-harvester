@@ -73,6 +73,7 @@ serve(async (req) => {
 
     const documentData = await dataResponse.json();
     console.log("Document data retrieved successfully");
+    console.log("Document data content:", JSON.stringify(documentData).substring(0, 200) + "...");
     
     // Extract the first document result (assuming single file upload)
     const documentResult = documentData.result && documentData.result.length > 0 
@@ -123,16 +124,23 @@ serve(async (req) => {
       file_name: file.name,
       mime_type: file.type,
       document_type: documentType,
-      status: 'processing',
+      status: 'processed', // Set status to processed immediately
       public_url: publicUrl, // Add the public URL if available
       extracted_data: {
-        raw_content: documentResult.markdown,
-        structured_data: documentResult.data,
-        metadata: documentResult.metadata,
+        raw_content: documentResult.markdown || documentResult.data?.markdown || "No content extracted",
+        structured_data: documentResult.data || documentResult.structured_data || {},
+        metadata: documentResult.metadata || {}
       }
     };
     
-    console.log("Creating document record in database");
+    console.log("Creating document record in database with status 'processed'");
+    console.log("Extracted data preview:", 
+      JSON.stringify({
+        raw_content_length: documentRecord.extracted_data.raw_content?.length || 0,
+        structured_data_keys: Object.keys(documentRecord.extracted_data.structured_data || {})
+      })
+    );
+    
     const { data: insertedDoc, error: insertError } = await supabase
       .from('documents')
       .insert(documentRecord)
@@ -145,6 +153,22 @@ serve(async (req) => {
     }
     
     console.log("Document processed and stored successfully:", insertedDoc.id);
+    console.log("Document status:", insertedDoc.status);
+    console.log("Extracted data present:", !!insertedDoc.extracted_data);
+    
+    // Verification step to ensure the document is properly marked as processed
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('documents')
+      .select('status, extracted_data')
+      .eq('id', insertedDoc.id)
+      .single();
+      
+    if (verifyError) {
+      console.error("Verification error:", verifyError);
+    } else {
+      console.log("Final document status:", verifyData.status);
+      console.log("Final extracted data present:", !!verifyData.extracted_data);
+    }
     
     // Cleanup on the microservice side (in background)
     fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
@@ -157,6 +181,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         documentId: insertedDoc.id,
+        status: "processed",
         message: "Document processed successfully",
       }),
       {

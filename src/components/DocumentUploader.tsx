@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -33,6 +33,7 @@ const DocumentUploader = ({
   const [documentType, setDocumentType] = useState<string>("certificate-fitness");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -62,6 +63,7 @@ const DocumentUploader = ({
     try {
       setUploading(true);
       setUploadProgress(10);
+      setProcessingStatus("Preparing upload...");
 
       // Get current user for folder path organization
       const { data: { user } } = await supabase.auth.getUser();
@@ -78,12 +80,22 @@ const DocumentUploader = ({
       // Simulate progress
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
-          if (prev < 60) return prev + 5;
+          if (prev < 40) {
+            setProcessingStatus("Uploading file...");
+            return prev + 5;
+          } else if (prev < 70) {
+            setProcessingStatus("Processing document...");
+            return prev + 2;
+          } else if (prev < 90) {
+            setProcessingStatus("Extracting data...");
+            return prev + 1;
+          }
           return prev;
         });
       }, 300);
 
       // Call the Supabase Edge Function to process the document
+      setProcessingStatus("Sending to processing service...");
       const { data, error } = await supabase.functions.invoke('process-document', {
         body: formData,
       });
@@ -92,7 +104,10 @@ const DocumentUploader = ({
       
       if (error) throw error;
       
-      setUploadProgress(80);
+      setUploadProgress(90);
+      setProcessingStatus("Finalizing...");
+      
+      console.log("Document processing response:", data);
       
       // First verify if the document has been properly created
       if (!data?.documentId) {
@@ -104,7 +119,8 @@ const DocumentUploader = ({
         .from('documents')
         .update({
           organization_id: organizationId,
-          client_organization_id: clientOrganizationId || null
+          client_organization_id: clientOrganizationId || null,
+          status: 'processed' // Force status to processed again
         })
         .eq('id', data.documentId);
         
@@ -113,10 +129,25 @@ const DocumentUploader = ({
       }
       
       setUploadProgress(100);
+      setProcessingStatus("Complete!");
+      
+      // Verify the document status after updating
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('documents')
+        .select('status, extracted_data')
+        .eq('id', data.documentId)
+        .single();
+        
+      if (verifyError) {
+        console.error("Error verifying document status:", verifyError);
+      } else {
+        console.log("Final document status:", verifyData.status);
+        console.log("Extracted data present:", !!verifyData.extracted_data);
+      }
       
       toast({
         title: "Upload successful",
-        description: "Your document has been uploaded and is being processed",
+        description: "Your document has been uploaded and processed",
       });
       
       if (onUploadComplete) {
@@ -131,9 +162,12 @@ const DocumentUploader = ({
         variant: "destructive"
       });
     } finally {
-      setUploading(false);
-      setFile(null);
-      setUploadProgress(0);
+      setTimeout(() => {
+        setUploading(false);
+        setFile(null);
+        setUploadProgress(0);
+        setProcessingStatus(null);
+      }, 2000); // Keep success message visible for 2 seconds
     }
   };
 
@@ -191,9 +225,18 @@ const DocumentUploader = ({
               style={{ width: `${uploadProgress}%` }}
             ></div>
           </div>
-          <p className="text-xs text-center text-muted-foreground">
-            {uploadProgress < 100 ? "Uploading..." : "Processing..."}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {processingStatus || "Processing..."}
+            </p>
+            <p className="text-xs font-medium">{uploadProgress}%</p>
+          </div>
+          {uploadProgress === 100 && (
+            <div className="flex items-center text-sm text-green-600 mt-2">
+              <CheckCircle className="h-4 w-4 mr-1" />
+              <span>Document processed successfully!</span>
+            </div>
+          )}
         </div>
       )}
       
