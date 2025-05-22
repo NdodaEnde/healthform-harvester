@@ -8,6 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, FileText, Download, Eye } from 'lucide-react';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import { Helmet } from 'react-helmet';
+import { toast } from 'sonner';
+
+interface ExtractedData {
+  raw_content?: string;
+  structured_data?: {
+    certificate_info?: Record<string, any>;
+    [key: string]: any;
+  };
+  chunks?: any[];
+  [key: string]: any;
+}
 
 interface Document {
   id: string;
@@ -16,7 +27,7 @@ interface Document {
   public_url: string;
   status: string;
   document_type: string;
-  extracted_data: any;
+  extracted_data: ExtractedData;
   created_at: string;
 }
 
@@ -43,8 +54,22 @@ const DocumentViewer: React.FC = () => {
         .single();
 
       if (error) throw error;
-      setDocument(data);
       console.log("Document data:", data);
+      
+      if (data && typeof data.extracted_data === 'string') {
+        try {
+          data.extracted_data = JSON.parse(data.extracted_data);
+        } catch (parseError) {
+          console.error('Error parsing extracted_data JSON:', parseError);
+        }
+      }
+      
+      setDocument(data);
+      
+      if (data.document_type?.includes('certificate') && data.extracted_data?.structured_data?.certificate_info) {
+        toast.info('Certificate data has been detected and loaded');
+        setViewMode('structured');
+      }
     } catch (err) {
       console.error('Error fetching document:', err);
       setError(err instanceof Error ? err.message : 'Failed to load document');
@@ -92,6 +117,10 @@ const DocumentViewer: React.FC = () => {
     );
   }
 
+  // Determine if certificate data exists
+  const hasCertificateData = document.document_type?.includes('certificate') && 
+    document.extracted_data?.structured_data?.certificate_info;
+
   return (
     <>
       <Helmet>
@@ -126,9 +155,10 @@ const DocumentViewer: React.FC = () => {
                 variant={viewMode === 'structured' ? 'default' : 'outline'}
                 onClick={() => setViewMode('structured')}
                 size="sm"
+                disabled={!hasCertificateData}
               >
                 <FileText className="w-4 h-4 mr-2" />
-                Structured Data
+                {hasCertificateData ? "Certificate View" : "No Certificate Data"}
               </Button>
               {document.public_url && (
                 <Button variant="outline" onClick={downloadDocument} size="sm">
@@ -169,11 +199,18 @@ const DocumentViewer: React.FC = () => {
           <Card className="lg:h-[calc(100vh-220px)] overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle>
-                {viewMode === 'structured' ? 'Extracted Data' : 'Certificate Preview'}
+                {viewMode === 'structured' ? 'Certificate Preview' : 'Extracted Data'}
               </CardTitle>
             </CardHeader>
             <CardContent className="overflow-auto h-full pb-6">
               {viewMode === 'structured' ? (
+                <div className="overflow-auto">
+                  <CertificateTemplate 
+                    extractedData={document.extracted_data || {}} 
+                    documentId={id || ''} 
+                  />
+                </div>
+              ) : (
                 <div className="space-y-4">
                   {document.extracted_data?.structured_data?.certificate_info && (
                     <div>
@@ -213,13 +250,6 @@ const DocumentViewer: React.FC = () => {
                       </div>
                     </div>
                   )}
-                </div>
-              ) : (
-                <div className="overflow-auto">
-                  <CertificateTemplate 
-                    extractedData={document.extracted_data} 
-                    documentId={id} 
-                  />
                 </div>
               )}
             </CardContent>
