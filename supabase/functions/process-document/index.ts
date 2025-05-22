@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -209,160 +210,42 @@ serve(async (req) => {
       console.log("Raw content preview (first 500 chars):");
       console.log(rawContent.substring(0, 500));
       
-      // ENHANCED EXTRACTION FOR CERTIFICATE OF FITNESS
-      // Extract employee info
-      const namePattern = /(?:Initials\s*&?\s*Surname|Name):\s*([^\n\r]+)/i;
+      // Simple test extraction first
+      if (rawContent.includes('NKOSI')) {
+        certificateInfo.test_field = 'Found NKOSI in document';
+        console.log("✓ Test extraction successful: Found NKOSI");
+      }
+      
+      // Extract employee info - more flexible patterns
+      const namePattern = /Initials\s*&?\s*Surname:\s*([^\n\r]+)/i;
       const nameMatch = rawContent.match(namePattern);
       if (nameMatch) {
         certificateInfo.employee_name = nameMatch[1].trim();
         console.log("✓ Found employee name:", certificateInfo.employee_name);
+      } else {
+        console.log("✗ Employee name pattern not found");
+        console.log("Looking for 'Initials' in text:", rawContent.includes('Initials'));
+        console.log("Looking for 'Surname' in text:", rawContent.includes('Surname'));
       }
       
-      const idPattern = /(?:ID\s*No|ID\s*Number):\s*([^\n\r]+)/i;
+      const idPattern = /ID\s*No:?\s*([^\n\r]+)/i;
       const idMatch = rawContent.match(idPattern);
       if (idMatch) {
         certificateInfo.id_number = idMatch[1].trim();
         console.log("✓ Found ID number:", certificateInfo.id_number);
+      } else {
+        console.log("✗ ID number pattern not found");
+        console.log("Looking for 'ID No' in text:", rawContent.includes('ID No'));
       }
       
-      const companyPattern = /(?:Company\s*Name|Employer):\s*([^\n\r]+)/i;
+      const companyPattern = /Company\s*Name:\s*([^\n\r]+)/i;
       const companyMatch = rawContent.match(companyPattern);
       if (companyMatch) {
         certificateInfo.company_name = companyMatch[1].trim();
         console.log("✓ Found company name:", certificateInfo.company_name);
-      }
-
-      // Extract job title
-      const jobPattern = /(?:Job\s*Title|Position|Occupation):\s*([^\n\r]+)/i;
-      const jobMatch = rawContent.match(jobPattern);
-      if (jobMatch) {
-        certificateInfo.job_title = jobMatch[1].trim();
-        console.log("✓ Found job title:", certificateInfo.job_title);
-      }
-      
-      // Extract dates
-      const examDatePattern = /(?:Date\s*of\s*Examination|Exam\s*Date):\s*([^\n\r]+)/i;
-      const examDateMatch = rawContent.match(examDatePattern);
-      if (examDateMatch) {
-        certificateInfo.examination_date = examDateMatch[1].trim();
-        console.log("✓ Found examination date:", certificateInfo.examination_date);
-      }
-      
-      const expiryDatePattern = /(?:Expiry\s*Date|Valid\s*Until|Expiration\s*Date):\s*([^\n\r]+)/i;
-      const expiryDateMatch = rawContent.match(expiryDatePattern);
-      if (expiryDateMatch) {
-        certificateInfo.expiry_date = expiryDateMatch[1].trim();
-        console.log("✓ Found expiry date:", certificateInfo.expiry_date);
-      }
-      
-      // Check for examination type
-      certificateInfo.pre_employment_checked = /PRE-EMPLOYMENT.*?\[\s*x\s*\]/is.test(rawContent) || 
-                                              rawContent.includes('**Pre-Employment**: [x]');
-      certificateInfo.periodical_checked = /PERIODICAL.*?\[\s*x\s*\]/is.test(rawContent) || 
-                                          rawContent.includes('**Periodical**: [x]');
-      certificateInfo.exit_checked = /EXIT.*?\[\s*x\s*\]/is.test(rawContent) || 
-                                    rawContent.includes('**Exit**: [x]');
-      
-      // Determine fitness status
-      if (/\*\*FIT\*\*:\s*\[\s*x\s*\]/i.test(rawContent) || 
-          /FIT(?!\s+with).*?\[\s*x\s*\]/i.test(rawContent)) {
-        certificateInfo.fitness_status = "FIT";
-        certificateInfo.fit_checked = true;
-      } else if (/(?:\*\*Fit with Restriction\*\*|\|.*?Fit with Restriction).*?\[\s*x\s*\]/i.test(rawContent)) {
-        certificateInfo.fitness_status = "FIT_WITH_RESTRICTION";
-        certificateInfo.fit_with_restriction_checked = true;
-      } else if (/(?:\*\*Fit with Condition\*\*|\|.*?Fit with Condition).*?\[\s*x\s*\]/i.test(rawContent)) {
-        certificateInfo.fitness_status = "FIT_WITH_CONDITION";
-        certificateInfo.fit_with_condition_checked = true;
-      } else if (/(?:\*\*Temporary Unfit\*\*|\|.*?Temporary Unfit).*?\[\s*x\s*\]/i.test(rawContent)) {
-        certificateInfo.fitness_status = "TEMPORARILY_UNFIT";
-        certificateInfo.temporarily_unfit_checked = true;
-      } else if (/(?:\*\*UNFIT\*\*|\|.*?UNFIT).*?\[\s*x\s*\]/i.test(rawContent)) {
-        certificateInfo.fitness_status = "UNFIT";
-        certificateInfo.unfit_checked = true;
-      }
-      
-      // Medical tests extraction
-      certificateInfo.medical_tests = {};
-      
-      // Vision test
-      const visionDoneMatch = /FAR, NEAR VISION.*?\[\s*x\s*\].*?(\d+\/\d+|Normal|N\/A)/is.test(rawContent);
-      if (visionDoneMatch) {
-        certificateInfo.medical_tests.vision_done = true;
-        const visionResultMatch = rawContent.match(/FAR, NEAR VISION.*?\[\s*x\s*\].*?(\d+\/\d+|Normal|N\/A)/is);
-        if (visionResultMatch && visionResultMatch[1]) {
-          certificateInfo.medical_tests.vision_result = visionResultMatch[1].trim();
-        }
-      }
-      
-      // Hearing test
-      const hearingDoneMatch = /Hearing.*?\[\s*x\s*\].*?(\d+|\d+\/\d+|Normal|N\/A)/is.test(rawContent);
-      if (hearingDoneMatch) {
-        certificateInfo.medical_tests.hearing_done = true;
-        const hearingResultMatch = rawContent.match(/Hearing.*?\[\s*x\s*\].*?(\d+|\d+\/\d+|Normal|N\/A)/is);
-        if (hearingResultMatch && hearingResultMatch[1]) {
-          certificateInfo.medical_tests.hearing_result = hearingResultMatch[1].trim();
-        }
-      }
-      
-      // Extract restrictions
-      const restrictionsData: string[] = [];
-      
-      // Check common restrictions
-      if (/Heights.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Heights");
-      }
-      if (/Dust Exposure.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Dust Exposure");
-      }
-      if (/Motorized Equipment.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Motorized Equipment");
-      }
-      if (/Wear Hearing Protection.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Wear Hearing Protection");
-      }
-      if (/Confined Spaces.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Confined Spaces");
-      }
-      if (/Chemical Exposure.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Chemical Exposure");
-      }
-      if (/Wear Spectacles.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Wear Spectacles");
-      }
-      if (/Remain on Treatment.*?\[\s*x\s*\]/is.test(rawContent)) {
-        restrictionsData.push("Remain on Treatment for Chronic Conditions");
-      }
-      
-      if (restrictionsData.length > 0) {
-        certificateInfo.restrictions = restrictionsData;
-      }
-      
-      // Extract comments or additional information
-      const commentsPattern = /Comments:(.*?)(?=\n\n|\r\n\r\n|$|<)/is;
-      const commentsMatch = rawContent.match(commentsPattern);
-      if (commentsMatch && commentsMatch[1]) {
-        const comments = commentsMatch[1].trim();
-        if (comments && comments !== "N/A" && comments !== "") {
-          certificateInfo.comments = comments;
-        }
-      }
-      
-      // Extract follow-up actions
-      const followUpPattern = /(?:Referred|follow up actions):(.*?)(?=\n|\r|$|<)/i;
-      const followUpMatch = rawContent.match(followUpPattern);
-      if (followUpMatch && followUpMatch[1]) {
-        const followUp = followUpMatch[1].trim();
-        if (followUp && followUp !== "N/A" && followUp !== "") {
-          certificateInfo.follow_up = followUp;
-        }
-      }
-      
-      // Extract review date if available
-      const reviewDatePattern = /Review Date:(.*?)(?=\n|\r|$|<)/i;
-      const reviewDateMatch = rawContent.match(reviewDatePattern);
-      if (reviewDateMatch && reviewDateMatch[1]) {
-        certificateInfo.review_date = reviewDateMatch[1].trim();
+      } else {
+        console.log("✗ Company name pattern not found");
+        console.log("Looking for 'Company Name' in text:", rawContent.includes('Company Name'));
       }
       
       console.log("Final certificate info keys:", Object.keys(certificateInfo));
@@ -455,11 +338,11 @@ serve(async (req) => {
       console.error("Error cleaning up temporary files:", error);
     });
     
-    // Return the expected JSON format with documentId at the top level
+    // FIXED: Return the expected JSON format with documentId at the top level
     return new Response(
       JSON.stringify({
         success: true,
-        documentId: insertedDoc.id,
+        documentId: insertedDoc.id, // Add documentId at the root level
         document: {
           id: insertedDoc.id,
           status: documentStatus,
@@ -468,9 +351,9 @@ serve(async (req) => {
           document_type: documentType,
           public_url: publicUrl,
           extracted_data: {
-            raw_content: rawContent,
-            structured_data: structuredData,
-            chunks: chunks
+            markdown: rawContent,
+            chunks: chunks,
+            structured_data: structuredData
           },
           processing_info: {
             batch_id: initialResult.batch_id,

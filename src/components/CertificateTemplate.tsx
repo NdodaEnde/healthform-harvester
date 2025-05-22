@@ -12,15 +12,6 @@ const CertificateTemplate = ({
 }: CertificateTemplateProps) => {
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
-    
-    // Additional logging to help diagnose the issue
-    if (extractedData?.structured_data) {
-      console.log("Structured data from props:", extractedData.structured_data);
-    }
-    
-    if (extractedData?.raw_content) {
-      console.log("Raw content available, length:", extractedData.raw_content.length);
-    }
   }, [extractedData]);
 
   const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
@@ -313,11 +304,136 @@ const CertificateTemplate = ({
     }
   }
 
+  // ENHANCED EXTRACTION FROM API RESPONSE
+  // Additional extraction method if we're still missing key data
+  if ((!structuredData.patient?.name || structuredData.patient?.name === 'Unknown') && 
+      extractedData?.raw_response?.data?.markdown) {
+    console.log("Using enhanced extraction from raw_response.data.markdown");
+    const markdown = extractedData.raw_response.data.markdown;
+    const enhancedData = extractDataFromMarkdown(markdown);
+    
+    // Override or supplement missing data
+    structuredData.patient = {
+      ...structuredData.patient,
+      name: enhancedData.patient.name || structuredData.patient?.name || 'Unknown',
+      id_number: enhancedData.patient.id_number || structuredData.patient?.id_number || '',
+      company: enhancedData.patient.company || structuredData.patient?.company || '',
+      occupation: enhancedData.patient.occupation || structuredData.patient?.occupation || ''
+    };
+    
+    // If we have dates in the enhanced data, use them
+    if (enhancedData.examination_results?.date) {
+      structuredData.examination_results = structuredData.examination_results || {};
+      structuredData.examination_results.date = enhancedData.examination_results.date;
+      
+      structuredData.certification = structuredData.certification || {};
+      structuredData.certification.examination_date = enhancedData.examination_results.date;
+    }
+    
+    if (enhancedData.certification?.valid_until) {
+      structuredData.certification = structuredData.certification || {};
+      structuredData.certification.valid_until = enhancedData.certification.valid_until;
+    }
+    
+    // Copy examination type data if available
+    if (enhancedData.examination_results?.type) {
+      structuredData.examination_results = structuredData.examination_results || {};
+      structuredData.examination_results.type = {
+        ...structuredData.examination_results.type,
+        ...enhancedData.examination_results.type
+      };
+    }
+    
+    // Copy test results if available
+    if (enhancedData.examination_results?.test_results) {
+      structuredData.examination_results = structuredData.examination_results || {};
+      structuredData.examination_results.test_results = {
+        ...structuredData.examination_results.test_results,
+        ...enhancedData.examination_results.test_results
+      };
+    }
+    
+    // Copy fitness status if available
+    if (enhancedData.certification) {
+      structuredData.certification = structuredData.certification || {};
+      Object.keys(enhancedData.certification).forEach(key => {
+        if (enhancedData.certification[key] !== false && 
+            enhancedData.certification[key] !== null && 
+            enhancedData.certification[key] !== undefined &&
+            enhancedData.certification[key] !== '') {
+          structuredData.certification[key] = enhancedData.certification[key];
+        }
+      });
+    }
+    
+    // Copy restrictions if available
+    if (enhancedData.restrictions) {
+      structuredData.restrictions = structuredData.restrictions || {};
+      Object.keys(enhancedData.restrictions).forEach(key => {
+        if (enhancedData.restrictions[key] === true) {
+          structuredData.restrictions[key] = true;
+        }
+      });
+    }
+  }
+
   // DIRECT EXTRACTION FROM API
-  // Try getting certificate_info directly if available
-  if (extractedData?.structured_data?.certificate_info) {
-    console.log("Found certificate_info in structured_data");
-    structuredData.certificate_info = extractedData.structured_data.certificate_info;
+  // Try getting data directly from directExtraction if available
+  if (extractedData?.raw_response?.directExtraction) {
+    console.log("Using direct extraction data from API client");
+    const directData = extractedData.raw_response.directExtraction;
+    
+    // Update patient data
+    if (directData.patient) {
+      structuredData.patient = structuredData.patient || {};
+      structuredData.patient.name = directData.patient.name || structuredData.patient.name;
+      structuredData.patient.id_number = directData.patient.id_number || structuredData.patient.id_number;
+      structuredData.patient.company = directData.patient.company || structuredData.patient.company;
+      structuredData.patient.occupation = directData.patient.occupation || structuredData.patient.occupation;
+    }
+    
+    // Update certification data
+    if (directData.certification) {
+      structuredData.certification = structuredData.certification || {};
+      structuredData.certification.examination_date = directData.certification.examination_date || structuredData.certification.examination_date;
+      structuredData.certification.valid_until = directData.certification.valid_until || structuredData.certification.valid_until;
+      
+      // Update fitness status
+      if (directData.certification.fit !== undefined) structuredData.certification.fit = directData.certification.fit;
+      if (directData.certification.fit_with_restrictions !== undefined) structuredData.certification.fit_with_restrictions = directData.certification.fit_with_restrictions;
+      if (directData.certification.fit_with_condition !== undefined) structuredData.certification.fit_with_condition = directData.certification.fit_with_condition;
+      if (directData.certification.temporarily_unfit !== undefined) structuredData.certification.temporarily_unfit = directData.certification.temporarily_unfit;
+      if (directData.certification.unfit !== undefined) structuredData.certification.unfit = directData.certification.unfit;
+    }
+    
+    // Update examination data
+    if (directData.examination) {
+      structuredData.examination_results = structuredData.examination_results || {};
+      
+      if (directData.examination.type) {
+        structuredData.examination_results.type = structuredData.examination_results.type || {};
+        structuredData.examination_results.type.pre_employment = directData.examination.type.pre_employment || structuredData.examination_results.type.pre_employment;
+        structuredData.examination_results.type.periodical = directData.examination.type.periodical || structuredData.examination_results.type.periodical;
+        structuredData.examination_results.type.exit = directData.examination.type.exit || structuredData.examination_results.type.exit;
+      }
+      
+      if (directData.examination.tests) {
+        structuredData.examination_results.test_results = structuredData.examination_results.test_results || {};
+        Object.keys(directData.examination.tests).forEach(key => {
+          structuredData.examination_results.test_results[key] = directData.examination.tests[key];
+        });
+      }
+    }
+    
+    // Update restrictions
+    if (directData.restrictions) {
+      structuredData.restrictions = structuredData.restrictions || {};
+      Object.keys(directData.restrictions).forEach(key => {
+        if (directData.restrictions[key] === true) {
+          structuredData.restrictions[key] = true;
+        }
+      });
+    }
   }
 
   console.log("Final structured data for certificate template:", structuredData);

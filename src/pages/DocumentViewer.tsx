@@ -16,15 +16,7 @@ interface Document {
   public_url: string;
   status: string;
   document_type: string;
-  extracted_data: {
-    raw_content?: string;
-    structured_data?: {
-      certificate_info?: Record<string, any>;
-      [key: string]: any;
-    };
-    chunks?: any[];
-    [key: string]: any;
-  };
+  extracted_data: any;
   created_at: string;
 }
 
@@ -51,28 +43,8 @@ const DocumentViewer: React.FC = () => {
         .single();
 
       if (error) throw error;
-      
-      // Ensure we're working with a properly structured document
-      const processedData: Document = {
-        ...data,
-        extracted_data: data.extracted_data || {}
-      };
-      
-      setDocument(processedData);
-      console.log("Document data:", processedData);
-      
-      // Log the extracted_data specifically to help with debugging
-      console.log("Extracted data:", processedData.extracted_data);
-      
-      // If structured_data exists, log it as well
-      if (processedData.extracted_data?.structured_data) {
-        console.log("Structured data:", processedData.extracted_data.structured_data);
-        
-        // Also log certificate info if it exists
-        if (processedData.extracted_data.structured_data.certificate_info) {
-          console.log("Certificate info:", processedData.extracted_data.structured_data.certificate_info);
-        }
-      }
+      setDocument(data);
+      console.log("Document data:", data);
     } catch (err) {
       console.error('Error fetching document:', err);
       setError(err instanceof Error ? err.message : 'Failed to load document');
@@ -159,11 +131,7 @@ const DocumentViewer: React.FC = () => {
                 Structured Data
               </Button>
               {document.public_url && (
-                <Button variant="outline" onClick={() => {
-                  if (document?.public_url) {
-                    window.open(document.public_url, '_blank');
-                  }
-                }} size="sm">
+                <Button variant="outline" onClick={downloadDocument} size="sm">
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </Button>
@@ -197,7 +165,7 @@ const DocumentViewer: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Structured Data or Certificate Preview */}
+          {/* Structured Data View */}
           <Card className="lg:h-[calc(100vh-220px)] overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle>
@@ -250,6 +218,7 @@ const DocumentViewer: React.FC = () => {
                 <div className="overflow-auto">
                   <CertificateTemplate 
                     extractedData={document.extracted_data} 
+                    documentId={id} 
                   />
                 </div>
               )}
