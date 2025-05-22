@@ -65,7 +65,11 @@ import {
 
 
 
-const PatientList = () => {
+const PatientList = ({ 
+  filters, 
+  sortOptions, 
+  currentPage 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState<string>("all");
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -86,8 +90,8 @@ const PatientList = () => {
   
   const organizationId = getEffectiveOrganizationId();
   
-  const { data: patientsData, isLoading, error, refetch } = useQuery({
-    queryKey: ['patients', organizationId, searchTerm, filterGender, dateFilter],
+  const { data: patients, isLoading, error } = useQuery({
+    queryKey: ['patients', organizationId, filters, sortOptions, currentPage],
     queryFn: async () => {
       let query = supabase
         .from('patients')
@@ -115,28 +119,12 @@ const PatientList = () => {
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
-        throw new Error(`Error fetching patients: ${error.message}`);
+        console.error('Error fetching patients:', error);
+        throw error;
       }
       
-      console.log('Patients fetched:', data?.length, 'Query params:', { 
-        organizationId, 
-        searchTerm, 
-        filterGender,
-        dateFilter: dateFilter.label
-      });
-      
-      if (!data || data.length === 0) {
-        console.log('No patients found for this organization. Organization ID:', organizationId);
-      } else {
-        console.log('Retrieved patients:', data.map(p => ({
-          id: p.id, 
-          name: `${p.first_name} ${p.last_name}`,
-          gender: p.gender,
-          dob: p.date_of_birth || p.birthdate_from_id
-        })));
-      }
-      
-      return data || [];
+      // Explicitly cast the response to PatientInfo[] to fix type issues
+      return (data || []) as PatientInfo[];
     },
     enabled: !!organizationId,
   });
@@ -155,7 +143,7 @@ const PatientList = () => {
     enabled: !!organizationId
   });
 
-  const patients: PatientInfo[] = patientsData?.map(p => {
+  const patients: PatientInfo[] = patients?.map(p => {
     let contactInfo: ContactInfo | null = null;
     if (p.contact_info) {
       if (typeof p.contact_info === 'string') {

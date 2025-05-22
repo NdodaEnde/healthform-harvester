@@ -186,7 +186,8 @@ const PatientRecordsPage = () => {
       if ('structured_data' in extractedData && 
           typeof extractedData.structured_data === 'object' && 
           extractedData.structured_data !== null) {
-        return !!extractedData.structured_data.validated;
+        // Use optional chaining and type checking for safer access
+        return extractedData.structured_data?.validated === true;
       }
     }
     return false;

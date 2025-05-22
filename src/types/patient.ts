@@ -1,4 +1,3 @@
-
 import { Json } from "@/integrations/supabase/types";
 
 export interface ContactInfo {
@@ -88,19 +87,20 @@ export interface PatientInfo {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  gender: string | null;
-  contact_info?: ContactInfo | null;
-  medical_history?: MedicalHistoryData | null;
+  gender: string;
+  contact_info?: ContactInfo;
+  medical_history?: MedicalHistoryData;
   organization_id?: string;
-  client_organization_id?: string | null;
+  client_organization_id?: string;
   created_at: string;
   updated_at: string;
-  // South African ID number fields
+  birthdate_from_id?: string | null;
+  gender_from_id?: string | null;
+  citizenship_status?: string | null;
+  citizenship?: string | null;
   id_number?: string;
-  birthdate_from_id?: string;
-  gender_from_id?: 'male' | 'female' | null;
-  citizenship_status?: 'citizen' | 'permanent_resident' | null;
   id_number_valid?: boolean;
+  age_at_registration?: number | null;
 }
 
 export interface CertificateData {
