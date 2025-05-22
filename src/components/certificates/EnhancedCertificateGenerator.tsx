@@ -31,6 +31,21 @@ export interface EnhancedCertificateGeneratorProps {
   onClose?: () => void;
 }
 
+// Extended FormattedCertificateData interface to include the missing properties
+interface ExtendedFormattedCertificateData {
+  patientName: string;
+  patientId: string;
+  companyName: string;
+  occupation: string;
+  validUntil: string;
+  examinationDate: string;
+  restrictionsText: string;
+  comments?: string;
+  followUpActions?: string;
+  reviewDate?: string;
+  [key: string]: any;
+}
+
 const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> = ({
   documentId,
   patientId,
@@ -43,7 +58,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
   const [isGenerating, setIsGenerating] = useState(false);
   const [fitnessStatus, setFitnessStatus] = useState<string>('unknown');
   const [editMode, setEditMode] = useState(false);
-  const [editedData, setEditedData] = useState<any>(null);
+  const [editedData, setEditedData] = useState<ExtendedFormattedCertificateData | null>(null);
   
   // Handle different data sources: direct extractedData, document with extracted_data, or certificateData
   const dataToUse = extractedData || 
