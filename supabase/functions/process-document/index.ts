@@ -84,24 +84,29 @@ serve(async (req) => {
       throw new Error("No document processing results returned");
     }
     
-    // Store file in Storage
+    // Store file in Storage - IMPROVED ERROR HANDLING HERE
     const timestamp = new Date().getTime();
     const fileExt = file.name.split('.').pop();
     const filePath = `${userId}/${timestamp}_${documentType}.${fileExt}`;
     
     console.log(`Uploading file to storage: ${filePath}`);
     
-    // FIX: Use try/catch specifically for storage operations
+    // FIX: Use try/catch specifically for storage operations - IMPROVED WITH BETTER FILE HANDLING
     let uploadData = null;
     let publicUrl = null;
     
     try {
-      // Attempt to upload to storage
+      // Create a blob copy of the file to ensure it's properly formatted for storage
+      const fileBuffer = await file.arrayBuffer();
+      const fileBlob = new Blob([fileBuffer], { type: file.type });
+      
+      // Attempt to upload to storage with proper content type
       const { data: storageData, error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(filePath, file, {
+        .upload(filePath, fileBlob, {
           contentType: file.type,
-          cacheControl: '3600'
+          cacheControl: '3600',
+          upsert: false // Don't overwrite existing files
         });
 
       if (uploadError) {
@@ -111,14 +116,24 @@ serve(async (req) => {
       
       uploadData = storageData;
       
-      // Get public URL if upload successful
+      // Get public URL if upload successful - IMPROVED URL GENERATION
       const { data: urlData } = await supabase.storage
         .from('documents')
         .getPublicUrl(filePath);
       
       if (urlData) {
         publicUrl = urlData.publicUrl;
-        console.log("Generated public URL:", publicUrl);
+        // Validate the URL is working by making a HEAD request - this can help detect issues
+        try {
+          const urlCheck = await fetch(publicUrl, { method: 'HEAD' });
+          if (!urlCheck.ok) {
+            console.warn(`Generated URL verification failed with status: ${urlCheck.status}`);
+          } else {
+            console.log("Generated public URL verified:", publicUrl);
+          }
+        } catch (urlCheckError) {
+          console.warn("Could not verify URL:", urlCheckError);
+        }
       }
     } catch (storageError) {
       console.error("Failed to upload to storage, proceeding without file storage:", storageError);
@@ -323,12 +338,11 @@ serve(async (req) => {
       console.error("Error cleaning up temporary files:", error);
     });
     
-    // Return the expected JSON format
-    // FIXED: Added documentId at the top level to match frontend expectations
+    // FIXED: Return the expected JSON format with documentId at the top level
     return new Response(
       JSON.stringify({
         success: true,
-        documentId: insertedDoc.id, // Add documentId at the root level
+        documentId: insertedDoc.id, // Ensure documentId is included at the top level
         document: {
           id: insertedDoc.id,
           status: documentStatus,
