@@ -403,17 +403,60 @@ const CertificateTemplate = ({
       extracted.restrictions[restriction.key] = isSelected;
     });
 
-    // Extract additional information
-    const followUpMatch = markdown.match(/Referred\s+or\s+follow\s+up\s+actions:\s*([^\n\r]+)/i);
-    if (followUpMatch && followUpMatch[1]) {
-      extracted.certification.follow_up = followUpMatch[1].trim();
+    // Extract additional information - UPDATED SECTION
+    // Improved follow up action extraction
+    const followUpPatterns = [
+      /Referred\s+or\s+follow\s+up\s+actions:?\s*([^<\n\r]+)/i,
+      /Follow\s+up\s+actions:?\s*([^<\n\r]+)/i,
+      /Referred:?\s*([^<\n\r]+)/i
+    ];
+    
+    for (const pattern of followUpPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        const cleanedText = match[1].trim().replace(/<\/td>.*$/, '');
+        extracted.certification.follow_up = cleanedText === "N/A" ? "N/A" : cleanedText;
+        break;
+      }
     }
 
-    const reviewDateMatch = markdown.match(/Review\s+Date:\s*([^\n\r]+)/i);
-    if (reviewDateMatch && reviewDateMatch[1]) {
-      extracted.certification.review_date = reviewDateMatch[1].trim();
+    // Improved review date extraction
+    const reviewDatePatterns = [
+      /Review\s+Date:?\s*([^<\n\r]+)/i,
+      /Next\s+Review:?\s*([^<\n\r]+)/i,
+      /Follow\s+up\s+Date:?\s*([^<\n\r]+)/i
+    ];
+    
+    for (const pattern of reviewDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        const cleanedText = match[1].trim().replace(/<\/td>.*$/, '').replace(/<\/tr>.*$/, '');
+        extracted.certification.review_date = cleanedText;
+        break;
+      }
     }
 
+    // As a fallback, try to find the review date in the raw text
+    if (!extracted.certification.review_date || extracted.certification.review_date.includes('<')) {
+      const rawReviewMatch = markdown.match(/Review\s+Date:?\s*([^\n<]+)/i);
+      if (rawReviewMatch && rawReviewMatch[1]) {
+        extracted.certification.review_date = rawReviewMatch[1].trim();
+      } else {
+        extracted.certification.review_date = '';
+      }
+    }
+
+    // Fallback for follow up if it contains HTML
+    if (!extracted.certification.follow_up || extracted.certification.follow_up.includes('<')) {
+      const rawFollowUpMatch = markdown.match(/follow\s+up\s+actions:?\s*([^\n<]+)/i);
+      if (rawFollowUpMatch && rawFollowUpMatch[1]) {
+        extracted.certification.follow_up = rawFollowUpMatch[1].trim();
+      } else {
+        extracted.certification.follow_up = '';
+      }
+    }
+
+    // Comments extraction - keeping this as is
     const commentsMatch = markdown.match(/Comments:\s*([^<\n\r]+)/i);
     if (commentsMatch && commentsMatch[1]) {
       let comments = commentsMatch[1].trim();
