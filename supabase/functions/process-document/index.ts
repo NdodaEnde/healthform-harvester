@@ -101,10 +101,11 @@ serve(async (req) => {
     // Create document record in database
     const documentRecord = {
       user_id: userId,
+      owner_id: userId, // Also set owner_id for backward compatibility
       organization_id: null, // Will be updated after insertion
       file_path: filePath,
       file_name: file.name,
-      mime_type: file.type, // Use mime_type instead of file_type
+      mime_type: file.type,
       document_type: documentType,
       status: 'processing',
       extracted_data: {

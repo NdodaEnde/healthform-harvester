@@ -237,10 +237,12 @@ export type Database = {
           id: string
           mime_type: string
           organization_id: string | null
+          owner_id: string | null
           processed_at: string | null
           processing_error: string | null
           status: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           client_organization_id?: string | null
@@ -252,10 +254,12 @@ export type Database = {
           id?: string
           mime_type: string
           organization_id?: string | null
+          owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
           status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           client_organization_id?: string | null
@@ -267,10 +271,12 @@ export type Database = {
           id?: string
           mime_type?: string
           organization_id?: string | null
+          owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
           status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
