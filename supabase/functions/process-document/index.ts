@@ -84,14 +84,14 @@ serve(async (req) => {
       throw new Error("No document processing results returned");
     }
     
-    // Store file in Storage - IMPROVED ERROR HANDLING HERE
+    // Store file in Storage
     const timestamp = new Date().getTime();
     const fileExt = file.name.split('.').pop();
     const filePath = `${userId}/${timestamp}_${documentType}.${fileExt}`;
     
     console.log(`Uploading file to storage: ${filePath}`);
     
-    // FIX: Use try/catch specifically for storage operations - IMPROVED WITH BETTER FILE HANDLING
+    // FIX: Use try/catch specifically for storage operations
     let uploadData = null;
     let publicUrl = null;
     
@@ -342,7 +342,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        documentId: insertedDoc.id, // Ensure documentId is included at the top level
+        documentId: insertedDoc.id, // Add documentId at the root level
         document: {
           id: insertedDoc.id,
           status: documentStatus,
