@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, FileText, Download, Eye } from 'lucide-react';
+import { Loader2, FileText, Download, Eye, EyeOff } from 'lucide-react';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
@@ -37,6 +37,7 @@ const DocumentViewer: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'pdf' | 'structured'>('pdf');
+  const [hideOriginalPdf, setHideOriginalPdf] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -56,17 +57,21 @@ const DocumentViewer: React.FC = () => {
       if (error) throw error;
       console.log("Document data:", data);
       
+      // Handle case where extracted_data is stored as a string
+      let processedData = { ...data };
       if (data && typeof data.extracted_data === 'string') {
         try {
-          data.extracted_data = JSON.parse(data.extracted_data);
+          processedData.extracted_data = JSON.parse(data.extracted_data);
         } catch (parseError) {
           console.error('Error parsing extracted_data JSON:', parseError);
         }
       }
       
-      setDocument(data);
+      setDocument(processedData);
       
-      if (data.document_type?.includes('certificate') && data.extracted_data?.structured_data?.certificate_info) {
+      // Auto-switch to structured view if certificate data exists
+      if (processedData.document_type?.includes('certificate') && 
+          processedData.extracted_data?.structured_data?.certificate_info) {
         toast.info('Certificate data has been detected and loaded');
         setViewMode('structured');
       }
@@ -166,37 +171,58 @@ const DocumentViewer: React.FC = () => {
                   Download
                 </Button>
               )}
+              {viewMode === 'structured' && hasCertificateData && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setHideOriginalPdf(!hideOriginalPdf)} 
+                  size="sm"
+                >
+                  {hideOriginalPdf ? (
+                    <>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Show Original
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      Hide Original
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* PDF Viewer */}
-          <Card className="lg:h-[calc(100vh-220px)]">
-            <CardHeader className="pb-2">
-              <CardTitle>Original Document</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {document.public_url ? (
-                <div className="w-full h-[600px] border rounded">
-                  <embed
-                    src={document.public_url}
-                    type="application/pdf"
-                    width="100%"
-                    height="100%"
-                    className="rounded"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-[600px] bg-gray-50 rounded">
-                  <p className="text-gray-500">PDF not available</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className={`grid grid-cols-1 ${hideOriginalPdf ? '' : 'lg:grid-cols-2'} gap-6`}>
+          {/* PDF Viewer - Hidden when hideOriginalPdf is true */}
+          {!hideOriginalPdf && (
+            <Card className="lg:h-[calc(100vh-220px)]">
+              <CardHeader className="pb-2">
+                <CardTitle>Original Document</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {document.public_url ? (
+                  <div className="w-full h-[600px] border rounded">
+                    <embed
+                      src={document.public_url}
+                      type="application/pdf"
+                      width="100%"
+                      height="100%"
+                      className="rounded"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[600px] bg-gray-50 rounded">
+                    <p className="text-gray-500">PDF not available</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Structured Data View */}
-          <Card className="lg:h-[calc(100vh-220px)] overflow-hidden">
+          {/* Certificate View or Structured Data View */}
+          <Card className={`${hideOriginalPdf ? 'w-full mx-auto max-w-4xl' : ''} lg:h-[calc(100vh-220px)] overflow-hidden`}>
             <CardHeader className="pb-2">
               <CardTitle>
                 {viewMode === 'structured' ? 'Certificate Preview' : 'Extracted Data'}
@@ -206,8 +232,9 @@ const DocumentViewer: React.FC = () => {
               {viewMode === 'structured' ? (
                 <div className="overflow-auto">
                   <CertificateTemplate 
-                    extractedData={document.extracted_data || {}} 
-                    documentId={id || ''} 
+                    extractedData={document.extracted_data || {}}
+                    documentId={id || ''}
+                    editable={true}
                   />
                 </div>
               ) : (
