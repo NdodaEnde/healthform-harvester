@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -147,11 +148,23 @@ const DocumentUploader = ({
         // Update UI with verified status
         setDocumentStatus(verifyData.status);
         
-        const hasStructuredData = verifyData.extracted_data?.structured_data && 
-          Object.keys(verifyData.extracted_data.structured_data).length > 0;
+        // Safely access nested properties using optional chaining
+        const extractedData = verifyData.extracted_data;
         
-        const hasRawContent = verifyData.extracted_data?.raw_content && 
-          verifyData.extracted_data.raw_content.length > 0;
+        // Check if we have structured data
+        const hasStructuredData = typeof extractedData === 'object' && 
+          extractedData !== null && 
+          'structured_data' in extractedData && 
+          extractedData.structured_data !== null &&
+          typeof extractedData.structured_data === 'object' &&
+          Object.keys(extractedData.structured_data || {}).length > 0;
+          
+        // Check if we have raw content
+        const hasRawContent = typeof extractedData === 'object' && 
+          extractedData !== null && 
+          'raw_content' in extractedData && 
+          typeof extractedData.raw_content === 'string' &&
+          extractedData.raw_content.length > 0;
           
         if (hasStructuredData) {
           setProcessingStatus("Document processed completely with structured data!");

@@ -117,8 +117,28 @@ serve(async (req) => {
     
     // Determine document status based on extracted data
     // Check if we have meaningful structured data
-    const rawContent = documentResult.markdown || documentResult.data?.markdown || "";
-    const structuredData = documentResult.data || documentResult.structured_data || {};
+    const rawContent = typeof documentResult.markdown === 'string' ? documentResult.markdown : 
+                      (documentResult.data && typeof documentResult.data.markdown === 'string' ? 
+                        documentResult.data.markdown : "");
+    
+    // Build structured data object carefully
+    let structuredData = documentResult.data || documentResult.structured_data || {};
+    
+    // Convert to proper object if it's a string
+    if (typeof structuredData === 'string') {
+      try {
+        structuredData = JSON.parse(structuredData);
+      } catch (e) {
+        console.warn("Failed to parse structured data string:", e);
+        structuredData = {};
+      }
+    }
+    
+    // Final check to ensure structuredData is an object
+    if (typeof structuredData !== 'object' || structuredData === null) {
+      structuredData = {};
+    }
+    
     const hasStructuredData = Object.keys(structuredData).length > 0;
     
     // Set status based on data quality

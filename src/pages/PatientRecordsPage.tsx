@@ -106,7 +106,19 @@ const PatientRecordsPage = () => {
       let filteredData = data || [];
       if (showOnlyValidated) {
         filteredData = filteredData.filter(doc => {
-          return doc.extracted_data?.structured_data?.validated === true;
+          // Safely check for structured_data.validated
+          if (!doc.extracted_data) return false;
+          
+          // Handle different possible formats of extracted_data
+          const extractedData = doc.extracted_data;
+          if (typeof extractedData === 'object' && extractedData !== null) {
+            if ('structured_data' in extractedData && 
+                typeof extractedData.structured_data === 'object' && 
+                extractedData.structured_data !== null) {
+              return !!extractedData.structured_data.validated;
+            }
+          }
+          return false;
         });
       }
       
@@ -166,7 +178,18 @@ const PatientRecordsPage = () => {
 
   // Helper function to check validation status safely
   const isDocumentValidated = (doc: Document) => {
-    return doc.extracted_data?.structured_data?.validated === true;
+    if (!doc.extracted_data) return false;
+    
+    // Safely check for structured_data.validated
+    const extractedData = doc.extracted_data;
+    if (typeof extractedData === 'object' && extractedData !== null) {
+      if ('structured_data' in extractedData && 
+          typeof extractedData.structured_data === 'object' && 
+          extractedData.structured_data !== null) {
+        return !!extractedData.structured_data.validated;
+      }
+    }
+    return false;
   };
 
   return (
