@@ -344,7 +344,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
               <EnhancedCertificateGenerator 
                 documentId={selectedCertificate.id} 
                 onClose={() => setIsGeneratorDialogOpen(false)}
-          />
               />
             )}
           </div>
