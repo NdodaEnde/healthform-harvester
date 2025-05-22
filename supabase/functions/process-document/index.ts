@@ -98,11 +98,6 @@ serve(async (req) => {
       throw new Error(`Storage error: ${uploadError.message}`);
     }
     
-    // Get public URL for the file
-    const { data: { publicUrl } } = supabase.storage
-      .from('documents')
-      .getPublicUrl(filePath);
-      
     // Create document record in database
     const documentRecord = {
       user_id: userId,
@@ -110,7 +105,6 @@ serve(async (req) => {
       file_path: filePath,
       file_name: file.name,
       mime_type: file.type, // Use mime_type instead of file_type
-      public_url: publicUrl,
       document_type: documentType,
       status: 'processing',
       extracted_data: {
