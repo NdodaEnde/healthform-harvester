@@ -25,3 +25,6 @@ export * from './organization-assets';
 // Debugging utilities
 export * from './rls-tester';
 export * from './dbDebugging';
+
+// Export utils from lib
+export * from '@/lib/utils';

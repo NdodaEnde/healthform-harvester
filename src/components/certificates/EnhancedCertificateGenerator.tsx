@@ -1,191 +1,120 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Printer, X } from 'lucide-react';
-import { format } from 'date-fns';
-import { useReactToPrint } from 'react-to-print';
-import { toast } from '@/components/ui/use-toast';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { CertificateData, FormattedCertificateData, FitnessStatus, extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
+import React, { useState } from 'react';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
+import { toast } from 'sonner';
 
-interface EnhancedCertificateGeneratorProps {
-  patientId?: string;
+export interface EnhancedCertificateGeneratorProps {
   documentId?: string;
-  onClose?: () => void;
-  document?: any;
+  patientId?: string;
+  certificateData?: any;
+  onGenerate?: () => Promise<void>;
 }
 
-const EnhancedCertificateGenerator = ({ 
-  patientId, 
+const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> = ({
   documentId,
-  onClose,
-  document
-}: EnhancedCertificateGeneratorProps) => {
-  const [certificateData, setCertificateData] = useState<FormattedCertificateData | null>(null);
-  const [fitnessStatus, setFitnessStatus] = useState<FitnessStatus>('unknown');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isPrinting, setIsPrinting] = useState(false);
+  patientId,
+  certificateData,
+  onGenerate = async () => { /* Default empty async function */ }
+}) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [fitnessStatus, setFitnessStatus] = useState<string>('unknown');
+  
+  // Extract and prepare certificate data
+  const extractedData = certificateData ? extractCertificateData(certificateData) : null;
+  const formattedData = extractedData ? formatCertificateData(extractedData) : null;
+  
+  // Determine fitness status if we have data
+  React.useEffect(() => {
+    if (extractedData) {
+      const status = determineFitnessStatus(extractedData);
+      setFitnessStatus(status);
+    }
+  }, [extractedData]);
 
-  const { data: documentData } = useQuery({
-    queryKey: ['document', documentId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!documentId && !document,
-  });
-
-  useEffect(() => {
-    // If document is provided directly, use it first
-    const docToUse = document || documentData;
+  const handleGenerate = async () => {
+    if (!documentId || !patientId) {
+      toast.error("Missing required information to generate certificate");
+      return;
+    }
     
-    if (docToUse) {
-      const extractedData = extractCertificateData(docToUse);
-      setCertificateData(formatCertificateData(extractedData));
-      setFitnessStatus(determineFitnessStatus(extractedData));
-      setIsLoading(false);
-    }
-  }, [document, documentData]);
-
-  // Fix the useReactToPrint implementation
-  const componentRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    documentTitle: `Certificate of Fitness - ${certificateData?.patientName || 'Patient'}`,
-    onBeforePrint: () => {
-      setIsPrinting(true);
-    },
-    onAfterPrint: () => {
-      setIsPrinting(false);
-      toast({
-        title: "Certificate printed",
-        description: "The certificate has been sent to your printer."
-      });
-    },
-    content: () => componentRef.current,
-  });
-
-  const getFitnessStatusDisplay = () => {
-    switch (fitnessStatus) {
-      case 'fit':
-        return <Badge variant="success">Fit for Work</Badge>;
-      case 'fit-with-restrictions':
-        return <Badge variant="warning">Fit with Restrictions</Badge>;
-      case 'fit-with-condition':
-        return <Badge variant="warning">Fit with Condition</Badge>;
-      case 'temporarily-unfit':
-        return <Badge variant="destructive">Temporarily Unfit</Badge>;
-      case 'unfit':
-        return <Badge variant="destructive">Unfit for Work</Badge>;
-      default:
-        return <Badge variant="secondary">Status Unknown</Badge>;
+    try {
+      setIsGenerating(true);
+      // Call the onGenerate prop which is expected to return a Promise
+      await onGenerate();
+      toast.success("Certificate generated successfully");
+    } catch (error) {
+      console.error("Error generating certificate:", error);
+      toast.error("Failed to generate certificate");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  // Update the print button handler
-  const printCertificate = () => {
-    if (handlePrint) {
-      handlePrint();
-    }
-  };
-
-  if (isLoading) {
+  if (!extractedData || !formattedData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Loading certificate...
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Certificate Generation</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-500">No certificate data available</p>
+        </CardContent>
+      </Card>
     );
   }
-  
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle>Certificate of Fitness</CardTitle>
-        {onClose && (
-          <Button variant="ghost" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+      <CardHeader>
+        <CardTitle>Certificate Generation</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {certificateData ? (
-          <div ref={componentRef} className="p-4 border rounded-md">
-            <h2 className="text-lg font-semibold mb-4">Patient Information</h2>
-            <Table>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Name</TableCell>
-                  <TableCell>{certificateData.patientName}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">ID Number</TableCell>
-                  <TableCell>{certificateData.patientId}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Company</TableCell>
-                  <TableCell>{certificateData.companyName}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Occupation</TableCell>
-                  <TableCell>{certificateData.occupation}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-
-            <h2 className="text-lg font-semibold mt-6 mb-4">Certification Details</h2>
-            <Table>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Examination Date</TableCell>
-                  <TableCell>{certificateData.examinationDate}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Valid Until</TableCell>
-                  <TableCell>{certificateData.validUntil}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Fitness Status</TableCell>
-                  <TableCell>{getFitnessStatusDisplay()}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Restrictions</TableCell>
-                  <TableCell>{certificateData.restrictionsText}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold">Patient Information</h3>
+            <p>{formattedData.patientName}</p>
+            <p className="text-sm text-gray-500">ID: {formattedData.patientId}</p>
           </div>
-        ) : (
-          <p>No data available for this certificate.</p>
-        )}
-        <div className="flex justify-end space-x-2">
-          {onClose && (
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
+          
+          <div>
+            <h3 className="font-semibold">Company</h3>
+            <p>{formattedData.companyName}</p>
+          </div>
+          
+          <div>
+            <h3 className="font-semibold">Occupation</h3>
+            <p>{formattedData.occupation}</p>
+          </div>
+          
+          <div>
+            <h3 className="font-semibold">Medical Status</h3>
+            <div className={`
+              inline-block px-2 py-1 rounded-md text-sm font-medium
+              ${fitnessStatus === 'fit' ? 'bg-green-100 text-green-800' : ''}
+              ${fitnessStatus === 'fit-with-restrictions' ? 'bg-yellow-100 text-yellow-800' : ''}
+              ${fitnessStatus === 'temporarily-unfit' ? 'bg-orange-100 text-orange-800' : ''}
+              ${fitnessStatus === 'unfit' ? 'bg-red-100 text-red-800' : ''}
+              ${fitnessStatus === 'unknown' ? 'bg-gray-100 text-gray-800' : ''}
+            `}>
+              {fitnessStatus.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+            </div>
+          </div>
+          
+          {formattedData.restrictionsText !== 'None' && (
+            <div>
+              <h3 className="font-semibold">Restrictions</h3>
+              <p>{formattedData.restrictionsText}</p>
+            </div>
           )}
-          <Button onClick={printCertificate} variant="default">
-            <Printer className="mr-2 h-4 w-4" />
-            Print Certificate
+          
+          <Button 
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="w-full"
+          >
+            {isGenerating ? 'Generating...' : 'Generate Certificate'}
           </Button>
         </div>
       </CardContent>

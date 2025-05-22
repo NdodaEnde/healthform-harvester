@@ -1,3 +1,4 @@
+
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from 'date-fns';
@@ -179,4 +180,21 @@ export function determineFitnessStatus(certificateData: CertificateData): Fitnes
     console.error('Error determining fitness status:', error);
     return 'unknown';
   }
+}
+
+// Add the missing function that's causing the import error
+export function mapExtractedDataToValidatorFormat(extractedData: any) {
+  if (!extractedData) return null;
+  
+  // Create a safe extraction of the data
+  const structuredData = extractedData.structured_data || {};
+  const rawContent = extractedData.raw_content || '';
+  
+  return {
+    patient: structuredData.patient || {},
+    certification: structuredData.certification || {},
+    examination_results: structuredData.examination_results || {},
+    restrictions: structuredData.restrictions || {},
+    raw_content: rawContent
+  };
 }

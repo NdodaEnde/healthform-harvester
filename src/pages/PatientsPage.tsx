@@ -19,6 +19,14 @@ const PatientsPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
+        <h1 className="text-2xl font-bold mb-6">Patients</h1>
+        {contextLabel && (
+          <div className="mb-4">
+            <span className="text-sm text-gray-500">Viewing patients for: </span>
+            <span className="font-medium">{contextLabel}</span>
+          </div>
+        )}
+        
         {/* Patient List Component - the main focus of the page */}
         <PatientList 
           filters={filters} 

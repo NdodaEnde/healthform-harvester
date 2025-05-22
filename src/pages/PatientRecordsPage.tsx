@@ -1,164 +1,131 @@
-
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, FileText } from 'lucide-react';
-import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import PatientVisits from '@/components/PatientVisits';
-import { toast } from '@/components/ui/use-toast';
 
-interface ExtractedData {
-  structured_data?: {
-    validated?: boolean;
-    [key: string]: any;
-  };
-  patient_info?: {
-    id?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-interface Document {
-  id: string;
-  file_name: string;
-  file_path: string;
-  status: string;
-  document_type: string | null;
-  processed_at: string | null;
-  created_at: string;
-  extracted_data: ExtractedData | null;
-  [key: string]: any;
-}
-
+// Import other components
 const PatientRecordsPage = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { getEffectiveOrganizationId } = useOrganization();
-  const organizationId = getEffectiveOrganizationId();
-  const [documentType, setDocumentType] = useState<string>("all");
-  const [showOnlyValidated, setShowOnlyValidated] = useState<boolean>(true);
+  const { patientId } = useParams<{ patientId: string }>();
+  const { currentOrganization, currentClient } = useOrganization();
+  const [patient, setPatient] = useState<any>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [visibleDocuments, setVisibleDocuments] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [currentFilter, setCurrentFilter] = useState<string>('all');
 
-  // Query patient information
-  const { data: patient, isLoading: isLoadingPatient } = useQuery({
-    queryKey: ['patient', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!id,
-  });
-
-  // Query patient documents
-  const { data: documents, isLoading: isLoadingDocuments } = useQuery({
-    queryKey: ['patient-documents', id, documentType, showOnlyValidated],
-    queryFn: async () => {
-      console.log('Fetching documents in PatientRecordsPage with filters:', {
-        patientId: id,
-        documentType,
-        showOnlyValidated
-      });
-      
-      let query = supabase
-        .from('documents')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      // Apply organization filter
-      query = query.eq('organization_id', organizationId);
-      
-      // Filter documents related to this patient
-      query = query.filter('extracted_data->patient_info->id', 'eq', id);
-      
-      // Apply document type filter if not "all"
-      if (documentType !== "all") {
-        query = query.eq('document_type', documentType);
-      }
-      
-      // Apply validation filter if enabled
-      if (showOnlyValidated) {
-        query = query.eq('status', 'processed');
-        // Handle cases where structured_data or validated might not exist
-        query = query.not('extracted_data', 'is', null);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching documents:', error);
-        throw error;
-      }
-      
-      // Further filter in JS for complex validation status check
-      let filteredData = data || [];
-      if (showOnlyValidated) {
-        filteredData = filteredData.filter(doc => {
-          // Safely check for structured_data.validated
-          if (!doc.extracted_data) return false;
+  // Load patient data
+  useEffect(() => {
+    if (!patientId) return;
+    
+    const fetchPatientData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Determine which organization ID to use
+        const organizationId = currentClient?.id || currentOrganization?.id;
+        if (!organizationId) {
+          throw new Error('No organization context available');
+        }
+        
+        // Fetch patient details
+        const { data: patientData, error: patientError } = await supabase
+          .from('patients')
+          .select('*')
+          .eq('id', patientId)
+          .single();
+        
+        if (patientError) throw patientError;
+        
+        if (patientData) {
+          setPatient(patientData);
           
-          // Handle different possible formats of extracted_data
-          const extractedData = doc.extracted_data;
-          if (typeof extractedData === 'object' && extractedData !== null) {
-            if ('structured_data' in extractedData && 
-                typeof extractedData.structured_data === 'object' && 
-                extractedData.structured_data !== null) {
-              return !!extractedData.structured_data.validated;
-            }
-          }
-          return false;
-        });
+          // Fetch related documents
+          const { data: documentsData, error: documentsError } = await supabase
+            .from('documents')
+            .select('*, certificates(*)')
+            .eq('owner_id', patientId)
+            .order('created_at', { ascending: false });
+          
+          if (documentsError) throw documentsError;
+          
+          setDocuments(documentsData || []);
+          setVisibleDocuments(documentsData || []);
+        }
+      } catch (error) {
+        console.error('Error fetching patient records:', error);
+        toast.error('Failed to load patient records');
+      } finally {
+        setIsLoading(false);
       }
-      
-      console.log('Documents fetched in PatientRecordsPage:', filteredData?.length, 'with filters:', {
-        documentType,
-        showOnlyValidated
-      });
-      
-      return filteredData as Document[] || [];
-    },
-    enabled: !!id && !!organizationId,
-  });
+    };
+    
+    fetchPatientData();
+  }, [patientId, currentOrganization?.id, currentClient?.id]);
 
-  const handleBackToPatient = () => {
-    navigate(`/patients/${id}`);
+  // Handle search and filter
+  useEffect(() => {
+    if (!documents.length) return;
+    
+    let filtered = [...documents];
+    
+    // Apply search filter if there is a search term
+    if (searchTerm) {
+      const lowercasedSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(doc => 
+        doc.file_name.toLowerCase().includes(lowercasedSearch) ||
+        doc.document_type?.toLowerCase().includes(lowercasedSearch)
+      );
+    }
+    
+    // Apply document type filter
+    if (currentFilter !== 'all') {
+      filtered = filtered.filter(doc => doc.document_type === currentFilter);
+    }
+    
+    setVisibleDocuments(filtered);
+  }, [searchTerm, currentFilter, documents]);
+
+  // Function to get certificate status
+  const getCertificateStatus = (document: any) => {
+    // Check if certificates exist and if there's at least one entry
+    if (document.certificates && document.certificates.length > 0) {
+      // Access the first certificate's validated field
+      const validated = document.certificates[0]?.validated;
+      // Return 'validated' if the field is true, otherwise 'not validated'
+      return validated === true ? 'Validated' : 'Not Validated';
+    }
+    return 'No Certificate';
   };
 
-  const handleBackToList = () => {
-    navigate('/patients');
+  // Function to get document status display
+  const getDocumentStatusDisplay = (document: any) => {
+    if (!document) return { text: 'Unknown', color: 'bg-gray-500' };
+    
+    const status = document.status || 'pending';
+    
+    switch (status.toLowerCase()) {
+      case 'processed':
+        return { text: 'Processed', color: 'bg-green-500' };
+      case 'extracted':
+        return { text: 'Data Extracted', color: 'bg-blue-500' };
+      case 'failed':
+        return { text: 'Processing Failed', color: 'bg-red-500' };
+      case 'pending':
+        return { text: 'Pending', color: 'bg-yellow-500' };
+      default:
+        return { text: status, color: 'bg-gray-500' };
+    }
   };
 
-  const handleViewDocument = (documentId: string) => {
-    navigate(`/documents/${documentId}`);
-  };
-
-  const toggleValidationFilter = () => {
-    console.log('Toggling validation filter from', showOnlyValidated, 'to', !showOnlyValidated);
-    setShowOnlyValidated(!showOnlyValidated);
-    toast({
-      title: showOnlyValidated ? "Showing all documents" : "Showing only validated documents",
-      description: showOnlyValidated 
-        ? "Now displaying all documents regardless of validation status" 
-        : "Now displaying only validated documents",
-    });
-  };
-
-  if (isLoadingPatient) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
       </div>
     );
   }
@@ -166,148 +133,200 @@ const PatientRecordsPage = () => {
   if (!patient) {
     return (
       <div className="text-center py-8">
-        <h2 className="text-xl font-semibold mb-2">Patient Not Found</h2>
-        <p className="text-muted-foreground mb-4">The patient you're looking for doesn't exist or you don't have permission to view it.</p>
-        <Button variant="outline" onClick={handleBackToList}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Patient List
+        <h2 className="text-2xl font-bold">Patient not found</h2>
+        <p className="mt-2">The patient record you are looking for does not exist or you don't have permission to view it.</p>
+        <Button asChild className="mt-4">
+          <Link to="/patients">Back to Patients</Link>
         </Button>
       </div>
     );
   }
 
-  // Helper function to check validation status safely
-  const isDocumentValidated = (doc: Document) => {
-    if (!doc.extracted_data) return false;
-    
-    // Safely check for structured_data.validated
-    const extractedData = doc.extracted_data;
-    if (typeof extractedData === 'object' && extractedData !== null) {
-      if ('structured_data' in extractedData && 
-          typeof extractedData.structured_data === 'object' && 
-          extractedData.structured_data !== null) {
-        // Use optional chaining and type checking for safer access
-        return extractedData.structured_data?.validated === true;
-      }
-    }
-    return false;
-  };
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-2 sm:flex-row sm:justify-between sm:items-center">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleBackToPatient}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Medical Records
-            </h1>
-          </div>
-          <p className="text-muted-foreground">
-            {patient.first_name} {patient.last_name}'s medical records and documents
-          </p>
+          <h1 className="text-2xl font-bold">{patient.first_name} {patient.last_name}</h1>
+          <p className="text-gray-500">ID: {patient.id_number || 'Not provided'}</p>
         </div>
+        <Button asChild variant="outline">
+          <Link to="/patients">Back to Patients</Link>
+        </Button>
       </div>
 
-      <Tabs defaultValue="visits">
-        <TabsList>
-          <TabsTrigger value="visits">Visit History</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="visits" className="mt-4">
-          <PatientVisits 
-            patientId={id!} 
-            organizationId={organizationId} 
-            showOnlyValidated={showOnlyValidated} 
-          />
-        </TabsContent>
-
-        <TabsContent value="documents" className="mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Documents</CardTitle>
-              <div className="flex items-center gap-2">
-                <Select value={documentType} onValueChange={setDocumentType}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Documents</SelectItem>
-                    <SelectItem value="certificate_of_fitness">Certificates of Fitness</SelectItem>
-                    <SelectItem value="medical_questionnaire">Medical Questionnaires</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button 
-                  variant={showOnlyValidated ? "default" : "outline"} 
-                  size="sm"
-                  onClick={toggleValidationFilter}
-                >
-                  {showOnlyValidated ? "Showing Validated" : "Show All"}
-                </Button>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Full Name</dt>
+                <dd>{patient.first_name} {patient.last_name}</dd>
               </div>
-            </CardHeader>
-            <CardContent>
-              {isLoadingDocuments ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                </div>
-              ) : documents && documents.length > 0 ? (
-                <div className="space-y-4">
-                  {documents.map(doc => (
-                    <div key={doc.id} className="border rounded-lg p-4 hover:bg-accent transition-colors">
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                        <div>
-                          <h3 className="font-medium">{doc.file_name}</h3>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <Badge variant="outline">
-                              {format(new Date(doc.created_at), 'PP')}
-                            </Badge>
-                            {doc.document_type && (
-                              <Badge variant="secondary" className="capitalize">
-                                {doc.document_type.replace(/_/g, ' ')}
-                              </Badge>
-                            )}
-                            <Badge 
-                              variant={doc.status === 'processed' ? 'success' : 'warning'} 
-                              className="capitalize"
-                            >
-                              {doc.status}
-                            </Badge>
-                            {isDocumentValidated(doc) ? (
-                              <Badge variant="success">Validated</Badge>
-                            ) : (
-                              <Badge variant="warning">Not Validated</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewDocument(doc.id)}
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          View Document
-                        </Button>
-                      </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">ID Number</dt>
+                <dd>{patient.id_number || 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
+                <dd>{patient.date_of_birth || 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Gender</dt>
+                <dd>{patient.gender || 'Not provided'}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Contact Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Email</dt>
+                <dd>{patient.email || 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                <dd>{patient.phone || 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Address</dt>
+                <dd>{patient.address || 'Not provided'}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Employment Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Company</dt>
+                <dd>{patient.company_name || 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Occupation</dt>
+                <dd>{patient.occupation || 'Not provided'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Employee ID</dt>
+                <dd>{patient.employee_id || 'Not provided'}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Separator className="my-6" />
+
+      <div className="mb-6">
+        <h2 className="text-xl font-bold mb-4">Documents</h2>
+        
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+          <div className="relative w-full sm:w-64">
+            <input
+              type="text"
+              placeholder="Search documents..."
+              className="w-full px-4 py-2 border rounded-md"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button 
+              variant={currentFilter === 'all' ? 'default' : 'outline'}
+              onClick={() => setCurrentFilter('all')}
+              size="sm"
+            >
+              All
+            </Button>
+            <Button 
+              variant={currentFilter === 'medical_certificate' ? 'default' : 'outline'}
+              onClick={() => setCurrentFilter('medical_certificate')}
+              size="sm"
+            >
+              Medical Certificates
+            </Button>
+            <Button 
+              variant={currentFilter === 'other' ? 'default' : 'outline'}
+              onClick={() => setCurrentFilter('other')}
+              size="sm"
+            >
+              Other
+            </Button>
+          </div>
+        </div>
+        
+        {visibleDocuments.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">No documents found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {visibleDocuments.map((doc) => (
+              <Card key={doc.id} className="overflow-hidden">
+                <div className="relative h-40 bg-gray-100">
+                  {doc.thumbnail_url ? (
+                    <img 
+                      src={doc.thumbnail_url} 
+                      alt={doc.file_name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
                     </div>
-                  ))}
+                  )}
+                  
+                  <div className="absolute top-2 right-2">
+                    <span className={`inline-block px-2 py-1 text-xs text-white rounded ${getDocumentStatusDisplay(doc).color}`}>
+                      {getDocumentStatusDisplay(doc).text}
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-8 border rounded-lg bg-background">
-                  <h3 className="text-lg font-medium mb-2">No records found</h3>
-                  <p className="text-muted-foreground">
-                    {showOnlyValidated 
-                      ? `No validated ${documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records found.`
-                      : `This patient doesn't have any ${documentType !== "all" ? documentType.replace(/_/g, ' ') : ''} records yet.`}
+                
+                <CardContent className="p-4">
+                  <h3 className="font-medium truncate" title={doc.file_name}>
+                    {doc.file_name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-2">
+                    {new Date(doc.created_at).toLocaleDateString()}
                   </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      {doc.document_type || 'Unknown type'}
+                    </span>
+                    <span className="text-xs">
+                      {getCertificateStatus(doc)}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <Button asChild size="sm" className="w-full">
+                      <Link to={`/patients/${patientId}/documents/${doc.id}`}>
+                        View Document
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
