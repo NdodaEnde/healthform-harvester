@@ -234,6 +234,7 @@ export type Database = {
           extracted_data: Json | null
           file_name: string
           file_path: string
+          file_size: number | null
           id: string
           mime_type: string
           organization_id: string | null
@@ -252,6 +253,7 @@ export type Database = {
           extracted_data?: Json | null
           file_name: string
           file_path: string
+          file_size?: number | null
           id?: string
           mime_type: string
           organization_id?: string | null
@@ -270,6 +272,7 @@ export type Database = {
           extracted_data?: Json | null
           file_name?: string
           file_path?: string
+          file_size?: number | null
           id?: string
           mime_type?: string
           organization_id?: string | null

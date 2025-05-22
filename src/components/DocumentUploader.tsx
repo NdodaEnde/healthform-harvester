@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
+import { ensureDocumentsBucketExists } from "@/utils/organization-assets";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -35,6 +36,20 @@ const DocumentUploader = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [documentStatus, setDocumentStatus] = useState<string | null>(null);
+  const [bucketReady, setBucketReady] = useState<boolean>(false);
+
+  // Ensure the documents bucket exists when component mounts
+  useEffect(() => {
+    const checkBucket = async () => {
+      const exists = await ensureDocumentsBucketExists();
+      setBucketReady(exists);
+      if (!exists) {
+        console.warn("Documents storage bucket may not be available");
+      }
+    };
+    
+    checkBucket();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -113,7 +128,7 @@ const DocumentUploader = ({
       console.log("Document processing response:", data);
       
       // First verify if the document has been properly created
-      if (!data?.documentId) {
+      if (!data?.document?.id) {
         throw new Error("No document ID returned from processing function");
       }
       
@@ -124,7 +139,7 @@ const DocumentUploader = ({
           organization_id: organizationId,
           client_organization_id: clientOrganizationId || null
         })
-        .eq('id', data.documentId);
+        .eq('id', data.document.id);
         
       if (updateError) {
         throw updateError;
@@ -136,7 +151,7 @@ const DocumentUploader = ({
       const { data: verifyData, error: verifyError } = await supabase
         .from('documents')
         .select('status, extracted_data')
-        .eq('id', data.documentId)
+        .eq('id', data.document.id)
         .single();
         
       if (verifyError) {
@@ -319,6 +334,13 @@ const DocumentUploader = ({
             <p className="text-xs font-medium">{uploadProgress}%</p>
           </div>
           {uploadProgress === 100 && getStatusDisplay()}
+        </div>
+      )}
+      
+      {!bucketReady && !uploading && (
+        <div className="text-xs text-amber-600">
+          <AlertTriangle className="inline h-3 w-3 mr-1" />
+          Storage system may not be ready. Some uploads may fail.
         </div>
       )}
       

@@ -3,6 +3,45 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
 /**
+ * Ensures that the documents storage bucket exists
+ * This helps prevent errors when trying to upload to a non-existent bucket
+ */
+export const ensureDocumentsBucketExists = async (): Promise<boolean> => {
+  try {
+    // Check if the bucket exists
+    const { data: buckets, error: listError } = await supabase
+      .storage
+      .listBuckets();
+      
+    if (listError) {
+      console.error("Error checking buckets:", listError);
+      return false;
+    }
+    
+    // If documents bucket doesn't exist, create it
+    if (!buckets.some(bucket => bucket.name === 'documents')) {
+      const { data, error: createError } = await supabase
+        .storage
+        .createBucket('documents', { public: false });
+        
+      if (createError) {
+        console.error("Error creating documents bucket:", createError);
+        return false;
+      }
+      
+      // Add RLS policy to allow authenticated users to upload
+      // Note: This is normally done in migrations, but as a fallback
+      console.log("Created documents bucket successfully");
+    }
+    
+    return true;
+  } catch (error: any) {
+    console.error("Error ensuring documents bucket exists:", error);
+    return false;
+  }
+};
+
+/**
  * Uploads an organization asset (logo, signature, stamp) to Supabase storage
  * and returns the public URL
  */

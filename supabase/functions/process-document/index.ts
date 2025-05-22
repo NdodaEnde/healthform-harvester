@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -89,18 +90,28 @@ serve(async (req) => {
     const filePath = `${userId}/${timestamp}_${documentType}.${fileExt}`;
     
     console.log(`Uploading file to storage: ${filePath}`);
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      console.error("Storage upload error:", uploadError);
-      throw new Error(`Storage error: ${uploadError.message}`);
-    }
     
-    // Generate public URL if needed
+    // FIX: Use try/catch specifically for storage operations
+    let uploadData = null;
     let publicUrl = null;
+    
     try {
+      // Attempt to upload to storage
+      const { data: storageData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          contentType: file.type,
+          cacheControl: '3600'
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw uploadError;
+      }
+      
+      uploadData = storageData;
+      
+      // Get public URL if upload successful
       const { data: urlData } = await supabase.storage
         .from('documents')
         .getPublicUrl(filePath);
@@ -109,9 +120,12 @@ serve(async (req) => {
         publicUrl = urlData.publicUrl;
         console.log("Generated public URL:", publicUrl);
       }
-    } catch (urlError) {
-      console.warn("Could not generate public URL:", urlError);
-      // Continue without public URL
+    } catch (storageError) {
+      console.error("Failed to upload to storage, proceeding without file storage:", storageError);
+      // Set default values but continue processing - don't terminate completely
+      uploadData = null;
+      publicUrl = null;
+      // Continue with document processing even if storage fails
     }
     
     // Extract data properly from the microservice response
@@ -261,7 +275,7 @@ serve(async (req) => {
     // Create document record in database
     const documentRecord = {
       user_id: userId,
-      file_path: filePath,
+      file_path: uploadData ? filePath : null,
       file_name: file.name,
       file_size: file.size,
       mime_type: file.type,
