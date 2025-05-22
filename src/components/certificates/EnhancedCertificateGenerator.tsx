@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -19,45 +20,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-
-interface CertificateData {
-  patient: any;
-  certification: any;
-  examination_results: any;
-  restrictions: any;
-  raw_content?: string;
-}
-
-interface FormattedCertificateData {
-  patientName: string;
-  patientId: string;
-  companyName: string;
-  occupation: string;
-  examinationDate: string;
-  validUntil: string;
-  restrictionsText: string;
-  rawContent: string;
-}
-
-type FitnessStatus = 'fit' | 'fit-with-restrictions' | 'fit-with-condition' | 'temporarily-unfit' | 'unfit' | 'unknown';
+import { CertificateData, FormattedCertificateData, FitnessStatus, extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
 
 interface EnhancedCertificateGeneratorProps {
-  patientId: string;
-  documentId: string;
-  onClose: () => void;
+  patientId?: string;
+  documentId?: string;
+  onClose?: () => void;
+  document?: any;
 }
 
 const EnhancedCertificateGenerator = ({ 
   patientId, 
   documentId,
-  onClose
+  onClose,
+  document
 }: EnhancedCertificateGeneratorProps) => {
   const [certificateData, setCertificateData] = useState<FormattedCertificateData | null>(null);
   const [fitnessStatus, setFitnessStatus] = useState<FitnessStatus>('unknown');
   const [isLoading, setIsLoading] = useState(true);
   const [isPrinting, setIsPrinting] = useState(false);
 
-  const { data: document } = useQuery({
+  const { data: documentData } = useQuery({
     queryKey: ['document', documentId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -69,17 +52,20 @@ const EnhancedCertificateGenerator = ({
       if (error) throw error;
       return data;
     },
-    enabled: !!documentId,
+    enabled: !!documentId && !document,
   });
 
   useEffect(() => {
-    if (document) {
-      const extractedData = extractCertificateData(document);
+    // If document is provided directly, use it first
+    const docToUse = document || documentData;
+    
+    if (docToUse) {
+      const extractedData = extractCertificateData(docToUse);
       setCertificateData(formatCertificateData(extractedData));
       setFitnessStatus(determineFitnessStatus(extractedData));
       setIsLoading(false);
     }
-  }, [document]);
+  }, [document, documentData]);
 
   // Fix the useReactToPrint implementation
   const componentRef = useRef<HTMLDivElement>(null);
@@ -95,10 +81,7 @@ const EnhancedCertificateGenerator = ({
         description: "The certificate has been sent to your printer."
       });
     },
-    // Remove the invalid 'content' property
-    // content: () => componentRef.current,
-    // Using the 'documentRef' instead which is valid
-    documentRef: componentRef,
+    content: () => componentRef.current,
   });
 
   const getFitnessStatusDisplay = () => {
@@ -137,10 +120,12 @@ const EnhancedCertificateGenerator = ({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle tag="h4">Certificate of Fitness</CardTitle>
-        <Button variant="ghost" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        <CardTitle>Certificate of Fitness</CardTitle>
+        {onClose && (
+          <Button variant="ghost" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {certificateData ? (
@@ -193,10 +178,11 @@ const EnhancedCertificateGenerator = ({
           <p>No data available for this certificate.</p>
         )}
         <div className="flex justify-end space-x-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          {/* Fix the onClick handler for the print button */}
+          {onClose && (
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
           <Button onClick={printCertificate} variant="default">
             <Printer className="mr-2 h-4 w-4" />
             Print Certificate
@@ -208,123 +194,3 @@ const EnhancedCertificateGenerator = ({
 };
 
 export default EnhancedCertificateGenerator;
-
-// Utility functions to extract and format data
-function extractCertificateData(document: any): CertificateData {
-  // Handle null or undefined document
-  if (!document || !document.extracted_data) {
-    return {
-      patient: {},
-      certification: {},
-      examination_results: {
-        date: '',
-        type: {
-          pre_employment: false,
-          periodical: false,
-          exit: false
-        }
-      },
-      restrictions: {}
-    };
-  }
-
-  // Try to extract data from document
-  try {
-    const data = document.extracted_data;
-    const structuredData = data.structured_data || {};
-    
-    // Initialize with safe defaults
-    const result: CertificateData = {
-      patient: structuredData.patient || {},
-      certification: structuredData.certification || {},
-      examination_results: {
-        date: '',
-        type: {
-          pre_employment: false,
-          periodical: false,
-          exit: false
-        }
-      },
-      restrictions: structuredData.restrictions || {},
-      raw_content: data.raw_content || ''
-    };
-    
-    // Set examination results if available
-    if (structuredData.examination_results) {
-      result.examination_results = structuredData.examination_results;
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('Error extracting certificate data:', error);
-    // Return default structure on error
-    return {
-      patient: {},
-      certification: {},
-      examination_results: {
-        date: '',
-        type: {
-          pre_employment: false,
-          periodical: false,
-          exit: false
-        }
-      },
-      restrictions: {},
-      raw_content: ''
-    };
-  }
-}
-
-function formatCertificateData(certificateData: CertificateData): FormattedCertificateData {
-  const { patient, certification, examination_results, restrictions, raw_content } = certificateData;
-  
-  // Use safe type checking and defaults
-  const patientObj = patient || {};
-  const certificationObj = certification || {};
-  const restrictionsObj = restrictions || {};
-  
-  return {
-    patientName: patientObj.name?.toString() || 'N/A',
-    patientId: patientObj.id_number?.toString() || 'N/A',
-    companyName: patientObj.company?.toString() || 'N/A',
-    occupation: patientObj.occupation?.toString() || 'N/A',
-    examinationDate: certificationObj.examination_date?.toString() || 'N/A',
-    validUntil: certificationObj.valid_until?.toString() || 'N/A',
-    restrictionsText: Array.isArray(restrictions) 
-      ? restrictions.join(', ') 
-      : (typeof restrictionsObj === 'string' ? restrictionsObj : 'None'),
-    rawContent: raw_content || ''
-  };
-}
-
-function determineFitnessStatus(certificateData: CertificateData): FitnessStatus {
-  try {
-    const examinationResults = certificateData.examination_results || {};
-    
-    // Create a safe reference to fitness data
-    const fitness = examinationResults.fitness || {};
-    
-    // Check each fitness status with safe property access
-    if ((fitness as any)?.fit === true) return 'fit';
-    if ((fitness as any)?.fit_with_restrictions === true) return 'fit-with-restrictions';
-    if ((fitness as any)?.fit_with_condition === true) return 'fit-with-condition';
-    if ((fitness as any)?.temporarily_unfit === true) return 'temporarily-unfit';
-    if ((fitness as any)?.unfit === true) return 'unfit';
-    
-    // If we have raw content but no structured data
-    if (certificateData.raw_content) {
-      const rawContent = certificateData.raw_content.toLowerCase();
-      
-      if (rawContent.includes('fit for work') || rawContent.includes('medically fit')) return 'fit';
-      if (rawContent.includes('fit with restrictions')) return 'fit-with-restrictions';
-      if (rawContent.includes('temporarily unfit')) return 'temporarily-unfit';
-      if (rawContent.includes('unfit for work') || rawContent.includes('medically unfit')) return 'unfit';
-    }
-    
-    // Default
-    return 'unknown';
-  } catch (error) {
-    console.error('Error determining fitness status:', error);
-    return 'unknown';
-  }
-}

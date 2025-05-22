@@ -68,12 +68,12 @@ import {
 const PatientList = ({ 
   filters, 
   sortOptions, 
-  currentPage 
+  currentPage: initialPage 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState<string>("all");
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialPage || 1);
   const [pageSize, setPageSize] = useState(9);
   const [dateFilter, setDateFilter] = useState<{
     label: string;
@@ -90,7 +90,7 @@ const PatientList = ({
   
   const organizationId = getEffectiveOrganizationId();
   
-  const { data: patients, isLoading, error } = useQuery({
+  const { data: patientData, isLoading, error, refetch } = useQuery({
     queryKey: ['patients', organizationId, filters, sortOptions, currentPage],
     queryFn: async () => {
       let query = supabase
@@ -143,7 +143,7 @@ const PatientList = ({
     enabled: !!organizationId
   });
 
-  const patients: PatientInfo[] = patients?.map(p => {
+  const patients = patientData?.map(p => {
     let contactInfo: ContactInfo | null = null;
     if (p.contact_info) {
       if (typeof p.contact_info === 'string') {
@@ -742,7 +742,6 @@ const PatientList = ({
               </TableHeader>
               <TableBody>
                 {paginatedPatients.map((patient, index) => {
-                  // Calculate age for each patient using enhanced function
                   const age = calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth);
                   
                   return (
