@@ -58,20 +58,40 @@ const DocumentViewer: React.FC = () => {
       console.log("Document data:", data);
       
       // Handle case where extracted_data is stored as a string
-      let processedData = { ...data };
-      if (data && typeof data.extracted_data === 'string') {
-        try {
-          processedData.extracted_data = JSON.parse(data.extracted_data);
-        } catch (parseError) {
-          console.error('Error parsing extracted_data JSON:', parseError);
+      let processedData: Document = { 
+        id: data.id,
+        file_name: data.file_name,
+        file_path: data.file_path,
+        public_url: data.public_url,
+        status: data.status,
+        document_type: data.document_type || '',
+        extracted_data: {},
+        created_at: data.created_at
+      };
+      
+      if (data.extracted_data) {
+        if (typeof data.extracted_data === 'string') {
+          try {
+            processedData.extracted_data = JSON.parse(data.extracted_data);
+          } catch (parseError) {
+            console.error('Error parsing extracted_data JSON:', parseError);
+            processedData.extracted_data = { raw_content: data.extracted_data };
+          }
+        } else {
+          processedData.extracted_data = data.extracted_data as ExtractedData;
         }
       }
       
       setDocument(processedData);
       
       // Auto-switch to structured view if certificate data exists
-      if (processedData.document_type?.includes('certificate') && 
-          processedData.extracted_data?.structured_data?.certificate_info) {
+      const hasCertificateData = 
+        processedData.document_type?.includes('certificate') && 
+        ((processedData.extracted_data?.structured_data?.certificate_info) ||
+         (typeof processedData.extracted_data === 'object' && 
+          processedData.extracted_data?.certificate_info));
+      
+      if (hasCertificateData) {
         toast.info('Certificate data has been detected and loaded');
         setViewMode('structured');
       }
@@ -124,7 +144,8 @@ const DocumentViewer: React.FC = () => {
 
   // Determine if certificate data exists
   const hasCertificateData = document.document_type?.includes('certificate') && 
-    document.extracted_data?.structured_data?.certificate_info;
+    (document.extracted_data?.structured_data?.certificate_info || 
+     document.extracted_data?.certificate_info);
 
   return (
     <>
@@ -232,7 +253,7 @@ const DocumentViewer: React.FC = () => {
               {viewMode === 'structured' ? (
                 <div className="overflow-auto">
                   <CertificateTemplate 
-                    extractedData={document.extracted_data || {}}
+                    extractedData={document.extracted_data}
                     documentId={id || ''}
                     editable={true}
                   />

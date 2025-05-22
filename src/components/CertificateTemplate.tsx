@@ -5,10 +5,14 @@ import OrganizationLogo from "./OrganizationLogo";
 
 type CertificateTemplateProps = {
   extractedData: any;
+  documentId?: string;
+  editable?: boolean;
 };
 
 const CertificateTemplate = ({
-  extractedData
+  extractedData,
+  documentId,
+  editable = false
 }: CertificateTemplateProps) => {
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
@@ -479,35 +483,7 @@ const CertificateTemplate = ({
     }
   };
 
-  console.log("Medical tests data:", medicalTests);ideDepth: {
-      done: isChecked(testResults.side_depth_done),
-      results: getValue(testResults, 'side_depth_results', 'N/A')
-    },
-    nightVision: {
-      done: isChecked(testResults.night_vision_done),
-      results: getValue(testResults, 'night_vision_results', 'N/A')
-    },
-    hearing: {
-      done: isChecked(testResults.hearing_done),
-      results: getValue(testResults, 'hearing_results', 'N/A')
-    },
-    heights: {
-      done: isChecked(testResults.heights_done),
-      results: getValue(testResults, 'heights_results', 'N/A')
-    },
-    lungFunction: {
-      done: isChecked(testResults.lung_function_done),
-      results: getValue(testResults, 'lung_function_results', 'N/A')
-    },
-    xRay: {
-      done: isChecked(testResults.x_ray_done),
-      results: getValue(testResults, 'x_ray_results', 'N/A')
-    },
-    drugScreen: {
-      done: isChecked(testResults.drug_screen_done),
-      results: getValue(testResults, 'drug_screen_results', 'N/A')
-    }
-  };
+  console.log("Medical tests data:", medicalTests);
 
   const restrictionsData = {
     heights: isChecked(restrictions.heights),
