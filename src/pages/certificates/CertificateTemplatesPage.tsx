@@ -82,7 +82,7 @@ export default function CertificateTemplatesPage() {
         
         <TabsContent value="generate" className="pt-4">
           <div className="bg-white rounded-lg shadow p-6">
-            <EnhancedCertificateGenerator document={sampleDocument} />
+            <EnhancedCertificateGenerator documentId={documentObject.id} />
           </div>
         </TabsContent>
       </Tabs>
