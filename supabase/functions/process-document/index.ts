@@ -109,8 +109,7 @@ serve(async (req) => {
       organization_id: null, // Will be updated after insertion
       file_path: filePath,
       file_name: file.name,
-      file_type: file.type,
-      // Remove file_size field as it doesn't exist in the schema
+      mime_type: file.type, // Use mime_type instead of file_type
       public_url: publicUrl,
       document_type: documentType,
       status: 'processing',
