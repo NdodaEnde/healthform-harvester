@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
-import { ensureDocumentsBucketExists, ensureStorageBucket } from "@/utils/organization-assets";
+import { createStandardizedFilePath, ensureStorageBucket } from "@/utils/documentOrganizationFixer";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -40,9 +40,8 @@ const DocumentUploader = ({
   // Ensure the documents bucket exists when component mounts
   useEffect(() => {
     const checkBucket = async () => {
-      // Try to ensure both bucket names for backward compatibility
-      const exists = await ensureStorageBucket('medical-documents') || 
-                     await ensureStorageBucket('documents');
+      // Always use medical-documents as the standard bucket
+      const exists = await ensureStorageBucket('medical-documents');
       setBucketReady(exists);
       if (!exists) {
         console.warn("Documents storage bucket may not be available");
@@ -89,11 +88,22 @@ const DocumentUploader = ({
         throw new Error("User not authenticated");
       }
       
+      // Create a standardized file path
+      const standardizedPath = createStandardizedFilePath(
+        organizationId,
+        documentType,
+        null, // No patient ID at upload time
+        file.name
+      );
+
+      console.log("Using standardized file path:", standardizedPath);
+      
       // Create a formData object
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
       formData.append('userId', user.id);
+      formData.append('filePath', standardizedPath);
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -327,10 +337,11 @@ const DocumentUploader = ({
 
       {organizationId && (
         <div className="text-xs text-muted-foreground">
-          {clientOrganizationId ? (
-            <p>This document will be uploaded for client organization</p>
-          ) : (
-            <p>This document will be uploaded to your organization</p>
+          <p>
+            This document will be uploaded to the standardized folder structure in the medical-documents bucket.
+          </p>
+          {clientOrganizationId && (
+            <p className="mt-1">Document will be associated with client organization.</p>
           )}
         </div>
       )}

@@ -10,7 +10,11 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { useOrganization } from "@/contexts/OrganizationContext";
-import { associateOrphanedDocuments, fixDocumentUrls } from "@/utils/documentOrganizationFixer";
+import { 
+  associateOrphanedDocuments, 
+  fixDocumentUrls, 
+  standardizeDocumentStorage
+} from "@/utils/documentOrganizationFixer";
 import { AlertTriangle, FileCheck, Link } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,8 +31,8 @@ export const OrphanedDocumentFixer = () => {
   const [loading, setLoading] = useState(false);
   const [fixed, setFixed] = useState(false);
   const [count, setCount] = useState(0);
-  const [standardizeBucket, setStandardizeBucket] = useState<string | undefined>(undefined);
-  const [shouldStandardize, setShouldStandardize] = useState(false);
+  const [standardizeBucket, setStandardizeBucket] = useState<string>("medical-documents");
+  const [shouldStandardize, setShouldStandardize] = useState(true);
   const { currentOrganization } = useOrganization();
   
   const handleFixOrphanedDocuments = async () => {
@@ -39,7 +43,9 @@ export const OrphanedDocumentFixer = () => {
       // First associate orphaned documents
       const result = await associateOrphanedDocuments(currentOrganization.id);
       let totalCount = 0;
+      let totalMigrated = 0;
       let urlResult = { success: false, count: 0 };
+      let standardizeResult = { success: false, count: 0 };
       
       // Then fix URLs for documents that need it
       if (result.success) {
@@ -47,8 +53,19 @@ export const OrphanedDocumentFixer = () => {
           currentOrganization.id, 
           shouldStandardize ? standardizeBucket : undefined
         );
+        
+        // If standardization is requested, reorganize files into proper structure
+        if (shouldStandardize) {
+          standardizeResult = await standardizeDocumentStorage(
+            currentOrganization.id,
+            standardizeBucket
+          );
+          
+          totalMigrated = standardizeResult.count || 0;
+        }
+        
         totalCount = (result.count || 0) + (urlResult.count || 0);
-        setFixed(result.success || urlResult.success);
+        setFixed(result.success || urlResult.success || standardizeResult.success);
         setCount(totalCount);
       } else {
         setFixed(result.success);
@@ -57,7 +74,11 @@ export const OrphanedDocumentFixer = () => {
       }
       
       if (totalCount > 0) {
-        toast.success(`Fixed ${totalCount} documents`);
+        let message = `Fixed ${totalCount} documents`;
+        if (totalMigrated > 0) {
+          message += ` and reorganized ${totalMigrated} documents into standardized folders`;
+        }
+        toast.success(message);
       } else {
         toast.info("No documents needed fixing");
       }
@@ -81,14 +102,13 @@ export const OrphanedDocumentFixer = () => {
           Document Management
         </CardTitle>
         <CardDescription>
-          Fix document organization associations and URLs to ensure all documents are visible
-          in the correct context.
+          Fix document organization associations, URLs, and standardize storage to ensure all documents
+          are properly organized and accessible.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          Some documents may not be associated with your organization or may have incorrect URLs.
-          This tool will fix both issues to ensure all your documents are properly accessible.
+          This tool fixes several common document issues and can standardize your document storage for improved organization.
         </p>
         
         <div className="space-y-4">
@@ -106,10 +126,10 @@ export const OrphanedDocumentFixer = () => {
           {shouldStandardize && (
             <div>
               <Label htmlFor="bucket-select" className="mb-2 block">
-                Select storage bucket for all documents:
+                Storage bucket for all documents:
               </Label>
               <Select
-                value={standardizeBucket || 'medical-documents'}
+                value={standardizeBucket}
                 onValueChange={setStandardizeBucket}
               >
                 <SelectTrigger id="bucket-select" className="w-full">
@@ -121,7 +141,7 @@ export const OrphanedDocumentFixer = () => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                This will copy files between buckets as needed to standardize your storage.
+                This will copy files between buckets as needed and organize them into a structured folder system.
               </p>
             </div>
           )}
@@ -141,7 +161,7 @@ export const OrphanedDocumentFixer = () => {
           onClick={handleFixOrphanedDocuments} 
           disabled={loading}
         >
-          {loading ? "Processing..." : fixed ? "Documents Fixed" : "Fix Document Associations"}
+          {loading ? "Processing..." : fixed ? "Documents Fixed" : "Fix and Standardize Documents"}
         </Button>
       </CardFooter>
     </Card>
