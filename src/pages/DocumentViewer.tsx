@@ -1,466 +1,321 @@
-import React, { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import DocumentHeader from '@/components/DocumentHeader';
+import { Helmet } from 'react-helmet';
+import EditableCertificateTemplate from '@/components/certificates/EditableCertificateTemplate';
+import EnhancedCertificateGenerator from '@/components/certificates/EnhancedCertificateGenerator';
 
-interface EditableCertificateTemplateProps {
-  extractedData: any;
-  documentId: string;
-  editable?: boolean;
-  onDataChange?: (field: string, value: any) => void;
-  validationErrors?: Array<{ field: string; message: string }>;
-}
+const DocumentViewer = () => {
+  const { id } = useParams();
+  const [document, setDocument] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('preview');
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Array<{field: string; message: string}>>([]);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editedData, setEditedData] = useState<any>(null);
+  const { toast } = useToast();
 
-const EditableCertificateTemplate: React.FC<EditableCertificateTemplateProps> = ({
-  extractedData,
-  documentId,
-  editable = false,
-  onDataChange,
-  validationErrors = []
-}) => {
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    fetchDocument(id);
+  }, [id]);
 
-  const certificateData = extractedData?.certificate_info || 
-                          extractedData?.structured_data?.certificate_info || 
-                          {};
-
-  const hasValidationError = (field: string) => {
-    return validationErrors.some(error => error.field === field);
+  const fetchDocument = async (documentId: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setDocument(data);
+        
+        // Try to find a patient that might be associated with this document
+        if (data.extracted_data?.certificate_info?.id_number) {
+          findPatientByIdNumber(data.extracted_data.certificate_info.id_number, data.organization_id);
+        } else if (data.extracted_data?.structured_data?.certificate_info?.id_number) {
+          findPatientByIdNumber(data.extracted_data.structured_data.certificate_info.id_number, data.organization_id);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching document:', err);
+      setError('Failed to load document. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
-
-  const getValidationMessage = (field: string) => {
-    const error = validationErrors.find(error => error.field === field);
-    return error?.message;
-  };
-
-  const handleFieldChange = (field: string, value: any) => {
-    if (onDataChange) {
-      onDataChange(field, value);
+  
+  const findPatientByIdNumber = async (idNumber: string, orgId: string) => {
+    if (!idNumber || !orgId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('id_number', idNumber)
+        .eq('organization_id', orgId)
+        .limit(1);
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        setPatientId(data[0].id);
+      }
+    } catch (err) {
+      console.error('Error finding patient:', err);
+      // Non-blocking error, don't show to user
     }
   };
 
-  const EditableField: React.FC<{
-    field: string;
-    value: any;
-    type?: 'text' | 'date' | 'select' | 'textarea' | 'checkbox';
-    options?: string[];
-    className?: string;
-    placeholder?: string;
-    rows?: number;
-  }> = ({ field, value, type = 'text', options, className, placeholder, rows = 1 }) => {
-    const hasError = hasValidationError(field);
-    const isFocused = focusedField === field;
-
-    if (!editable) {
-      return (
-        <span className={cn("inline-block min-w-[100px]", className)}>
-          {value || 'Not specified'}
-        </span>
-      );
+  const handleDataChange = (field: string, value: any) => {
+    if (!editedData) {
+      // Initialize with the original data if this is the first edit
+      setEditedData({
+        ...document.extracted_data
+      });
     }
+    
+    // Deep update the nested field
+    setEditedData(prev => {
+      const newData = { ...prev };
+      
+      // Handle nested paths (e.g., "certificate_info.employee_name")
+      const parts = field.split('.');
+      let current = newData;
+      
+      // Navigate to the deepest level
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!current[parts[i]]) {
+          current[parts[i]] = {};
+        }
+        current = current[parts[i]];
+      }
+      
+      // Set the value at the deepest level
+      current[parts[parts.length - 1]] = value;
+      return newData;
+    });
+  };
 
-    const baseClassName = cn(
-      "border-0 border-b-2 border-dashed border-gray-300 bg-transparent px-1 py-0.5 rounded-none",
-      "focus:border-blue-500 focus:outline-none focus:ring-0 focus:bg-blue-50",
-      hasError && "border-red-500 bg-red-50",
-      isFocused && "bg-blue-50 border-blue-500",
-      className
+  const validateData = () => {
+    const errors = [];
+    
+    // Example validation - in a real app, this would be more comprehensive
+    if (editedData?.certificate_info?.employee_name === '') {
+      errors.push({ field: 'employee_name', message: 'Employee name is required' });
+    }
+    
+    if (editedData?.certificate_info?.id_number && 
+        editedData.certificate_info.id_number.length !== 13) {
+      errors.push({ field: 'id_number', message: 'ID number should be 13 digits' });
+    }
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  const saveChanges = async () => {
+    if (!validateData()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the highlighted errors before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ extracted_data: editedData })
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Changes saved",
+        description: "Document data has been updated successfully.",
+      });
+      
+      // Refresh the document
+      fetchDocument(id!);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error saving changes:', err);
+      toast({
+        title: "Error saving changes",
+        description: "There was a problem saving your changes. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !document) {
+    return (
+      <div className="container mx-auto p-4">
+        <Helmet>
+          <title>Loading Document...</title>
+        </Helmet>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-1/3" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
     );
+  }
 
-    const fieldProps = {
-      value: value || '',
-      onChange: (e: any) => handleFieldChange(field, e.target.value),
-      onFocus: () => setFocusedField(field),
-      onBlur: () => setFocusedField(null),
-      className: baseClassName,
-      placeholder: placeholder || 'Enter value...'
-    };
-
-    switch (type) {
-      case 'date':
-        return (
-          <div className="relative inline-block">
-            <Input
-              type="date"
-              {...fieldProps}
-              className={cn(baseClassName, "min-w-[140px]")}
-            />
-            {hasError && (
-              <div className="absolute top-full left-0 z-10 mt-1">
-                <Badge variant="destructive" className="text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {getValidationMessage(field)}
-                </Badge>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'select':
-        return (
-          <div className="relative inline-block min-w-[150px]">
-            <Select
-              value={value || ''}
-              onValueChange={(newValue) => handleFieldChange(field, newValue)}
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <Helmet>
+          <title>Error</title>
+        </Helmet>
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error Loading Document</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{error}</p>
+            <Button 
+              variant="outline" 
+              className="mt-4" 
+              onClick={() => fetchDocument(id!)}
             >
-              <SelectTrigger className={baseClassName}>
-                <SelectValue placeholder={placeholder} />
-              </SelectTrigger>
-              <SelectContent>
-                {options?.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {hasError && (
-              <div className="absolute top-full left-0 z-10 mt-1">
-                <Badge variant="destructive" className="text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {getValidationMessage(field)}
-                </Badge>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'textarea':
-        return (
-          <div className="relative block w-full">
-            <Textarea
-              {...fieldProps}
-              rows={rows}
-              className={cn(baseClassName, "w-full resize-none")}
-            />
-            {hasError && (
-              <div className="absolute top-full left-0 z-10 mt-1">
-                <Badge variant="destructive" className="text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {getValidationMessage(field)}
-                </Badge>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'checkbox':
-        return (
-          <div className="relative inline-flex items-center">
-            <Checkbox
-              checked={value === true || value === 'true' || value === 'yes'}
-              onCheckedChange={(checked) => handleFieldChange(field, checked)}
-              className="mr-2"
-            />
-            {hasError && (
-              <div className="absolute top-full left-0 z-10 mt-1">
-                <Badge variant="destructive" className="text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {getValidationMessage(field)}
-                </Badge>
-              </div>
-            )}
-          </div>
-        );
-
-      default:
-        return (
-          <div className="relative inline-block">
-            <Input
-              {...fieldProps}
-              className={cn(baseClassName, "min-w-[100px]")}
-            />
-            {hasError && (
-              <div className="absolute top-full left-0 z-10 mt-1">
-                <Badge variant="destructive" className="text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {getValidationMessage(field)}
-                </Badge>
-              </div>
-            )}
-          </div>
-        );
-    }
-  };
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white p-8 border rounded-lg shadow-sm font-mono text-sm leading-relaxed">
-      {/* Header */}
-      <div className="text-center mb-6 border-b pb-4">
-        <h1 className="text-lg font-bold mb-2">BLUECOLLAR OCCUPATIONAL HEALTH</h1>
-        <p className="text-xs mb-1">Tel: +27 11 892 0771/ 011 892 0627</p>
-        <p className="text-xs mb-1">Email: admin@bluecollarocc.co.za / office@bluecollarocc.co.za</p>
-        <p className="text-xs mb-1">135 Leeuwpoort Street; Boksburg South; Boksburg</p>
-        <p className="text-xs">Co Reg: 2014/135234/07</p>
-      </div>
-
-      {/* Certificate Title */}
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-bold mb-4">CERTIFICATE OF FITNESS</h2>
-        <p className="text-xs mb-2">
-          Dr. MJ Mputhi / Practice No: 0404160 / Sr. Sibongile Mahlangu / Practice No: 999 088 0000 8177 91
-        </p>
-        <p className="text-sm mb-4">certify that the following employee:</p>
-      </div>
-
-      {/* Employee Information */}
-      <div className="mb-6 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">Initials & Surname:</span>
-          <EditableField 
-            field="employee_name" 
-            value={certificateData.employee_name}
-            className="font-semibold text-blue-700 min-w-[200px]"
-            placeholder="Enter full name"
-          />
-          <span className="ml-4 font-semibold">ID NO:</span>
-          <EditableField 
-            field="id_number" 
-            value={certificateData.id_number}
-            className="font-mono min-w-[150px]"
-            placeholder="Enter ID number"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">Company Name:</span>
-          <EditableField 
-            field="company_name" 
-            value={certificateData.company_name}
-            className="min-w-[250px]"
-            placeholder="Enter company name"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">Date of Examination:</span>
-            <EditableField 
-              field="examination_date" 
-              value={certificateData.examination_date}
-              type="date"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">Expiry Date:</span>
-            <EditableField 
-              field="expiry_date" 
-              value={certificateData.expiry_date}
-              type="date"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">Job Title:</span>
-          <EditableField 
-            field="job_title" 
-            value={certificateData.job_title}
-            className="min-w-[200px]"
-            placeholder="Enter job title"
-          />
-        </div>
-      </div>
-
-      {/* Examination Type */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4 text-center">
-          <EditableField 
-            field="pre_employment" 
-            value={certificateData.examination_type === 'PRE-EMPLOYMENT'}
-            type="checkbox"
-          />
-          <span className="font-semibold">PRE-EMPLOYMENT</span>
+    <div className="container mx-auto p-4">
+      <Helmet>
+        <title>{document?.file_name || 'Document Viewer'}</title>
+      </Helmet>
+      
+      <DocumentHeader
+        document={document}
+        onRefresh={() => fetchDocument(id!)}
+      />
+      
+      <div className="mt-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-4 mb-4">
+            <TabsTrigger value="preview">Document Preview</TabsTrigger>
+            <TabsTrigger value="data">Extracted Data</TabsTrigger>
+            <TabsTrigger value="certificate">Certificate</TabsTrigger>
+            <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+          </TabsList>
           
-          <EditableField 
-            field="periodical" 
-            value={certificateData.examination_type === 'PERIODICAL'}
-            type="checkbox"
-          />
-          <span className="font-semibold">PERIODICAL</span>
+          <TabsContent value="preview" className="h-[calc(100vh-250px)] overflow-auto">
+            {document?.public_url ? (
+              <iframe 
+                src={document.public_url} 
+                className="w-full h-full border-0"
+                title="Document Preview"
+              />
+            ) : (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-center text-gray-500">No preview available</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
           
-          <EditableField 
-            field="exit" 
-            value={certificateData.examination_type === 'EXIT'}
-            type="checkbox"
-          />
-          <span className="font-semibold">EXIT</span>
-        </div>
-      </div>
-
-      {/* Medical Examination Tests Table */}
-      <div className="mb-6">
-        <h3 className="font-bold text-center mb-4">MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS</h3>
-        
-        <div className="grid grid-cols-2 gap-6">
-          {/* Left Column */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <span className="font-semibold">Done</span>
-              <span className="font-semibold">Results</span>
-              <span className="font-semibold">Test</span>
-            </div>
-            
-            {['BLOODS', 'FAR, NEAR VISION', 'SIDE & DEPTH', 'NIGHT VISION'].map((test) => (
-              <div key={test} className="grid grid-cols-3 gap-2 text-xs">
-                <EditableField 
-                  field={`${test.toLowerCase().replace(/[,\s]/g, '_')}_done`}
-                  value={certificateData[`${test.toLowerCase().replace(/[,\s]/g, '_')}_done`]}
-                  type="checkbox"
+          <TabsContent value="data">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Extracted Data</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="edit-mode"
+                    checked={isEditing}
+                    onCheckedChange={(checked) => setIsEditing(!!checked)}
+                  />
+                  <label htmlFor="edit-mode" className="text-sm cursor-pointer">
+                    Edit Mode
+                  </label>
+                  {isEditing && (
+                    <Button onClick={saveChanges} disabled={loading} size="sm">
+                      Save Changes
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {document?.extracted_data && document.id && (
+                  <EditableCertificateTemplate 
+                    extractedData={isEditing ? editedData : document.extracted_data} 
+                    documentId={document.id}
+                    editable={isEditing}
+                    onDataChange={handleDataChange}
+                    validationErrors={validationErrors}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="certificate">
+            <Card>
+              <CardContent className="p-6">
+                <EnhancedCertificateGenerator 
+                  documentId={document?.id}
+                  patientId={patientId}
+                  document={document}
+                  onGenerate={async () => {
+                    // Placeholder for certificate generation functionality
+                    console.log("Certificate generation would happen here");
+                    return Promise.resolve();
+                  }}
                 />
-                <EditableField 
-                  field={`${test.toLowerCase().replace(/[,\s]/g, '_')}_result`}
-                  value={certificateData[`${test.toLowerCase().replace(/[,\s]/g, '_')}_result`]}
-                  className="text-xs min-w-[80px]"
-                />
-                <span>{test}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <span className="font-semibold">Done</span>
-              <span className="font-semibold">Results</span>
-              <span className="font-semibold">Test</span>
-            </div>
-            
-            {['Hearing', 'Working at Heights', 'Lung Function', 'X-Ray', 'Drug Screen'].map((test) => (
-              <div key={test} className="grid grid-cols-3 gap-2 text-xs">
-                <EditableField 
-                  field={`${test.toLowerCase().replace(/\s/g, '_')}_done`}
-                  value={certificateData[`${test.toLowerCase().replace(/\s/g, '_')}_done`]}
-                  type="checkbox"
-                />
-                <EditableField 
-                  field={`${test.toLowerCase().replace(/\s/g, '_')}_result`}
-                  value={certificateData[`${test.toLowerCase().replace(/\s/g, '_')}_result`]}
-                  className="text-xs min-w-[80px]"
-                />
-                <span>{test}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="raw">
+            <Card>
+              <CardHeader>
+                <CardTitle>Raw Document Data</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="bg-gray-50 p-4 rounded overflow-auto h-[calc(100vh-400px)] text-xs">
+                  {JSON.stringify(document, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Follow-up Actions */}
-      <div className="mb-6 grid grid-cols-2 gap-6">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="font-semibold">Referred or follow up actions:</span>
-            <EditableField 
-              field="follow_up_actions" 
-              value={certificateData.follow_up_actions}
-              className="min-w-[150px]"
-            />
-          </div>
-        </div>
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="font-semibold">Review Date:</span>
-            <EditableField 
-              field="review_date" 
-              value={certificateData.review_date}
-              type="date"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Restrictions */}
-      <div className="mb-6">
-        <div className="mb-2">
-          <span className="font-semibold">Restrictions:</span>
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-xs">
-          {[
-            'Heights', 'Dust Exposure', 'Motorized Equipment', 'Wear Hearing Protection',
-            'Confined Spaces', 'Chemical Exposure', 'Wear Spectacles', 'Remain on Treatment for Chronic Conditions'
-          ].map((restriction) => (
-            <div key={restriction} className="flex items-center gap-2">
-              <EditableField 
-                field={`restriction_${restriction.toLowerCase().replace(/\s/g, '_')}`}
-                value={certificateData[`restriction_${restriction.toLowerCase().replace(/\s/g, '_')}`]}
-                type="checkbox"
-              />
-              <span>{restriction}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Medical Fitness Declaration */}
-      <div className="mb-6">
-        <h3 className="font-bold text-center mb-4">Medical Fitness Declaration</h3>
-        <div className="flex flex-wrap justify-center gap-6 text-sm">
-          {['FIT', 'Fit with Restriction', 'Fit with Condition', 'Temporary Unfit', 'UNFIT'].map((status) => (
-            <div key={status} className="flex items-center gap-2">
-              <EditableField 
-                field="medical_fitness"
-                value={certificateData.medical_fitness === status}
-                type="checkbox"
-              />
-              <span className={certificateData.medical_fitness === status ? 'font-bold' : ''}>{status}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Comments */}
-      <div className="mb-6">
-        <div className="mb-2">
-          <span className="font-semibold">Comments:</span>
-        </div>
-        <EditableField 
-          field="comments" 
-          value={certificateData.comments}
-          type="textarea"
-          rows={3}
-          placeholder="Enter any additional comments..."
-        />
-      </div>
-
-      {/* Signature Section */}
-      <div className="mb-6 text-center">
-        <div className="grid grid-cols-2 gap-8">
-          <div>
-            <div className="h-16 border-b border-gray-400 mb-2"></div>
-            <p className="text-xs">SIGNATURE</p>
-          </div>
-          <div>
-            <div className="h-16 border-b border-gray-400 mb-2"></div>
-            <p className="text-xs">STAMP</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="text-center text-xs">
-        <p className="mb-2">Occupational Health Practitioner / Occupational Medical Practitioner</p>
-        <p className="mb-1">Dr MJ Mphuthi / Practice No. 0404160</p>
-        <p className="mb-1">Sr. Sibongile Mahlangu</p>
-        <p>SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
-        <p>Practice Number: 999 088 0000 8177 91</p>
-      </div>
-
-      {/* Editing Instructions */}
-      {editable && (
-        <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-          <p className="font-semibold mb-1">Editing Instructions:</p>
-          <p>• Click on any underlined field to edit it</p>
-          <p>• Compare with the original document on the right to ensure accuracy</p>
-          <p>• Red highlights indicate validation errors that need to be fixed</p>
-          <p>• Click "Save" when all corrections are complete</p>
-        </div>
-      )}
     </div>
   );
 };
 
-export default EditableCertificateTemplate;
+export default DocumentViewer;
