@@ -76,10 +76,11 @@ export const AccuracyMatrix = () => {
         monthlyTrends: []
       };
 
+      // Cast organizationId to any to resolve TypeScript error
       const { data: documents, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId as any)
         .order('created_at', { ascending: false });
 
       if (error) {
