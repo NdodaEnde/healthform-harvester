@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,7 @@ import { Loader2, FileText, Download, Eye, EyeOff } from 'lucide-react';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
+import EnhancedCertificateGenerator from '@/components/certificates/EnhancedCertificateGenerator';
 
 interface ExtractedData {
   raw_content?: string;
@@ -106,6 +106,14 @@ const DocumentViewer: React.FC = () => {
   const downloadDocument = () => {
     if (document?.public_url) {
       window.open(document.public_url, '_blank');
+    }
+  };
+
+  const handleCertificateUpdate = async () => {
+    if (document && id) {
+      toast.success("Certificate data updated");
+      // Refresh the document data
+      await fetchDocument(id);
     }
   };
 
@@ -252,11 +260,19 @@ const DocumentViewer: React.FC = () => {
             <CardContent className="overflow-auto h-full pb-6">
               {viewMode === 'structured' ? (
                 <div className="overflow-auto">
-                  <CertificateTemplate 
-                    extractedData={document.extracted_data}
-                    documentId={id || ''}
-                    editable={true}
-                  />
+                  {document.document_type?.includes('certificate') ? (
+                    <EnhancedCertificateGenerator 
+                      document={document}
+                      documentId={id || ''}
+                      onGenerate={handleCertificateUpdate}
+                    />
+                  ) : (
+                    <CertificateTemplate 
+                      extractedData={document.extracted_data}
+                      documentId={id || ''}
+                      editable={true}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
