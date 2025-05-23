@@ -34,6 +34,7 @@ export interface BatchDocumentUploaderProps {
   onUploadComplete?: (data?: any) => void;
   organizationId?: string;
   clientOrganizationId?: string;
+  patientId?: string;
 }
 
 type FileStatus = 'pending' | 'uploading' | 'processing' | 'complete' | 'error';
@@ -72,7 +73,8 @@ interface SavedBatch {
 const BatchDocumentUploader = ({ 
   onUploadComplete,
   organizationId,
-  clientOrganizationId 
+  clientOrganizationId,
+  patientId
 }: BatchDocumentUploaderProps) => {
   const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
   const [defaultDocumentType, setDefaultDocumentType] = useState<string>("certificate-fitness");
@@ -215,7 +217,8 @@ const BatchDocumentUploader = ({
           .from('documents')
           .update({
             organization_id: organizationId,
-            client_organization_id: clientOrganizationId || null
+            client_organization_id: clientOrganizationId || null,
+            owner_id: patientId || null 
           })
           .eq('id', data.documentId);
           
