@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -402,6 +401,7 @@ serve(async (req) => {
     const file = formData.get('file');
     const documentType = formData.get('documentType') || 'unknown';
     const userId = formData.get('userId');
+    const filePath = formData.get('filePath') || '';
 
     if (!file || !(file instanceof File)) {
       throw new Error('No file provided');
@@ -413,6 +413,7 @@ serve(async (req) => {
 
     console.log(`Processing document of type: ${documentType}`);
     console.log(`File name: ${file.name}, size: ${file.size} bytes`);
+    console.log(`Using file path: ${filePath}`);
 
     // Create a new form data to send to the microservice
     const forwardFormData = new FormData();
@@ -447,7 +448,6 @@ serve(async (req) => {
 
     const documentData = await dataResponse.json();
     console.log("Document data retrieved successfully");
-    console.log("Document data content:", JSON.stringify(documentData).substring(0, 500) + "...");
     
     // Extract the first document result (assuming single file upload)
     const documentResult = documentData.result && documentData.result.length > 0 
@@ -458,12 +458,10 @@ serve(async (req) => {
       throw new Error("No document processing results returned");
     }
     
-    // Store file in Storage
-    const timestamp = new Date().getTime();
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${userId}/${timestamp}_${documentType}.${fileExt}`;
+    // Store file in Storage - UPDATED to always use medical-documents bucket
+    const storagePath = filePath.toString() || `${userId}/${new Date().getTime()}_${documentType}.${file.name.split('.').pop()}`;
     
-    console.log(`Uploading file to storage: ${filePath}`);
+    console.log(`Uploading file to storage: ${storagePath}`);
     
     // FIX: Use try/catch specifically for storage operations
     let uploadData = null;
@@ -476,8 +474,8 @@ serve(async (req) => {
       
       // Attempt to upload to storage with proper content type
       const { data: storageData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, fileBlob, {
+        .from('medical-documents')
+        .upload(storagePath, fileBlob, {
           contentType: file.type,
           cacheControl: '3600',
           upsert: false // Don't overwrite existing files
@@ -492,8 +490,8 @@ serve(async (req) => {
       
       // Get public URL if upload successful - IMPROVED URL GENERATION
       const { data: urlData } = await supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
+        .from('medical-documents')
+        .getPublicUrl(storagePath);
       
       if (urlData) {
         publicUrl = urlData.publicUrl;
@@ -588,8 +586,6 @@ serve(async (req) => {
       }
     } else {
       console.log("Document type does not match certificate patterns");
-      console.log("Document type:", documentType);
-      console.log("Contains 'certificate':", rawContent.toLowerCase().includes('certificate'));
     }
     
     console.log("=== FINAL STRUCTURED DATA ===");
@@ -620,7 +616,7 @@ serve(async (req) => {
     // Create document record in database
     const documentRecord = {
       user_id: userId,
-      file_path: uploadData ? filePath : null,
+      file_path: storagePath, // Always use the standardized path
       file_name: file.name,
       file_size: file.size,
       mime_type: file.type,
@@ -641,12 +637,6 @@ serve(async (req) => {
     };
     
     console.log(`Creating document record in database with status '${documentStatus}'`);
-    console.log("Extracted data preview:", {
-      raw_content_length: rawContent.length,
-      structured_data_keys: Object.keys(structuredData),
-      chunk_count: chunks.length,
-      has_structured_data: hasStructuredData
-    });
     
     const { data: insertedDoc, error: insertError } = await supabase
       .from('documents')
@@ -684,12 +674,6 @@ serve(async (req) => {
             markdown: rawContent,
             chunks: chunks,
             structured_data: structuredData
-          },
-          processing_info: {
-            batch_id: initialResult.batch_id,
-            processing_time_seconds: initialResult.processing_time_seconds || 0,
-            chunk_count: chunks.length,
-            has_structured_data: hasStructuredData
           }
         },
         message: `Document ${documentStatus} successfully`
@@ -701,7 +685,7 @@ serve(async (req) => {
         }
       }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing document:", error);
     
     return new Response(

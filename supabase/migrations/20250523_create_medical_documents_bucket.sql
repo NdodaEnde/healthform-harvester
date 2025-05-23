@@ -1,8 +1,16 @@
 
--- Check if the bucket already exists
+-- Clean up old documents bucket if it exists
 DO $$
 BEGIN
-  -- Create medical-documents storage bucket if it doesn't exist
+  -- Drop the old documents bucket if it exists
+  IF EXISTS (
+    SELECT 1 FROM storage.buckets WHERE name = 'documents'
+  ) THEN
+    DELETE FROM storage.objects WHERE bucket_id = 'documents';
+    DELETE FROM storage.buckets WHERE name = 'documents';
+  END IF;
+  
+  -- Create or update medical-documents storage bucket
   IF NOT EXISTS (
     SELECT 1 FROM storage.buckets WHERE name = 'medical-documents'
   ) THEN
@@ -10,19 +18,30 @@ BEGIN
     VALUES ('medical-documents', 'medical-documents', true);
     
     -- Create a policy to allow authenticated users to upload files
-    INSERT INTO storage.policies (name, definition, bucket_id)
+    INSERT INTO storage.policies (name, definition, bucket_id, operation)
     VALUES (
       'Authenticated users can upload documents',
       '(auth.role() = ''authenticated'')',
-      'medical-documents'
+      'medical-documents',
+      'INSERT'
     );
     
-    -- Create a policy to allow anyone to download public files
-    INSERT INTO storage.policies (name, definition, bucket_id)
+    -- Create a policy to allow authenticated users to update files they uploaded
+    INSERT INTO storage.policies (name, definition, bucket_id, operation)
+    VALUES (
+      'Authenticated users can update their documents',
+      '(auth.role() = ''authenticated'')',
+      'medical-documents',
+      'UPDATE'
+    );
+    
+    -- Create a policy to allow anyone to download files
+    INSERT INTO storage.policies (name, definition, bucket_id, operation)
     VALUES (
       'Documents are publicly accessible',
-      '(bucket_id = ''medical-documents'')',
-      'medical-documents'
+      'true',
+      'medical-documents',
+      'SELECT'
     );
   END IF;
 END $$;

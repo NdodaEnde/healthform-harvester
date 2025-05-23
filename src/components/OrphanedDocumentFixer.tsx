@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { 
-  associateOrphanedDocuments, 
   fixDocumentUrls, 
   standardizeDocumentStorage
 } from "@/utils/documentOrganizationFixer";
@@ -24,47 +23,37 @@ export const OrphanedDocumentFixer = () => {
   const [count, setCount] = useState(0);
   const { currentOrganization } = useOrganization();
   
-  const handleFixOrphanedDocuments = async () => {
+  const handleStandardizeDocuments = async () => {
     if (!currentOrganization?.id) return;
     
     setLoading(true);
     try {
-      // First associate orphaned documents
-      const result = await associateOrphanedDocuments(currentOrganization.id);
-      
-      // Then fix URLs for documents that need it and standardize paths
       let totalCount = 0;
       
-      if (result.success) {
-        // Fix document URLs and standardize to medical-documents bucket
-        const standardizeResult = await standardizeDocumentStorage(
-          currentOrganization.id,
-          'medical-documents'
-        );
-        
-        // Update URLs for any remaining documents
-        const urlResult = await fixDocumentUrls(
-          currentOrganization.id, 
-          'medical-documents'
-        );
-        
-        totalCount = (result.count || 0) + (urlResult.count || 0) + (standardizeResult.count || 0);
-        setFixed(result.success || urlResult.success || standardizeResult.success);
-        setCount(totalCount);
-      } else {
-        setFixed(result.success);
-        setCount(result.count || 0);
-        totalCount = result.count || 0;
-      }
+      // Standardize document storage to medical-documents bucket
+      const standardizeResult = await standardizeDocumentStorage(
+        currentOrganization.id,
+        'medical-documents'
+      );
+      
+      // Update URLs for any documents
+      const urlResult = await fixDocumentUrls(
+        currentOrganization.id, 
+        'medical-documents'
+      );
+      
+      totalCount = (standardizeResult.count || 0) + (urlResult.count || 0);
+      setFixed(standardizeResult.success || urlResult.success);
+      setCount(totalCount);
       
       if (totalCount > 0) {
-        toast.success(`Fixed ${totalCount} documents`);
+        toast.success(`Standardized ${totalCount} documents`);
       } else {
-        toast.info("No documents needed fixing");
+        toast.info("No documents needed standardization");
       }
     } catch (error) {
-      console.error("Error fixing documents:", error);
-      toast.error("Failed to fix documents");
+      console.error("Error standardizing documents:", error);
+      toast.error("Failed to standardize documents");
     } finally {
       setLoading(false);
     }
@@ -82,29 +71,29 @@ export const OrphanedDocumentFixer = () => {
           Document Management
         </CardTitle>
         <CardDescription>
-          Fix document organization and standardize storage to ensure all documents are properly accessible.
+          Standardize document storage to ensure all documents are properly accessible.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          This utility fixes orphaned documents, updates document URLs, and standardizes document storage using the medical-documents bucket.
+          This utility standardizes document storage using the medical-documents bucket with a consistent folder structure.
         </p>
         
         {fixed && (
           <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center gap-2 mt-4">
             <FileCheck className="h-5 w-5" />
             <span className="text-sm font-medium">
-              Success! {count} documents have been processed for {currentOrganization.name}
+              Success! {count} documents have been standardized for {currentOrganization.name}
             </span>
           </div>
         )}
       </CardContent>
       <CardFooter>
         <Button 
-          onClick={handleFixOrphanedDocuments} 
+          onClick={handleStandardizeDocuments} 
           disabled={loading}
         >
-          {loading ? "Processing..." : fixed ? "Documents Fixed" : "Fix and Standardize Documents"}
+          {loading ? "Processing..." : fixed ? "Documents Standardized" : "Standardize Documents"}
         </Button>
       </CardFooter>
     </Card>

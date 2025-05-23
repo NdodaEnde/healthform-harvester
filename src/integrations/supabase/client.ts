@@ -24,7 +24,6 @@ export const supabase = createClient<Database>(
     },
     // Storage configuration focused on medical-documents bucket
     storage: {
-      // Enable content type detection to ensure files are properly displayed
       detectContentType: true
     }
   }
