@@ -573,7 +573,7 @@ const CertificateTemplate = ({
             <img 
               src="/lovable-uploads/ead30039-3558-4ae0-a3ec-c58d8755a311.png" 
               alt="BlueCollar Health & Wellness" 
-              className="w-5/6 h-5/6 object-contain"
+              className="w-[70%] h-[70%] object-contain"
             />
           </div>
           
