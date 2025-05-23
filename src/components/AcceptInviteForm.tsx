@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, safeQueryResult } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,10 +66,13 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
             .eq("token", token as any)
             .maybeSingle();
               
-          if (acceptedData?.accepted_at) {
+          // Use safe type casting to prevent TypeScript errors
+          const typedAcceptedData = safeQueryResult<{ accepted_at: string; organization_id: string }>(acceptedData);
+          
+          if (typedAcceptedData?.accepted_at) {
             setInvitationError("This invitation has already been accepted.");
             // If invitation was already accepted, check if user is already associated with the organization
-            checkExistingOrganizationMembership(acceptedData);
+            checkExistingOrganizationMembership(typedAcceptedData);
           }
           
           return;
@@ -78,27 +81,29 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
         console.log("Invitation data:", data);
         
         // Check if invitation has expired
-        if (data && new Date(data.expires_at as string) < new Date()) {
+        const typedData = safeQueryResult<{ expires_at: string; email: string; organizations?: { name: string } }>(data);
+        
+        if (typedData && new Date(typedData.expires_at as string) < new Date()) {
           setInvitationError("This invitation has expired.");
           setLoading(false);
           return;
         }
 
-        setInvitation(data);
-        setEmail(data?.email || "");
+        setInvitation(typedData);
+        setEmail(typedData?.email || "");
 
         // Check if the user is currently logged in
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData?.session) {
           // If logged in, check if the email matches the invitation
-          if (sessionData.session.user.email === data?.email) {
+          if (sessionData.session.user.email === typedData?.email) {
             // Already logged in with the correct account
             setExistingAccount(true);
             setShowCreateAccount(false);
           } else {
             // Logged in but with a different email
             toast("Account Mismatch", {
-              description: `You are logged in as ${sessionData.session.user.email} but this invitation is for ${data?.email}. Please sign out first.`,
+              description: `You are logged in as ${sessionData.session.user.email} but this invitation is for ${typedData?.email}. Please sign out first.`,
             });
             setInvitationError("You are logged in with a different email address than the invitation.");
           }
@@ -106,7 +111,7 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
           // Not logged in, check if account exists
           try {
             const { error: signInError } = await supabase.auth.signInWithOtp({
-              email: data?.email || "",
+              email: typedData?.email || "",
               options: {
                 shouldCreateUser: false
               }

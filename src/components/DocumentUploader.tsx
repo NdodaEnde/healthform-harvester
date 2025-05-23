@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, safeQueryResult } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { createStandardizedFilePath, ensureStorageBucket } from "@/utils/documentOrganizationFixer";
@@ -157,7 +158,7 @@ const DocumentUploader = ({
           organization_id: organizationId,
           client_organization_id: clientOrganizationId || null,
           owner_id: null  // Clear owner_id if it exists
-        })
+        } as any)
         .eq('id', documentId);
         
       if (updateError) {
@@ -181,16 +182,24 @@ const DocumentUploader = ({
       if (verifyError) {
         console.error("Error verifying document status:", verifyError);
       } else {
-        console.log("Final document status:", verifyData.status);
-        console.log("Extracted data present:", !!verifyData.extracted_data);
-        console.log("Public URL:", verifyData.public_url);
-        console.log("File path:", verifyData.file_path);
+        // Use type casting to ensure TypeScript compatibility
+        const typedVerifyData = safeQueryResult<{
+          status: string;
+          extracted_data: any;
+          public_url: string;
+          file_path: string;
+        }>(verifyData);
+
+        console.log("Final document status:", typedVerifyData.status);
+        console.log("Extracted data present:", !!typedVerifyData.extracted_data);
+        console.log("Public URL:", typedVerifyData.public_url);
+        console.log("File path:", typedVerifyData.file_path);
         
         // Update UI with verified status
-        setDocumentStatus(verifyData.status);
+        setDocumentStatus(typedVerifyData.status);
         
         // Safely access nested properties using optional chaining
-        const extractedData = verifyData.extracted_data;
+        const extractedData = typedVerifyData.extracted_data;
         
         // Check if we have structured data
         const hasStructuredData = typeof extractedData === 'object' && 
@@ -219,7 +228,10 @@ const DocumentUploader = ({
       let toastMessage = "";
       let toastVariant: "default" | "destructive" = "default";
       
-      switch (verifyData?.status || data?.document?.status) {
+      // Use the verified data if available, otherwise fallback to the data from the function
+      const docStatus = verifyData ? safeQueryResult<{status: string}>(verifyData).status : (data?.document?.status || "unknown");
+      
+      switch (docStatus) {
         case "processed":
           toastMessage = "Your document has been uploaded and fully processed";
           break;

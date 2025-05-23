@@ -13,3 +13,17 @@ export const ensureDocumentsBucket = async () => {
     return false;
   }
 };
+
+// Check if a file exists in storage
+export const checkFileExists = async (bucketName: string, filePath: string) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .download(filePath);
+    
+    return !!data && !error;
+  } catch (error) {
+    console.error("Error checking if file exists:", error);
+    return false;
+  }
+};
