@@ -13,11 +13,22 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { associateOrphanedDocuments, fixDocumentUrls } from "@/utils/documentOrganizationFixer";
 import { AlertTriangle, FileCheck, Link } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 export const OrphanedDocumentFixer = () => {
   const [loading, setLoading] = useState(false);
   const [fixed, setFixed] = useState(false);
   const [count, setCount] = useState(0);
+  const [standardizeBucket, setStandardizeBucket] = useState<string | undefined>(undefined);
+  const [shouldStandardize, setShouldStandardize] = useState(false);
   const { currentOrganization } = useOrganization();
   
   const handleFixOrphanedDocuments = async () => {
@@ -32,7 +43,10 @@ export const OrphanedDocumentFixer = () => {
       
       // Then fix URLs for documents that need it
       if (result.success) {
-        urlResult = await fixDocumentUrls(currentOrganization.id);
+        urlResult = await fixDocumentUrls(
+          currentOrganization.id, 
+          shouldStandardize ? standardizeBucket : undefined
+        );
         totalCount = (result.count || 0) + (urlResult.count || 0);
         setFixed(result.success || urlResult.success);
         setCount(totalCount);
@@ -77,8 +91,44 @@ export const OrphanedDocumentFixer = () => {
           This tool will fix both issues to ensure all your documents are properly accessible.
         </p>
         
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="standardize" 
+              checked={shouldStandardize}
+              onCheckedChange={(checked) => setShouldStandardize(checked === true)}
+            />
+            <Label htmlFor="standardize">
+              Standardize document storage (recommended)
+            </Label>
+          </div>
+          
+          {shouldStandardize && (
+            <div>
+              <Label htmlFor="bucket-select" className="mb-2 block">
+                Select storage bucket for all documents:
+              </Label>
+              <Select
+                value={standardizeBucket || 'medical-documents'}
+                onValueChange={setStandardizeBucket}
+              >
+                <SelectTrigger id="bucket-select" className="w-full">
+                  <SelectValue placeholder="Select bucket" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="medical-documents">medical-documents (Recommended)</SelectItem>
+                  <SelectItem value="documents">documents</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                This will copy files between buckets as needed to standardize your storage.
+              </p>
+            </div>
+          )}
+        </div>
+        
         {fixed && (
-          <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center gap-2 mb-2">
+          <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center gap-2 mt-4">
             <FileCheck className="h-5 w-5" />
             <span className="text-sm font-medium">
               Success! {count} documents have been processed for {currentOrganization.name}
