@@ -12,6 +12,7 @@ import { OrphanedDocumentFixer } from '@/components/OrphanedDocumentFixer';
 import DocumentUploader from '@/components/DocumentUploader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileText, Upload, RefreshCcw } from 'lucide-react';
+import { isDefined } from '@/utils/type-guards';
 
 const PatientRecordsPage = () => {
   const { patientId } = useParams<{ patientId: string }>();
@@ -51,17 +52,32 @@ const PatientRecordsPage = () => {
         if (patientData) {
           setPatient(patientData);
           
-          // Fetch related documents
-          const { data: documentsData, error: documentsError } = await supabase
+          // Fetch related documents with more complex query to handle service provider scenario
+          let documentsQuery = supabase
             .from('documents')
             .select('*, certificates(*)')
             .eq('owner_id', patientId)
             .order('created_at', { ascending: false });
           
+          // If we're a service provider viewing client documents, ensure we only see documents
+          // that are linked to either the service provider or the specific client
+          if (currentOrganization?.organization_type === 'service_provider' && currentClient?.id) {
+            documentsQuery = documentsQuery.or(`organization_id.eq.${currentOrganization.id},client_organization_id.eq.${currentClient.id}`);
+          }
+          
+          const { data: documentsData, error: documentsError } = await documentsQuery;
+          
           if (documentsError) throw documentsError;
           
           // Map documents to ensure type safety
           const safeDocuments = (documentsData || []).map(doc => safeDocumentAccess(doc));
+          
+          // Debug output
+          console.log(`Found ${safeDocuments.length} documents for patient ${patientId}`);
+          safeDocuments.forEach(doc => {
+            console.log(`Document ${doc.id}: type=${doc.document_type}, org=${doc.organization_id}, client_org=${doc.client_organization_id}`);
+          });
+          
           setDocuments(safeDocuments);
           setVisibleDocuments(safeDocuments);
         }
@@ -74,7 +90,7 @@ const PatientRecordsPage = () => {
     };
     
     fetchPatientData();
-  }, [patientId, currentOrganization?.id, currentClient?.id, refreshTrigger]);
+  }, [patientId, currentOrganization?.id, currentClient?.id, refreshTrigger, currentOrganization?.organization_type]);
 
   // Handle search and filter
   useEffect(() => {

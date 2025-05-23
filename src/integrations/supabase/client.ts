@@ -54,5 +54,6 @@ export const safeDocumentAccess = (document: any) => {
     owner_id: document.owner_id || null,
     organization_id: document.organization_id || null,
     client_organization_id: document.client_organization_id || null,
+    certificates: document.certificates || [],
   };
 };

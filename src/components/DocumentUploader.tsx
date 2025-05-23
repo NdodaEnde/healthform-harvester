@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { supabase, safeQueryResult } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { createStandardizedFilePath, ensureStorageBucket } from "@/utils/documentOrganizationFixer";
+import { isDefined, isDataResult } from "@/utils/type-guards";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -29,7 +31,7 @@ const DocumentUploader = ({
   onUploadComplete,
   organizationId,
   clientOrganizationId,
-  patientId // New parameter to link documents to patients
+  patientId // For linking documents to patients
 }: DocumentUploaderProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>("certificate-fitness");
