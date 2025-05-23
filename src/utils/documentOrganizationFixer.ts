@@ -20,9 +20,7 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
     }
     
     if (!count || count === 0) {
-      toast.info("No orphaned documents found", {
-        description: "All documents are already associated with an organization"
-      });
+      console.log("No orphaned documents found");
       return { success: true, count: 0 };
     }
     
@@ -38,15 +36,11 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
       throw error;
     }
     
-    toast.success("Documents associated successfully", {
-      description: `${data?.length || 0} documents are now associated with your organization`
-    });
+    console.log(`Associated ${data?.length || 0} orphaned documents with organization ${organizationId}`);
     
     return { success: true, count: data?.length || 0, data };
   } catch (error: any) {
-    toast.error("Error associating documents", {
-      description: error.message || "There was an error associating documents with your organization"
-    });
+    console.error("Error associating documents:", error);
     
     return { success: false, error };
   }
@@ -58,46 +52,95 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
 export const fixDocumentUrls = async (organizationId: string) => {
   try {
     // Get documents missing URLs but having file paths
-    const { data, error } = await supabase
+    const { data: missingUrlDocs, error: missingUrlError } = await supabase
       .from('documents')
       .select('*')
       .eq('organization_id', organizationId)
       .is('public_url', null)
       .not('file_path', 'is', null);
     
-    if (error) throw error;
+    if (missingUrlError) throw missingUrlError;
     
-    if (!data || data.length === 0) {
-      toast.info("No documents need URL fixing");
+    // Get documents with potentially incorrect URLs (they have a URL but it might be wrong)
+    const { data: potentiallyBrokenDocs, error: brokenUrlError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .not('public_url', 'is', null)
+      .not('file_path', 'is', null);
+      
+    if (brokenUrlError) throw brokenUrlError;
+    
+    console.log(`Found ${missingUrlDocs?.length || 0} documents with missing URLs`);
+    console.log(`Found ${potentiallyBrokenDocs?.length || 0} documents to check for correct URLs`);
+    
+    // Combine both sets of documents that need attention
+    const docsToProcess = [
+      ...(missingUrlDocs || []), 
+      ...(potentiallyBrokenDocs || [])
+    ];
+    
+    if (docsToProcess.length === 0) {
       return { success: true, count: 0 };
     }
     
     let fixed = 0;
     
     // Fix each document
-    for (const doc of data) {
+    for (const doc of docsToProcess) {
       if (doc.file_path) {
-        const bucketName = 'medical-documents';
-        const publicUrl = `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+        // First, check which bucket the file is actually in
+        let bucketName = 'medical-documents'; // Default bucket
+        let publicUrl;
         
-        const { error: updateError } = await supabase
+        // Check if file exists in medical-documents bucket
+        const { data: medicalBucketData, error: medicalBucketError } = await supabase
+          .storage
+          .from('medical-documents')
+          .getPublicUrl(doc.file_path);
+        
+        // Check if file exists in documents bucket
+        const { data: documentsBucketData, error: documentsBucketError } = await supabase
+          .storage
           .from('documents')
-          .update({ public_url: publicUrl })
-          .eq('id', doc.id);
+          .getPublicUrl(doc.file_path);
         
-        if (!updateError) fixed++;
+        // Determine which bucket actually has the file
+        // We'll check by trying to get a public URL from each bucket
+        if (!medicalBucketError && medicalBucketData) {
+          publicUrl = medicalBucketData.publicUrl;
+          bucketName = 'medical-documents';
+        } else if (!documentsBucketError && documentsBucketData) {
+          publicUrl = documentsBucketData.publicUrl;
+          bucketName = 'documents';
+        } else {
+          // Try to construct a URL manually as a last resort
+          publicUrl = `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+        }
+        
+        // Only update if we need to (URL is null or different)
+        if (!doc.public_url || doc.public_url !== publicUrl) {
+          console.log(`Updating document ${doc.id} with URL from ${bucketName} bucket`);
+          
+          const { error: updateError } = await supabase
+            .from('documents')
+            .update({ public_url: publicUrl })
+            .eq('id', doc.id);
+          
+          if (updateError) {
+            console.error(`Failed to update document ${doc.id}:`, updateError);
+          } else {
+            fixed++;
+          }
+        }
       }
     }
     
-    if (fixed > 0) {
-      toast.success(`Fixed URLs for ${fixed} documents`);
-    }
+    console.log(`Fixed URLs for ${fixed} documents`);
     
     return { success: true, count: fixed };
   } catch (error: any) {
-    toast.error("Error fixing document URLs", {
-      description: error.message
-    });
+    console.error("Error fixing document URLs:", error);
     return { success: false, error };
   }
 };

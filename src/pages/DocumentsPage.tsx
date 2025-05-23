@@ -1,14 +1,14 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import DocumentUploader from '@/components/DocumentUploader';
 import BatchDocumentUploader from '@/components/BatchDocumentUploader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { OrphanedDocumentFixer } from '@/components/OrphanedDocumentFixer';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList } from 'lucide-react';
@@ -470,6 +470,11 @@ const DocumentsPage = () => {
             <span>Upload Document</span>
           </Button>
         </div>
+      </div>
+      
+      {/* OrphanedDocumentFixer */}
+      <div className="mb-6">
+        <OrphanedDocumentFixer />
       </div>
       
       {/* Document Upload Dialog */}

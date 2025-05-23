@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 // Helper function to ensure storage bucket exists
@@ -39,10 +40,13 @@ export const ensureStorageBucket = async (bucketName: string): Promise<boolean> 
 // Helper function to ensure the documents bucket exists
 export const ensureDocumentsBucket = async () => {
   try {
-    const bucket = 'medical-documents';
-    return await ensureStorageBucket(bucket);
+    // Check both buckets for backward compatibility
+    const medicalDocumentsBucketExists = await ensureStorageBucket('medical-documents');
+    const documentsBucketExists = await ensureStorageBucket('documents');
+    
+    return medicalDocumentsBucketExists || documentsBucketExists;
   } catch (error) {
-    console.error("Error setting up documents bucket:", error);
+    console.error("Error setting up documents buckets:", error);
     return false;
   }
 };

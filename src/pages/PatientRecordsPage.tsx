@@ -227,7 +227,7 @@ const PatientRecordsPage = () => {
         </Card>
       </div>
 
-      {/* Document Fixer (only show if needed) */}
+      {/* Document Fixer */}
       {currentOrganization && 
         <div className="mb-6">
           <OrphanedDocumentFixer />

@@ -12,6 +12,7 @@ import {
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { associateOrphanedDocuments, fixDocumentUrls } from "@/utils/documentOrganizationFixer";
 import { AlertTriangle, FileCheck, Link } from "lucide-react";
+import { toast } from "sonner";
 
 export const OrphanedDocumentFixer = () => {
   const [loading, setLoading] = useState(false);
@@ -31,11 +32,20 @@ export const OrphanedDocumentFixer = () => {
       if (result.success) {
         const urlResult = await fixDocumentUrls(currentOrganization.id);
         setFixed(result.success || urlResult.success);
-        setCount(result.count || 0);
+        setCount((result.count || 0) + (urlResult.count || 0));
       } else {
         setFixed(result.success);
         setCount(result.count || 0);
       }
+      
+      if ((result.count || 0) + (urlResult.count || 0) > 0) {
+        toast.success(`Fixed ${(result.count || 0) + (urlResult.count || 0)} documents`);
+      } else {
+        toast.info("No documents needed fixing");
+      }
+    } catch (error) {
+      console.error("Error fixing documents:", error);
+      toast.error("Failed to fix documents");
     } finally {
       setLoading(false);
     }
@@ -59,7 +69,7 @@ export const OrphanedDocumentFixer = () => {
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          Some documents may not be associated with your organization or may have invalid URLs.
+          Some documents may not be associated with your organization or may have incorrect URLs.
           This tool will fix both issues to ensure all your documents are properly accessible.
         </p>
         

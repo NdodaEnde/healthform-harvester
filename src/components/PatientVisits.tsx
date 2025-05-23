@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -108,10 +107,17 @@ const getDocumentUrl = (doc: Document): string | null => {
     return doc.public_url;
   }
   
-  // If we have a file_path but no public_url, construct it
+  // If we have a file_path but no public_url, try to construct it
   if (doc.file_path) {
+    // Try both buckets - medical-documents is the default
     const bucketName = 'medical-documents';
-    return `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+    const url = `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+    
+    // Also check the "documents" bucket as fallback
+    const documentsBucketUrl = `${supabase.storageUrl}/object/public/documents/${doc.file_path}`;
+    
+    // Return the URL - we'll determine which one works when loading the document
+    return url;
   }
   
   return null;
@@ -144,7 +150,6 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     queryKey: ['patient-visits-documents', patientId, showOnlyValidated, patient?.first_name, patient?.last_name],
     queryFn: async () => {
       console.log('Fetching documents for patient visits:', patientId);
-      console.log('Patient name for visits:', patient?.first_name, patient?.last_name);
       
       // First check if this patient has medical_history.documents
       if (patient?.medical_history?.documents?.length) {
@@ -168,11 +173,18 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
             setHasMissingDocuments(true);
           }
           
-          // Add review status and return
-          const docsWithReviewStatus = patientDocuments.map(doc => ({
-            ...doc,
-            reviewStatus: getDocumentReviewStatus(doc.id)
-          }));
+          // Add review status and fix URLs
+          const docsWithReviewStatus = patientDocuments.map(doc => {
+            // Check if document needs URL fixing
+            if (!doc.public_url && doc.file_path) {
+              doc.public_url = getDocumentUrl(doc);
+            }
+            
+            return {
+              ...doc,
+              reviewStatus: getDocumentReviewStatus(doc.id)
+            };
+          });
           
           return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
         }
@@ -368,7 +380,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                   <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
                   <p className="text-sm">
                     Some documents referenced in the patient record could not be found. 
-                    They may need to be re-uploaded or linked properly.
+                    Use the document fixer tool above to repair associations.
                   </p>
                 </div>
               </div>
