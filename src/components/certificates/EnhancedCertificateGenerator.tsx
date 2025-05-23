@@ -45,30 +45,25 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
   const extractedCertData = dataToUse ? extractCertificateData(dataToUse) : null;
   const formattedData = extractedCertData ? formatCertificateData(extractedCertData) : null;
   
-  // Initialize form data with extracted certificate data
+  // Initialize form data with extracted certificate data when component mounts or data changes
   useEffect(() => {
     if (extractedCertData) {
+      const status = determineFitnessStatus(extractedCertData);
+      setFitnessStatus(status);
+      
       setFormData({
         patientName: formattedData?.patientName || '',
         patientId: formattedData?.patientId || '',
         companyName: formattedData?.companyName || '',
         occupation: formattedData?.occupation || '',
         restrictionsText: formattedData?.restrictionsText || 'None',
-        fitnessStatus: fitnessStatus
+        fitnessStatus: status
       });
     }
-  }, [extractedCertData, formattedData, fitnessStatus]);
+  }, [extractedCertData, formattedData]);
   
   // Get document ID from props or from document object
   const effectiveDocumentId = documentId || document?.id;
-  
-  // Determine fitness status if we have data
-  React.useEffect(() => {
-    if (extractedCertData) {
-      const status = determineFitnessStatus(extractedCertData);
-      setFitnessStatus(status);
-    }
-  }, [extractedCertData]);
 
   const handleGenerate = async () => {
     if (!effectiveDocumentId || !patientId) {
@@ -98,7 +93,10 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
     if (onSave) {
       try {
         setIsSaving(true);
-        await onSave(formData);
+        await onSave({
+          ...formData,
+          fitnessStatus: fitnessStatus
+        });
         toast.success("Certificate data saved successfully");
         setIsEditing(false);
       } catch (error) {
@@ -118,6 +116,17 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
   };
 
   const toggleEditMode = () => {
+    // When toggling edit mode, ensure form data is properly initialized
+    if (!isEditing && formattedData) {
+      setFormData({
+        patientName: formattedData.patientName || '',
+        patientId: formattedData.patientId || '',
+        companyName: formattedData.companyName || '',
+        occupation: formattedData.occupation || '',
+        restrictionsText: formattedData.restrictionsText || 'None',
+        fitnessStatus: fitnessStatus
+      });
+    }
     setIsEditing(!isEditing);
   };
 
@@ -145,7 +154,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
             <h3 className="font-semibold">Patient Information</h3>
             {isEditing ? (
               <Input 
-                value={formData.patientName || ''}
+                value={formData.patientName || formattedData.patientName || ''}
                 onChange={(e) => handleInputChange('patientName', e.target.value)}
                 className="mb-2"
               />
@@ -155,7 +164,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
             <p className="text-sm text-gray-500">
               ID: {isEditing ? (
                 <Input 
-                  value={formData.patientId || ''}
+                  value={formData.patientId || formattedData.patientId || ''}
                   onChange={(e) => handleInputChange('patientId', e.target.value)}
                   className="mt-1"
                 />
@@ -169,7 +178,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
             <h3 className="font-semibold">Company</h3>
             {isEditing ? (
               <Input 
-                value={formData.companyName || ''}
+                value={formData.companyName || formattedData.companyName || ''}
                 onChange={(e) => handleInputChange('companyName', e.target.value)}
                 className="mb-2"
               />
@@ -182,7 +191,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
             <h3 className="font-semibold">Occupation</h3>
             {isEditing ? (
               <Input 
-                value={formData.occupation || ''}
+                value={formData.occupation || formattedData.occupation || ''}
                 onChange={(e) => handleInputChange('occupation', e.target.value)}
                 className="mb-2"
               />
@@ -247,7 +256,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
               <h3 className="font-semibold">Restrictions</h3>
               {isEditing ? (
                 <Input 
-                  value={formData.restrictionsText || 'None'}
+                  value={formData.restrictionsText || formattedData.restrictionsText || 'None'}
                   onChange={(e) => handleInputChange('restrictionsText', e.target.value)}
                   className="mb-2"
                 />
