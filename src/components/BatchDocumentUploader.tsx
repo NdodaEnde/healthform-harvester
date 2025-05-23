@@ -189,6 +189,22 @@ const BatchDocumentUploader = ({
       formData.append('documentType', fileItem.documentType);
       formData.append('userId', user.id);
 
+       // Add this line to pass patientId to the edge function
+      if (patientId) formData.append('patientId', patientId);
+    
+    // Add these lines to pass organization context
+      if (organizationId) formData.append('organizationId', organizationId);
+      if (clientOrganizationId) formData.append('clientOrganizationId', clientOrganizationId);
+    
+      // Add debug logging
+      console.log("Uploading document with params:", {
+        documentType: fileItem.documentType,
+        patientId: patientId || "null",
+        organizationId: organizationId || "null",
+        clientOrganizationId: clientOrganizationId || "null"
+      });
+
+
       // Create a simulated progress updater
       const progressInterval = setInterval(() => {
         updateFileProgress(index, Math.min(
