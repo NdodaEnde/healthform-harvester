@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -570,7 +569,7 @@ const CertificateTemplate = ({
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none" aria-hidden="true">
+          <div className="absolute inset-0 flex items-center justify-center opacity-25 pointer-events-none" aria-hidden="true">
             <img 
               src="/lovable-uploads/ead30039-3558-4ae0-a3ec-c58d8755a311.png" 
               alt="BlueCollar Health & Wellness" 
