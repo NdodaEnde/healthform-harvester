@@ -570,26 +570,19 @@ const CertificateTemplate = ({
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none" aria-hidden="true">
-            {/* Use organization logo instead of hardcoded text for watermark */}
-            <div className="rotate-45 scale-150">
-              <OrganizationLogo
-                organization={organization}
-                size="lg"
-                className="max-w-[400px] opacity-20"
-                variant="logo"
-              />
-            </div>
+            <span className="text-8xl font-bold tracking-widest text-gray-400 rotate-45">
+              OCCUPATIONAL HEALTH
+            </span>
           </div>
           
           <div className="relative z-10">
             <div className="px-4 pt-4">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <OrganizationLogo 
-                    organization={organization}
-                    size="lg" 
+                  <img 
+                    src="/lovable-uploads/b75ebd30-51c1-441a-8b04-eec2746a7ebd.png" 
+                    alt="BlueCollar Health & Wellness Logo" 
                     className="h-20 object-contain"
-                    fallbackText="BlueCollar Health & Wellness"
                   />
                 </div>
                 <div className="bg-white text-right">
