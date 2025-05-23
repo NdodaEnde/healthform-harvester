@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ChevronLeft, Download, Copy, Printer, CheckCircle2, Eye, 
   EyeOff, FileText, AlertCircle, ClipboardCheck, Loader2, Clock,
-  Check, Pencil, Save, X, Mail, FileDown
+  Check, Pencil, Save, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -15,18 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
-import EnhancedCertificateGenerator from "@/components/certificates/EnhancedCertificateGenerator";
 import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "@/components/ui/tabs";
 
 const mockDocumentData = {
   id: "doc-1",
@@ -172,194 +167,12 @@ const DocumentViewer = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState<any>(null);
   const [originalData, setOriginalData] = useState<any>(null);
-  
-  // Zoom and drag controls for the original document
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const zoomStep = 0.25; // How much to zoom in/out with each click
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 });
-  const documentContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Zoom functions
-  const zoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + zoomStep, 3)); // Max zoom: 3x
-  };
-  
-  const zoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - zoomStep, 0.5)); // Min zoom: 0.5x
-  };
-  
-  const resetZoom = () => {
-    setZoomLevel(1); // Reset to default zoom
-    // Reset scroll position when zoom is reset
-    if (documentContainerRef.current) {
-      documentContainerRef.current.scrollTop = 0;
-      documentContainerRef.current.scrollLeft = 0;
-    }
-  };
-  
-  // Using useCallback to memoize our event handlers
-  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging) return;
-    
-    e.preventDefault(); // Prevent text selection during drag
-    
-    // Calculate how far the mouse has moved from the starting point
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    
-    if (documentContainerRef.current) {
-      // IMPORTANT: For natural feeling dragging, we move the view in the OPPOSITE 
-      // direction of the mouse movement (hence the minus sign)
-      const newScrollLeft = scrollPosition.x - dx;
-      const newScrollTop = scrollPosition.y - dy;
-      
-      documentContainerRef.current.scrollLeft = newScrollLeft;
-      documentContainerRef.current.scrollTop = newScrollTop;
-      
-      // Debug info to help diagnose dragging issues
-      console.log('Dragging:', {
-        dx, 
-        dy, 
-        scrollLeft: documentContainerRef.current.scrollLeft,
-        scrollTop: documentContainerRef.current.scrollTop,
-        newScrollLeft,
-        newScrollTop
-      });
-    }
-  }, [isDragging, dragStart.x, dragStart.y, scrollPosition.x, scrollPosition.y]);
-  
-  const handleGlobalMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      if (documentContainerRef.current) {
-        documentContainerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
-      }
-    }
-  }, [isDragging, zoomLevel]);
-  
-  // Set up and clean up global event listeners whenever dragging state changes
-  useEffect(() => {
-    if (isDragging) {
-      // Add listeners when dragging starts
-      window.addEventListener('mousemove', handleGlobalMouseMove);
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-    }
-    
-    // Clean up listeners when dragging ends or component unmounts
-    return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [isDragging, handleGlobalMouseMove, handleGlobalMouseUp]);
-  
-  // Drag handlers for the container
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only enable dragging when zoomed in
-    if (zoomLevel > 1) {
-      e.preventDefault(); // Prevent default browser behavior
-      
-      // Store the initial mouse position when the drag starts
-      setDragStart({ x: e.clientX, y: e.clientY });
-      
-      if (documentContainerRef.current) {
-        // Store the initial scroll position of the container
-        setScrollPosition({
-          x: documentContainerRef.current.scrollLeft,
-          y: documentContainerRef.current.scrollTop
-        });
-        
-        // Change cursor to indicate dragging
-        documentContainerRef.current.style.cursor = 'grabbing';
-        
-        // Log initial state for debugging
-        console.log('Starting drag:', {
-          clientX: e.clientX,
-          clientY: e.clientY,
-          scrollLeft: documentContainerRef.current.scrollLeft,
-          scrollTop: documentContainerRef.current.scrollTop
-        });
-      }
-      
-      // Set dragging state - this will trigger the effect to add global listeners
-      setIsDragging(true);
-    }
-  };
-  
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Container-level handler, mostly just prevents default behavior
-    if (isDragging) {
-      e.preventDefault();
-    }
-  };
-  
-  const handleMouseUp = () => {
-    // Container-level handler, mostly just resets dragging state
-    if (isDragging) {
-      setIsDragging(false);
-    }
-  };
-  
-  // Set initial cursor style when zoom level changes
-  useEffect(() => {
-    if (documentContainerRef.current) {
-      documentContainerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
-    }
-  }, [zoomLevel]);
 
-  // ENHANCED: Better getNestedValue function with debugging
-const getNestedValue = (obj: any, path: string[]): any => {
-  console.log(`Getting nested value for path: ${path.join('.')} from:`, obj);
-  
-  if (!obj || !path || path.length === 0) {
-    console.log('Invalid input - returning empty string');
-    return '';
-  }
-  
-  let current = obj;
-  for (let i = 0; i < path.length; i++) {
-    const key = path[i];
-    console.log(`Step ${i}: Looking for key '${key}' in:`, current);
-    
-    if (current && typeof current === 'object' && key in current) {
-      current = current[key];
-      console.log(`Found: ${key} =`, current);
-    } else {
-      console.log(`Key '${key}' not found, returning empty string`);
-      return '';
-    }
-  }
-  
-  const result = current || '';
-  console.log(`Final result for ${path.join('.')}:`, result);
-  return result;
-};
-
-  // FIXED: Improved toggleEditMode function
   const toggleEditMode = () => {
     if (!isEditing) {
-      // Entering edit mode - copy current document data
-      const currentData = document?.extractedData;
-      if (currentData) {
-        console.log('Entering edit mode with data:', currentData);
-        
-        // Create deep copies to avoid mutation
-        const originalDataCopy = JSON.parse(JSON.stringify(currentData));
-        const editableDataCopy = JSON.parse(JSON.stringify(currentData));
-        
-        setOriginalData(originalDataCopy);
-        setEditableData(editableDataCopy);
-        
-        console.log('Set editable data to:', editableDataCopy);
-      } else {
-        console.error('No extracted data available for editing');
-        toast.error("No data available for editing");
-        return;
-      }
+      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
+      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
     } else {
-      // Exiting edit mode - clean up
-      console.log('Exiting edit mode');
       setEditableData(null);
       setOriginalData(null);
     }
@@ -528,7 +341,6 @@ const getNestedValue = (obj: any, path: string[]): any => {
       return "Unknown";
     }
     
-    // Direct path for structured data
     if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
       const patientData = extractedData.structured_data.patient;
       if (patientData && typeof patientData === 'object') {
@@ -537,40 +349,14 @@ const getNestedValue = (obj: any, path: string[]): any => {
       }
     }
     
-    // Try finding from raw_response.data.markdown
-    if (extractedData.raw_response && typeof extractedData.raw_response === 'object') {
-      // Check in data.markdown
-      if (extractedData.raw_response.data && extractedData.raw_response.data.markdown) {
-        const markdown = extractedData.raw_response.data.markdown;
-        const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
-        if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
-      }
-      
-      // Check in raw_response.structured_data path
-      if (extractedData.raw_response.structured_data && 
-          extractedData.raw_response.structured_data.patient &&
-          extractedData.raw_response.structured_data.patient.name) {
-        return extractedData.raw_response.structured_data.patient.name;
-      }
-      
-      // Check in result path
-      if (extractedData.raw_response.result && 
-          extractedData.raw_response.result.patient &&
-          extractedData.raw_response.result.patient.name) {
-        return extractedData.raw_response.result.patient.name;
-      }
-    }
-    
-    // Look for raw_content in structured_data
-    if (extractedData.structured_data && extractedData.structured_data.raw_content) {
-      const markdown = extractedData.structured_data.raw_content;
-      if (typeof markdown === 'string') {
+    if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
+      const markdown = extractedData.raw_response.data.markdown;
+      if (markdown) {
         const nameMatch = markdown.match(/\*\*Initials & Surname\*\*:\s*(.*?)(?=\n|\r|$)/i);
         if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
       }
     }
     
-    // Recursively search the object for patient name
     if (typeof extractedData === 'object') {
       const findPatientName = (obj: any): string | null => {
         if (!obj || typeof obj !== 'object') return null;
@@ -609,7 +395,6 @@ const getNestedValue = (obj: any, path: string[]): any => {
       return "No ID";
     }
     
-    // Direct path for structured data
     if (extractedData.structured_data && typeof extractedData.structured_data === 'object') {
       const patientData = extractedData.structured_data.patient;
       if (patientData && typeof patientData === 'object') {
@@ -619,57 +404,14 @@ const getNestedValue = (obj: any, path: string[]): any => {
       }
     }
     
-    // Try finding from raw_response
-    if (extractedData.raw_response && typeof extractedData.raw_response === 'object') {
-      // Check in data.markdown
-      if (extractedData.raw_response.data && extractedData.raw_response.data.markdown) {
-        const markdown = extractedData.raw_response.data.markdown;
-        
+    if (extractedData.raw_response && typeof extractedData.raw_response === 'object' && extractedData.raw_response.data) {
+      const markdown = extractedData.raw_response.data.markdown;
+      if (markdown) {
         const idPatterns = [
           /\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i,
           /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i,
           /ID No[.:]\s*(.*?)(?=\n|\r|$)/i,
-          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i,
-          /\*\*ID Number\*\*:\s*(.*?)(?=\n|\r|$)/i,
-          /\*\*Identity Number\*\*:\s*(.*?)(?=\n|\r|$)/i
-        ];
-        
-        for (const pattern of idPatterns) {
-          const idMatch = markdown.match(pattern);
-          if (idMatch && idMatch[1]) return idMatch[1].trim();
-        }
-      }
-      
-      // Check in raw_response.structured_data path
-      if (extractedData.raw_response.structured_data && 
-          extractedData.raw_response.structured_data.patient) {
-        const patientData = extractedData.raw_response.structured_data.patient;
-        if (patientData.id_number) return patientData.id_number;
-        if (patientData.employee_id) return patientData.employee_id;
-        if (patientData.id) return patientData.id;
-      }
-      
-      // Check in result path
-      if (extractedData.raw_response.result && 
-          extractedData.raw_response.result.patient) {
-        const patientData = extractedData.raw_response.result.patient;
-        if (patientData.id_number) return patientData.id_number;
-        if (patientData.employee_id) return patientData.employee_id;
-        if (patientData.id) return patientData.id;
-      }
-    }
-    
-    // Look for raw_content in structured_data
-    if (extractedData.structured_data && extractedData.structured_data.raw_content) {
-      const markdown = extractedData.structured_data.raw_content;
-      if (typeof markdown === 'string') {
-        const idPatterns = [
-          /\*\*ID No\*\*:\s*(.*?)(?=\n|\r|$)/i,
-          /\*\*ID NO\*\*:\s*(.*?)(?=\n|\r|$)/i,
-          /ID No[.:]\s*(.*?)(?=\n|\r|$)/i,
-          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i,
-          /\*\*ID Number\*\*:\s*(.*?)(?=\n|\r|$)/i,
-          /\*\*Identity Number\*\*:\s*(.*?)(?=\n|\r|$)/i
+          /ID NO[.:]\s*(.*?)(?=\n|\r|$)/i
         ];
         
         for (const pattern of idPatterns) {
@@ -679,7 +421,6 @@ const getNestedValue = (obj: any, path: string[]): any => {
       }
     }
     
-    // Recursively search for ID
     if (typeof extractedData === 'object') {
       const findPatientId = (obj: any): string | null => {
         if (!obj || typeof obj !== 'object') return null;
@@ -708,193 +449,150 @@ const getNestedValue = (obj: any, path: string[]): any => {
     return "No ID";
   };
 
-  // FIXED: Improved fetchDocumentFromSupabase function
-  const fetchDocumentFromSupabase = async (documentId: string) => {
-    try {
-      const { data: documentData, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching document:', error);
-        return null;
-      }
-      
-      if (!documentData) {
-        return null;
-      }
-      
-      console.log('Fetched document data:', documentData);
-      
-      // FIXED: Improved URL handling with better error handling and fallback
-      let signedUrl = null;
-      try {
-        const { data: urlData, error: urlError } = await supabase
-          .storage
-          .from('medical-documents')
-          .createSignedUrl(documentData.file_path, 3600);
-        
-        if (urlError) {
-          console.error('Error creating signed URL:', urlError);
-          // Try to get public URL as fallback
-          const { data: publicUrlData } = supabase
-            .storage
-            .from('medical-documents')
-            .getPublicUrl(documentData.file_path);
-          
-          signedUrl = publicUrlData?.publicUrl || null;
-        } else {
-          signedUrl = urlData?.signedUrl || null;
-        }
-      } catch (urlException) {
-        console.error('Exception getting document URL:', urlException);
-        signedUrl = null;
-      }
-      
-      let extractedData = documentData.extracted_data || {};
-      
-      if (documentData.document_type === 'certificate-of-fitness') {
-        console.log('Before mapping:', extractedData);
-        
-        extractedData = mapExtractedDataToValidatorFormat(extractedData);
-        console.log('After mapping:', extractedData);
-      }
-      
-      let patientName = extractPatientName(extractedData);
-      let patientId = extractPatientId(extractedData);
-      
-      console.log('Processed extracted data:', extractedData);
-      console.log('Document URL:', signedUrl);
-      
-      return {
-        id: documentData.id,
-        name: documentData.file_name,
-        type: documentData.document_type === 'medical-questionnaire' 
-          ? 'Medical Examination Questionnaire' 
-          : 'Certificate of Fitness',
-        uploadedAt: documentData.created_at,
-        status: documentData.status,
-        patientName: patientName,
-        patientId: patientId,
-        imageUrl: signedUrl, // This should now properly contain the URL or be null
-        extractedData: extractedData,
-        jsonData: JSON.stringify(extractedData, null, 2)
-      };
-    } catch (error) {
-      console.error('Error fetching document from Supabase:', error);
+  // MINIMAL FIX: Only improve the URL handling in your existing fetchDocumentFromSupabase
+const fetchDocumentFromSupabase = async (documentId: string) => {
+  try {
+    const { data: documentData, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching document:', error);
       return null;
     }
-  };
-
-  // ENHANCED: Better updateEditableData function with debugging
-const updateEditableData = (path: string[], value: any) => {
-  console.log(`Updating editable data at path: ${path.join('.')} with value:`, value);
-  console.log('Current editableData before update:', editableData);
-  
-  setEditableData((prev: any) => {
-    if (!prev) {
-      console.error('No editableData to update!');
-      return prev;
+    
+    if (!documentData) {
+      return null;
     }
     
-    console.log('Previous editableData:', prev);
+    console.log('Fetched document data:', documentData);
+    console.log('File path:', documentData.file_path);
     
+    // ENHANCED: Better URL handling (only change from your working version)
+    let signedUrl = null;
     try {
+      const { data: urlData, error: urlError } = await supabase
+        .storage
+        .from('medical-documents')
+        .createSignedUrl(documentData.file_path, 3600);
+      
+      if (urlError) {
+        console.error('Signed URL error:', urlError);
+        // Try public URL as fallback
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('medical-documents')
+          .getPublicUrl(documentData.file_path);
+        
+        signedUrl = publicUrlData?.publicUrl || null;
+        console.log('Using public URL fallback:', signedUrl);
+      } else {
+        signedUrl = urlData?.signedUrl || null;
+        console.log('Using signed URL:', signedUrl);
+      }
+    } catch (urlException) {
+      console.error('Exception getting URL:', urlException);
+      signedUrl = null;
+    }
+    
+    // Rest of your existing code remains the same...
+    let extractedData = documentData.extracted_data || {};
+    
+    if (documentData.document_type === 'certificate-of-fitness') {
+      console.log('Before mapping:', extractedData);
+      extractedData = mapExtractedDataToValidatorFormat(extractedData);
+      console.log('After mapping:', extractedData);
+    }
+    
+    let patientName = extractPatientName(extractedData);
+    let patientId = extractPatientId(extractedData);
+    
+    console.log('Processed extracted data:', extractedData);
+    
+    return {
+      id: documentData.id,
+      name: documentData.file_name,
+      type: documentData.document_type === 'medical-questionnaire' 
+        ? 'Medical Examination Questionnaire' 
+        : 'Certificate of Fitness',
+      uploadedAt: documentData.created_at,
+      status: documentData.status,
+      patientName: patientName,
+      patientId: patientId,
+      imageUrl: signedUrl, // Now with better error handling
+      extractedData: extractedData,
+      jsonData: JSON.stringify(extractedData, null, 2)
+    };
+  } catch (error) {
+    console.error('Error fetching document from Supabase:', error);
+    return null;
+  }
+};
+
+  const updateEditableData = (path: string[], value: any) => {
+    setEditableData((prev: any) => {
+      if (!prev) return prev;
+      
       const newData = JSON.parse(JSON.stringify(prev));
       
       let current = newData;
       for (let i = 0; i < path.length - 1; i++) {
-        const key = path[i];
-        if (!current[key] || typeof current[key] !== 'object') {
-          console.log(`Creating missing object at key: ${key}`);
-          current[key] = {};
+        if (!current[path[i]]) {
+          current[path[i]] = {};
         }
-        current = current[key];
+        current = current[path[i]];
       }
       
-      const finalKey = path[path.length - 1];
-      console.log(`Setting ${finalKey} = ${value}`);
-      current[finalKey] = value;
+      current[path[path.length - 1]] = value;
       
-      console.log('Updated editableData:', newData);
       return newData;
-    } catch (error) {
-      console.error('Error updating editable data:', error);
-      return prev;
-    }
-  });
-};
+    });
+  };
 
-  // ENHANCED: Better renderStructuredSection with more debugging
-const renderStructuredSection = (title: string, data: any, path: string[]) => {
-  console.log(`=== RENDERING SECTION: ${title} ===`);
-  console.log('Section data:', data);
-  console.log('Section path:', path);
-  console.log('Is editing:', isEditing);
-  console.log('Current editableData:', editableData);
-  
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    console.log('Invalid data for section, skipping');
-    return null;
-  }
-  
-  return (
-    <div className="px-6">
-      <h3 className="text-lg font-medium mb-4">{title}</h3>
-      <div className="space-y-3">
-        {Object.entries(data).map(([key, value]) => {
-          console.log(`Processing field: ${key} =`, value);
-          
-          if (typeof value === 'object' && value !== null) {
-            console.log(`Skipping object field: ${key}`);
-            return null;
-          }
-          
-          const displayKey = key
-            .replace(/_/g, ' ')
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-          
-          // ENHANCED: Better value retrieval logic
-          let currentValue = '';
-          
-          if (isEditing && editableData) {
-            console.log(`Edit mode: getting value for ${key} from editableData`);
-            currentValue = getNestedValue(editableData, [...path, key]);
-          } else {
-            console.log(`View mode: using direct value for ${key}`);
-            currentValue = (value as string) || '';
-          }
-          
-          console.log(`Final value for ${key}:`, currentValue);
+  const renderStructuredSection = (title: string, data: any, path: string[]) => {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return null;
+    }
+    
+    return (
+      <div className="px-6">
+        <h3 className="text-lg font-medium mb-4">{title}</h3>
+        <div className="space-y-3">
+          {Object.entries(data).map(([key, value]) => {
+            if (typeof value === 'object' && value !== null) {
+              return null;
+            }
             
-          return (
-            <div key={key} className="flex items-center">
-              <span className="font-semibold mr-1 min-w-32">{displayKey}:</span>
-              {isEditing ? (
-                <Input 
-                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                  value={currentValue || ''}
-                  onChange={(e) => {
-                    console.log(`Field ${key} changed to: "${e.target.value}"`);
-                    const newPath = [...path, key];
-                    updateEditableData(newPath, e.target.value);
-                  }}
-                  placeholder={`Enter ${displayKey}`}
-                />
-              ) : (
-                <span className="text-gray-700">{currentValue || 'N/A'}</span>
-              )}
-            </div>
-          );
-        })}
+            const displayKey = key
+              .replace(/_/g, ' ')
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+              
+            return (
+              <div key={key} className="flex items-center">
+                <span className="font-semibold mr-1 min-w-32">{displayKey}:</span>
+                {isEditing ? (
+                  <Input 
+                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                    value={value as string || ''}
+                    onChange={(e) => {
+                      const newPath = [...path, key];
+                      updateEditableData(newPath, e.target.value);
+                    }}
+                  />
+                ) : (
+                  <span className="text-gray-700">{value as string || 'N/A'}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const renderCertificateSection = (data: any) => {
     if (!data || !data.structured_data) return null;
@@ -1251,323 +949,150 @@ const renderStructuredSection = (title: string, data: any, path: string[]) => {
         {renderFitnessAssessmentSection()}
         <Separator />
         {renderCommentsSection()}
+        
+        <div className="mt-6 flex justify-end space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsEditing(false);
+              setEditableData(null);
+            }}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEdits}>
+            <Save className="h-4 w-4 mr-2" />
+            Save Changes
+          </Button>
+        </div>
       </div>
     );
   };
 
-  // ENHANCED: Better renderExtractedData with debugging
-const renderExtractedData = () => {
-  console.log('=== RENDERING EXTRACTED DATA ===');
-  console.log('isValidating:', isValidating);
-  console.log('isEditing:', isEditing);
-  console.log('document:', document);
-  console.log('editableData:', editableData);
-  
-  if (isValidating && document) {
-    console.log('Rendering validator');
-    const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
-    
-    return (
-      <CertificateValidator 
-        documentId={document.id}
-        extractedData={dataForValidator}
-        onSave={handleValidationSave}
-        onCancel={() => {
-          setIsValidating(false);
-          setValidatorData(null);
-        }}
-      />
-    );
-  }
-  
-  if (!document) {
-    console.log('No document available');
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No document available</p>
-      </div>
-    );
-  }
-  
-  if (document.status === 'processing') {
-    console.log('Document still processing');
-    return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-        <h3 className="text-lg font-medium mb-2">Document Processing</h3>
-        <p className="text-muted-foreground text-center max-w-md">
-          This document is currently being processed. The extracted data will be available here once processing is complete.
-        </p>
-        <p className="text-sm text-muted-foreground mt-4">
-          You can view the original document on the left while waiting.
-        </p>
-      </div>
-    );
-  }
-  
-  if (!document.extractedData) {
-    console.log('No extracted data available');
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No data available</p>
-      </div>
-    );
-  }
-  
-  // ENHANCED: Better data selection logic with debugging
-  const extractedData = (() => {
-    if (isEditing) {
-      console.log('Edit mode: using editableData');
-      const result = editableData || document.extractedData;
-      console.log('Selected data (edit mode):', result);
-      return result;
-    } else {
-      console.log('View mode: using document.extractedData');
-      console.log('Selected data (view mode):', document.extractedData);
-      return document.extractedData;
-    }
-  })();
-  
-  console.log('Final extractedData to render:', extractedData);
-  
-  // Rest of the function remains the same...
-  if (document.type === 'Certificate of Fitness') {
-    if (isEditing) {
-      return renderCertificateSection(extractedData);
-    }
-    
-    return (
-      <div className="certificate-container pb-6">
-        <Tabs defaultValue="view" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="view">View Certificate</TabsTrigger>
-            <TabsTrigger value="download">Download & Print Options</TabsTrigger>
-          </TabsList>
-          <TabsContent value="view" className="pt-4">
-            <CertificateTemplate extractedData={extractedData} />
-          </TabsContent>
-          <TabsContent value="download" className="pt-4">
-            <Card className="border-0 shadow-none">
-              <CardContent className="pt-4">
-                <div className="flex items-center mb-4">
-                  <FileDown className="mr-2 h-5 w-5 text-blue-500" />
-                  <h3 className="text-lg font-medium">Download, Print or Email Certificate</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Use the options below to download, print or email this certificate.
-                </p>
-                <EnhancedCertificateGenerator extractedData={extractedData} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  }
-  
-  if (
-    typeof extractedData === 'object' && 
-    extractedData !== null && 
-    !Array.isArray(extractedData) && 
-    extractedData.structured_data
-  ) {
-    const structuredData = extractedData.structured_data;
-    
-    return (
-      <div className="space-y-6">
-        {structuredData.patient && (
-          <>
-            {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
-            <Separator />
-          </>
-        )}
-        
-        {structuredData.medical_details && (
-          <>
-            {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
-            <Separator />
-          </>
-        )}
-        
-        {structuredData.examination_results && (
-          <>
-            {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
-            <Separator />
-          </>
-        )}
-        
-        {structuredData.certification && (
-          <>
-            {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
-          </>
-        )}
-        
-        {!structuredData.patient && !structuredData.medical_details && 
-         !structuredData.examination_results && !structuredData.certification && (
-          <div>
-            <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
-            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-              {JSON.stringify(structuredData, null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
-    );
-  }
-  
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          The data structure from this extraction doesn't match the expected format. 
-          Here's the raw data that was extracted:
-        </p>
-        <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-          {JSON.stringify(extractedData, null, 2)}
-        </pre>
-      </div>
-    </div>
-  );
-};
-
-  // FIXED: Add debugging to original document display
-  const renderOriginalDocument = () => {
-    console.log('Rendering original document with imageUrl:', imageUrl);
-    console.log('Document object:', document);
-    
-    if (!imageUrl) {
+  const renderExtractedData = () => {
+    if (isValidating && document) {
+      console.log('Data passed to validator:', validatorData || document.extractedData);
+      
+      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
+      
       return (
-        <div className="flex flex-col items-center justify-center h-full text-center p-4">
-          <FileText className="h-16 w-16 text-muted-foreground mb-4" strokeWidth={1.5} />
-          <p className="text-muted-foreground mb-2">Document preview not available</p>
-          <p className="text-sm text-muted-foreground">
-            The document URL could not be loaded. Please check your network connection and try again.
-          </p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-4"
-            onClick={() => {
-              // Trigger a refresh of the document data
-              setRefreshKey(prev => prev + 1);
-            }}
-          >
-            Retry Loading
-          </Button>
+        <CertificateValidator 
+          documentId={document.id}
+          extractedData={dataForValidator}
+          onSave={handleValidationSave}
+          onCancel={() => {
+            setIsValidating(false);
+            setValidatorData(null);
+          }}
+        />
+      );
+    }
+    
+    if (!document || !document.extractedData) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available</p>
+        </div>
+      );
+    }
+    
+    const extractedData = isEditing ? editableData : document.extractedData;
+    
+    if (document.type === 'Certificate of Fitness') {
+      if (isEditing) {
+        return renderCertificateSection(extractedData);
+      }
+      
+      console.log("Passing to CertificateTemplate:", extractedData);
+      return (
+        <div className="certificate-container pb-6">
+          <CertificateTemplate extractedData={extractedData} />
+        </div>
+      );
+    }
+    
+    if (
+      typeof extractedData === 'object' && 
+      extractedData !== null && 
+      !Array.isArray(extractedData) && 
+      extractedData.structured_data
+    ) {
+      const structuredData = extractedData.structured_data;
+      
+      return (
+        <div className="space-y-6">
+          {structuredData.patient && (
+            <>
+              {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.medical_details && (
+            <>
+              {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.examination_results && (
+            <>
+              {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
+              <Separator />
+            </>
+          )}
+          
+          {structuredData.certification && (
+            <>
+              {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
+            </>
+          )}
+          
+          {isEditing && (
+            <div className="mt-6 flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditableData(null);
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          )}
+          
+          {!structuredData.patient && !structuredData.medical_details && 
+           !structuredData.examination_results && !structuredData.certification && (
+            <div>
+              <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
+              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                {JSON.stringify(structuredData, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       );
     }
     
     return (
-      <div className="relative w-full h-full overflow-auto"
-           ref={documentContainerRef}
-           onMouseDown={handleMouseDown}
-           onMouseMove={handleMouseMove}
-           onMouseUp={handleMouseUp}
-           onMouseLeave={handleMouseUp}
-           style={{ 
-             userSelect: isDragging ? 'none' : 'auto',
-             touchAction: 'none',
-             scrollBehavior: 'auto',
-             overscrollBehavior: 'none'
-           }}>
-        
-        {/* Zoom overlay and drag hint */}
-        {zoomLevel > 1 && (
-          <>
-            <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs py-1 px-2 rounded-md z-10 pointer-events-none">
-              Drag to move
-            </div>
-            
-            <div 
-              className="absolute inset-0 z-10"
-              style={{ 
-                cursor: isDragging ? 'grabbing' : 'grab',
-                backgroundColor: 'rgba(0,0,0,0.01)',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                width: '100%',
-                height: '100%'
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                handleMouseDown(e);
-              }}
-            />
-          </>
-        )}
-        
-        {document?.name?.toLowerCase().endsWith('.pdf') ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <div style={{ 
-              transform: `scale(${zoomLevel})`, 
-              transformOrigin: 'center',
-              width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-              height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-              transition: 'transform 0.2s ease',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <iframe 
-                src={`${imageUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                title="PDF document preview"
-                className="w-full h-full border-0"
-                style={{ 
-                  minHeight: '500px',
-                  maxHeight: '100%',
-                  pointerEvents: isDragging ? 'none' : 'auto',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                }}
-                onError={() => {
-                  console.error('PDF iframe failed to load');
-                  toast.error('Failed to load PDF preview');
-                }}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center relative">
-            <div 
-              style={{ 
-                transform: `scale(${zoomLevel})`,
-                transformOrigin: 'center center', 
-                transition: 'transform 0.2s ease',
-                width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-                height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-                padding: '20px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <img 
-                src={imageUrl} 
-                alt="Document preview" 
-                className="max-w-full h-auto"
-                draggable="false"
-                style={{ 
-                  pointerEvents: isDragging ? 'none' : 'auto',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                  maxWidth: zoomLevel > 1 ? 'none' : '100%',
-                  maxHeight: zoomLevel > 1 ? 'none' : '100%',
-                }}
-                onError={() => {
-                  console.error('Image failed to load:', imageUrl);
-                  toast.error('Failed to load image preview');
-                }}
-                onLoad={() => {
-                  console.log('Image loaded successfully:', imageUrl);
-                }}
-              />
-            </div>
-          </div>
-        )}
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            The data structure from this extraction doesn't match the expected format. 
+            Here's the raw data that was extracted:
+          </p>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+            {JSON.stringify(extractedData, null, 2)}
+          </pre>
+        </div>
       </div>
     );
   };
@@ -1587,11 +1112,6 @@ const renderExtractedData = () => {
         if (documentData) {
           setDocument(documentData);
           setImageUrl(documentData.imageUrl);
-          
-          // Ensure original document is visible when in processing status
-          if (documentData.status === 'processing') {
-            setShowOriginal(true);
-          }
           
           sessionStorage.setItem(`document-${id}`, JSON.stringify(documentData));
           
@@ -1799,9 +1319,9 @@ const renderExtractedData = () => {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">Document Not Found</h2>
           <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => navigate("/documents")}>
+          <Button onClick={() => navigate("/dashboard")}>
             <ChevronLeft className="h-4 w-4" />
-            Back to Documents
+            Back to Dashboard
           </Button>
         </div>
       </div>
@@ -1815,7 +1335,7 @@ const renderExtractedData = () => {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => navigate("/documents")}
+            onClick={() => navigate("/dashboard")}
           >
             <ChevronLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
@@ -1824,12 +1344,6 @@ const renderExtractedData = () => {
             <h1 className="text-lg font-medium truncate">{document.name}</h1>
             <p className="text-sm text-muted-foreground">
               {document.type} | {document.patientName || "Unknown Patient"}
-              {document.status === 'processing' && (
-                <span className="ml-2 inline-flex items-center">
-                  <Clock className="h-3 w-3 mr-1 text-amber-500 animate-pulse" />
-                  <span className="text-amber-500">Processing</span>
-                </span>
-              )}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -1887,7 +1401,7 @@ const renderExtractedData = () => {
             )}
             {isEditing && (
               <Button 
-                variant="outline" 
+                variant="warning" 
                 size="sm"
                 onClick={toggleEditMode}
               >
@@ -1922,49 +1436,24 @@ const renderExtractedData = () => {
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Original Document</h2>
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center border rounded-md">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={zoomOut}
-                      disabled={zoomLevel <= 0.5}
-                      className="h-8 px-2 rounded-none rounded-l-md"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3 7.5H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </Button>
-                    <div className="px-2 text-xs font-medium">
-                      {Math.round(zoomLevel * 100)}%
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={zoomIn}
-                      disabled={zoomLevel >= 3}
-                      className="h-8 px-2 rounded-none rounded-r-md"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7.5 3V12M3 7.5H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </Button>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetZoom}
-                    className="h-8 text-xs"
-                  >
-                    Reset
-                  </Button>
-                  <Badge variant="outline" className="text-xs">
-                    {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
-                  </Badge>
-                </div>
+                <Badge variant="outline" className="text-xs">
+                  {document.name?.split('.').pop()?.toUpperCase() || 'PDF'}
+                </Badge>
               </div>
               <Card className="overflow-hidden h-[calc(100vh-220px)]">
-                {renderOriginalDocument()}
+                <div className="relative w-full h-full">
+                  {imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt="Document preview" 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
+                    </div>
+                  )}
+                </div>
               </Card>
             </motion.div>
           )}
@@ -2014,15 +1503,50 @@ const renderExtractedData = () => {
                   {renderExtractedData()}
                 </CardContent>
               ) : isEditing ? (
-                <CardContent className="p-6 h-[calc(100vh-330px)] overflow-auto">
+                <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
               ) : (
-                <CardContent className="pt-4 h-[calc(100vh-290px)] overflow-hidden">
-                  <ScrollArea className="h-full pr-4">
-                    {renderExtractedData()}
-                  </ScrollArea>
-                </CardContent>
+                <>
+                  <Tabs defaultValue="structured">
+                    <CardContent className="pb-0 pt-4">
+                      <TabsList className="grid grid-cols-2">
+                        <TabsTrigger value="structured">Structured Data</TabsTrigger>
+                        <TabsTrigger value="json">JSON</TabsTrigger>
+                      </TabsList>
+                    </CardContent>
+                    
+                    <CardContent className="pt-2 h-[calc(100vh-320px)] overflow-hidden">
+                      <TabsContent value="structured" className="m-0 h-full">
+                        <ScrollArea className="h-full pr-4">
+                          {renderExtractedData()}
+                        </ScrollArea>
+                      </TabsContent>
+                      
+                      <TabsContent value="json" className="m-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="relative">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="absolute top-1 right-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(document.jsonData);
+                                toast.success("JSON data copied to clipboard");
+                              }}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </Button>
+                            <pre className="p-4 rounded-md bg-muted/50 text-sm overflow-x-auto">
+                              {document.jsonData}
+                            </pre>
+                          </div>
+                        </ScrollArea>
+                      </TabsContent>
+                    </CardContent>
+                  </Tabs>
+                </>
               )}
             </Card>
             
@@ -2030,10 +1554,10 @@ const renderExtractedData = () => {
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
-                  onClick={() => navigate("/documents")}
+                  onClick={() => navigate("/dashboard")}
                 >
                   <ChevronLeft className="h-4 w-4 mr-2" />
-                  Back to Documents
+                  Back to Dashboard
                 </Button>
                 {document.status === 'processed' && !isEditing && (
                   <Button
@@ -2043,11 +1567,19 @@ const renderExtractedData = () => {
                     Edit Data
                   </Button>
                 )}
+                {document.status === 'processed' && !isValidating && !isEditing && (
+                  <Button
+                    onClick={startValidation}
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
+                  </Button>
+                )}
               </div>
             )}
             
             {isEditing && (
-              <div className="flex justify-end space-x-2 mt-4">
+              <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => {
