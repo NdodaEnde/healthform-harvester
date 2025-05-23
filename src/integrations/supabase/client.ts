@@ -22,7 +22,7 @@ export const supabase = createClient<Database>(
     db: {
       schema: 'public'
     },
-    // Enhanced storage configuration for better file handling
+    // Storage configuration focused on medical-documents bucket
     storage: {
       // Enable content type detection to ensure files are properly displayed
       detectContentType: true

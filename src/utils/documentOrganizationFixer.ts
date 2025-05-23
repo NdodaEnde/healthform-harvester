@@ -47,9 +47,9 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
 
 /**
  * Utility to fix document URLs by regenerating them from storage paths
- * Can optionally standardize storage location to use a single bucket
+ * Standardizes storage location to use a single bucket
  */
-export const fixDocumentUrls = async (organizationId: string, standardizeToBucket?: string) => {
+export const fixDocumentUrls = async (organizationId: string, targetBucket: string = 'medical-documents') => {
   try {
     // Get documents missing URLs but having file paths
     const { data: missingUrlDocs, error: missingUrlError } = await supabase
@@ -61,7 +61,7 @@ export const fixDocumentUrls = async (organizationId: string, standardizeToBucke
     
     if (missingUrlError) throw missingUrlError;
     
-    // Get documents with potentially incorrect URLs (they have a URL but it might be wrong)
+    // Get documents with potentially incorrect URLs
     const { data: potentiallyBrokenDocs, error: brokenUrlError } = await supabase
       .from('documents')
       .select('id, file_path, public_url')
@@ -86,105 +86,41 @@ export const fixDocumentUrls = async (organizationId: string, standardizeToBucke
     
     let fixed = 0;
     
-    // Define the standard bucket to use if standardizing
-    const standardBucket = standardizeToBucket || 'medical-documents';
-    const bucketExists = await ensureStorageBucket(standardBucket);
+    // Ensure the target bucket exists
+    const bucketExists = await ensureStorageBucket(targetBucket);
     
-    if (!bucketExists && standardizeToBucket) {
-      console.error(`Cannot standardize to bucket ${standardBucket} as it doesn't exist`);
-      return { success: false, error: `Bucket ${standardBucket} doesn't exist` };
+    if (!bucketExists) {
+      console.error(`Cannot standardize to bucket ${targetBucket} as it doesn't exist`);
+      return { success: false, error: `Bucket ${targetBucket} doesn't exist` };
     }
     
     // Fix each document
     for (const doc of docsToProcess) {
       if (doc.file_path) {
-        // First, check which bucket the file is actually in
-        let sourceBucketName = 'medical-documents'; // Default bucket
-        let publicUrl = '';
-        let fileExists = false;
-        
-        // Check if file exists in medical-documents bucket
-        const { data: medicalBucketData } = await supabase
-          .storage
-          .from('medical-documents')
-          .getPublicUrl(doc.file_path);
-        
-        // Check if file exists in documents bucket
-        const { data: documentsBucketData } = await supabase
-          .storage
-          .from('documents')
-          .getPublicUrl(doc.file_path);
-        
-        // Determine which bucket actually has the file
-        if (medicalBucketData?.publicUrl) {
-          publicUrl = medicalBucketData.publicUrl;
-          sourceBucketName = 'medical-documents';
-          fileExists = true;
-        } else if (documentsBucketData?.publicUrl) {
-          publicUrl = documentsBucketData.publicUrl;
-          sourceBucketName = 'documents';
-          fileExists = true;
-        } else {
-          // Try to construct a URL manually as a last resort
-          publicUrl = `${supabase.storageUrl}/object/public/${standardBucket}/${doc.file_path}`;
-          fileExists = false;
-        }
-        
-        // If standardizing to a specific bucket and the file exists but in a different bucket
-        if (standardizeToBucket && fileExists && sourceBucketName !== standardBucket) {
-          try {
-            // Get the file from the source bucket
-            const { data: fileData, error: downloadError } = await supabase
-              .storage
-              .from(sourceBucketName)
-              .download(doc.file_path);
-            
-            if (downloadError || !fileData) {
-              console.error(`Failed to download file from ${sourceBucketName} bucket:`, downloadError);
-              continue; // Skip to next document
-            }
-            
-            // Upload to the standard bucket
-            const { error: uploadError } = await supabase
-              .storage
-              .from(standardBucket)
-              .upload(doc.file_path, fileData, { upsert: true });
-            
-            if (uploadError) {
-              console.error(`Failed to upload file to ${standardBucket} bucket:`, uploadError);
-              continue; // Skip to next document
-            }
-            
-            // Get the new public URL
-            const { data: newUrlData } = await supabase
-              .storage
-              .from(standardBucket)
-              .getPublicUrl(doc.file_path);
-            
-            if (newUrlData?.publicUrl) {
-              publicUrl = newUrlData.publicUrl;
-              console.log(`Successfully migrated file from ${sourceBucketName} to ${standardBucket}`);
-            }
-          } catch (migrationError) {
-            console.error("Error during file migration:", migrationError);
-            // Continue with the original URL if migration fails
-          }
-        }
-        
-        // Only update if URL is null or different
-        if (!doc.public_url || doc.public_url !== publicUrl) {
-          console.log(`Updating document ${doc.id} with URL from ${fileExists ? sourceBucketName : 'constructed'} bucket`);
+        try {
+          // Get the new public URL from the target bucket
+          const { data: urlData } = await supabase
+            .storage
+            .from(targetBucket)
+            .getPublicUrl(doc.file_path);
           
-          const { error: updateError } = await supabase
-            .from('documents')
-            .update({ public_url: publicUrl })
-            .eq('id', doc.id);
+          const publicUrl = urlData?.publicUrl || '';
           
-          if (updateError) {
-            console.error(`Failed to update document ${doc.id}:`, updateError);
-          } else {
-            fixed++;
+          // Only update if URL is null or different
+          if (!doc.public_url || doc.public_url !== publicUrl) {
+            const { error: updateError } = await supabase
+              .from('documents')
+              .update({ public_url: publicUrl })
+              .eq('id', doc.id);
+            
+            if (updateError) {
+              console.error(`Failed to update document ${doc.id}:`, updateError);
+            } else {
+              fixed++;
+            }
           }
+        } catch (docError) {
+          console.error(`Error processing document ${doc.id}:`, docError);
         }
       }
     }
@@ -199,7 +135,7 @@ export const fixDocumentUrls = async (organizationId: string, standardizeToBucke
 };
 
 /**
- * New utility to standardize document storage by reorganizing files into a proper folder structure
+ * Utility to standardize document storage by reorganizing files into a proper folder structure
  */
 export const standardizeDocumentStorage = async (organizationId: string, targetBucket: string = 'medical-documents') => {
   try {
@@ -237,21 +173,12 @@ export const standardizeDocumentStorage = async (organizationId: string, targetB
           continue;
         }
         
-        // Determine which bucket the file is currently in
-        let sourceBucket = 'medical-documents';
+        // Check if the file exists in any bucket - for migration from documents bucket
+        let fileData = null;
         let fileExists = false;
         
-        // Check medical-documents bucket first
-        const { data: existsInMedical, error: medicalCheckError } = await supabase
-          .storage
-          .from('medical-documents')
-          .download(doc.file_path);
-          
-        if (existsInMedical) {
-          fileExists = true;
-          sourceBucket = 'medical-documents';
-        } else {
-          // Check documents bucket
+        // Try to download from the documents bucket if it exists
+        try {
           const { data: existsInDocuments, error: docsCheckError } = await supabase
             .storage
             .from('documents')
@@ -259,23 +186,31 @@ export const standardizeDocumentStorage = async (organizationId: string, targetB
             
           if (existsInDocuments) {
             fileExists = true;
-            sourceBucket = 'documents';
+            fileData = existsInDocuments;
+          }
+        } catch (e) {
+          console.log(`File not found in documents bucket: ${doc.file_path}`);
+        }
+        
+        // If file doesn't exist in documents bucket, check medical-documents bucket
+        if (!fileExists) {
+          try {
+            const { data: existsInMedical, error: medicalCheckError } = await supabase
+              .storage
+              .from('medical-documents')
+              .download(doc.file_path);
+              
+            if (existsInMedical) {
+              fileExists = true;
+              fileData = existsInMedical;
+            }
+          } catch (e) {
+            console.log(`File not found in medical-documents bucket: ${doc.file_path}`);
           }
         }
         
-        if (!fileExists) {
+        if (!fileExists || !fileData) {
           console.log(`File for document ${doc.id} not found in any bucket: ${doc.file_path}`);
-          continue;
-        }
-        
-        // Download the file from the source bucket
-        const { data: fileData, error: downloadError } = await supabase
-          .storage
-          .from(sourceBucket)
-          .download(doc.file_path);
-          
-        if (downloadError || !fileData) {
-          console.error(`Failed to download file for document ${doc.id}:`, downloadError);
           continue;
         }
         
@@ -285,7 +220,7 @@ export const standardizeDocumentStorage = async (organizationId: string, targetB
           organizationId,
           documentType,
           doc.owner_id || null,
-          doc.file_name
+          doc.file_name || 'unnamed.pdf'
         );
         
         // Upload to the target bucket with the new standardized path

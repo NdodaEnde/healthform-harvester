@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -37,14 +38,14 @@ const DocumentUploader = ({
   const [documentStatus, setDocumentStatus] = useState<string | null>(null);
   const [bucketReady, setBucketReady] = useState<boolean>(false);
 
-  // Ensure the documents bucket exists when component mounts
+  // Ensure the medical-documents bucket exists when component mounts
   useEffect(() => {
     const checkBucket = async () => {
-      // Always use medical-documents as the standard bucket
+      // Only use medical-documents as the standard bucket
       const exists = await ensureStorageBucket('medical-documents');
       setBucketReady(exists);
       if (!exists) {
-        console.warn("Documents storage bucket may not be available");
+        console.warn("Medical-documents storage bucket may not be available");
       }
     };
     
@@ -125,7 +126,7 @@ const DocumentUploader = ({
       // Call the Supabase Edge Function to process the document
       setProcessingStatus("Sending to processing service...");
       
-      // First ensure the bucket exists
+      // Ensure the medical-documents bucket exists
       await ensureStorageBucket('medical-documents');
       
       const { data, error } = await supabase.functions.invoke('process-document', {

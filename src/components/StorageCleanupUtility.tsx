@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Trash2, CheckCircle } from "lucide-react";
@@ -101,7 +102,7 @@ export const StorageCleanupUtility = () => {
           Storage Cleanup Utility
         </CardTitle>
         <CardDescription className="text-red-600">
-          Permanently delete all document files from Supabase storage
+          Permanently delete all document files from the medical-documents bucket
         </CardDescription>
       </CardHeader>
       <CardContent>
