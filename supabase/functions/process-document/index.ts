@@ -402,6 +402,8 @@ serve(async (req) => {
     const documentType = formData.get('documentType') || 'unknown';
     const userId = formData.get('userId');
     const filePath = formData.get('filePath') || '';
+    // Get patient ID if provided
+    const patientId = formData.get('patientId');
 
     if (!file || !(file instanceof File)) {
       throw new Error('No file provided');
@@ -414,6 +416,9 @@ serve(async (req) => {
     console.log(`Processing document of type: ${documentType}`);
     console.log(`File name: ${file.name}, size: ${file.size} bytes`);
     console.log(`Using file path: ${filePath}`);
+    if (patientId) {
+      console.log(`Linking to patient ID: ${patientId}`);
+    }
 
     // Create a new form data to send to the microservice
     const forwardFormData = new FormData();
@@ -575,8 +580,9 @@ serve(async (req) => {
     if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
       console.log("Processing as certificate document");
       
-      // Use the enhanced extraction function
-      const certificateInfo = extractCertificateInfo(rawContent);
+      // Use the enhanced extraction function - This function is defined elsewhere in the file
+      // and remains unchanged
+      const certificateInfo = extractCertificateInfo ? extractCertificateInfo(rawContent) : {};
       
       if (Object.keys(certificateInfo).length > 0) {
         structuredData.certificate_info = certificateInfo;
@@ -623,6 +629,7 @@ serve(async (req) => {
       document_type: documentType,
       status: documentStatus,
       public_url: publicUrl,
+      owner_id: patientId || null, // Set patient ID if provided
       extracted_data: {
         raw_content: rawContent,
         structured_data: structuredData,
@@ -637,6 +644,9 @@ serve(async (req) => {
     };
     
     console.log(`Creating document record in database with status '${documentStatus}'`);
+    if (patientId) {
+      console.log(`Document will be linked to patient ${patientId}`);
+    }
     
     const { data: insertedDoc, error: insertError } = await supabase
       .from('documents')
@@ -670,6 +680,7 @@ serve(async (req) => {
           file_size: file.size,
           document_type: documentType,
           public_url: publicUrl,
+          owner_id: patientId || null,
           extracted_data: {
             markdown: rawContent,
             chunks: chunks,

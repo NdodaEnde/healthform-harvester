@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -23,12 +22,14 @@ export interface DocumentUploaderProps {
   onUploadComplete?: (data?: any) => void;
   organizationId?: string;
   clientOrganizationId?: string;
+  patientId?: string; // Added patient ID parameter
 }
 
 const DocumentUploader = ({ 
   onUploadComplete,
   organizationId,
-  clientOrganizationId 
+  clientOrganizationId,
+  patientId // New parameter to link documents to patients
 }: DocumentUploaderProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>("certificate-fitness");
@@ -93,7 +94,7 @@ const DocumentUploader = ({
       const standardizedPath = createStandardizedFilePath(
         organizationId,
         documentType,
-        null, // No patient ID at upload time
+        patientId, // Pass the patient ID for proper organization
         file.name
       );
 
@@ -105,6 +106,10 @@ const DocumentUploader = ({
       formData.append('documentType', documentType);
       formData.append('userId', user.id);
       formData.append('filePath', standardizedPath);
+      // Add patient ID to formData if available
+      if (patientId) {
+        formData.append('patientId', patientId);
+      }
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -151,31 +156,34 @@ const DocumentUploader = ({
       // First verify if the document has been properly created
       const documentId = data.documentId;
       
-      // Update the document record with organization context
+      // Update the document record with organization and patient context
+      const updateData: any = {
+        organization_id: organizationId,
+        client_organization_id: clientOrganizationId || null
+      };
+      
+      // Link to patient if patientId is provided
+      if (patientId) {
+        updateData.owner_id = patientId;
+        console.log(`Linking document ${documentId} to patient ${patientId}`);
+      }
+      
       const { error: updateError } = await supabase
         .from('documents')
-        .update({
-          organization_id: organizationId,
-          client_organization_id: clientOrganizationId || null,
-          owner_id: null  // Clear owner_id if it exists
-        } as any)
+        .update(updateData)
         .eq('id', documentId);
         
       if (updateError) {
+        console.error("Error updating document with patient link:", updateError);
         throw updateError;
       }
       
       setUploadProgress(100);
       
-      // Check if document was properly linked to a patient
-      if (!data.document?.owner_id) {
-        console.log("Document was not linked to a patient. This may need to be done manually.");
-      }
-      
       // Verify the document status after updating
       const { data: verifyData, error: verifyError } = await supabase
         .from('documents')
-        .select('status, extracted_data, public_url, file_path')
+        .select('status, extracted_data, public_url, file_path, owner_id')
         .eq('id', documentId)
         .single();
         
@@ -188,12 +196,14 @@ const DocumentUploader = ({
           extracted_data: any;
           public_url: string;
           file_path: string;
+          owner_id: string | null;
         }>(verifyData);
 
         console.log("Final document status:", typedVerifyData.status);
         console.log("Extracted data present:", !!typedVerifyData.extracted_data);
         console.log("Public URL:", typedVerifyData.public_url);
         console.log("File path:", typedVerifyData.file_path);
+        console.log("Owner (patient) ID:", typedVerifyData.owner_id);
         
         // Update UI with verified status
         setDocumentStatus(typedVerifyData.status);
@@ -231,20 +241,25 @@ const DocumentUploader = ({
       // Use the verified data if available, otherwise fallback to the data from the function
       const docStatus = verifyData ? safeQueryResult<{status: string}>(verifyData).status : (data?.document?.status || "unknown");
       
-      switch (docStatus) {
-        case "processed":
-          toastMessage = "Your document has been uploaded and fully processed";
-          break;
-        case "extracted":
-          toastMessage = "Your document has been uploaded but only raw text was extracted";
-          toastVariant = "destructive";
-          break;
-        case "failed":
-          toastMessage = "Your document was uploaded but data extraction failed";
-          toastVariant = "destructive";
-          break;
-        default:
-          toastMessage = "Your document has been uploaded";
+      // Update toast message with patient linking information
+      if (patientId) {
+        toastMessage = "Your document has been uploaded and linked to the patient";
+      } else {
+        switch (docStatus) {
+          case "processed":
+            toastMessage = "Your document has been uploaded and fully processed";
+            break;
+          case "extracted":
+            toastMessage = "Your document has been uploaded but only raw text was extracted";
+            toastVariant = "destructive";
+            break;
+          case "failed":
+            toastMessage = "Your document was uploaded but data extraction failed";
+            toastVariant = "destructive";
+            break;
+          default:
+            toastMessage = "Your document has been uploaded";
+        }
       }
       
       toast({
@@ -352,6 +367,9 @@ const DocumentUploader = ({
           <p>
             This document will be uploaded to the standardized folder structure in the medical-documents bucket.
           </p>
+          {patientId && (
+            <p className="mt-1 text-green-600">Document will be linked to the current patient.</p>
+          )}
           {clientOrganizationId && (
             <p className="mt-1">Document will be associated with client organization.</p>
           )}

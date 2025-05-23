@@ -33,3 +33,26 @@ export const safeQueryResult = <T>(data: any): T => {
   // This function helps with TypeScript casting of query results
   return data as T;
 };
+
+// Helper to check if result has error
+export const isQueryError = (result: any): boolean => {
+  return result && 'error' in result && result.error !== null;
+};
+
+// Helper to safely access document properties with type checking
+export const safeDocumentAccess = (document: any) => {
+  if (!document || typeof document !== 'object') return null;
+  
+  return {
+    id: document.id || null,
+    document_type: document.document_type || 'unknown',
+    file_name: document.file_name || 'Unnamed document',
+    status: document.status || 'unknown',
+    created_at: document.created_at || null,
+    public_url: document.public_url || null,
+    extracted_data: document.extracted_data || null,
+    owner_id: document.owner_id || null,
+    organization_id: document.organization_id || null,
+    client_organization_id: document.client_organization_id || null,
+  };
+};
