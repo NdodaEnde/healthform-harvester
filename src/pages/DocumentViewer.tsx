@@ -1,3 +1,4 @@
+
 // Add this helper function to properly extract and flatten the data structure
 const extractFieldValue = (data: any, fieldPath: string[]): any => {
   let current = data;
