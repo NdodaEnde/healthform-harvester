@@ -308,11 +308,46 @@ const DocumentViewer = () => {
     }
   }, [zoomLevel]);
 
+  // Helper function to get nested values safely
+  const getNestedValue = (obj: any, path: string[]): any => {
+    if (!obj || !path || path.length === 0) return '';
+    
+    let current = obj;
+    for (const key of path) {
+      if (current && typeof current === 'object' && key in current) {
+        current = current[key];
+      } else {
+        return '';
+      }
+    }
+    
+    return current || '';
+  };
+
+  // FIXED: Improved toggleEditMode function
   const toggleEditMode = () => {
     if (!isEditing) {
-      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
-      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
+      // Entering edit mode - copy current document data
+      const currentData = document?.extractedData;
+      if (currentData) {
+        console.log('Entering edit mode with data:', currentData);
+        
+        // Create deep copies to avoid mutation
+        const originalDataCopy = JSON.parse(JSON.stringify(currentData));
+        const editableDataCopy = JSON.parse(JSON.stringify(currentData));
+        
+        setOriginalData(originalDataCopy);
+        setEditableData(editableDataCopy);
+        
+        console.log('Set editable data to:', editableDataCopy);
+      } else {
+        console.error('No extracted data available for editing');
+        toast.error("No data available for editing");
+        return;
+      }
     } else {
+      // Exiting edit mode - clean up
+      console.log('Exiting edit mode');
       setEditableData(null);
       setOriginalData(null);
     }
@@ -661,6 +696,7 @@ const DocumentViewer = () => {
     return "No ID";
   };
 
+  // FIXED: Improved fetchDocumentFromSupabase function
   const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
       const { data: documentData, error } = await supabase
@@ -680,10 +716,30 @@ const DocumentViewer = () => {
       
       console.log('Fetched document data:', documentData);
       
-      const { data: urlData } = await supabase
-        .storage
-        .from('medical-documents')
-        .createSignedUrl(documentData.file_path, 3600);
+      // FIXED: Improved URL handling with better error handling and fallback
+      let signedUrl = null;
+      try {
+        const { data: urlData, error: urlError } = await supabase
+          .storage
+          .from('medical-documents')
+          .createSignedUrl(documentData.file_path, 3600);
+        
+        if (urlError) {
+          console.error('Error creating signed URL:', urlError);
+          // Try to get public URL as fallback
+          const { data: publicUrlData } = supabase
+            .storage
+            .from('medical-documents')
+            .getPublicUrl(documentData.file_path);
+          
+          signedUrl = publicUrlData?.publicUrl || null;
+        } else {
+          signedUrl = urlData?.signedUrl || null;
+        }
+      } catch (urlException) {
+        console.error('Exception getting document URL:', urlException);
+        signedUrl = null;
+      }
       
       let extractedData = documentData.extracted_data || {};
       
@@ -698,6 +754,7 @@ const DocumentViewer = () => {
       let patientId = extractPatientId(extractedData);
       
       console.log('Processed extracted data:', extractedData);
+      console.log('Document URL:', signedUrl);
       
       return {
         id: documentData.id,
@@ -709,7 +766,7 @@ const DocumentViewer = () => {
         status: documentData.status,
         patientName: patientName,
         patientId: patientId,
-        imageUrl: urlData?.signedUrl || null,
+        imageUrl: signedUrl, // This should now properly contain the URL or be null
         extractedData: extractedData,
         jsonData: JSON.stringify(extractedData, null, 2)
       };
@@ -739,10 +796,14 @@ const DocumentViewer = () => {
     });
   };
 
+  // FIXED: Improved renderStructuredSection to handle editing better
   const renderStructuredSection = (title: string, data: any, path: string[]) => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       return null;
     }
+    
+    console.log(`Rendering section ${title} with data:`, data);
+    console.log(`Is editing: ${isEditing}`);
     
     return (
       <div className="px-6">
@@ -758,6 +819,13 @@ const DocumentViewer = () => {
               .split(' ')
               .map(word => word.charAt(0).toUpperCase() + word.slice(1))
               .join(' ');
+            
+            // Get the current value - use editableData when editing
+            const currentValue = isEditing && editableData ? 
+              getNestedValue(editableData, [...path, key]) : 
+              (value as string || '');
+            
+            console.log(`Field ${key}: current value = "${currentValue}"`);
               
             return (
               <div key={key} className="flex items-center">
@@ -765,14 +833,15 @@ const DocumentViewer = () => {
                 {isEditing ? (
                   <Input 
                     className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                    value={value as string || ''}
+                    value={currentValue || ''}
                     onChange={(e) => {
+                      console.log(`Updating ${key} to: "${e.target.value}"`);
                       const newPath = [...path, key];
                       updateEditableData(newPath, e.target.value);
                     }}
                   />
                 ) : (
-                  <span className="text-gray-700">{value as string || 'N/A'}</span>
+                  <span className="text-gray-700">{currentValue || 'N/A'}</span>
                 )}
               </div>
             );
@@ -1137,12 +1206,11 @@ const DocumentViewer = () => {
         {renderFitnessAssessmentSection()}
         <Separator />
         {renderCommentsSection()}
-        
-        {/* Buttons moved to main document viewer UI */}
       </div>
     );
   };
 
+  // FIXED: Improved renderExtractedData function with better data handling
   const renderExtractedData = () => {
     if (isValidating && document) {
       console.log('Data passed to validator:', validatorData || document.extractedData);
@@ -1193,7 +1261,12 @@ const DocumentViewer = () => {
       );
     }
     
-    const extractedData = isEditing ? editableData : document.extractedData;
+    // FIXED: Use editableData when editing, otherwise use document.extractedData
+    const extractedData = isEditing ? (editableData || document.extractedData) : document.extractedData;
+    
+    console.log('Rendering extracted data:', extractedData);
+    console.log('Is editing:', isEditing);
+    console.log('Editable data:', editableData);
     
     if (document.type === 'Certificate of Fitness') {
       if (isEditing) {
@@ -1292,6 +1365,147 @@ const DocumentViewer = () => {
             {JSON.stringify(extractedData, null, 2)}
           </pre>
         </div>
+      </div>
+    );
+  };
+
+  // FIXED: Add debugging to original document display
+  const renderOriginalDocument = () => {
+    console.log('Rendering original document with imageUrl:', imageUrl);
+    console.log('Document object:', document);
+    
+    if (!imageUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center p-4">
+          <FileText className="h-16 w-16 text-muted-foreground mb-4" strokeWidth={1.5} />
+          <p className="text-muted-foreground mb-2">Document preview not available</p>
+          <p className="text-sm text-muted-foreground">
+            The document URL could not be loaded. Please check your network connection and try again.
+          </p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-4"
+            onClick={() => {
+              // Trigger a refresh of the document data
+              setRefreshKey(prev => prev + 1);
+            }}
+          >
+            Retry Loading
+          </Button>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="relative w-full h-full overflow-auto"
+           ref={documentContainerRef}
+           onMouseDown={handleMouseDown}
+           onMouseMove={handleMouseMove}
+           onMouseUp={handleMouseUp}
+           onMouseLeave={handleMouseUp}
+           style={{ 
+             userSelect: isDragging ? 'none' : 'auto',
+             touchAction: 'none',
+             scrollBehavior: 'auto',
+             overscrollBehavior: 'none'
+           }}>
+        
+        {/* Zoom overlay and drag hint */}
+        {zoomLevel > 1 && (
+          <>
+            <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs py-1 px-2 rounded-md z-10 pointer-events-none">
+              Drag to move
+            </div>
+            
+            <div 
+              className="absolute inset-0 z-10"
+              style={{ 
+                cursor: isDragging ? 'grabbing' : 'grab',
+                backgroundColor: 'rgba(0,0,0,0.01)',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100%',
+                height: '100%'
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                handleMouseDown(e);
+              }}
+            />
+          </>
+        )}
+        
+        {document?.name?.toLowerCase().endsWith('.pdf') ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <div style={{ 
+              transform: `scale(${zoomLevel})`, 
+              transformOrigin: 'center',
+              width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+              height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+              transition: 'transform 0.2s ease',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <iframe 
+                src={`${imageUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                title="PDF document preview"
+                className="w-full h-full border-0"
+                style={{ 
+                  minHeight: '500px',
+                  maxHeight: '100%',
+                  pointerEvents: isDragging ? 'none' : 'auto',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                }}
+                onError={() => {
+                  console.error('PDF iframe failed to load');
+                  toast.error('Failed to load PDF preview');
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center relative">
+            <div 
+              style={{ 
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'center center', 
+                transition: 'transform 0.2s ease',
+                width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+                height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
+                padding: '20px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <img 
+                src={imageUrl} 
+                alt="Document preview" 
+                className="max-w-full h-auto"
+                draggable="false"
+                style={{ 
+                  pointerEvents: isDragging ? 'none' : 'auto',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  maxWidth: zoomLevel > 1 ? 'none' : '100%',
+                  maxHeight: zoomLevel > 1 ? 'none' : '100%',
+                }}
+                onError={() => {
+                  console.error('Image failed to load:', imageUrl);
+                  toast.error('Failed to load image preview');
+                }}
+                onLoad={() => {
+                  console.log('Image loaded successfully:', imageUrl);
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -1611,7 +1825,7 @@ const DocumentViewer = () => {
             )}
             {isEditing && (
               <Button 
-                variant="warning" 
+                variant="outline" 
                 size="sm"
                 onClick={toggleEditMode}
               >
@@ -1688,116 +1902,7 @@ const DocumentViewer = () => {
                 </div>
               </div>
               <Card className="overflow-hidden h-[calc(100vh-220px)]">
-                <div 
-                  ref={documentContainerRef}
-                  className="relative w-full h-full overflow-auto"
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  style={{ 
-                    userSelect: isDragging ? 'none' : 'auto',
-                    touchAction: 'none', // Disable browser's touch actions
-                    scrollBehavior: 'auto',
-                    overscrollBehavior: 'none' // Prevent browser pull-to-refresh and bouncing
-                  }}
-                >
-                  {/* Drag overlay - only visible when zoomed in */}
-                  {zoomLevel > 1 && (
-                    <>
-                      {/* Drag hint tooltip */}
-                      <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs py-1 px-2 rounded-md z-10 pointer-events-none">
-                        Drag to move
-                      </div>
-                      
-                      {/* Transparent overlay for easier dragging - active for all document types */}
-                      <div 
-                        className="absolute inset-0 z-10"
-                        style={{ 
-                          cursor: isDragging ? 'grabbing' : 'grab',
-                          backgroundColor: 'rgba(0,0,0,0.01)', // Nearly invisible but still captures events
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          width: '100%',
-                          height: '100%'
-                        }}
-                        onMouseDown={(e) => {
-                          // Direct mouseDown handler for overlay to ensure dragging works
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleMouseDown(e);
-                        }}
-                      />
-                    </>
-                  )}
-                  
-                  {imageUrl ? (
-                    document.name?.toLowerCase().endsWith('.pdf') ? (
-                      // For PDF files, use an iframe with content scaling
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div style={{ 
-                          transform: `scale(${zoomLevel})`, 
-                          transformOrigin: 'center',
-                          width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-                          height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-                          transition: 'transform 0.2s ease',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}>
-                          <iframe 
-                            src={`${imageUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                            title="PDF document preview"
-                            className="w-full h-full border-0"
-                            style={{ 
-                              minHeight: '500px',
-                              maxHeight: '100%',
-                              pointerEvents: isDragging ? 'none' : 'auto',
-                              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      // For image files, use optimized image display with proper centering and padding
-                      <div className="w-full h-full flex items-center justify-center relative">
-                        <div 
-                          style={{ 
-                            transform: `scale(${zoomLevel})`,
-                            transformOrigin: 'center center', 
-                            transition: 'transform 0.2s ease',
-                            width: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-                            height: zoomLevel > 1 ? `${Math.max(100, 100 * zoomLevel)}%` : '100%',
-                            padding: '20px', // Add some padding around the image
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <img 
-                            src={imageUrl} 
-                            alt="Document preview" 
-                            className="max-w-full h-auto"
-                            draggable="false"
-                            style={{ 
-                              pointerEvents: isDragging ? 'none' : 'auto',
-                              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)', // Add subtle shadow to the image
-                              maxWidth: zoomLevel > 1 ? 'none' : '100%',
-                              maxHeight: zoomLevel > 1 ? 'none' : '100%',
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <FileText className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
-                    </div>
-                  )}
-                </div>
+                {renderOriginalDocument()}
               </Card>
             </motion.div>
           )}
