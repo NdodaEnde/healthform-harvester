@@ -19,5 +19,50 @@ export const supabase = createClient<Database>(
     global: {
       fetch: fetch
     },
+    db: {
+      schema: 'public'
+    },
+    // Add storage configuration to ensure files are properly loaded
+    storage: {
+      // Enforce content type detection for proper file display
+      detectContentType: true
+    }
   }
 );
+
+// Helper function to ensure storage bucket exists
+export const ensureStorageBucket = async (bucketName: string): Promise<boolean> => {
+  try {
+    // Check if the bucket already exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Error checking storage buckets:', listError);
+      return false;
+    }
+
+    // If the bucket already exists, return true
+    if (buckets && buckets.some(bucket => bucket.name === bucketName)) {
+      console.log(`Bucket ${bucketName} already exists`);
+      return true;
+    }
+
+    // Create the bucket if it doesn't exist
+    const { error: createError } = await supabase.storage.createBucket(bucketName, {
+      public: true, // Make it public so documents can be viewed
+      fileSizeLimit: 10485760 // 10MB file size limit
+    });
+
+    if (createError) {
+      console.error(`Error creating ${bucketName} bucket:`, createError);
+      return false;
+    }
+
+    console.log(`Created ${bucketName} bucket successfully`);
+    return true;
+  } catch (err) {
+    console.error(`Error ensuring ${bucketName} bucket exists:`, err);
+    return false;
+  }
+};
+

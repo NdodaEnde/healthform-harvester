@@ -100,8 +100,27 @@ const isDocumentValidated = (doc: Document): boolean => {
   return doc.extracted_data?.structured_data?.validated === true;
 };
 
+// Helper function to get the correct document URL
+const getDocumentUrl = (doc: Document): string | null => {
+  // Check for direct public_url first
+  if (doc.public_url) {
+    return doc.public_url;
+  }
+  
+  // If we have a file_path but no public_url, construct it
+  if (doc.file_path) {
+    const bucketName = 'medical-documents';
+    return `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+  }
+  
+  return null;
+};
+
 const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId, showOnlyValidated = false }) => {
   const navigate = useNavigate();
+  
+  // Add a state to track if there are missing documents
+  const [hasMissingDocuments, setHasMissingDocuments] = useState(false);
 
   // Query to fetch patient details to assist with matching
   const { data: patient } = useQuery({
@@ -126,6 +145,41 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       console.log('Fetching documents for patient visits:', patientId);
       console.log('Patient name for visits:', patient?.first_name, patient?.last_name);
       
+      // First check if this patient has medical_history.documents
+      if (patient?.medical_history?.documents?.length) {
+        // Get document IDs from patient's medical history
+        const documentIds = patient.medical_history.documents.map((doc: any) => doc.document_id);
+        
+        // Fetch these specific documents
+        const { data: patientDocuments, error: patientDocsError } = await supabase
+          .from('documents')
+          .select('*')
+          .in('id', documentIds);
+        
+        if (patientDocsError) {
+          console.error("Error fetching patient documents:", patientDocsError);
+        } else if (patientDocuments && patientDocuments.length) {
+          console.log(`Found ${patientDocuments.length} documents in patient's medical history`);
+          
+          // Check for missing documents
+          if (patientDocuments.length < documentIds.length) {
+            console.log("Some documents referenced in medical history are missing");
+            setHasMissingDocuments(true);
+          }
+          
+          // Add review status and return
+          const docsWithReviewStatus = patientDocuments.map(doc => ({
+            ...doc,
+            reviewStatus: getDocumentReviewStatus(doc.id)
+          }));
+          
+          return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
+        }
+      }
+      
+      // Fallback to organization-based document search
+      console.log("Performing organization-based document search...");
+      
       // Get all processed documents for this organization
       const { data, error } = await supabase
         .from('documents')
@@ -148,6 +202,12 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         // Strategy 1: Direct patient ID match in patient_info
         if (extractedData?.patient_info?.id === patientId) {
           console.log('Match by patient_info.id:', doc.id);
+          return true;
+        }
+        
+        // Strategy 1.5: Check owner_id field
+        if (doc.owner_id === patientId) {
+          console.log('Match by owner_id:', doc.id);
           return true;
         }
         
@@ -186,8 +246,19 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         return false;
       });
       
+      // Check for urls and fix if needed
+      const processedDocs = filteredDocs.map(doc => {
+        // Check if document has a URL
+        if (!doc.public_url && doc.file_path) {
+          const url = getDocumentUrl(doc);
+          console.log(`Generated URL for document ${doc.id}: ${url}`);
+          doc.public_url = url;
+        }
+        return doc;
+      });
+      
       // Add review status from localStorage to each document
-      const docsWithReviewStatus = filteredDocs.map(doc => ({
+      const docsWithReviewStatus = processedDocs.map(doc => ({
         ...doc,
         reviewStatus: getDocumentReviewStatus(doc.id)
       }));
@@ -290,6 +361,17 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
           </div>
         ) : (
           <div className="space-y-6">
+            {hasMissingDocuments && (
+              <div className="mb-4 p-3 border border-amber-200 bg-amber-50 rounded-md">
+                <div className="flex items-center text-amber-700">
+                  <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <p className="text-sm">
+                    Some documents referenced in the patient record could not be found. 
+                    They may need to be re-uploaded or linked properly.
+                  </p>
+                </div>
+              </div>
+            )}
             {visits.map((visit: any, index: number) => (
               <div key={index} className="border rounded-lg overflow-hidden">
                 <div className="bg-muted p-3 flex justify-between items-center">

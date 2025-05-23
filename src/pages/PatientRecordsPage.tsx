@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import PatientVisits from '@/components/PatientVisits';
 
-// Import other components
 const PatientRecordsPage = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const { currentOrganization, currentClient } = useOrganization();
@@ -189,15 +190,15 @@ const PatientRecordsPage = () => {
             <dl className="space-y-2">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Email</dt>
-                <dd>{patient.email || 'Not provided'}</dd>
+                <dd>{patient.contact_info?.email || 'Not provided'}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Phone</dt>
-                <dd>{patient.phone || 'Not provided'}</dd>
+                <dd>{patient.contact_info?.phone || 'Not provided'}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Address</dt>
-                <dd>{patient.address || 'Not provided'}</dd>
+                <dd>{patient.contact_info?.address || 'Not provided'}</dd>
               </div>
             </dl>
           </CardContent>
@@ -211,11 +212,11 @@ const PatientRecordsPage = () => {
             <dl className="space-y-2">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Company</dt>
-                <dd>{patient.company_name || 'Not provided'}</dd>
+                <dd>{patient.contact_info?.company || 'Not provided'}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Occupation</dt>
-                <dd>{patient.occupation || 'Not provided'}</dd>
+                <dd>{patient.contact_info?.occupation || 'Not provided'}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Employee ID</dt>
@@ -224,6 +225,16 @@ const PatientRecordsPage = () => {
             </dl>
           </CardContent>
         </Card>
+      </div>
+
+      <Separator className="my-6" />
+      
+      {/* Patient Visits Component */}
+      <div className="mb-8">
+        <PatientVisits
+          patientId={patientId || ''}
+          organizationId={currentOrganization?.id || currentClient?.id || ''}
+        />
       </div>
 
       <Separator className="my-6" />

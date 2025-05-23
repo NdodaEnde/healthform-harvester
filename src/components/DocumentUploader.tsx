@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
-import { ensureDocumentsBucketExists } from "@/utils/organization-assets";
+import { ensureDocumentsBucketExists, ensureStorageBucket } from "@/utils/organization-assets";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -41,7 +40,9 @@ const DocumentUploader = ({
   // Ensure the documents bucket exists when component mounts
   useEffect(() => {
     const checkBucket = async () => {
-      const exists = await ensureDocumentsBucketExists();
+      // Try to ensure both bucket names for backward compatibility
+      const exists = await ensureStorageBucket('medical-documents') || 
+                     await ensureStorageBucket('documents');
       setBucketReady(exists);
       if (!exists) {
         console.warn("Documents storage bucket may not be available");
@@ -113,6 +114,10 @@ const DocumentUploader = ({
 
       // Call the Supabase Edge Function to process the document
       setProcessingStatus("Sending to processing service...");
+      
+      // First ensure the bucket exists
+      await ensureStorageBucket('medical-documents');
+      
       const { data, error } = await supabase.functions.invoke('process-document', {
         body: formData,
       });
@@ -121,7 +126,7 @@ const DocumentUploader = ({
       
       if (error) throw error;
       
-      // FIXED: Check that the response contains the expected documentId
+      // Check that the response contains the expected documentId
       if (!data?.documentId) {
         throw new Error("No document ID returned from processing function");
       }
@@ -134,16 +139,14 @@ const DocumentUploader = ({
       
       // First verify if the document has been properly created
       const documentId = data.documentId;
-      if (!documentId) {
-        throw new Error("No document ID returned from processing function");
-      }
       
       // Update the document record with organization context
       const { error: updateError } = await supabase
         .from('documents')
         .update({
           organization_id: organizationId,
-          client_organization_id: clientOrganizationId || null
+          client_organization_id: clientOrganizationId || null,
+          owner_id: null  // Clear owner_id if it exists
         })
         .eq('id', documentId);
         
@@ -153,10 +156,15 @@ const DocumentUploader = ({
       
       setUploadProgress(100);
       
+      // Check if document was properly linked to a patient
+      if (!data.document?.owner_id) {
+        console.log("Document was not linked to a patient. This may need to be done manually.");
+      }
+      
       // Verify the document status after updating
       const { data: verifyData, error: verifyError } = await supabase
         .from('documents')
-        .select('status, extracted_data')
+        .select('status, extracted_data, public_url, file_path')
         .eq('id', documentId)
         .single();
         
@@ -165,6 +173,8 @@ const DocumentUploader = ({
       } else {
         console.log("Final document status:", verifyData.status);
         console.log("Extracted data present:", !!verifyData.extracted_data);
+        console.log("Public URL:", verifyData.public_url);
+        console.log("File path:", verifyData.file_path);
         
         // Update UI with verified status
         setDocumentStatus(verifyData.status);
