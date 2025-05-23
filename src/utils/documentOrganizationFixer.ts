@@ -1,6 +1,5 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 /**
  * Utility to associate orphaned documents (documents with null organization_id) 
@@ -54,7 +53,7 @@ export const fixDocumentUrls = async (organizationId: string) => {
     // Get documents missing URLs but having file paths
     const { data: missingUrlDocs, error: missingUrlError } = await supabase
       .from('documents')
-      .select('*')
+      .select('id, file_path')
       .eq('organization_id', organizationId)
       .is('public_url', null)
       .not('file_path', 'is', null);
@@ -64,7 +63,7 @@ export const fixDocumentUrls = async (organizationId: string) => {
     // Get documents with potentially incorrect URLs (they have a URL but it might be wrong)
     const { data: potentiallyBrokenDocs, error: brokenUrlError } = await supabase
       .from('documents')
-      .select('*')
+      .select('id, file_path, public_url')
       .eq('organization_id', organizationId)
       .not('public_url', 'is', null)
       .not('file_path', 'is', null);
@@ -91,26 +90,25 @@ export const fixDocumentUrls = async (organizationId: string) => {
       if (doc.file_path) {
         // First, check which bucket the file is actually in
         let bucketName = 'medical-documents'; // Default bucket
-        let publicUrl;
+        let publicUrl = '';
         
         // Check if file exists in medical-documents bucket
-        const { data: medicalBucketData, error: medicalBucketError } = await supabase
+        const { data: medicalBucketData } = await supabase
           .storage
           .from('medical-documents')
           .getPublicUrl(doc.file_path);
         
         // Check if file exists in documents bucket
-        const { data: documentsBucketData, error: documentsBucketError } = await supabase
+        const { data: documentsBucketData } = await supabase
           .storage
           .from('documents')
           .getPublicUrl(doc.file_path);
         
         // Determine which bucket actually has the file
-        // We'll check by trying to get a public URL from each bucket
-        if (!medicalBucketError && medicalBucketData) {
+        if (medicalBucketData?.publicUrl) {
           publicUrl = medicalBucketData.publicUrl;
           bucketName = 'medical-documents';
-        } else if (!documentsBucketError && documentsBucketData) {
+        } else if (documentsBucketData?.publicUrl) {
           publicUrl = documentsBucketData.publicUrl;
           bucketName = 'documents';
         } else {
@@ -118,7 +116,7 @@ export const fixDocumentUrls = async (organizationId: string) => {
           publicUrl = `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
         }
         
-        // Only update if we need to (URL is null or different)
+        // Only update if URL is null or different
         if (!doc.public_url || doc.public_url !== publicUrl) {
           console.log(`Updating document ${doc.id} with URL from ${bucketName} bucket`);
           

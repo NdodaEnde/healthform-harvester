@@ -21,25 +21,29 @@ export const OrphanedDocumentFixer = () => {
   const { currentOrganization } = useOrganization();
   
   const handleFixOrphanedDocuments = async () => {
-    if (!currentOrganization) return;
+    if (!currentOrganization?.id) return;
     
     setLoading(true);
     try {
       // First associate orphaned documents
       const result = await associateOrphanedDocuments(currentOrganization.id);
+      let totalCount = 0;
+      let urlResult = { success: false, count: 0 };
       
       // Then fix URLs for documents that need it
       if (result.success) {
-        const urlResult = await fixDocumentUrls(currentOrganization.id);
+        urlResult = await fixDocumentUrls(currentOrganization.id);
+        totalCount = (result.count || 0) + (urlResult.count || 0);
         setFixed(result.success || urlResult.success);
-        setCount((result.count || 0) + (urlResult.count || 0));
+        setCount(totalCount);
       } else {
         setFixed(result.success);
         setCount(result.count || 0);
+        totalCount = result.count || 0;
       }
       
-      if ((result.count || 0) + (urlResult.count || 0) > 0) {
-        toast.success(`Fixed ${(result.count || 0) + (urlResult.count || 0)} documents`);
+      if (totalCount > 0) {
+        toast.success(`Fixed ${totalCount} documents`);
       } else {
         toast.info("No documents needed fixing");
       }
