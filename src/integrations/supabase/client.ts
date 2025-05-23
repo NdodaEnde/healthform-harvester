@@ -22,9 +22,9 @@ export const supabase = createClient<Database>(
     db: {
       schema: 'public'
     },
-    // Add storage configuration to ensure files are properly loaded
+    // Enhanced storage configuration for better file handling
     storage: {
-      // Enforce content type detection for proper file display
+      // Enable content type detection to ensure files are properly displayed
       detectContentType: true
     }
   }
@@ -65,4 +65,3 @@ export const ensureStorageBucket = async (bucketName: string): Promise<boolean> 
     return false;
   }
 };
-

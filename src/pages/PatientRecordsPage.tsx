@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import PatientVisits from '@/components/PatientVisits';
+import { OrphanedDocumentFixer } from '@/components/OrphanedDocumentFixer';
 
 const PatientRecordsPage = () => {
   const { patientId } = useParams<{ patientId: string }>();
@@ -227,6 +227,13 @@ const PatientRecordsPage = () => {
         </Card>
       </div>
 
+      {/* Document Fixer (only show if needed) */}
+      {currentOrganization && 
+        <div className="mb-6">
+          <OrphanedDocumentFixer />
+        </div>
+      }
+
       <Separator className="my-6" />
       
       {/* Patient Visits Component */}
@@ -239,105 +246,108 @@ const PatientRecordsPage = () => {
 
       <Separator className="my-6" />
 
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-4">Documents</h2>
-        
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <div className="relative w-full sm:w-64">
-            <input
-              type="text"
-              placeholder="Search documents..."
-              className="w-full px-4 py-2 border rounded-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      {/* Original documents section - could be replaced completely by PatientVisits component */}
+      {documents.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-xl font-bold mb-4">Direct Documents</h2>
+          
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                placeholder="Search documents..."
+                className="w-full px-4 py-2 border rounded-md"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button 
+                variant={currentFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setCurrentFilter('all')}
+                size="sm"
+              >
+                All
+              </Button>
+              <Button 
+                variant={currentFilter === 'medical_certificate' ? 'default' : 'outline'}
+                onClick={() => setCurrentFilter('medical_certificate')}
+                size="sm"
+              >
+                Medical Certificates
+              </Button>
+              <Button 
+                variant={currentFilter === 'other' ? 'default' : 'outline'}
+                onClick={() => setCurrentFilter('other')}
+                size="sm"
+              >
+                Other
+              </Button>
+            </div>
           </div>
           
-          <div className="flex space-x-2">
-            <Button 
-              variant={currentFilter === 'all' ? 'default' : 'outline'}
-              onClick={() => setCurrentFilter('all')}
-              size="sm"
-            >
-              All
-            </Button>
-            <Button 
-              variant={currentFilter === 'medical_certificate' ? 'default' : 'outline'}
-              onClick={() => setCurrentFilter('medical_certificate')}
-              size="sm"
-            >
-              Medical Certificates
-            </Button>
-            <Button 
-              variant={currentFilter === 'other' ? 'default' : 'outline'}
-              onClick={() => setCurrentFilter('other')}
-              size="sm"
-            >
-              Other
-            </Button>
-          </div>
-        </div>
-        
-        {visibleDocuments.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No documents found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleDocuments.map((doc) => (
-              <Card key={doc.id} className="overflow-hidden">
-                <div className="relative h-40 bg-gray-100">
-                  {doc.thumbnail_url ? (
-                    <img 
-                      src={doc.thumbnail_url} 
-                      alt={doc.file_name} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+          {visibleDocuments.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No documents found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visibleDocuments.map((doc) => (
+                <Card key={doc.id} className="overflow-hidden">
+                  <div className="relative h-40 bg-gray-100">
+                    {doc.thumbnail_url ? (
+                      <img 
+                        src={doc.thumbnail_url} 
+                        alt={doc.file_name} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-2 right-2">
+                      <span className={`inline-block px-2 py-1 text-xs text-white rounded ${getDocumentStatusDisplay(doc).color}`}>
+                        {getDocumentStatusDisplay(doc).text}
+                      </span>
                     </div>
-                  )}
-                  
-                  <div className="absolute top-2 right-2">
-                    <span className={`inline-block px-2 py-1 text-xs text-white rounded ${getDocumentStatusDisplay(doc).color}`}>
-                      {getDocumentStatusDisplay(doc).text}
-                    </span>
-                  </div>
-                </div>
-                
-                <CardContent className="p-4">
-                  <h3 className="font-medium truncate" title={doc.file_name}>
-                    {doc.file_name}
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-2">
-                    {new Date(doc.created_at).toLocaleDateString()}
-                  </p>
-                  
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                      {doc.document_type || 'Unknown type'}
-                    </span>
-                    <span className="text-xs">
-                      {getCertificateStatus(doc)}
-                    </span>
                   </div>
                   
-                  <div className="mt-4">
-                    <Button asChild size="sm" className="w-full">
-                      <Link to={`/patients/${patientId}/documents/${doc.id}`}>
-                        View Document
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-medium truncate" title={doc.file_name}>
+                      {doc.file_name}
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-2">
+                      {new Date(doc.created_at).toLocaleDateString()}
+                    </p>
+                    
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                        {doc.document_type || 'Unknown type'}
+                      </span>
+                      <span className="text-xs">
+                        {getCertificateStatus(doc)}
+                      </span>
+                    </div>
+                    
+                    <div className="mt-4">
+                      <Button asChild size="sm" className="w-full">
+                        <Link to={`/patients/${patientId}/documents/${doc.id}`}>
+                          View Document
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

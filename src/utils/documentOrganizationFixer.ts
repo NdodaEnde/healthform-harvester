@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 /**
  * Utility to associate orphaned documents (documents with null organization_id) 
@@ -20,8 +20,7 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
     }
     
     if (!count || count === 0) {
-      toast({
-        title: "No orphaned documents found",
+      toast.info("No orphaned documents found", {
         description: "All documents are already associated with an organization"
       });
       return { success: true, count: 0 };
@@ -39,17 +38,14 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
       throw error;
     }
     
-    toast({
-      title: "Documents associated successfully",
+    toast.success("Documents associated successfully", {
       description: `${data?.length || 0} documents are now associated with your organization`
     });
     
     return { success: true, count: data?.length || 0, data };
   } catch (error: any) {
-    toast({
-      title: "Error associating documents",
-      description: error.message || "There was an error associating documents with your organization",
-      variant: "destructive"
+    toast.error("Error associating documents", {
+      description: error.message || "There was an error associating documents with your organization"
     });
     
     return { success: false, error };
@@ -57,47 +53,51 @@ export const associateOrphanedDocuments = async (organizationId: string) => {
 };
 
 /**
- * Utility to delete all files from the medical-documents storage bucket
+ * Utility to fix document URLs by regenerating them from storage paths
  */
-export const deleteAllStorageFiles = async () => {
+export const fixDocumentUrls = async (organizationId: string) => {
   try {
-    // List all files in the medical-documents bucket
-    const { data: files, error } = await supabase
-      .storage
-      .from('medical-documents')
-      .list('', { limit: 1000 });
+    // Get documents missing URLs but having file paths
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .is('public_url', null)
+      .not('file_path', 'is', null);
     
-    if (error) {
-      throw error;
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      toast.info("No documents need URL fixing");
+      return { success: true, count: 0 };
     }
     
-    if (!files || files.length === 0) {
-      return { success: true, count: 0, message: "No files found to delete" };
+    let fixed = 0;
+    
+    // Fix each document
+    for (const doc of data) {
+      if (doc.file_path) {
+        const bucketName = 'medical-documents';
+        const publicUrl = `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+        
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({ public_url: publicUrl })
+          .eq('id', doc.id);
+        
+        if (!updateError) fixed++;
+      }
     }
     
-    // Get all file paths
-    const filePaths = files.map(file => file.name);
-    
-    // Delete all files
-    const { error: deleteError } = await supabase
-      .storage
-      .from('medical-documents')
-      .remove(filePaths);
-    
-    if (deleteError) {
-      throw deleteError;
+    if (fixed > 0) {
+      toast.success(`Fixed URLs for ${fixed} documents`);
     }
     
-    return { 
-      success: true, 
-      count: filePaths.length, 
-      message: `Successfully deleted ${filePaths.length} files` 
-    };
+    return { success: true, count: fixed };
   } catch (error: any) {
-    console.error("Error deleting storage files:", error);
-    return { 
-      success: false, 
-      error: error.message || "An unexpected error occurred" 
-    };
+    toast.error("Error fixing document URLs", {
+      description: error.message
+    });
+    return { success: false, error };
   }
 };

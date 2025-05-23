@@ -1,4 +1,5 @@
 
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   Card, 
@@ -9,9 +10,8 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { useOrganization } from "@/contexts/OrganizationContext";
-import { associateOrphanedDocuments } from "@/utils/documentOrganizationFixer";
-import { AlertTriangle, FileCheck } from "lucide-react";
-import { useState } from "react";
+import { associateOrphanedDocuments, fixDocumentUrls } from "@/utils/documentOrganizationFixer";
+import { AlertTriangle, FileCheck, Link } from "lucide-react";
 
 export const OrphanedDocumentFixer = () => {
   const [loading, setLoading] = useState(false);
@@ -24,9 +24,18 @@ export const OrphanedDocumentFixer = () => {
     
     setLoading(true);
     try {
+      // First associate orphaned documents
       const result = await associateOrphanedDocuments(currentOrganization.id);
-      setFixed(result.success);
-      setCount(result.count || 0);
+      
+      // Then fix URLs for documents that need it
+      if (result.success) {
+        const urlResult = await fixDocumentUrls(currentOrganization.id);
+        setFixed(result.success || urlResult.success);
+        setCount(result.count || 0);
+      } else {
+        setFixed(result.success);
+        setCount(result.count || 0);
+      }
     } finally {
       setLoading(false);
     }
@@ -41,25 +50,24 @@ export const OrphanedDocumentFixer = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-amber-500" />
-          Orphaned Documents Detected
+          Document Management
         </CardTitle>
         <CardDescription>
-          Some documents in your system are not associated with any organization,
-          which may cause them to be inaccessible due to security policies.
+          Fix document organization associations and URLs to ensure all documents are visible
+          in the correct context.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          These are documents that were uploaded before your organization context was created.
-          Associating them with your current organization will make them visible and protected
-          by the correct security policies.
+          Some documents may not be associated with your organization or may have invalid URLs.
+          This tool will fix both issues to ensure all your documents are properly accessible.
         </p>
         
         {fixed && (
           <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center gap-2 mb-2">
             <FileCheck className="h-5 w-5" />
             <span className="text-sm font-medium">
-              Success! {count} documents have been associated with {currentOrganization.name}
+              Success! {count} documents have been processed for {currentOrganization.name}
             </span>
           </div>
         )}
@@ -67,11 +75,13 @@ export const OrphanedDocumentFixer = () => {
       <CardFooter>
         <Button 
           onClick={handleFixOrphanedDocuments} 
-          disabled={loading || fixed}
+          disabled={loading}
         >
-          {loading ? "Processing..." : fixed ? "Documents Fixed" : "Associate Orphaned Documents"}
+          {loading ? "Processing..." : fixed ? "Documents Fixed" : "Fix Document Associations"}
         </Button>
       </CardFooter>
     </Card>
   );
 };
+
+export default OrphanedDocumentFixer;

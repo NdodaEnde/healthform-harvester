@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ interface Document {
   processed_at: string | null;
   created_at: string;
   extracted_data: ExtractedData | null;
+  public_url?: string | null;
   [key: string]: any;
 }
 
@@ -395,13 +396,6 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                                 {getDocumentTypeLabel(doc.document_type)}
                               </Badge>
                             )}
-                            <Badge variant={
-                              doc.status === 'processed' ? 'success' : 
-                              doc.status === 'extracted' ? 'warning' : 
-                              'outline'
-                            } className="capitalize">
-                              {doc.status}
-                            </Badge>
                             {getStatusBadge(doc)}
                           </div>
                         </div>

@@ -1,152 +1,48 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
 
-/**
- * Ensures that the documents storage bucket exists
- * This helps prevent errors when trying to upload to a non-existent bucket
- */
-export const ensureDocumentsBucketExists = async (): Promise<boolean> => {
+// Helper function to ensure storage bucket exists
+export const ensureStorageBucket = async (bucketName: string): Promise<boolean> => {
   try {
-    // Check if the bucket exists
-    const { data: buckets, error: listError } = await supabase
-      .storage
-      .listBuckets();
-      
+    // Check if the bucket already exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
     if (listError) {
-      console.error("Error checking buckets:", listError);
+      console.error('Error checking storage buckets:', listError);
       return false;
     }
-    
-    // If documents bucket doesn't exist, create it
-    if (!buckets.some(bucket => bucket.name === 'documents')) {
-      const { data, error: createError } = await supabase
-        .storage
-        .createBucket('documents', { public: false });
-        
-      if (createError) {
-        console.error("Error creating documents bucket:", createError);
-        return false;
-      }
-      
-      // Add RLS policy to allow authenticated users to upload
-      // Note: This is normally done in migrations, but as a fallback
-      console.log("Created documents bucket successfully");
+
+    // If the bucket already exists, return true
+    if (buckets && buckets.some(bucket => bucket.name === bucketName)) {
+      console.log(`Bucket ${bucketName} already exists`);
+      return true;
     }
-    
+
+    // Create the bucket if it doesn't exist
+    const { error: createError } = await supabase.storage.createBucket(bucketName, {
+      public: true, // Make it public so documents can be viewed
+      fileSizeLimit: 10485760 // 10MB file size limit
+    });
+
+    if (createError) {
+      console.error(`Error creating ${bucketName} bucket:`, createError);
+      return false;
+    }
+
+    console.log(`Created ${bucketName} bucket successfully`);
     return true;
-  } catch (error: any) {
-    console.error("Error ensuring documents bucket exists:", error);
+  } catch (err) {
+    console.error(`Error ensuring ${bucketName} bucket exists:`, err);
     return false;
   }
 };
 
-/**
- * Uploads an organization asset (logo, signature, stamp) to Supabase storage
- * and returns the public URL
- */
-export const uploadOrganizationAsset = async (
-  file: File,
-  organizationId: string,
-  assetType: 'logo' | 'signature' | 'stamp'
-): Promise<string | null> => {
+// Helper function to ensure the documents bucket exists
+export const ensureDocumentsBucket = async () => {
   try {
-    if (!file || !organizationId) return null;
-    
-    // Create a unique file name to avoid collisions
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${organizationId}-${assetType}-${Date.now()}.${fileExt}`;
-    const filePath = `organizations/${organizationId}/${fileName}`;
-    
-    // Upload file to storage
-    const { error: uploadError } = await supabase
-      .storage
-      .from('organization-assets')
-      .upload(filePath, file);
-      
-    if (uploadError) throw uploadError;
-    
-    // Get public URL for the uploaded file
-    const { data } = supabase
-      .storage
-      .from('organization-assets')
-      .getPublicUrl(filePath);
-      
-    return data.publicUrl;
-  } catch (error: any) {
-    console.error(`Error uploading ${assetType}:`, error);
-    toast({
-      title: `Upload Failed`,
-      description: `Failed to upload ${assetType}: ${error.message}`,
-      variant: "destructive"
-    });
-    return null;
-  }
-};
-
-/**
- * Deletes an organization asset from Supabase storage
- */
-export const deleteOrganizationAsset = async (
-  assetUrl: string,
-  organizationId: string
-): Promise<boolean> => {
-  try {
-    if (!assetUrl || !organizationId) return false;
-    
-    // Extract the file path from the URL
-    const urlObj = new URL(assetUrl);
-    const pathParts = urlObj.pathname.split('/');
-    const fileName = pathParts[pathParts.length - 1];
-    const filePath = `organizations/${organizationId}/${fileName}`;
-    
-    // Delete the file from storage
-    const { error } = await supabase
-      .storage
-      .from('organization-assets')
-      .remove([filePath]);
-      
-    if (error) throw error;
-    
-    return true;
-  } catch (error: any) {
-    console.error("Error deleting asset:", error);
-    toast({
-      title: "Deletion Failed",
-      description: `Failed to delete asset: ${error.message}`,
-      variant: "destructive"
-    });
-    return false;
-  }
-};
-
-/**
- * Updates an organization's asset URLs in the database
- */
-export const updateOrganizationAssets = async (
-  organizationId: string,
-  updates: {
-    logo_url?: string;
-    signature_url?: string;
-    stamp_url?: string;
-  }
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('organizations')
-      .update(updates)
-      .eq('id', organizationId);
-      
-    if (error) throw error;
-    
-    return true;
-  } catch (error: any) {
-    console.error("Error updating organization assets:", error);
-    toast({
-      title: "Update Failed",
-      description: `Failed to update organization assets: ${error.message}`,
-      variant: "destructive"
-    });
+    const bucket = 'medical-documents';
+    return await ensureStorageBucket(bucket);
+  } catch (error) {
+    console.error("Error setting up documents bucket:", error);
     return false;
   }
 };
