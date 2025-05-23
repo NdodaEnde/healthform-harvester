@@ -308,21 +308,33 @@ const DocumentViewer = () => {
     }
   }, [zoomLevel]);
 
-  // Helper function to get nested values safely
-  const getNestedValue = (obj: any, path: string[]): any => {
-    if (!obj || !path || path.length === 0) return '';
+  // ENHANCED: Better getNestedValue function with debugging
+const getNestedValue = (obj: any, path: string[]): any => {
+  console.log(`Getting nested value for path: ${path.join('.')} from:`, obj);
+  
+  if (!obj || !path || path.length === 0) {
+    console.log('Invalid input - returning empty string');
+    return '';
+  }
+  
+  let current = obj;
+  for (let i = 0; i < path.length; i++) {
+    const key = path[i];
+    console.log(`Step ${i}: Looking for key '${key}' in:`, current);
     
-    let current = obj;
-    for (const key of path) {
-      if (current && typeof current === 'object' && key in current) {
-        current = current[key];
-      } else {
-        return '';
-      }
+    if (current && typeof current === 'object' && key in current) {
+      current = current[key];
+      console.log(`Found: ${key} =`, current);
+    } else {
+      console.log(`Key '${key}' not found, returning empty string`);
+      return '';
     }
-    
-    return current || '';
-  };
+  }
+  
+  const result = current || '';
+  console.log(`Final result for ${path.join('.')}:`, result);
+  return result;
+};
 
   // FIXED: Improved toggleEditMode function
   const toggleEditMode = () => {
@@ -776,80 +788,113 @@ const DocumentViewer = () => {
     }
   };
 
-  const updateEditableData = (path: string[], value: any) => {
-    setEditableData((prev: any) => {
-      if (!prev) return prev;
-      
+  / ENHANCED: Better updateEditableData function with debugging
+const updateEditableData = (path: string[], value: any) => {
+  console.log(`Updating editable data at path: ${path.join('.')} with value:`, value);
+  console.log('Current editableData before update:', editableData);
+  
+  setEditableData((prev: any) => {
+    if (!prev) {
+      console.error('No editableData to update!');
+      return prev;
+    }
+    
+    console.log('Previous editableData:', prev);
+    
+    try {
       const newData = JSON.parse(JSON.stringify(prev));
       
       let current = newData;
       for (let i = 0; i < path.length - 1; i++) {
-        if (!current[path[i]]) {
-          current[path[i]] = {};
+        const key = path[i];
+        if (!current[key] || typeof current[key] !== 'object') {
+          console.log(`Creating missing object at key: ${key}`);
+          current[key] = {};
         }
-        current = current[path[i]];
+        current = current[key];
       }
       
-      current[path[path.length - 1]] = value;
+      const finalKey = path[path.length - 1];
+      console.log(`Setting ${finalKey} = ${value}`);
+      current[finalKey] = value;
       
+      console.log('Updated editableData:', newData);
       return newData;
-    });
-  };
-
-  // FIXED: Improved renderStructuredSection to handle editing better
-  const renderStructuredSection = (title: string, data: any, path: string[]) => {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return null;
+    } catch (error) {
+      console.error('Error updating editable data:', error);
+      return prev;
     }
-    
-    console.log(`Rendering section ${title} with data:`, data);
-    console.log(`Is editing: ${isEditing}`);
-    
-    return (
-      <div className="px-6">
-        <h3 className="text-lg font-medium mb-4">{title}</h3>
-        <div className="space-y-3">
-          {Object.entries(data).map(([key, value]) => {
-            if (typeof value === 'object' && value !== null) {
-              return null;
-            }
+  });
+};
+
+  // ENHANCED: Better renderStructuredSection with more debugging
+const renderStructuredSection = (title: string, data: any, path: string[]) => {
+  console.log(`=== RENDERING SECTION: ${title} ===`);
+  console.log('Section data:', data);
+  console.log('Section path:', path);
+  console.log('Is editing:', isEditing);
+  console.log('Current editableData:', editableData);
+  
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    console.log('Invalid data for section, skipping');
+    return null;
+  }
+  
+  return (
+    <div className="px-6">
+      <h3 className="text-lg font-medium mb-4">{title}</h3>
+      <div className="space-y-3">
+        {Object.entries(data).map(([key, value]) => {
+          console.log(`Processing field: ${key} =`, value);
+          
+          if (typeof value === 'object' && value !== null) {
+            console.log(`Skipping object field: ${key}`);
+            return null;
+          }
+          
+          const displayKey = key
+            .replace(/_/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          
+          // ENHANCED: Better value retrieval logic
+          let currentValue = '';
+          
+          if (isEditing && editableData) {
+            console.log(`Edit mode: getting value for ${key} from editableData`);
+            currentValue = getNestedValue(editableData, [...path, key]);
+          } else {
+            console.log(`View mode: using direct value for ${key}`);
+            currentValue = (value as string) || '';
+          }
+          
+          console.log(`Final value for ${key}:`, currentValue);
             
-            const displayKey = key
-              .replace(/_/g, ' ')
-              .split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
-            
-            // Get the current value - use editableData when editing
-            const currentValue = isEditing && editableData ? 
-              getNestedValue(editableData, [...path, key]) : 
-              (value as string || '');
-            
-            console.log(`Field ${key}: current value = "${currentValue}"`);
-              
-            return (
-              <div key={key} className="flex items-center">
-                <span className="font-semibold mr-1 min-w-32">{displayKey}:</span>
-                {isEditing ? (
-                  <Input 
-                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                    value={currentValue || ''}
-                    onChange={(e) => {
-                      console.log(`Updating ${key} to: "${e.target.value}"`);
-                      const newPath = [...path, key];
-                      updateEditableData(newPath, e.target.value);
-                    }}
-                  />
-                ) : (
-                  <span className="text-gray-700">{currentValue || 'N/A'}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+          return (
+            <div key={key} className="flex items-center">
+              <span className="font-semibold mr-1 min-w-32">{displayKey}:</span>
+              {isEditing ? (
+                <Input 
+                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                  value={currentValue || ''}
+                  onChange={(e) => {
+                    console.log(`Field ${key} changed to: "${e.target.value}"`);
+                    const newPath = [...path, key];
+                    updateEditableData(newPath, e.target.value);
+                  }}
+                  placeholder={`Enter ${displayKey}`}
+                />
+              ) : (
+                <span className="text-gray-700">{currentValue || 'N/A'}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   const renderCertificateSection = (data: any) => {
     if (!data || !data.structured_data) return null;
@@ -1210,164 +1255,181 @@ const DocumentViewer = () => {
     );
   };
 
-  // FIXED: Improved renderExtractedData function with better data handling
-  const renderExtractedData = () => {
-    if (isValidating && document) {
-      console.log('Data passed to validator:', validatorData || document.extractedData);
-      
-      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
-      
-      return (
-        <CertificateValidator 
-          documentId={document.id}
-          extractedData={dataForValidator}
-          onSave={handleValidationSave}
-          onCancel={() => {
-            setIsValidating(false);
-            setValidatorData(null);
-          }}
-        />
-      );
+  // ENHANCED: Better renderExtractedData with debugging
+const renderExtractedData = () => {
+  console.log('=== RENDERING EXTRACTED DATA ===');
+  console.log('isValidating:', isValidating);
+  console.log('isEditing:', isEditing);
+  console.log('document:', document);
+  console.log('editableData:', editableData);
+  
+  if (isValidating && document) {
+    console.log('Rendering validator');
+    const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
+    
+    return (
+      <CertificateValidator 
+        documentId={document.id}
+        extractedData={dataForValidator}
+        onSave={handleValidationSave}
+        onCancel={() => {
+          setIsValidating(false);
+          setValidatorData(null);
+        }}
+      />
+    );
+  }
+  
+  if (!document) {
+    console.log('No document available');
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">No document available</p>
+      </div>
+    );
+  }
+  
+  if (document.status === 'processing') {
+    console.log('Document still processing');
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+        <h3 className="text-lg font-medium mb-2">Document Processing</h3>
+        <p className="text-muted-foreground text-center max-w-md">
+          This document is currently being processed. The extracted data will be available here once processing is complete.
+        </p>
+        <p className="text-sm text-muted-foreground mt-4">
+          You can view the original document on the left while waiting.
+        </p>
+      </div>
+    );
+  }
+  
+  if (!document.extractedData) {
+    console.log('No extracted data available');
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">No data available</p>
+      </div>
+    );
+  }
+  
+  // ENHANCED: Better data selection logic with debugging
+  const extractedData = (() => {
+    if (isEditing) {
+      console.log('Edit mode: using editableData');
+      const result = editableData || document.extractedData;
+      console.log('Selected data (edit mode):', result);
+      return result;
+    } else {
+      console.log('View mode: using document.extractedData');
+      console.log('Selected data (view mode):', document.extractedData);
+      return document.extractedData;
     }
-    
-    if (!document) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No document available</p>
-        </div>
-      );
-    }
-    
-    if (document.status === 'processing') {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-          <h3 className="text-lg font-medium mb-2">Document Processing</h3>
-          <p className="text-muted-foreground text-center max-w-md">
-            This document is currently being processed. The extracted data will be available here once processing is complete.
-          </p>
-          <p className="text-sm text-muted-foreground mt-4">
-            You can view the original document on the left while waiting.
-          </p>
-        </div>
-      );
-    }
-    
-    if (!document.extractedData) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No data available</p>
-        </div>
-      );
-    }
-    
-    // FIXED: Use editableData when editing, otherwise use document.extractedData
-    const extractedData = isEditing ? (editableData || document.extractedData) : document.extractedData;
-    
-    console.log('Rendering extracted data:', extractedData);
-    console.log('Is editing:', isEditing);
-    console.log('Editable data:', editableData);
-    
-    if (document.type === 'Certificate of Fitness') {
-      if (isEditing) {
-        return renderCertificateSection(extractedData);
-      }
-      
-      console.log("Passing to CertificateTemplate:", extractedData);
-      return (
-        <div className="certificate-container pb-6">
-          <Tabs defaultValue="view" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="view">View Certificate</TabsTrigger>
-              <TabsTrigger value="download">Download & Print Options</TabsTrigger>
-            </TabsList>
-            <TabsContent value="view" className="pt-4">
-              <CertificateTemplate extractedData={extractedData} />
-            </TabsContent>
-            <TabsContent value="download" className="pt-4">
-              <Card className="border-0 shadow-none">
-                <CardContent className="pt-4">
-                  <div className="flex items-center mb-4">
-                    <FileDown className="mr-2 h-5 w-5 text-blue-500" />
-                    <h3 className="text-lg font-medium">Download, Print or Email Certificate</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Use the options below to download, print or email this certificate.
-                  </p>
-                  <EnhancedCertificateGenerator extractedData={extractedData} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      );
-    }
-    
-    if (
-      typeof extractedData === 'object' && 
-      extractedData !== null && 
-      !Array.isArray(extractedData) && 
-      extractedData.structured_data
-    ) {
-      const structuredData = extractedData.structured_data;
-      
-      return (
-        <div className="space-y-6">
-          {structuredData.patient && (
-            <>
-              {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
-              <Separator />
-            </>
-          )}
-          
-          {structuredData.medical_details && (
-            <>
-              {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
-              <Separator />
-            </>
-          )}
-          
-          {structuredData.examination_results && (
-            <>
-              {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
-              <Separator />
-            </>
-          )}
-          
-          {structuredData.certification && (
-            <>
-              {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
-            </>
-          )}
-          
-          {!structuredData.patient && !structuredData.medical_details && 
-           !structuredData.examination_results && !structuredData.certification && (
-            <div>
-              <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                {JSON.stringify(structuredData, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      );
+  })();
+  
+  console.log('Final extractedData to render:', extractedData);
+  
+  // Rest of the function remains the same...
+  if (document.type === 'Certificate of Fitness') {
+    if (isEditing) {
+      return renderCertificateSection(extractedData);
     }
     
     return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            The data structure from this extraction doesn't match the expected format. 
-            Here's the raw data that was extracted:
-          </p>
-          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-            {JSON.stringify(extractedData, null, 2)}
-          </pre>
-        </div>
+      <div className="certificate-container pb-6">
+        <Tabs defaultValue="view" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="view">View Certificate</TabsTrigger>
+            <TabsTrigger value="download">Download & Print Options</TabsTrigger>
+          </TabsList>
+          <TabsContent value="view" className="pt-4">
+            <CertificateTemplate extractedData={extractedData} />
+          </TabsContent>
+          <TabsContent value="download" className="pt-4">
+            <Card className="border-0 shadow-none">
+              <CardContent className="pt-4">
+                <div className="flex items-center mb-4">
+                  <FileDown className="mr-2 h-5 w-5 text-blue-500" />
+                  <h3 className="text-lg font-medium">Download, Print or Email Certificate</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Use the options below to download, print or email this certificate.
+                </p>
+                <EnhancedCertificateGenerator extractedData={extractedData} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     );
-  };
+  }
+  
+  if (
+    typeof extractedData === 'object' && 
+    extractedData !== null && 
+    !Array.isArray(extractedData) && 
+    extractedData.structured_data
+  ) {
+    const structuredData = extractedData.structured_data;
+    
+    return (
+      <div className="space-y-6">
+        {structuredData.patient && (
+          <>
+            {renderStructuredSection("Patient Information", structuredData.patient, ['structured_data', 'patient'])}
+            <Separator />
+          </>
+        )}
+        
+        {structuredData.medical_details && (
+          <>
+            {renderStructuredSection("Medical Information", structuredData.medical_details, ['structured_data', 'medical_details'])}
+            <Separator />
+          </>
+        )}
+        
+        {structuredData.examination_results && (
+          <>
+            {renderStructuredSection("Examination Results", structuredData.examination_results, ['structured_data', 'examination_results'])}
+            <Separator />
+          </>
+        )}
+        
+        {structuredData.certification && (
+          <>
+            {renderStructuredSection("Certification", structuredData.certification, ['structured_data', 'certification'])}
+          </>
+        )}
+        
+        {!structuredData.patient && !structuredData.medical_details && 
+         !structuredData.examination_results && !structuredData.certification && (
+          <div>
+            <h3 className="text-lg font-medium mb-3">Extracted Information</h3>
+            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+              {JSON.stringify(structuredData, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-3">Raw Extracted Data</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          The data structure from this extraction doesn't match the expected format. 
+          Here's the raw data that was extracted:
+        </p>
+        <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+          {JSON.stringify(extractedData, null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
+};
 
   // FIXED: Add debugging to original document display
   const renderOriginalDocument = () => {
