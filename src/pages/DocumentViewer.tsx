@@ -788,7 +788,7 @@ const getNestedValue = (obj: any, path: string[]): any => {
     }
   };
 
-  / ENHANCED: Better updateEditableData function with debugging
+  // ENHANCED: Better updateEditableData function with debugging
 const updateEditableData = (path: string[], value: any) => {
   console.log(`Updating editable data at path: ${path.join('.')} with value:`, value);
   console.log('Current editableData before update:', editableData);
