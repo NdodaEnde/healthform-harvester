@@ -1,627 +1,466 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, FileText, Download, Eye, EyeOff, Save, Edit3, CheckCircle, AlertTriangle, X } from 'lucide-react';
-import CertificateTemplate from '@/components/CertificateTemplate';
-import { Helmet } from 'react-helmet';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface ExtractedData {
-  raw_content?: string;
-  structured_data?: {
-    certificate_info?: Record<string, any>;
-    [key: string]: any;
-  };
-  chunks?: any[];
-  [key: string]: any;
+interface EditableCertificateTemplateProps {
+  extractedData: any;
+  documentId: string;
+  editable?: boolean;
+  onDataChange?: (field: string, value: any) => void;
+  validationErrors?: Array<{ field: string; message: string }>;
 }
 
-interface Document {
-  id: string;
-  file_name: string;
-  file_path: string;
-  public_url: string;
-  status: string;
-  document_type: string;
-  extracted_data: ExtractedData;
-  created_at: string;
-  validated?: boolean;
-}
+const EditableCertificateTemplate: React.FC<EditableCertificateTemplateProps> = ({
+  extractedData,
+  documentId,
+  editable = false,
+  onDataChange,
+  validationErrors = []
+}) => {
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-interface ValidationError {
-  field: string;
-  message: string;
-}
+  const certificateData = extractedData?.certificate_info || 
+                          extractedData?.structured_data?.certificate_info || 
+                          {};
 
-const DocumentViewer: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const [document, setDocument] = useState<Document | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'pdf' | 'structured' | 'edit'>('pdf');
-  const [hideOriginalPdf, setHideOriginalPdf] = useState(false);
-  const [editableData, setEditableData] = useState<any>({});
-  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
-  const [isValidated, setIsValidated] = useState(false);
-
-  useEffect(() => {
-    if (id) {
-      fetchDocument(id);
-    }
-  }, [id]);
-
-  const fetchDocument = async (documentId: string) => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .single();
-
-      if (error) throw error;
-      console.log("Document data:", data);
-      
-      let processedData: Document = { 
-        id: data.id,
-        file_name: data.file_name,
-        file_path: data.file_path,
-        public_url: data.public_url,
-        status: data.status,
-        document_type: data.document_type || '',
-        extracted_data: {},
-        created_at: data.created_at,
-        validated: data.validated || false
-      };
-      
-      if (data.extracted_data) {
-        if (typeof data.extracted_data === 'string') {
-          try {
-            processedData.extracted_data = JSON.parse(data.extracted_data);
-          } catch (parseError) {
-            console.error('Error parsing extracted_data JSON:', parseError);
-            processedData.extracted_data = { raw_content: data.extracted_data };
-          }
-        } else {
-          processedData.extracted_data = data.extracted_data as ExtractedData;
-        }
-      }
-      
-      setDocument(processedData);
-      setIsValidated(processedData.validated || false);
-      
-      // Initialize editable data
-      const certificateInfo = processedData.extracted_data?.structured_data?.certificate_info || 
-                             processedData.extracted_data?.certificate_info || {};
-      setEditableData(certificateInfo);
-      
-      // Auto-switch to structured view if certificate data exists
-      const hasCertificateData = 
-        processedData.document_type?.includes('certificate') && 
-        (certificateInfo && Object.keys(certificateInfo).length > 0);
-      
-      if (hasCertificateData) {
-        toast.info('Certificate data has been detected and loaded');
-        setViewMode('structured');
-        validateExtractedData(certificateInfo);
-      }
-    } catch (err) {
-      console.error('Error fetching document:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load document');
-    } finally {
-      setLoading(false);
-    }
+  const hasValidationError = (field: string) => {
+    return validationErrors.some(error => error.field === field);
   };
 
-  const validateExtractedData = (data: any) => {
-    const errors: ValidationError[] = [];
-    
-    // Define required fields for certificate validation
-    const requiredFields = [
-      { key: 'employee_name', label: 'Employee Name' },
-      { key: 'id_number', label: 'ID Number' },
-      { key: 'company_name', label: 'Company Name' },
-      { key: 'examination_date', label: 'Examination Date' },
-      { key: 'expiry_date', label: 'Expiry Date' },
-      { key: 'job_title', label: 'Job Title' },
-      { key: 'medical_fitness', label: 'Medical Fitness Status' }
-    ];
-
-    // Check for missing required fields
-    requiredFields.forEach(field => {
-      if (!data[field.key] || data[field.key].toString().trim() === '' || data[field.key] === 'Not specified') {
-        errors.push({
-          field: field.key,
-          message: `${field.label} is required and appears to be missing or incomplete`
-        });
-      }
-    });
-
-    // Validate ID number format (South African ID - 13 digits)
-    if (data.id_number && !/^\d{13}$/.test(data.id_number.replace(/\s/g, ''))) {
-      errors.push({
-        field: 'id_number',
-        message: 'ID Number should be 13 digits'
-      });
-    }
-
-    // Validate date formats
-    if (data.examination_date && !isValidDate(data.examination_date)) {
-      errors.push({
-        field: 'examination_date',
-        message: 'Examination date format appears invalid'
-      });
-    }
-
-    if (data.expiry_date && !isValidDate(data.expiry_date)) {
-      errors.push({
-        field: 'expiry_date',
-        message: 'Expiry date format appears invalid'
-      });
-    }
-
-    setValidationErrors(errors);
-    return errors.length === 0;
-  };
-
-  const isValidDate = (dateString: string) => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date.getTime());
+  const getValidationMessage = (field: string) => {
+    const error = validationErrors.find(error => error.field === field);
+    return error?.message;
   };
 
   const handleFieldChange = (field: string, value: any) => {
-    const updatedData = { ...editableData, [field]: value };
-    setEditableData(updatedData);
-    
-    // Re-validate when data changes
-    validateExtractedData(updatedData);
-  };
-
-  const saveValidatedData = async () => {
-    try {
-      setSaving(true);
-      
-      // Final validation before saving
-      const isValid = validateExtractedData(editableData);
-      
-      if (!isValid) {
-        toast.error('Please fix all validation errors before saving');
-        return;
-      }
-
-      // Update the document with validated data
-      const updatedExtractedData = {
-        ...document?.extracted_data,
-        structured_data: {
-          ...document?.extracted_data?.structured_data,
-          certificate_info: editableData
-        },
-        certificate_info: editableData // Keep both for compatibility
-      };
-
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          extracted_data: updatedExtractedData,
-          validated: true,
-          status: 'validated'
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setIsValidated(true);
-      setDocument(prev => prev ? { ...prev, validated: true, status: 'validated', extracted_data: updatedExtractedData } : null);
-      setViewMode('structured');
-      
-      toast.success('Certificate data has been validated and saved successfully!');
-    } catch (err) {
-      console.error('Error saving validated data:', err);
-      toast.error('Failed to save validated data');
-    } finally {
-      setSaving(false);
+    if (onDataChange) {
+      onDataChange(field, value);
     }
   };
 
-  const downloadDocument = () => {
-    if (document?.public_url) {
-      window.open(document.public_url, '_blank');
+  const EditableField: React.FC<{
+    field: string;
+    value: any;
+    type?: 'text' | 'date' | 'select' | 'textarea' | 'checkbox';
+    options?: string[];
+    className?: string;
+    placeholder?: string;
+    rows?: number;
+  }> = ({ field, value, type = 'text', options, className, placeholder, rows = 1 }) => {
+    const hasError = hasValidationError(field);
+    const isFocused = focusedField === field;
+
+    if (!editable) {
+      return (
+        <span className={cn("inline-block min-w-[100px]", className)}>
+          {value || 'Not specified'}
+        </span>
+      );
     }
-  };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+    const baseClassName = cn(
+      "border-0 border-b-2 border-dashed border-gray-300 bg-transparent px-1 py-0.5 rounded-none",
+      "focus:border-blue-500 focus:outline-none focus:ring-0 focus:bg-blue-50",
+      hasError && "border-red-500 bg-red-50",
+      isFocused && "bg-blue-50 border-blue-500",
+      className
     );
-  }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-red-600 mb-4">{error}</p>
-              <Button onClick={() => window.history.back()}>
-                Go Back
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+    const fieldProps = {
+      value: value || '',
+      onChange: (e: any) => handleFieldChange(field, e.target.value),
+      onFocus: () => setFocusedField(field),
+      onBlur: () => setFocusedField(null),
+      className: baseClassName,
+      placeholder: placeholder || 'Enter value...'
+    };
 
-  if (!document) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p>Document not found</p>
-      </div>
-    );
-  }
-
-  const hasCertificateData = document.document_type?.includes('certificate') && 
-    (document.extracted_data?.structured_data?.certificate_info || 
-     document.extracted_data?.certificate_info);
-
-  const renderEditForm = () => {
-    return (
-      <div className="space-y-6 p-4">
-        {/* Validation Status */}
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-          {validationErrors.length === 0 ? (
-            <CheckCircle className="h-5 w-5 text-green-600" />
-          ) : (
-            <AlertTriangle className="h-5 w-5 text-amber-600" />
-          )}
-          <span className={validationErrors.length === 0 ? 'text-green-800' : 'text-amber-800'}>
-            {validationErrors.length === 0 
-              ? 'All fields validated successfully' 
-              : `${validationErrors.length} validation error${validationErrors.length > 1 ? 's' : ''} found`}
-          </span>
-        </div>
-
-        {/* Validation Errors */}
-        {validationErrors.length > 0 && (
-          <div className="space-y-2">
-            {validationErrors.map((error, index) => (
-              <div key={index} className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-200">
-                <X className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-red-800">
-                    {error.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </p>
-                  <p className="text-sm text-red-600">{error.message}</p>
-                </div>
+    switch (type) {
+      case 'date':
+        return (
+          <div className="relative inline-block">
+            <Input
+              type="date"
+              {...fieldProps}
+              className={cn(baseClassName, "min-w-[140px]")}
+            />
+            {hasError && (
+              <div className="absolute top-full left-0 z-10 mt-1">
+                <Badge variant="destructive" className="text-xs">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {getValidationMessage(field)}
+                </Badge>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Form Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="employee_name">Employee Name *</Label>
-            <Input
-              id="employee_name"
-              value={editableData.employee_name || ''}
-              onChange={(e) => handleFieldChange('employee_name', e.target.value)}
-              className={validationErrors.some(e => e.field === 'employee_name') ? 'border-red-500' : ''}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="id_number">ID Number *</Label>
-            <Input
-              id="id_number"
-              value={editableData.id_number || ''}
-              onChange={(e) => handleFieldChange('id_number', e.target.value)}
-              className={validationErrors.some(e => e.field === 'id_number') ? 'border-red-500' : ''}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="company_name">Company Name *</Label>
-            <Input
-              id="company_name"
-              value={editableData.company_name || ''}
-              onChange={(e) => handleFieldChange('company_name', e.target.value)}
-              className={validationErrors.some(e => e.field === 'company_name') ? 'border-red-500' : ''}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="job_title">Job Title *</Label>
-            <Input
-              id="job_title"
-              value={editableData.job_title || ''}
-              onChange={(e) => handleFieldChange('job_title', e.target.value)}
-              className={validationErrors.some(e => e.field === 'job_title') ? 'border-red-500' : ''}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="examination_date">Examination Date *</Label>
-            <Input
-              id="examination_date"
-              type="date"
-              value={editableData.examination_date || ''}
-              onChange={(e) => handleFieldChange('examination_date', e.target.value)}
-              className={validationErrors.some(e => e.field === 'examination_date') ? 'border-red-500' : ''}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="expiry_date">Expiry Date *</Label>
-            <Input
-              id="expiry_date"
-              type="date"
-              value={editableData.expiry_date || ''}
-              onChange={(e) => handleFieldChange('expiry_date', e.target.value)}
-              className={validationErrors.some(e => e.field === 'expiry_date') ? 'border-red-500' : ''}
-            />
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="medical_fitness">Medical Fitness Status *</Label>
-            <Select
-              value={editableData.medical_fitness || ''}
-              onValueChange={(value) => handleFieldChange('medical_fitness', value)}
-            >
-              <SelectTrigger className={validationErrors.some(e => e.field === 'medical_fitness') ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Select fitness status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FIT">FIT</SelectItem>
-                <SelectItem value="Fit with Restriction">Fit with Restriction</SelectItem>
-                <SelectItem value="Fit with Condition">Fit with Condition</SelectItem>
-                <SelectItem value="Temporary Unfit">Temporary Unfit</SelectItem>
-                <SelectItem value="UNFIT">UNFIT</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="examination_type">Examination Type</Label>
-            <Select
-              value={editableData.examination_type || ''}
-              onValueChange={(value) => handleFieldChange('examination_type', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select examination type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PRE-EMPLOYMENT">Pre-Employment</SelectItem>
-                <SelectItem value="PERIODICAL">Periodical</SelectItem>
-                <SelectItem value="EXIT">Exit</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="restrictions">Restrictions</Label>
-            <Textarea
-              id="restrictions"
-              value={editableData.restrictions || ''}
-              onChange={(e) => handleFieldChange('restrictions', e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="comments">Comments</Label>
-            <Textarea
-              id="comments"
-              value={editableData.comments || ''}
-              onChange={(e) => handleFieldChange('comments', e.target.value)}
-              rows={3}
-            />
-          </div>
-        </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button
-            variant="outline"
-            onClick={() => setViewMode('structured')}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={saveValidatedData}
-            disabled={saving || validationErrors.length > 0}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
             )}
-            Save Validated Data
-          </Button>
-        </div>
-      </div>
-    );
+          </div>
+        );
+
+      case 'select':
+        return (
+          <div className="relative inline-block min-w-[150px]">
+            <Select
+              value={value || ''}
+              onValueChange={(newValue) => handleFieldChange(field, newValue)}
+            >
+              <SelectTrigger className={baseClassName}>
+                <SelectValue placeholder={placeholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {options?.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasError && (
+              <div className="absolute top-full left-0 z-10 mt-1">
+                <Badge variant="destructive" className="text-xs">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {getValidationMessage(field)}
+                </Badge>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'textarea':
+        return (
+          <div className="relative block w-full">
+            <Textarea
+              {...fieldProps}
+              rows={rows}
+              className={cn(baseClassName, "w-full resize-none")}
+            />
+            {hasError && (
+              <div className="absolute top-full left-0 z-10 mt-1">
+                <Badge variant="destructive" className="text-xs">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {getValidationMessage(field)}
+                </Badge>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'checkbox':
+        return (
+          <div className="relative inline-flex items-center">
+            <Checkbox
+              checked={value === true || value === 'true' || value === 'yes'}
+              onCheckedChange={(checked) => handleFieldChange(field, checked)}
+              className="mr-2"
+            />
+            {hasError && (
+              <div className="absolute top-full left-0 z-10 mt-1">
+                <Badge variant="destructive" className="text-xs">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {getValidationMessage(field)}
+                </Badge>
+              </div>
+            )}
+          </div>
+        );
+
+      default:
+        return (
+          <div className="relative inline-block">
+            <Input
+              {...fieldProps}
+              className={cn(baseClassName, "min-w-[100px]")}
+            />
+            {hasError && (
+              <div className="absolute top-full left-0 z-10 mt-1">
+                <Badge variant="destructive" className="text-xs">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {getValidationMessage(field)}
+                </Badge>
+              </div>
+            )}
+          </div>
+        );
+    }
   };
 
   return (
-    <>
-      <Helmet>
-        <title>Document Viewer: {document.file_name}</title>
-      </Helmet>
-      <div className="container mx-auto p-4">
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
-            <div>
-              <h1 className="text-2xl font-bold">{document.file_name}</h1>
-              <div className="flex gap-2 mt-2">
-                <Badge variant={document.status === 'validated' ? 'success' : 
-                              document.status === 'processed' ? 'secondary' : 
-                              document.status === 'failed' ? 'destructive' : 'secondary'}>
-                  {document.status}
-                </Badge>
-                <Badge variant="outline">
-                  {document.document_type}
-                </Badge>
-                {isValidated && (
-                  <Badge className="bg-green-600">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Validated
-                  </Badge>
-                )}
-                {validationErrors.length > 0 && (
-                  <Badge variant="destructive">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    {validationErrors.length} Error{validationErrors.length > 1 ? 's' : ''}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={viewMode === 'pdf' ? 'default' : 'outline'}
-                onClick={() => setViewMode('pdf')}
-                size="sm"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                PDF View
-              </Button>
-              <Button
-                variant={viewMode === 'structured' ? 'default' : 'outline'}
-                onClick={() => setViewMode('structured')}
-                size="sm"
-                disabled={!hasCertificateData}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                {hasCertificateData ? "Certificate View" : "No Certificate Data"}
-              </Button>
-              <Button
-                variant={viewMode === 'edit' ? 'default' : 'outline'}
-                onClick={() => setViewMode('edit')}
-                size="sm"
-                disabled={!hasCertificateData}
-              >
-                <Edit3 className="w-4 h-4 mr-2" />
-                Edit & Validate
-              </Button>
-              {document.public_url && (
-                <Button variant="outline" onClick={downloadDocument} size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-              )}
-              {(viewMode === 'structured' || viewMode === 'edit') && hasCertificateData && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setHideOriginalPdf(!hideOriginalPdf)} 
-                  size="sm"
-                >
-                  {hideOriginalPdf ? (
-                    <>
-                      <Eye className="w-4 h-4 mr-2" />
-                      Show Original
-                    </>
-                  ) : (
-                    <>
-                      <EyeOff className="w-4 h-4 mr-2" />
-                      Hide Original
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+    <div className="bg-white p-8 border rounded-lg shadow-sm font-mono text-sm leading-relaxed">
+      {/* Header */}
+      <div className="text-center mb-6 border-b pb-4">
+        <h1 className="text-lg font-bold mb-2">BLUECOLLAR OCCUPATIONAL HEALTH</h1>
+        <p className="text-xs mb-1">Tel: +27 11 892 0771/ 011 892 0627</p>
+        <p className="text-xs mb-1">Email: admin@bluecollarocc.co.za / office@bluecollarocc.co.za</p>
+        <p className="text-xs mb-1">135 Leeuwpoort Street; Boksburg South; Boksburg</p>
+        <p className="text-xs">Co Reg: 2014/135234/07</p>
+      </div>
+
+      {/* Certificate Title */}
+      <div className="text-center mb-6">
+        <h2 className="text-xl font-bold mb-4">CERTIFICATE OF FITNESS</h2>
+        <p className="text-xs mb-2">
+          Dr. MJ Mputhi / Practice No: 0404160 / Sr. Sibongile Mahlangu / Practice No: 999 088 0000 8177 91
+        </p>
+        <p className="text-sm mb-4">certify that the following employee:</p>
+      </div>
+
+      {/* Employee Information */}
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">Initials & Surname:</span>
+          <EditableField 
+            field="employee_name" 
+            value={certificateData.employee_name}
+            className="font-semibold text-blue-700 min-w-[200px]"
+            placeholder="Enter full name"
+          />
+          <span className="ml-4 font-semibold">ID NO:</span>
+          <EditableField 
+            field="id_number" 
+            value={certificateData.id_number}
+            className="font-mono min-w-[150px]"
+            placeholder="Enter ID number"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">Company Name:</span>
+          <EditableField 
+            field="company_name" 
+            value={certificateData.company_name}
+            className="min-w-[250px]"
+            placeholder="Enter company name"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">Date of Examination:</span>
+            <EditableField 
+              field="examination_date" 
+              value={certificateData.examination_date}
+              type="date"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">Expiry Date:</span>
+            <EditableField 
+              field="expiry_date" 
+              value={certificateData.expiry_date}
+              type="date"
+            />
           </div>
         </div>
 
-        <div className={`grid grid-cols-1 ${hideOriginalPdf ? '' : 'lg:grid-cols-2'} gap-6`}>
-          {/* PDF Viewer - Hidden when hideOriginalPdf is true */}
-          {!hideOriginalPdf && (
-            <Card className="lg:h-[calc(100vh-220px)]">
-              <CardHeader className="pb-2">
-                <CardTitle>Original Document</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {document.public_url ? (
-                  <div className="w-full h-[600px] border rounded">
-                    <embed
-                      src={document.public_url}
-                      type="application/pdf"
-                      width="100%"
-                      height="100%"
-                      className="rounded"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-[600px] bg-gray-50 rounded">
-                    <p className="text-gray-500">PDF not available</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Certificate/Edit View */}
-          <Card className={`${hideOriginalPdf ? 'w-full mx-auto max-w-4xl' : ''} lg:h-[calc(100vh-220px)] overflow-hidden`}>
-            <CardHeader className="pb-2">
-              <CardTitle>
-                {viewMode === 'edit' ? 'Edit & Validate Certificate Data' : 
-                 viewMode === 'structured' ? 'Certificate Preview' : 'Extracted Data'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-auto h-full pb-6">
-              {viewMode === 'edit' ? (
-                renderEditForm()
-              ) : viewMode === 'structured' ? (
-                <div className="overflow-auto">
-                  <CertificateTemplate 
-                    extractedData={{ ...document.extracted_data, certificate_info: editableData }}
-                    documentId={id || ''}
-                    editable={false}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {(document.extracted_data?.structured_data?.certificate_info || editableData) && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Certificate Information</h3>
-                      <div className="space-y-2 text-sm">
-                        {Object.entries(editableData).map(([key, value]) => (
-                          <div key={key} className="flex justify-between">
-                            <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>
-                            <span>{String(value)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <h3 className="font-semibold mb-2">Raw Content Preview</h3>
-                    <div className="bg-gray-50 p-3 rounded text-sm max-h-96 overflow-y-auto">
-                      {document.extracted_data?.raw_content?.substring(0, 500)}...
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">Job Title:</span>
+          <EditableField 
+            field="job_title" 
+            value={certificateData.job_title}
+            className="min-w-[200px]"
+            placeholder="Enter job title"
+          />
         </div>
       </div>
-    </>
+
+      {/* Examination Type */}
+      <div className="mb-6">
+        <div className="flex items-center gap-4 text-center">
+          <EditableField 
+            field="pre_employment" 
+            value={certificateData.examination_type === 'PRE-EMPLOYMENT'}
+            type="checkbox"
+          />
+          <span className="font-semibold">PRE-EMPLOYMENT</span>
+          
+          <EditableField 
+            field="periodical" 
+            value={certificateData.examination_type === 'PERIODICAL'}
+            type="checkbox"
+          />
+          <span className="font-semibold">PERIODICAL</span>
+          
+          <EditableField 
+            field="exit" 
+            value={certificateData.examination_type === 'EXIT'}
+            type="checkbox"
+          />
+          <span className="font-semibold">EXIT</span>
+        </div>
+      </div>
+
+      {/* Medical Examination Tests Table */}
+      <div className="mb-6">
+        <h3 className="font-bold text-center mb-4">MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS</h3>
+        
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <span className="font-semibold">Done</span>
+              <span className="font-semibold">Results</span>
+              <span className="font-semibold">Test</span>
+            </div>
+            
+            {['BLOODS', 'FAR, NEAR VISION', 'SIDE & DEPTH', 'NIGHT VISION'].map((test) => (
+              <div key={test} className="grid grid-cols-3 gap-2 text-xs">
+                <EditableField 
+                  field={`${test.toLowerCase().replace(/[,\s]/g, '_')}_done`}
+                  value={certificateData[`${test.toLowerCase().replace(/[,\s]/g, '_')}_done`]}
+                  type="checkbox"
+                />
+                <EditableField 
+                  field={`${test.toLowerCase().replace(/[,\s]/g, '_')}_result`}
+                  value={certificateData[`${test.toLowerCase().replace(/[,\s]/g, '_')}_result`]}
+                  className="text-xs min-w-[80px]"
+                />
+                <span>{test}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <span className="font-semibold">Done</span>
+              <span className="font-semibold">Results</span>
+              <span className="font-semibold">Test</span>
+            </div>
+            
+            {['Hearing', 'Working at Heights', 'Lung Function', 'X-Ray', 'Drug Screen'].map((test) => (
+              <div key={test} className="grid grid-cols-3 gap-2 text-xs">
+                <EditableField 
+                  field={`${test.toLowerCase().replace(/\s/g, '_')}_done`}
+                  value={certificateData[`${test.toLowerCase().replace(/\s/g, '_')}_done`]}
+                  type="checkbox"
+                />
+                <EditableField 
+                  field={`${test.toLowerCase().replace(/\s/g, '_')}_result`}
+                  value={certificateData[`${test.toLowerCase().replace(/\s/g, '_')}_result`]}
+                  className="text-xs min-w-[80px]"
+                />
+                <span>{test}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Follow-up Actions */}
+      <div className="mb-6 grid grid-cols-2 gap-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="font-semibold">Referred or follow up actions:</span>
+            <EditableField 
+              field="follow_up_actions" 
+              value={certificateData.follow_up_actions}
+              className="min-w-[150px]"
+            />
+          </div>
+        </div>
+        <div>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="font-semibold">Review Date:</span>
+            <EditableField 
+              field="review_date" 
+              value={certificateData.review_date}
+              type="date"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Restrictions */}
+      <div className="mb-6">
+        <div className="mb-2">
+          <span className="font-semibold">Restrictions:</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          {[
+            'Heights', 'Dust Exposure', 'Motorized Equipment', 'Wear Hearing Protection',
+            'Confined Spaces', 'Chemical Exposure', 'Wear Spectacles', 'Remain on Treatment for Chronic Conditions'
+          ].map((restriction) => (
+            <div key={restriction} className="flex items-center gap-2">
+              <EditableField 
+                field={`restriction_${restriction.toLowerCase().replace(/\s/g, '_')}`}
+                value={certificateData[`restriction_${restriction.toLowerCase().replace(/\s/g, '_')}`]}
+                type="checkbox"
+              />
+              <span>{restriction}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Medical Fitness Declaration */}
+      <div className="mb-6">
+        <h3 className="font-bold text-center mb-4">Medical Fitness Declaration</h3>
+        <div className="flex flex-wrap justify-center gap-6 text-sm">
+          {['FIT', 'Fit with Restriction', 'Fit with Condition', 'Temporary Unfit', 'UNFIT'].map((status) => (
+            <div key={status} className="flex items-center gap-2">
+              <EditableField 
+                field="medical_fitness"
+                value={certificateData.medical_fitness === status}
+                type="checkbox"
+              />
+              <span className={certificateData.medical_fitness === status ? 'font-bold' : ''}>{status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Comments */}
+      <div className="mb-6">
+        <div className="mb-2">
+          <span className="font-semibold">Comments:</span>
+        </div>
+        <EditableField 
+          field="comments" 
+          value={certificateData.comments}
+          type="textarea"
+          rows={3}
+          placeholder="Enter any additional comments..."
+        />
+      </div>
+
+      {/* Signature Section */}
+      <div className="mb-6 text-center">
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <div className="h-16 border-b border-gray-400 mb-2"></div>
+            <p className="text-xs">SIGNATURE</p>
+          </div>
+          <div>
+            <div className="h-16 border-b border-gray-400 mb-2"></div>
+            <p className="text-xs">STAMP</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="text-center text-xs">
+        <p className="mb-2">Occupational Health Practitioner / Occupational Medical Practitioner</p>
+        <p className="mb-1">Dr MJ Mphuthi / Practice No. 0404160</p>
+        <p className="mb-1">Sr. Sibongile Mahlangu</p>
+        <p>SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
+        <p>Practice Number: 999 088 0000 8177 91</p>
+      </div>
+
+      {/* Editing Instructions */}
+      {editable && (
+        <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+          <p className="font-semibold mb-1">Editing Instructions:</p>
+          <p>• Click on any underlined field to edit it</p>
+          <p>• Compare with the original document on the right to ensure accuracy</p>
+          <p>• Red highlights indicate validation errors that need to be fixed</p>
+          <p>• Click "Save" when all corrections are complete</p>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default DocumentViewer;
+export default EditableCertificateTemplate;
