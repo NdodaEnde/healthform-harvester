@@ -569,7 +569,7 @@ const CertificateTemplate = ({
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
-          <div className="absolute top-3/10 inset-x-0 flex items-center justify-center opacity-40 pointer-events-none" aria-hidden="true">
+          <div className="absolute top-1/2 inset-x-0 flex items-center justify-center opacity-40 pointer-events-none" aria-hidden="true">
             <img 
               src="/lovable-uploads/ead30039-3558-4ae0-a3ec-c58d8755a311.png" 
               alt="BlueCollar Health & Wellness" 
