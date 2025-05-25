@@ -34,7 +34,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { data, error } = await supabase
         .from("invitations")
         .select("*")
-        .eq("organization_id", organizationId as any)
+        .eq("organization_id", organizationId)
         .is("accepted_at", null) // This ensures we only get pending invitations
         .order("created_at", { ascending: false });
 
@@ -42,9 +42,20 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         throw error;
       }
 
-      const typedInvitations: Invitation[] = (data || [])
+      if (!data || !Array.isArray(data)) {
+        setInvitations([]);
+        return;
+      }
+
+      const typedInvitations: Invitation[] = data
         .filter((invitation): invitation is NonNullable<typeof invitation> => 
-          invitation !== null && typeof invitation === 'object' && 'id' in invitation
+          invitation !== null && 
+          typeof invitation === 'object' && 
+          'id' in invitation &&
+          'email' in invitation &&
+          'role' in invitation &&
+          'created_at' in invitation &&
+          'expires_at' in invitation
         )
         .map(invitation => ({
           id: String(invitation.id || ''),
@@ -52,8 +63,8 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
           role: String(invitation.role || ''),
           created_at: String(invitation.created_at || ''),
           expires_at: String(invitation.expires_at || ''),
-          accepted_at: invitation.accepted_at,
-          token: invitation.token || undefined
+          accepted_at: invitation.accepted_at ? String(invitation.accepted_at) : null,
+          token: invitation.token ? String(invitation.token) : undefined
         }));
       
       setInvitations(typedInvitations);
@@ -80,7 +91,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { error } = await supabase
         .from("invitations")
         .delete()
-        .eq("id", id as any);
+        .eq("id", id);
 
       if (error) {
         throw error;
@@ -117,8 +128,8 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         .from("invitations")
         .update({
           expires_at: expires_at.toISOString()
-        } as any)
-        .eq("id", invitation.id as any);
+        })
+        .eq("id", invitation.id);
 
       if (error) {
         throw error;
@@ -128,7 +139,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("name")
-        .eq("id", organizationId as any)
+        .eq("id", organizationId)
         .single();
 
       if (orgError) {
@@ -147,7 +158,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         const { data, error: fetchError } = await supabase
           .from("invitations")
           .select("token")
-          .eq("id", invitation.id as any)
+          .eq("id", invitation.id)
           .single();
           
         if (fetchError) {

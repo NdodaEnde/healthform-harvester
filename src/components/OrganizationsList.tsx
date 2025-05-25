@@ -25,10 +25,19 @@ export default function OrganizationsList() {
           
         if (error) throw error;
         
+        if (!data || !Array.isArray(data)) {
+          setOrganizations([]);
+          return;
+        }
+        
         // Type the data safely
-        const typedOrganizations: Organization[] = (data || [])
+        const typedOrganizations: Organization[] = data
           .filter((org): org is NonNullable<typeof org> => 
-            org !== null && typeof org === 'object' && 'id' in org
+            org !== null && 
+            typeof org === 'object' && 
+            'id' in org &&
+            'name' in org &&
+            'organization_type' in org
           )
           .map(org => ({
             id: String(org.id || ''),

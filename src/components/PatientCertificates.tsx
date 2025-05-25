@@ -134,7 +134,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('id', patientId as any)
+        .eq('id', patientId)
         .single();
       
       if (error) {
@@ -168,9 +168,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId as any)
-        .eq('status', 'processed' as any)
-        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'] as any)
+        .eq('organization_id', organizationId)
+        .eq('status', 'processed')
+        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'])
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -235,7 +235,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       // Add review status from localStorage to each document
       const docsWithReviewStatus = filteredDocs
         .filter((doc): doc is NonNullable<typeof doc> => 
-          doc !== null && typeof doc === 'object'
+          doc !== null && 
+          typeof doc === 'object' &&
+          'id' in doc &&
+          'file_name' in doc &&
+          'file_path' in doc &&
+          'status' in doc &&
+          'created_at' in doc
         )
         .map(doc => {
           // Add calculated examination date if missing but has valid_until
