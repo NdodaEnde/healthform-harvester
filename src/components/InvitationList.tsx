@@ -35,7 +35,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         .from("invitations")
         .select("*")
         .eq("organization_id", organizationId)
-        .is("accepted_at", null) // This ensures we only get pending invitations
+        .is("accepted_at", null)
         .order("created_at", { ascending: false });
 
       if (error) {

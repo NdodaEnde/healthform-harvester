@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase, safeQueryResult } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
-import { createStandardizedFilePath, ensureStorageBucket } from "@/utils/documentOrganizationFixer";
+import { createStandardizedFilePath } from "@/utils/documentOrganizationFixer";
+import { ensureDocumentsBucket } from "@/utils/organization-assets";
 import { isDefined, isDataResult } from "@/utils/type-guards";
 
 const DOCUMENT_TYPES = [
@@ -24,14 +25,14 @@ export interface DocumentUploaderProps {
   onUploadComplete?: (data?: any) => void;
   organizationId?: string;
   clientOrganizationId?: string;
-  patientId?: string; // Added patient ID parameter
+  patientId?: string;
 }
 
 const DocumentUploader = ({ 
   onUploadComplete,
   organizationId,
   clientOrganizationId,
-  patientId // For linking documents to patients
+  patientId
 }: DocumentUploaderProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>("certificate-fitness");
@@ -40,15 +41,35 @@ const DocumentUploader = ({
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [documentStatus, setDocumentStatus] = useState<string | null>(null);
   const [bucketReady, setBucketReady] = useState<boolean>(false);
+  const [bucketCheckLoading, setBucketCheckLoading] = useState(true);
 
   // Ensure the medical-documents bucket exists when component mounts
   useEffect(() => {
     const checkBucket = async () => {
-      // Only use medical-documents as the standard bucket
-      const exists = await ensureStorageBucket('medical-documents');
-      setBucketReady(exists);
-      if (!exists) {
-        console.warn("Medical-documents storage bucket may not be available");
+      setBucketCheckLoading(true);
+      try {
+        const exists = await ensureDocumentsBucket();
+        setBucketReady(exists);
+        if (!exists) {
+          console.warn("Medical-documents storage bucket setup failed");
+          toast({
+            title: "Storage Warning",
+            description: "Storage system setup encountered issues. Uploads may fail.",
+            variant: "destructive"
+          });
+        } else {
+          console.log("Storage bucket ready for uploads");
+        }
+      } catch (error) {
+        console.error("Error checking bucket availability:", error);
+        setBucketReady(false);
+        toast({
+          title: "Storage Warning", 
+          description: "Could not verify storage availability. Uploads may fail.",
+          variant: "destructive"
+        });
+      } finally {
+        setBucketCheckLoading(false);
       }
     };
     
@@ -96,7 +117,7 @@ const DocumentUploader = ({
       const standardizedPath = createStandardizedFilePath(
         organizationId,
         documentType,
-        patientId, // Pass the patient ID for proper organization
+        patientId,
         file.name
       );
 
@@ -108,9 +129,15 @@ const DocumentUploader = ({
       formData.append('documentType', documentType);
       formData.append('userId', user.id);
       formData.append('filePath', standardizedPath);
-      // Add patient ID to formData if available
+      
       if (patientId) {
         formData.append('patientId', patientId);
+      }
+      if (organizationId) {
+        formData.append('organizationId', organizationId);
+      }
+      if (clientOrganizationId) {
+        formData.append('clientOrganizationId', clientOrganizationId);
       }
 
       // Simulate progress
@@ -133,9 +160,6 @@ const DocumentUploader = ({
       // Call the Supabase Edge Function to process the document
       setProcessingStatus("Sending to processing service...");
       
-      // Ensure the medical-documents bucket exists
-      await ensureStorageBucket('medical-documents');
-      
       const { data, error } = await supabase.functions.invoke('process-document', {
         body: formData,
       });
@@ -155,9 +179,6 @@ const DocumentUploader = ({
       
       console.log("Document processing response:", data);
       
-      // First verify if the document has been properly created
-      const documentId = data.documentId;
-      
       // Update the document record with organization and patient context
       const updateData: any = {
         organization_id: organizationId,
@@ -167,13 +188,13 @@ const DocumentUploader = ({
       // Link to patient if patientId is provided
       if (patientId) {
         updateData.owner_id = patientId;
-        console.log(`Linking document ${documentId} to patient ${patientId}`);
+        console.log(`Linking document ${data.documentId} to patient ${patientId}`);
       }
       
       const { error: updateError } = await supabase
         .from('documents')
         .update(updateData)
-        .eq('id', documentId);
+        .eq('id', data.documentId);
         
       if (updateError) {
         console.error("Error updating document with patient link:", updateError);
@@ -186,13 +207,12 @@ const DocumentUploader = ({
       const { data: verifyData, error: verifyError } = await supabase
         .from('documents')
         .select('status, extracted_data, public_url, file_path, owner_id')
-        .eq('id', documentId)
+        .eq('id', data.documentId)
         .single();
         
       if (verifyError) {
         console.error("Error verifying document status:", verifyError);
       } else {
-        // Use type casting to ensure TypeScript compatibility
         const typedVerifyData = safeQueryResult<{
           status: string;
           extracted_data: any;
@@ -207,13 +227,10 @@ const DocumentUploader = ({
         console.log("File path:", typedVerifyData.file_path);
         console.log("Owner (patient) ID:", typedVerifyData.owner_id);
         
-        // Update UI with verified status
         setDocumentStatus(typedVerifyData.status);
         
-        // Safely access nested properties using optional chaining
         const extractedData = typedVerifyData.extracted_data;
         
-        // Check if we have structured data
         const hasStructuredData = typeof extractedData === 'object' && 
           extractedData !== null && 
           'structured_data' in extractedData && 
@@ -221,7 +238,6 @@ const DocumentUploader = ({
           typeof extractedData.structured_data === 'object' &&
           Object.keys(extractedData.structured_data || {}).length > 0;
           
-        // Check if we have raw content
         const hasRawContent = typeof extractedData === 'object' && 
           extractedData !== null && 
           'raw_content' in extractedData && 
@@ -240,10 +256,8 @@ const DocumentUploader = ({
       let toastMessage = "";
       let toastVariant: "default" | "destructive" = "default";
       
-      // Use the verified data if available, otherwise fallback to the data from the function
       const docStatus = verifyData ? safeQueryResult<{status: string}>(verifyData).status : (data?.document?.status || "unknown");
       
-      // Update toast message with patient linking information
       if (patientId) {
         toastMessage = "Your document has been uploaded and linked to the patient";
       } else {
@@ -288,8 +302,7 @@ const DocumentUploader = ({
         setUploading(false);
         setFile(null);
         setUploadProgress(0);
-        // Keep the status message visible
-      }, 2000); // Keep success/failure message visible for 2 seconds
+      }, 2000);
     }
   };
 
@@ -378,6 +391,27 @@ const DocumentUploader = ({
         </div>
       )}
       
+      {bucketCheckLoading && (
+        <div className="text-xs text-blue-600">
+          <Info className="inline h-3 w-3 mr-1" />
+          Checking storage system availability...
+        </div>
+      )}
+      
+      {!bucketCheckLoading && !bucketReady && !uploading && (
+        <div className="text-xs text-amber-600">
+          <AlertTriangle className="inline h-3 w-3 mr-1" />
+          Storage system may not be ready. Some uploads may fail.
+        </div>
+      )}
+      
+      {!bucketCheckLoading && bucketReady && !uploading && (
+        <div className="text-xs text-green-600">
+          <CheckCircle className="inline h-3 w-3 mr-1" />
+          Storage system is ready for uploads.
+        </div>
+      )}
+      
       {uploading && (
         <div className="space-y-2">
           <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -396,16 +430,9 @@ const DocumentUploader = ({
         </div>
       )}
       
-      {!bucketReady && !uploading && (
-        <div className="text-xs text-amber-600">
-          <AlertTriangle className="inline h-3 w-3 mr-1" />
-          Storage system may not be ready. Some uploads may fail.
-        </div>
-      )}
-      
       <Button 
         onClick={handleUpload} 
-        disabled={!file || uploading} 
+        disabled={!file || uploading || (!bucketReady && !bucketCheckLoading)} 
         className="w-full"
       >
         {uploading ? (
