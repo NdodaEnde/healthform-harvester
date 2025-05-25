@@ -41,7 +41,7 @@ const AccuracyMatrix = () => {
         return;
       }
 
-      // Safely process the data
+      // Safely process the data with proper type checking
       const typedDocuments: DocumentData[] = (data || []).map(doc => ({
         id: doc.id,
         document_type: doc.document_type,
