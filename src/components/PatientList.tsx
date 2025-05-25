@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,10 +46,10 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       let query = supabase
         .from("patients")
         .select("*")
-        .eq("organization_id", organizationId as any);
+        .eq("organization_id", organizationId);
 
       if (clientOrganizationId) {
-        query = query.eq("client_organization_id", clientOrganizationId as any);
+        query = query.eq("client_organization_id", clientOrganizationId);
       }
 
       const { data, error } = await query.order("created_at", { ascending: false });
@@ -134,8 +135,8 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       const { data, error } = await supabase
         .from('documents')
         .select('id, status, document_type')
-        .eq('owner_id', patientId as any)
-        .eq('organization_id', organizationId as any);
+        .eq('owner_id', patientId)
+        .eq('organization_id', organizationId);
 
       if (error) {
         console.error('Error checking documents:', error);

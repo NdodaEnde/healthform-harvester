@@ -61,8 +61,13 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
 
       if (error) throw error;
 
+      if (!organizationUsers) {
+        setUsers([]);
+        return;
+      }
+
       // Get emails from profiles table
-      const userIds = organizationUsers?.map(ou => ou.user_id) || [];
+      const userIds = organizationUsers.map(ou => ou.user_id);
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, email")
@@ -71,13 +76,13 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       if (profilesError) throw profilesError;
 
       // Combine organization users with profiles
-      const usersWithEmail = organizationUsers?.map(orgUser => {
+      const usersWithEmail = organizationUsers.map(orgUser => {
         const profile = profiles?.find(p => p.id === orgUser.user_id);
         return {
           ...orgUser,
           email: profile?.email || "Unknown Email"
         };
-      }) || [];
+      });
 
       setUsers(usersWithEmail);
     } catch (error: any) {
