@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('organization_id', organizationId as any)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -40,7 +41,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       if (data && Array.isArray(data)) {
         // Safe type conversion with proper validation
         const typedInvitations: Invitation[] = data
-          .filter(item => {
+          .filter((item): item is NonNullable<typeof item> => {
             return item !== null && 
                    typeof item === 'object' &&
                    'id' in item && item.id &&
@@ -84,7 +85,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { error } = await supabase
         .from('invitations')
         .delete()
-        .eq('id', invitationId as any);
+        .eq('id', invitationId);
 
       if (error) throw error;
 

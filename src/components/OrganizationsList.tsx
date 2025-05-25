@@ -47,7 +47,7 @@ const OrganizationsList = () => {
 
       // Safe type conversion with proper validation
       const typedOrganizations: Organization[] = data
-        .filter(item => {
+        .filter((item): item is NonNullable<typeof item> => {
           return item !== null && 
                  typeof item === 'object' &&
                  'id' in item && item.id &&
