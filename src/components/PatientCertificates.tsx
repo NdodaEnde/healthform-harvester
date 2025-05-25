@@ -105,7 +105,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         });
       }
 
-      // Fetch documents with proper typing
+      // Fetch documents with proper typing - using exact string values for the filter
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('id, file_name, file_path, status, document_type, processed_at, created_at, extracted_data')
