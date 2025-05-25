@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar, Clock } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar, Clock, Upload } from 'lucide-react';
 import { format, differenceInDays, isFuture, parseISO, isValid, parse, differenceInYears } from 'date-fns';
 import { PatientInfo, CertificateData } from '@/types/patient';
 import { formatSafeDateEnhanced, calculateAgeEnhanced, getEffectiveGenderEnhanced } from '@/utils/date-utils';
@@ -14,6 +15,7 @@ import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
 import PatientCertificates, { getExaminationDate } from '@/components/PatientCertificates';
 import PatientVisits from '@/components/PatientVisits';
 import PatientSAIDInfo from '@/components/PatientSAIDInfo';
+import DocumentUploader from '@/components/DocumentUploader';
 import { Separator } from '@/components/ui/separator';
 
 
@@ -24,6 +26,7 @@ const PatientDetailPage = () => {
   const { getEffectiveOrganizationId } = useOrganization();
   const queryClient = useQueryClient();
   const organizationId = getEffectiveOrganizationId();
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const { data: patient, isLoading } = useQuery({
     queryKey: ['patient', id],
@@ -194,6 +197,12 @@ const PatientDetailPage = () => {
 
   const handleViewMedicalRecords = () => {
     navigate(`/patients/${id}/records`);
+  };
+
+  const handleUploadComplete = () => {
+    setUploadDialogOpen(false);
+    // Refresh the certificates data
+    queryClient.invalidateQueries({ queryKey: ['patient-certificates-data', id, organizationId] });
   };
 
   // Improved age calculation with fallbacks and better date validation
@@ -386,6 +395,24 @@ const PatientDetailPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Document
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Upload Document for {patient.first_name} {patient.last_name}</DialogTitle>
+              </DialogHeader>
+              <DocumentUploader 
+                onUploadComplete={handleUploadComplete}
+                organizationId={organizationId}
+                patientId={id}
+              />
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" onClick={handleViewMedicalRecords}>
             <FileText className="mr-2 h-4 w-4" />
             Medical Records
@@ -429,24 +456,17 @@ const PatientDetailPage = () => {
               </CardHeader>
               <CardContent>
                 <dl className="space-y-4">
-                  
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={handleBackToList}>
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h1 className="text-2xl font-bold tracking-tight">
-                      {patient.first_name} {patient.last_name}
-                    </h1>
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Full Name</dt>
+                    <dd className="text-base mt-1">{patient.first_name} {patient.last_name}</dd>
                   </div>
-                  <p className="text-muted-foreground">
-                    {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
-                    {' • '}
-                    {calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth) 
-                      ? `${calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth)} years old` 
-                      : 'Age not available'}
-                  </p>
-                </div>
+                  
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Date of Birth</dt>
+                    <dd className="text-base mt-1">
+                      {formatSafeDateEnhanced(patient.birthdate_from_id || patient.date_of_birth)}
+                    </dd>
+                  </div>
                   
                   <div>
                     <dt className="text-sm font-medium text-muted-foreground">Gender</dt>
