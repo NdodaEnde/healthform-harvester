@@ -5,70 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Loader2, X, FileText, Upload, CheckCircle, AlertCircle, Eye, Save, Archive } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import OrganizationCard from "./OrganizationCard";
-
-const DOCUMENT_TYPES = [
-  { label: "Certificate of Fitness", value: "certificate-fitness" },
-  { label: "Medical Questionnaire", value: "medical-questionnaire" },
-  { label: "Medical Report", value: "medical-report" },
-  { label: "Audiogram", value: "audiogram" },
-  { label: "Spirometry", value: "spirometry" },
-  { label: "X-Ray Report", value: "xray-report" },
-  { label: "Other", value: "other" }
-];
-
-const BATCH_LOCAL_STORAGE_KEY = "doc-batch-";
-// Batch size for concurrent uploads - smaller to avoid overloading the server
-const MAX_CONCURRENT_UPLOADS = 2;
-// Delay between batches to prevent rate limiting (in ms)
-const BATCH_DELAY = 1000;
-
-export interface BatchDocumentUploaderProps {
-  onUploadComplete?: (data?: any) => void;
-  organizationId?: string;
-  clientOrganizationId?: string;
-  patientId?: string;
-}
-
-type FileStatus = 'pending' | 'uploading' | 'processing' | 'complete' | 'error';
-type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
-
-interface QueuedFile {
-  file: File;
-  documentType: string;
-  status: FileStatus;
-  progress: number;
-  error?: string;
-  documentId?: string;
-  reviewStatus?: ReviewStatus;
-  reviewNote?: string;
-}
-
-interface SavedFile {
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  documentType: string;
-  status: FileStatus;
-  progress: number;
-  error?: string;
-  documentId?: string;
-  reviewStatus?: ReviewStatus;
-  reviewNote?: string;
-}
-
-interface SavedBatch {
-  timestamp: number;
-  files: SavedFile[];
-  defaultDocumentType: string;
-}
+import FileQueueTable from "./batch-upload/FileQueueTable";
+import { FileUploadService } from "./batch-upload/FileUploadService";
+import { BatchStorageService } from "./batch-upload/BatchStorageService";
+import { Loader2, Upload, Save, Archive } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { 
+  QueuedFile, 
+  FileStatus, 
+  ReviewStatus, 
+  BatchDocumentUploaderProps 
+} from "./batch-upload/types";
+import { 
+  DOCUMENT_TYPES, 
+  MAX_CONCURRENT_UPLOADS, 
+  BATCH_DELAY 
+} from "./batch-upload/constants";
 
 const BatchDocumentUploader = ({ 
   onUploadComplete,
@@ -85,18 +41,7 @@ const BatchDocumentUploader = ({
 
   useEffect(() => {
     if (!organizationId) return;
-    
-    const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
-    const savedBatchJson = localStorage.getItem(savedBatchKey);
-    
-    if (savedBatchJson) {
-      try {
-        setHasSavedBatch(true);
-      } catch (e) {
-        console.error("Error parsing saved batch", e);
-        localStorage.removeItem(savedBatchKey);
-      }
-    }
+    setHasSavedBatch(BatchStorageService.hasSavedBatch(organizationId, clientOrganizationId));
   }, [organizationId, clientOrganizationId]);
 
   const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,96 +119,6 @@ const BatchDocumentUploader = ({
     );
   };
 
-  const uploadFile = async (fileItem: QueuedFile, index: number) => {
-    updateFileStatus(index, 'uploading');
-    updateFileProgress(index, 10);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-      
-      const formData = new FormData();
-      formData.append('file', fileItem.file);
-      formData.append('documentType', fileItem.documentType);
-      formData.append('userId', user.id);
-
-       // Add this line to pass patientId to the edge function
-      if (patientId) formData.append('patientId', patientId);
-    
-    // Add these lines to pass organization context
-      if (organizationId) formData.append('organizationId', organizationId);
-      if (clientOrganizationId) formData.append('clientOrganizationId', clientOrganizationId);
-    
-      // Add debug logging
-      console.log("Uploading document with params:", {
-        documentType: fileItem.documentType,
-        patientId: patientId || "null",
-        organizationId: organizationId || "null",
-        clientOrganizationId: clientOrganizationId || "null"
-      });
-
-      // Create a simulated progress updater
-      const progressInterval = setInterval(() => {
-        updateFileProgress(index, Math.min(
-          (queuedFiles[index]?.progress || 0) + Math.random() * 5, 
-          60)
-        );
-      }, 500);
-
-      try {
-        const { data, error } = await supabase.functions.invoke('process-document', {
-          body: formData,
-        });
-
-        clearInterval(progressInterval);
-        
-        if (error) throw error;
-        
-        updateFileProgress(index, 80);
-        updateFileStatus(index, 'processing', data?.documentId);
-        
-        if (!data?.documentId) {
-          throw new Error("No document ID returned from processing function");
-        }
-        
-        // Update the document record with organization and patient context using proper typing
-        const updateData: Record<string, any> = {
-          organization_id: organizationId,
-          client_organization_id: clientOrganizationId || null
-        };
-        
-        // Link to patient if patientId is provided
-        if (patientId) {
-          updateData.owner_id = patientId;
-          console.log(`Linking document ${data.documentId} to patient ${patientId}`);
-        }
-        
-        const { error: updateError } = await supabase
-          .from('documents')
-          .update(updateData)
-          .eq('id', data.documentId);
-          
-        if (updateError) {
-          throw updateError;
-        }
-        
-        updateFileProgress(index, 100);
-        updateFileStatus(index, 'complete', data.documentId);
-        
-        return data;
-      } catch (error) {
-        clearInterval(progressInterval);
-        throw error;
-      }
-    } catch (error: any) {
-      console.error("Error uploading document:", error);
-      updateFileStatus(index, 'error', undefined, error.message || "Upload failed");
-      throw error;
-    }
-  };
-
   const processBatch = async () => {
     if (queuedFiles.length === 0) {
       toast({
@@ -299,21 +154,26 @@ const BatchDocumentUploader = ({
         description: `Uploading ${pendingFiles.length} document(s)`,
       });
       
-      // Process in smaller batches to prevent overwhelming the server
       let successCount = 0;
       let failCount = 0;
       const results = [];
       
-      // Process files in batches of MAX_CONCURRENT_UPLOADS
       for (let i = 0; i < pendingFiles.length; i += MAX_CONCURRENT_UPLOADS) {
         const batch = pendingFiles.slice(i, i + MAX_CONCURRENT_UPLOADS);
         
-        // Process this batch concurrently
         const batchPromises = batch.map(async (fileItem) => {
           const fileIndex = queuedFiles.findIndex(f => f === fileItem);
           if (fileIndex !== -1) {
             try {
-              const result = await uploadFile(fileItem, fileIndex);
+              const result = await FileUploadService.uploadFile(
+                fileItem, 
+                fileIndex, 
+                updateFileProgress, 
+                updateFileStatus,
+                patientId,
+                organizationId,
+                clientOrganizationId
+              );
               successCount++;
               return result;
             } catch (error) {
@@ -325,11 +185,9 @@ const BatchDocumentUploader = ({
           return null;
         });
         
-        // Wait for this batch to complete
         const batchResults = await Promise.all(batchPromises);
         results.push(...batchResults.filter(Boolean));
         
-        // Add a delay between batches to prevent rate limiting
         if (i + MAX_CONCURRENT_UPLOADS < pendingFiles.length) {
           console.log(`Waiting ${BATCH_DELAY}ms before processing next batch...`);
           await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
@@ -363,98 +221,21 @@ const BatchDocumentUploader = ({
   };
 
   const saveBatchProgress = () => {
-    if (!organizationId || queuedFiles.length === 0) return;
-    
-    try {
-      const savedFiles: SavedFile[] = queuedFiles.map(file => ({
-        fileName: file.file.name,
-        fileType: file.file.type,
-        fileSize: file.file.size,
-        documentType: file.documentType,
-        status: file.status,
-        progress: file.progress,
-        error: file.error,
-        documentId: file.documentId,
-        reviewStatus: file.reviewStatus || 'not-reviewed',
-        reviewNote: file.reviewNote
-      }));
-      
-      const batchToSave: SavedBatch = {
-        timestamp: Date.now(),
-        files: savedFiles,
-        defaultDocumentType
-      };
-      
-      const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
-      localStorage.setItem(savedBatchKey, JSON.stringify(batchToSave));
-      
-      toast({
-        title: "Batch progress saved",
-        description: `You can continue this batch later`,
-      });
-      
+    const success = BatchStorageService.saveBatch(
+      queuedFiles, 
+      defaultDocumentType, 
+      organizationId!, 
+      clientOrganizationId
+    );
+    if (success) {
       setHasSavedBatch(true);
-    } catch (error) {
-      console.error("Error saving batch progress:", error);
-      toast({
-        title: "Could not save progress",
-        description: "There was an error saving your batch progress",
-        variant: "destructive"
-      });
     }
   };
 
   const loadSavedBatch = () => {
-    if (!organizationId) return;
-    
-    try {
-      const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
-      const savedBatchJson = localStorage.getItem(savedBatchKey);
-      
-      if (!savedBatchJson) {
-        toast({
-          title: "No saved batch found",
-          description: "Could not find a previously saved batch",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const savedBatch: SavedBatch = JSON.parse(savedBatchJson);
-      setDefaultDocumentType(savedBatch.defaultDocumentType);
-      
-      const loadableFiles = savedBatch.files.filter(file => 
-        (file.status === 'complete' || file.status === 'processing') && file.documentId
-      );
-      
-      if (loadableFiles.length === 0) {
-        toast({
-          title: "No documents to restore",
-          description: "The saved batch does not contain any processed documents",
-          variant: "destructive"
-        });
-        localStorage.removeItem(savedBatchKey);
-        setHasSavedBatch(false);
-        return;
-      }
-      
-      const restoredFiles: QueuedFile[] = loadableFiles.map(file => ({
-        file: new File([], file.fileName, { type: file.fileType }),
-        documentType: file.documentType,
-        status: file.status,
-        progress: file.progress,
-        error: file.error,
-        documentId: file.documentId,
-        reviewStatus: file.reviewStatus,
-        reviewNote: file.reviewNote
-      }));
-      
+    const restoredFiles = BatchStorageService.loadBatch(organizationId!, clientOrganizationId);
+    if (restoredFiles) {
       setQueuedFiles(prev => [...prev, ...restoredFiles]);
-      
-      toast({
-        title: "Batch restored",
-        description: `Restored ${restoredFiles.length} document(s) from your saved batch`,
-      });
       
       // Verify document status after loading
       restoredFiles.forEach(async (file, index) => {
@@ -482,28 +263,12 @@ const BatchDocumentUploader = ({
           }
         }
       });
-      
-    } catch (error) {
-      console.error("Error loading saved batch:", error);
-      toast({
-        title: "Could not load saved batch",
-        description: "There was an error loading your saved batch",
-        variant: "destructive"
-      });
     }
   };
 
   const clearSavedBatch = () => {
-    if (!organizationId) return;
-    
-    const savedBatchKey = `${BATCH_LOCAL_STORAGE_KEY}${organizationId}${clientOrganizationId ? `-${clientOrganizationId}` : ''}`;
-    localStorage.removeItem(savedBatchKey);
+    BatchStorageService.clearBatch(organizationId!, clientOrganizationId);
     setHasSavedBatch(false);
-    
-    toast({
-      title: "Saved batch cleared",
-      description: "Your saved batch has been cleared"
-    });
   };
 
   const getOverallProgress = () => {
@@ -524,26 +289,6 @@ const BatchDocumentUploader = ({
   ).length;
   const reviewedCount = queuedFiles.filter(f => f.reviewStatus === 'reviewed').length;
   const needsCorrectionCount = queuedFiles.filter(f => f.reviewStatus === 'needs-correction').length;
-
-  const getStatusIcon = (status: FileStatus) => {
-    switch (status) {
-      case 'pending': return <FileText className="h-4 w-4 text-muted-foreground" />;
-      case 'uploading': return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'processing': return <Loader2 className="h-4 w-4 animate-spin text-amber-500" />;
-      case 'complete': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'error': return <AlertCircle className="h-4 w-4 text-red-500" />;
-    }
-  };
-  
-  const getReviewStatusBadge = (reviewStatus: ReviewStatus | undefined) => {
-    if (!reviewStatus || reviewStatus === 'not-reviewed') {
-      return <Badge variant="outline" className="text-xs">Not Reviewed</Badge>;
-    } else if (reviewStatus === 'reviewed') {
-      return <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600 text-white">Reviewed</Badge>;
-    } else if (reviewStatus === 'needs-correction') {
-      return <Badge variant="destructive" className="text-xs">Needs Correction</Badge>;
-    }
-  };
   
   const cardActions = (
     <>
@@ -679,158 +424,13 @@ const BatchDocumentUploader = ({
               </div>
             )}
             
-            <Card>
-              <CardHeader className="py-2 px-4">
-                <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground">
-                  <div className="col-span-5">Filename</div>
-                  <div className="col-span-2">Document Type</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-2">Review</div>
-                  <div className="col-span-1">Actions</div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[240px] w-full rounded-md border">
-                  <div className="p-2 space-y-2">
-                    {queuedFiles.map((queuedFile, index) => (
-                      <div 
-                        key={index}
-                        className="grid grid-cols-12 gap-2 p-2 text-sm items-center border-b last:border-b-0"
-                      >
-                        <div className="col-span-5 flex items-center gap-2 truncate">
-                          {getStatusIcon(queuedFile.status)}
-                          <span className="truncate" title={queuedFile.file.name}>
-                            {queuedFile.file.name}
-                          </span>
-                        </div>
-                        <div className="col-span-2">
-                          {queuedFile.status === 'pending' ? (
-                            <Select 
-                              value={queuedFile.documentType} 
-                              onValueChange={(value) => handleSetDocumentType(index, value)}
-                              disabled={uploading}
-                            >
-                              <SelectTrigger className="h-8">
-                                <SelectValue placeholder="Type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {DOCUMENT_TYPES.map(type => (
-                                  <SelectItem key={type.value} value={type.value}>
-                                    {type.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <span className="text-xs">
-                              {DOCUMENT_TYPES.find(t => t.value === queuedFile.documentType)?.label || queuedFile.documentType}
-                            </span>
-                          )}
-                        </div>
-                        <div className="col-span-2">
-                          {queuedFile.status === 'uploading' || queuedFile.status === 'processing' ? (
-                            <Progress value={queuedFile.progress} className="h-2" />
-                          ) : queuedFile.status === 'error' ? (
-                            <span className="text-xs text-red-500" title={queuedFile.error}>
-                              Failed
-                            </span>
-                          ) : queuedFile.status === 'complete' ? (
-                            <span className="text-xs text-green-500">
-                              Complete
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Pending
-                            </span>
-                          )}
-                        </div>
-                        <div className="col-span-2">
-                          {(queuedFile.status === 'complete' || queuedFile.documentId) && (
-                            <div className="flex gap-1 items-center">
-                              {getReviewStatusBadge(queuedFile.reviewStatus)}
-                              
-                              {queuedFile.documentId && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-6 w-6"
-                                        onClick={() => {
-                                          window.open(`/document/${queuedFile.documentId}`, '_blank');
-                                        }}
-                                      >
-                                        <Eye className="h-3 w-3" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>View document</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
-                              
-                              {queuedFile.documentId && (
-                                <div className="flex gap-1">
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => updateFileReviewStatus(index, 'reviewed')}
-                                        >
-                                          <CheckCircle className="h-3 w-3 text-green-500" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Mark as reviewed</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                  
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => updateFileReviewStatus(index, 'needs-correction')}
-                                        >
-                                          <AlertCircle className="h-3 w-3 text-red-500" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Needs correction</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="col-span-1 flex justify-end">
-                          {queuedFile.status === 'pending' && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleRemoveFile(index)}
-                              disabled={uploading}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+            <FileQueueTable 
+              queuedFiles={queuedFiles}
+              uploading={uploading}
+              onRemoveFile={handleRemoveFile}
+              onSetDocumentType={handleSetDocumentType}
+              onUpdateReviewStatus={updateFileReviewStatus}
+            />
             
             {(uploading || processing) && (
               <div className="space-y-2">
