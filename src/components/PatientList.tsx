@@ -45,10 +45,10 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       let query = supabase
         .from("patients")
         .select("*")
-        .eq("organization_id", organizationId);
+        .eq("organization_id", organizationId as any);
 
       if (clientOrganizationId) {
-        query = query.eq("client_organization_id", clientOrganizationId);
+        query = query.eq("client_organization_id", clientOrganizationId as any);
       }
 
       const { data, error } = await query.order("created_at", { ascending: false });
@@ -134,8 +134,8 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       const { data, error } = await supabase
         .from('documents')
         .select('id, status, document_type')
-        .eq('owner_id', patientId)
-        .eq('organization_id', organizationId);
+        .eq('owner_id', patientId as any)
+        .eq('organization_id', organizationId as any);
 
       if (error) {
         console.error('Error checking documents:', error);

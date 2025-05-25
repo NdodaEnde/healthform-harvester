@@ -32,7 +32,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId as any)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -84,7 +84,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { error } = await supabase
         .from('invitations')
         .delete()
-        .eq('id', invitationId);
+        .eq('id', invitationId as any);
 
       if (error) throw error;
 
