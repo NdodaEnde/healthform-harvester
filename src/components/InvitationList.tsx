@@ -38,25 +38,16 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
 
       if (error) throw error;
 
-      const typedInvitations = (data || [])
-        .filter((invitation): invitation is NonNullable<typeof invitation> => 
-          invitation !== null && 
-          typeof invitation === 'object' && 
-          'id' in invitation &&
-          'email' in invitation &&
-          'role' in invitation &&
-          'created_at' in invitation &&
-          'expires_at' in invitation &&
-          'token' in invitation
-        )
+      const typedInvitations: Invitation[] = (data || [])
+        .filter((invitation) => invitation !== null)
         .map(invitation => ({
-          id: String(invitation.id || ''),
-          email: String(invitation.email || ''),
-          role: String(invitation.role || ''),
-          created_at: String(invitation.created_at || ''),
-          expires_at: String(invitation.expires_at || ''),
-          accepted_at: invitation.accepted_at ? String(invitation.accepted_at) : null,
-          token: String(invitation.token || '')
+          id: invitation.id || '',
+          email: invitation.email || '',
+          role: invitation.role || '',
+          created_at: invitation.created_at || '',
+          expires_at: invitation.expires_at || '',
+          accepted_at: invitation.accepted_at || null,
+          token: invitation.token || ''
         }));
 
       setInvitations(typedInvitations);

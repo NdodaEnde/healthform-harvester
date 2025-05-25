@@ -47,25 +47,17 @@ const OrganizationsList = () => {
       }
 
       const typedOrganizations: Organization[] = data
-        .filter((org): org is NonNullable<typeof org> => 
-          org !== null && 
-          typeof org === 'object' && 
-          'id' in org &&
-          'name' in org &&
-          'organization_type' in org &&
-          'created_at' in org &&
-          'updated_at' in org
-        )
+        .filter((org) => org !== null)
         .map(org => ({
-          id: String(org.id || ''),
-          name: String(org.name || ''),
-          organization_type: String(org.organization_type || ''),
-          contact_email: org.contact_email ? String(org.contact_email) : null,
-          contact_phone: org.contact_phone ? String(org.contact_phone) : null,
+          id: org.id || '',
+          name: org.name || '',
+          organization_type: org.organization_type || '',
+          contact_email: org.contact_email || null,
+          contact_phone: org.contact_phone || null,
           address: org.address,
           settings: org.settings,
-          created_at: String(org.created_at || ''),
-          updated_at: String(org.updated_at || '')
+          created_at: org.created_at || '',
+          updated_at: org.updated_at || ''
         }));
 
       setOrganizations(typedOrganizations);
