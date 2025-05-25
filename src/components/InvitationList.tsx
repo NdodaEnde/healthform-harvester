@@ -34,7 +34,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { data, error } = await supabase
         .from("invitations")
         .select("*")
-        .eq("organization_id", organizationId as any)
+        .eq("organization_id", organizationId)
         .is("accepted_at", null)
         .order("created_at", { ascending: false });
 
@@ -91,7 +91,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { error } = await supabase
         .from("invitations")
         .delete()
-        .eq("id", id as any);
+        .eq("id", id);
 
       if (error) {
         throw error;
@@ -128,8 +128,8 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         .from("invitations")
         .update({
           expires_at: expires_at.toISOString()
-        } as any)
-        .eq("id", invitation.id as any);
+        })
+        .eq("id", invitation.id);
 
       if (error) {
         throw error;
@@ -139,7 +139,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("name")
-        .eq("id", organizationId as any)
+        .eq("id", organizationId)
         .single();
 
       if (orgError) {
@@ -158,7 +158,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         const { data, error: fetchError } = await supabase
           .from("invitations")
           .select("token")
-          .eq("id", invitation.id as any)
+          .eq("id", invitation.id)
           .single();
           
         if (fetchError) {
