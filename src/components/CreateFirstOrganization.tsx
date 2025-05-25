@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -58,13 +57,15 @@ const CreateFirstOrganization = () => {
           const orgUserData = data[0];
           if (orgUserData && 'organizations' in orgUserData && orgUserData.organizations) {
             const orgData = orgUserData.organizations as any;
-            setExistingOrg({
-              id: orgData.id,
-              name: orgData.name
-            });
-            
-            // Pre-fill the form with existing org name
-            setName(orgData.name);
+            if (orgData && orgData.id && orgData.name) {
+              setExistingOrg({
+                id: orgData.id,
+                name: orgData.name
+              });
+              
+              // Pre-fill the form with existing org name
+              setName(orgData.name);
+            }
           }
         }
       } catch (err) {

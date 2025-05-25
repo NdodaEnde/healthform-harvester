@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -43,11 +42,11 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       }
 
       const typedInvitations: Invitation[] = (data || []).map(invitation => ({
-        id: invitation.id,
-        email: invitation.email,
-        role: invitation.role,
-        created_at: invitation.created_at,
-        expires_at: invitation.expires_at,
+        id: invitation.id || '',
+        email: invitation.email || '',
+        role: invitation.role || '',
+        created_at: invitation.created_at || '',
+        expires_at: invitation.expires_at || '',
         accepted_at: invitation.accepted_at,
         token: invitation.token
       }));

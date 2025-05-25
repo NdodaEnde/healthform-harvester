@@ -43,11 +43,11 @@ const AccuracyMatrix = () => {
 
       // Safely process the data with proper type checking
       const typedDocuments: DocumentData[] = (data || []).map(doc => ({
-        id: doc.id,
+        id: doc.id || '',
         document_type: doc.document_type,
-        created_at: doc.created_at,
+        created_at: doc.created_at || '',
         extracted_data: doc.extracted_data,
-        status: doc.status
+        status: doc.status || ''
       }));
       setDocuments(typedDocuments);
       

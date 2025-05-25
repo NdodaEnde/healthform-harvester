@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,11 +52,11 @@ const CertificateValidator = () => {
       if (error) throw error;
 
       const typedDocuments: CertificateData[] = (data || []).map(doc => ({
-        id: doc.id,
-        file_name: doc.file_name,
+        id: doc.id || '',
+        file_name: doc.file_name || '',
         extracted_data: doc.extracted_data,
-        status: doc.status,
-        created_at: doc.created_at,
+        status: doc.status || '',
+        created_at: doc.created_at || '',
         owner_id: doc.owner_id
       }));
       setDocuments(typedDocuments);
@@ -79,9 +78,9 @@ const CertificateValidator = () => {
       if (error) throw error;
 
       const typedPatients: PatientInfo[] = (data || []).map(patient => ({
-        id: patient.id,
-        first_name: patient.first_name,
-        last_name: patient.last_name
+        id: patient.id || '',
+        first_name: patient.first_name || '',
+        last_name: patient.last_name || ''
       }));
       setPatients(typedPatients);
     } catch (error) {
