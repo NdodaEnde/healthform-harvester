@@ -33,32 +33,34 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('organization_id', organizationId as any)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data && Array.isArray(data)) {
-        const validInvitations = data.filter((item): item is NonNullable<typeof item> => {
-          return item !== null && 
-                 typeof item === 'object' &&
-                 typeof item.id === 'string' &&
-                 typeof item.email === 'string' &&
-                 typeof item.role === 'string' &&
-                 typeof item.created_at === 'string' &&
-                 typeof item.expires_at === 'string' &&
-                 typeof item.token === 'string';
-        });
-
-        const typedInvitations: Invitation[] = validInvitations.map(item => ({
-          id: item.id,
-          email: item.email,
-          role: item.role,
-          created_at: item.created_at,
-          expires_at: item.expires_at,
-          accepted_at: item.accepted_at ? String(item.accepted_at) : null,
-          token: item.token
-        }));
+        // Type-safe filtering and mapping
+        const typedInvitations: Invitation[] = data
+          .filter(item => {
+            // Ensure item is not null and has required properties
+            return item && 
+                   typeof item === 'object' &&
+                   item.id &&
+                   item.email &&
+                   item.role &&
+                   item.created_at &&
+                   item.expires_at &&
+                   item.token;
+          })
+          .map(item => ({
+            id: String(item.id),
+            email: String(item.email),
+            role: String(item.role),
+            created_at: String(item.created_at),
+            expires_at: String(item.expires_at),
+            accepted_at: item.accepted_at ? String(item.accepted_at) : null,
+            token: String(item.token)
+          }));
 
         setInvitations(typedInvitations);
       } else {
@@ -84,7 +86,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { error } = await supabase
         .from('invitations')
         .delete()
-        .eq('id', invitationId as any);
+        .eq('id', invitationId);
 
       if (error) throw error;
 
