@@ -52,13 +52,13 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
                    'token' in item && typeof item.token === 'string';
           })
           .map(item => ({
-            id: item.id as string,
-            email: item.email as string,
-            role: item.role as string,
-            created_at: item.created_at as string,
-            expires_at: item.expires_at as string,
+            id: item.id,
+            email: item.email,
+            role: item.role,
+            created_at: item.created_at,
+            expires_at: item.expires_at,
             accepted_at: item.accepted_at ? String(item.accepted_at) : null,
-            token: item.token as string
+            token: item.token
           }));
 
         setInvitations(typedInvitations);
