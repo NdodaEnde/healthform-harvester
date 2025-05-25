@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import OrganizationCard from "./OrganizationCard";
 import FileQueueTable from "./batch-upload/FileQueueTable";
@@ -237,7 +235,7 @@ const BatchDocumentUploader = ({
     if (restoredFiles) {
       setQueuedFiles(prev => [...prev, ...restoredFiles]);
       
-      // Verify document status after loading
+      // Verify document status after loading - fixed type casting
       restoredFiles.forEach(async (file, index) => {
         if (file.documentId) {
           const { data, error } = await supabase

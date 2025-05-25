@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase, safeQueryResult } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { CheckCircle, XCircle, AlertTriangle, FileText, User, Building, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
@@ -52,7 +51,14 @@ const CertificateValidator = () => {
 
       if (error) throw error;
 
-      const typedDocuments = (data || []).map(doc => safeQueryResult<CertificateData>(doc));
+      const typedDocuments = (data || []).map(doc => ({
+        id: doc.id,
+        file_name: doc.file_name,
+        extracted_data: doc.extracted_data,
+        status: doc.status,
+        created_at: doc.created_at,
+        owner_id: doc.owner_id
+      }));
       setDocuments(typedDocuments);
     } catch (error) {
       console.error('Error fetching certificate documents:', error);
@@ -71,7 +77,11 @@ const CertificateValidator = () => {
 
       if (error) throw error;
 
-      const typedPatients = (data || []).map(patient => safeQueryResult<PatientInfo>(patient));
+      const typedPatients = (data || []).map(patient => ({
+        id: patient.id,
+        first_name: patient.first_name,
+        last_name: patient.last_name
+      }));
       setPatients(typedPatients);
     } catch (error) {
       console.error('Error fetching patients:', error);
@@ -85,8 +95,8 @@ const CertificateValidator = () => {
       const validationStatus = isValid ? 'validated' : 'invalid';
       const note = validationNotes[documentId] || '';
       
-      // Update the document with validation information using proper typing
-      const updateData: Record<string, any> = {
+      // Update the document with validation information
+      const updateData = {
         extracted_data: {
           ...documents.find(d => d.id === documentId)?.extracted_data,
           validation_status: validationStatus,
