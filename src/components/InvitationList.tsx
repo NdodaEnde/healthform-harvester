@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -41,15 +42,17 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         throw error;
       }
 
-      const typedInvitations: Invitation[] = (data || []).map(invitation => ({
-        id: invitation.id || '',
-        email: invitation.email || '',
-        role: invitation.role || '',
-        created_at: invitation.created_at || '',
-        expires_at: invitation.expires_at || '',
-        accepted_at: invitation.accepted_at,
-        token: invitation.token
-      }));
+      const typedInvitations: Invitation[] = (data || [])
+        .filter((invitation): invitation is any => invitation && typeof invitation === 'object' && 'id' in invitation)
+        .map(invitation => ({
+          id: String(invitation.id || ''),
+          email: String(invitation.email || ''),
+          role: String(invitation.role || ''),
+          created_at: String(invitation.created_at || ''),
+          expires_at: String(invitation.expires_at || ''),
+          accepted_at: invitation.accepted_at,
+          token: invitation.token
+        }));
       setInvitations(typedInvitations);
     } catch (error: any) {
       console.error("Error fetching invitations:", error);

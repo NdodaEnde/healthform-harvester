@@ -42,13 +42,15 @@ const AccuracyMatrix = () => {
       }
 
       // Safely process the data with proper type checking
-      const typedDocuments: DocumentData[] = (data || []).map(doc => ({
-        id: doc.id || '',
-        document_type: doc.document_type,
-        created_at: doc.created_at || '',
-        extracted_data: doc.extracted_data,
-        status: doc.status || ''
-      }));
+      const typedDocuments: DocumentData[] = (data || [])
+        .filter((doc): doc is any => doc && typeof doc === 'object' && 'id' in doc)
+        .map(doc => ({
+          id: String(doc.id || ''),
+          document_type: doc.document_type,
+          created_at: String(doc.created_at || ''),
+          extracted_data: doc.extracted_data,
+          status: String(doc.status || '')
+        }));
       setDocuments(typedDocuments);
       
     } catch (error) {

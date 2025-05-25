@@ -51,14 +51,16 @@ const CertificateValidator = () => {
 
       if (error) throw error;
 
-      const typedDocuments: CertificateData[] = (data || []).map(doc => ({
-        id: doc.id || '',
-        file_name: doc.file_name || '',
-        extracted_data: doc.extracted_data,
-        status: doc.status || '',
-        created_at: doc.created_at || '',
-        owner_id: doc.owner_id
-      }));
+      const typedDocuments: CertificateData[] = (data || [])
+        .filter((doc): doc is any => doc && typeof doc === 'object' && 'id' in doc)
+        .map(doc => ({
+          id: String(doc.id || ''),
+          file_name: String(doc.file_name || ''),
+          extracted_data: doc.extracted_data,
+          status: String(doc.status || ''),
+          created_at: String(doc.created_at || ''),
+          owner_id: doc.owner_id
+        }));
       setDocuments(typedDocuments);
     } catch (error) {
       console.error('Error fetching certificate documents:', error);
@@ -77,11 +79,13 @@ const CertificateValidator = () => {
 
       if (error) throw error;
 
-      const typedPatients: PatientInfo[] = (data || []).map(patient => ({
-        id: patient.id || '',
-        first_name: patient.first_name || '',
-        last_name: patient.last_name || ''
-      }));
+      const typedPatients: PatientInfo[] = (data || [])
+        .filter((patient): patient is any => patient && typeof patient === 'object' && 'id' in patient)
+        .map(patient => ({
+          id: String(patient.id || ''),
+          first_name: String(patient.first_name || ''),
+          last_name: String(patient.last_name || '')
+        }));
       setPatients(typedPatients);
     } catch (error) {
       console.error('Error fetching patients:', error);
