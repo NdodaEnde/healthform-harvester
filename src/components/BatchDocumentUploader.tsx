@@ -245,7 +245,7 @@ const BatchDocumentUploader = ({
               .eq('id', file.documentId)
               .single();
               
-            if (!error && data) {
+            if (!error && data && 'status' in data) {
               const updatedStatus = data.status === 'completed' 
                 ? 'complete' as FileStatus 
                 : data.status === 'processing' 

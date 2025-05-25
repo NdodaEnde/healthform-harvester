@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase, safeQueryResult } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { AlertCircle, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -42,8 +41,14 @@ const AccuracyMatrix = () => {
         return;
       }
 
-      // Safely type the data
-      const typedDocuments = (data || []).map(doc => safeQueryResult<DocumentData>(doc));
+      // Safely process the data
+      const typedDocuments: DocumentData[] = (data || []).map(doc => ({
+        id: doc.id,
+        document_type: doc.document_type,
+        created_at: doc.created_at,
+        extracted_data: doc.extracted_data,
+        status: doc.status
+      }));
       setDocuments(typedDocuments);
       
     } catch (error) {

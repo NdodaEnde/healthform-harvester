@@ -53,16 +53,19 @@ const CreateFirstOrganization = () => {
           return;
         }
         
-        if (data && data.length > 0 && data[0].organizations) {
-          // User already has an organization
-          const orgData = data[0].organizations;
-          setExistingOrg({
-            id: orgData.id,
-            name: orgData.name
-          });
-          
-          // Pre-fill the form with existing org name
-          setName(orgData.name);
+        if (data && data.length > 0) {
+          // Check if organizations data exists and is not an error
+          const orgUserData = data[0];
+          if (orgUserData && 'organizations' in orgUserData && orgUserData.organizations) {
+            const orgData = orgUserData.organizations as any;
+            setExistingOrg({
+              id: orgData.id,
+              name: orgData.name
+            });
+            
+            // Pre-fill the form with existing org name
+            setName(orgData.name);
+          }
         }
       } catch (err) {
         console.error("Error checking organization:", err);
@@ -143,7 +146,7 @@ const CreateFirstOrganization = () => {
       }
       
       console.log("Organization created with ID:", orgId);
-      localStorage.setItem("currentOrganizationId", orgId);
+      localStorage.setItem("currentOrganizationId", String(orgId));
       
       toast.success("Organization created", {
         description: `${name} has been created successfully.`

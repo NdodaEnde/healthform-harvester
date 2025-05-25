@@ -51,7 +51,7 @@ const CertificateValidator = () => {
 
       if (error) throw error;
 
-      const typedDocuments = (data || []).map(doc => ({
+      const typedDocuments: CertificateData[] = (data || []).map(doc => ({
         id: doc.id,
         file_name: doc.file_name,
         extracted_data: doc.extracted_data,
@@ -77,7 +77,7 @@ const CertificateValidator = () => {
 
       if (error) throw error;
 
-      const typedPatients = (data || []).map(patient => ({
+      const typedPatients: PatientInfo[] = (data || []).map(patient => ({
         id: patient.id,
         first_name: patient.first_name,
         last_name: patient.last_name

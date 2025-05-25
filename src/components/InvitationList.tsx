@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,16 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         throw error;
       }
 
-      setInvitations(data || []);
+      const typedInvitations: Invitation[] = (data || []).map(invitation => ({
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role,
+        created_at: invitation.created_at,
+        expires_at: invitation.expires_at,
+        accepted_at: invitation.accepted_at,
+        token: invitation.token
+      }));
+      setInvitations(typedInvitations);
     } catch (error: any) {
       console.error("Error fetching invitations:", error);
       toast({
@@ -138,7 +146,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
           
         if (fetchError) {
           console.error("Error getting invitation token:", fetchError);
-        } else if (data && data.token) {
+        } else if (data && 'token' in data && data.token) {
           console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${data.token}`);
         }
       }
