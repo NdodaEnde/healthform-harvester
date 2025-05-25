@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -38,10 +37,10 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
 
       if (error) throw error;
 
-      if (data) {
+      if (data && Array.isArray(data)) {
         // Safe type conversion with proper validation
         const typedInvitations: Invitation[] = data
-          .filter((item): item is NonNullable<typeof item> => {
+          .filter((item: any): item is Record<string, any> => {
             return item !== null && 
                    typeof item === 'object' &&
                    'id' in item && typeof item.id === 'string' &&
@@ -51,14 +50,14 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
                    'expires_at' in item && typeof item.expires_at === 'string' &&
                    'token' in item && typeof item.token === 'string';
           })
-          .map(item => ({
-            id: item.id,
-            email: item.email,
-            role: item.role,
-            created_at: item.created_at,
-            expires_at: item.expires_at,
+          .map((item: Record<string, any>) => ({
+            id: item.id as string,
+            email: item.email as string,
+            role: item.role as string,
+            created_at: item.created_at as string,
+            expires_at: item.expires_at as string,
             accepted_at: item.accepted_at ? String(item.accepted_at) : null,
-            token: item.token
+            token: item.token as string
           }));
 
         setInvitations(typedInvitations);

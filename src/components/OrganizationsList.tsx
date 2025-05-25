@@ -47,7 +47,7 @@ const OrganizationsList = () => {
 
       // Safe type conversion with proper validation
       const typedOrganizations: Organization[] = data
-        .filter((item): item is NonNullable<typeof item> => {
+        .filter((item: any): item is Record<string, any> => {
           return item !== null && 
                  typeof item === 'object' &&
                  'id' in item && item.id &&
@@ -55,7 +55,7 @@ const OrganizationsList = () => {
                  'organization_type' in item && item.organization_type &&
                  'created_at' in item && item.created_at;
         })
-        .map(item => ({
+        .map((item: Record<string, any>) => ({
           id: String(item.id),
           name: String(item.name),
           organization_type: String(item.organization_type),
