@@ -1,524 +1,270 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line
-} from "recharts";
-import { useOrganization } from "@/contexts/OrganizationContext";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Json } from "@/integrations/supabase/types";
-import { format, subMonths, parse } from "date-fns";
 
-interface AccuracyData {
-  documentType: string;
-  totalDocuments: number;
-  editedDocuments: number;
-  totalFields: number;
-  editedFields: number;
-  accuracyRate: number;
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { supabase, safeQueryResult } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { AlertCircle, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface DocumentData {
+  id: string;
+  document_type: string | null;
+  created_at: string;
+  extracted_data: any;
+  status: string;
 }
 
-interface FrequentlyEditedField {
-  fieldName: string;
-  editCount: number;
-  percentage: number;
-}
+const AccuracyMatrix = () => {
+  const { currentOrganization } = useOrganization();
+  const [documents, setDocuments] = useState<DocumentData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-interface MonthlyAccuracy {
-  month: string;
-  accuracy: number;
-  documentCount: number;
-}
-
-interface AccuracyResult {
-  documentTypes: AccuracyData[];
-  frequentlyEditedFields: FrequentlyEditedField[];
-  monthlyTrends: MonthlyAccuracy[];
-}
-
-interface ExtractedData {
-  edit_tracking?: Record<string, any>;
-  [key: string]: any;
-}
-
-const COLORS = ['#4ade80', '#f87171', '#60a5fa', '#fbbf24'];
-// Metadata fields that should be excluded from accuracy tracking
-const METADATA_FIELDS = ['last_edited_at', 'edit_tracking', 'created_at', 'updated_at'];
-
-export const AccuracyMatrix = () => {
-  const { getEffectiveOrganizationId } = useOrganization();
-  const organizationId = getEffectiveOrganizationId();
-
-  const { data: accuracyData, isLoading } = useQuery<AccuracyResult>({
-    queryKey: ['document-accuracy', organizationId],
-    queryFn: async () => {
-      if (!organizationId) return {
-        documentTypes: [],
-        frequentlyEditedFields: [],
-        monthlyTrends: []
-      };
-
-      // Cast organizationId to any to resolve TypeScript error
-      const { data: documents, error } = await supabase
+  const fetchDocuments = async () => {
+    if (!currentOrganization?.id) return;
+    
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
         .from('documents')
-        .select('*')
-        .eq('organization_id', organizationId as any)
-        .order('created_at', { ascending: false });
+        .select('id, document_type, created_at, extracted_data, status')
+        .eq('organization_id', currentOrganization.id)
+        .not('status', 'eq', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) {
-        console.error('Error fetching accuracy data:', error);
-        return {
-          documentTypes: [],
-          frequentlyEditedFields: [],
-          monthlyTrends: []
-        };
-      }
-
-      const documentTypes: Record<string, AccuracyData> = {};
-      const fieldEditCounts: Record<string, number> = {};
-      const monthlyAccuracyData: Record<string, { total: number, edited: number, documents: number }> = {};
-      
-      const today = new Date();
-      for (let i = 0; i < 6; i++) {
-        const monthDate = subMonths(today, i);
-        const monthKey = format(monthDate, 'MMM yyyy');
-        monthlyAccuracyData[monthKey] = { total: 0, edited: 0, documents: 0 };
-      }
-      
-      documents?.forEach(doc => {
-        const docType = doc.document_type || 'unknown';
-        const docDate = new Date(doc.created_at);
-        const monthKey = format(docDate, 'MMM yyyy');
-        
-        if (monthlyAccuracyData[monthKey]) {
-          monthlyAccuracyData[monthKey].documents += 1;
-        }
-        
-        if (!documentTypes[docType]) {
-          documentTypes[docType] = {
-            documentType: formatDocumentType(docType),
-            totalDocuments: 0,
-            editedDocuments: 0,
-            totalFields: 0,
-            editedFields: 0,
-            accuracyRate: 100
-          };
-        }
-
-        documentTypes[docType].totalDocuments++;
-        
-        const extractedData = doc.extracted_data as ExtractedData;
-        
-        if (extractedData && typeof extractedData === 'object' && extractedData.edit_tracking) {
-          const editTracking = extractedData.edit_tracking;
-          
-          const totalFieldCount = countTotalFields(extractedData);
-          const editedFieldCount = Object.keys(editTracking).length;
-          
-          documentTypes[docType].totalFields += totalFieldCount;
-          documentTypes[docType].editedFields += editedFieldCount;
-          
-          if (editedFieldCount > 0) {
-            documentTypes[docType].editedDocuments++;
-          }
-          
-          Object.keys(editTracking).forEach(fieldPath => {
-            const normalizedField = fieldPath.split('.').pop() || fieldPath;
-            // Skip metadata fields
-            if (!METADATA_FIELDS.includes(normalizedField)) {
-              fieldEditCounts[normalizedField] = (fieldEditCounts[normalizedField] || 0) + 1;
-            }
-          });
-          
-          if (monthlyAccuracyData[monthKey]) {
-            monthlyAccuracyData[monthKey].total += totalFieldCount;
-            monthlyAccuracyData[monthKey].edited += editedFieldCount;
-          }
-        } else {
-          const totalFieldCount = countTotalFields(extractedData);
-          documentTypes[docType].totalFields += totalFieldCount;
-          
-          if (monthlyAccuracyData[monthKey]) {
-            monthlyAccuracyData[monthKey].total += totalFieldCount;
-          }
-        }
-      });
-      
-      Object.keys(documentTypes).forEach(docType => {
-        const data = documentTypes[docType];
-        
-        if (data.totalFields > 0) {
-          data.accuracyRate = parseFloat(
-            (((data.totalFields - data.editedFields) / data.totalFields) * 100).toFixed(2)
-          );
-        }
-      });
-      
-      const frequentlyEditedFields = Object.entries(fieldEditCounts)
-        .map(([fieldName, editCount]) => ({
-          fieldName: formatFieldName(fieldName),
-          editCount,
-          percentage: parseFloat(((editCount / Object.values(fieldEditCounts).reduce((a, b) => a + b, 0)) * 100).toFixed(1))
-        }))
-        .sort((a, b) => b.editCount - a.editCount)
-        .slice(0, 5);
-      
-      const monthlyTrends = Object.entries(monthlyAccuracyData)
-        .map(([month, data]) => ({
-          month,
-          accuracy: data.total > 0 
-            ? parseFloat((((data.total - data.edited) / data.total) * 100).toFixed(1)) 
-            : 100,
-          documentCount: data.documents
-        }))
-        .sort((a, b) => {
-          const dateA = parse(a.month, 'MMM yyyy', new Date());
-          const dateB = parse(b.month, 'MMM yyyy', new Date());
-          return dateA.getTime() - dateB.getTime();
-        });
-      
-      return {
-        documentTypes: Object.values(documentTypes),
-        frequentlyEditedFields,
-        monthlyTrends,
-      };
-    },
-    enabled: !!organizationId
-  });
-
-  const formatFieldName = (fieldName: string): string => {
-    if (fieldName.includes(' ')) return fieldName;
-    
-    return fieldName
-      .replace(/_/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  const countTotalFields = (extractedData: any): number => {
-    if (!extractedData) return 0;
-    
-    let count = 0;
-    const countObjectFields = (obj: any) => {
-      if (!obj || typeof obj !== 'object') return;
-      
-      if (Array.isArray(obj)) {
-        obj.forEach(item => countObjectFields(item));
+        console.error('Error fetching documents:', error);
+        toast.error('Failed to fetch documents for accuracy analysis');
         return;
       }
+
+      // Safely type the data
+      const typedDocuments = (data || []).map(doc => safeQueryResult<DocumentData>(doc));
+      setDocuments(typedDocuments);
       
-      Object.keys(obj).forEach(key => {
-        // Skip metadata fields when counting
-        if (!METADATA_FIELDS.includes(key)) {
-          if (typeof obj[key] === 'object' && obj[key] !== null) {
-            countObjectFields(obj[key]);
-          } else {
-            count++;
-          }
-        }
-      });
-    };
-    
-    countObjectFields(extractedData);
-    return count;
-  };
-
-  const formatDocumentType = (type: string): string => {
-    if (!type) return 'Unknown';
-    
-    return type
-      .replace(/-/g, ' ')
-      .replace(/_/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  const calculateOverallAccuracy = (): number => {
-    if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) return 100;
-    
-    const totalFields = accuracyData.documentTypes.reduce((sum, item) => sum + item.totalFields, 0);
-    const totalEdited = accuracyData.documentTypes.reduce((sum, item) => sum + item.editedFields, 0);
-    
-    if (totalFields === 0) return 100;
-    return parseFloat((((totalFields - totalEdited) / totalFields) * 100).toFixed(2));
-  };
-
-  const prepareOverallData = () => {
-    if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) {
-      return [
-        { name: 'Accurate', value: 100 },
-        { name: 'Edited', value: 0 }
-      ];
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
-    
-    const overallAccuracy = calculateOverallAccuracy();
-    
-    return [
-      { name: 'Accurate', value: overallAccuracy },
-      { name: 'Edited', value: 100 - overallAccuracy }
-    ];
   };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchDocuments();
+    setRefreshing(false);
+    toast.success('Accuracy matrix refreshed');
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [currentOrganization?.id]);
+
+  const getAccuracyStats = () => {
+    if (documents.length === 0) return { total: 0, processed: 0, failed: 0, accuracy: 0 };
+    
+    const processed = documents.filter(doc => doc.status === 'processed').length;
+    const failed = documents.filter(doc => doc.status === 'failed').length;
+    const total = documents.length;
+    const accuracy = total > 0 ? Math.round((processed / total) * 100) : 0;
+    
+    return { total, processed, failed, accuracy };
+  };
+
+  const getDocumentTypeStats = () => {
+    const typeStats: Record<string, { total: number; processed: number; failed: number }> = {};
+    
+    documents.forEach(doc => {
+      const type = doc.document_type || 'unknown';
+      if (!typeStats[type]) {
+        typeStats[type] = { total: 0, processed: 0, failed: 0 };
+      }
+      
+      typeStats[type].total++;
+      if (doc.status === 'processed') {
+        typeStats[type].processed++;
+      } else if (doc.status === 'failed') {
+        typeStats[type].failed++;
+      }
+    });
+    
+    return typeStats;
+  };
+
+  const getDataQualityStats = () => {
+    const processedDocs = documents.filter(doc => doc.status === 'processed');
+    if (processedDocs.length === 0) return { withStructuredData: 0, withRawOnly: 0, withoutData: 0 };
+    
+    let withStructuredData = 0;
+    let withRawOnly = 0;
+    let withoutData = 0;
+    
+    processedDocs.forEach(doc => {
+      const extractedData = doc.extracted_data;
+      
+      if (extractedData?.structured_data && Object.keys(extractedData.structured_data).length > 0) {
+        withStructuredData++;
+      } else if (extractedData?.raw_content && extractedData.raw_content.length > 0) {
+        withRawOnly++;
+      } else {
+        withoutData++;
+      }
+    });
+    
+    return { withStructuredData, withRawOnly, withoutData };
+  };
+
+  const stats = getAccuracyStats();
+  const typeStats = getDocumentTypeStats();
+  const qualityStats = getDataQualityStats();
+
+  const getRecentTrend = () => {
+    const last7Days = documents.filter(doc => {
+      const docDate = new Date(doc.created_at);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return docDate >= weekAgo;
+    });
+    
+    const recentProcessed = last7Days.filter(doc => doc.status === 'processed').length;
+    const recentTotal = last7Days.length;
+    
+    return recentTotal > 0 ? Math.round((recentProcessed / recentTotal) * 100) : 0;
+  };
+
+  const recentTrend = getRecentTrend();
 
   if (isLoading) {
     return (
-      <Card className="col-span-1">
+      <Card>
         <CardHeader>
-          <CardTitle>Processing Accuracy</CardTitle>
-          <CardDescription>Document extraction accuracy metrics</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Processing Accuracy Matrix
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[250px] w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!accuracyData || !accuracyData.documentTypes || accuracyData.documentTypes.length === 0) {
-    return (
-      <Card className="col-span-1">
-        <CardHeader>
-          <CardTitle>Processing Accuracy</CardTitle>
-          <CardDescription>Document extraction accuracy metrics</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center h-[250px]">
-          <p className="text-muted-foreground text-center">
-            No accuracy data available yet. Edit document data to start tracking accuracy.
-          </p>
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="col-span-1">
-      <CardHeader>
-        <CardTitle>Processing Accuracy</CardTitle>
-        <CardDescription>Document extraction accuracy metrics</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="h-[250px]">
-            <h3 className="text-sm font-medium mb-2 text-center">Overall Accuracy</h3>
-            <ResponsiveContainer width="100%" height="90%">
-              <PieChart>
-                <Pie
-                  data={prepareOverallData()}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {prepareOverallData().map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#ef4444'} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="h-[250px]">
-            <h3 className="text-sm font-medium mb-2 text-center">Accuracy by Document Type</h3>
-            <ResponsiveContainer width="100%" height="90%">
-              <BarChart
-                data={accuracyData?.documentTypes}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="documentType" />
-                <YAxis domain={[0, 100]} />
-                <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
-                <Bar dataKey="accuracyRate" fill="#8884d8" name="Accuracy">
-                  {accuracyData?.documentTypes.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        
-        <div className="mt-6">
-          <h3 className="text-sm font-medium mb-2">Most Frequently Edited Fields</h3>
-          {accuracyData?.frequentlyEditedFields && accuracyData.frequentlyEditedFields.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Field Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Edit Count
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      % of All Field Edits
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Visualization
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {accuracyData.frequentlyEditedFields.map((field, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {field.fieldName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {field.editCount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {field.percentage}% of all edits
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                          <div 
-                            className="h-2.5 rounded-full bg-blue-500"
-                            style={{ width: `${field.percentage}%` }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            Processing Accuracy Matrix
+          </CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-blue-600">{stats.total}</div>
+              <div className="text-sm text-muted-foreground">Total Documents</div>
             </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-2">
-              No field edit data available yet.
-            </p>
-          )}
-        </div>
-        
-        <div className="mt-6">
-          <h3 className="text-sm font-medium mb-2">Accuracy Trends Over Time</h3>
-          {accuracyData?.monthlyTrends && accuracyData.monthlyTrends.length > 0 ? (
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={accuracyData.monthlyTrends}
-                  margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip formatter={(value, name) => {
-                    if (name === 'accuracy') return [`${value}%`, 'Accuracy'];
-                    if (name === 'documentCount') return [value, 'Documents'];
-                    return [value, name];
-                  }} />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="accuracy" 
-                    stroke="#10b981" 
-                    activeDot={{ r: 8 }} 
-                    name="Accuracy (%)"
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="documentCount" 
-                    stroke="#6366f1" 
-                    name="Document Count" 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-600">{stats.processed}</div>
+              <div className="text-sm text-muted-foreground">Successfully Processed</div>
             </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-2">
-              No trend data available yet. More document history is needed.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4">
-          <h3 className="text-sm font-medium mb-2">Document Type Statistics</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Document Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Accuracy
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Documents
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Edited
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {accuracyData?.documentTypes.map((item, index) => (
-                  <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.documentType}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <div className="w-24 bg-gray-200 rounded-full h-2.5">
-                          <div 
-                            className={`h-2.5 rounded-full ${
-                              item.accuracyRate >= 90 ? 'bg-green-500' : 
-                              item.accuracyRate >= 70 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${item.accuracyRate}%` }}
-                          />
-                        </div>
-                        <span className="ml-2">{item.accuracyRate}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.totalDocuments}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.editedDocuments} ({(item.editedDocuments / item.totalDocuments * 100).toFixed(1)}%)
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-600">{stats.failed}</div>
+              <div className="text-sm text-muted-foreground">Failed Processing</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-600">{stats.accuracy}%</div>
+              <div className="text-sm text-muted-foreground">Overall Accuracy</div>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm text-muted-foreground">7-day trend:</span>
+            <Badge variant={recentTrend >= stats.accuracy ? "default" : "destructive"}>
+              {recentTrend}% accuracy
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Document Type Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Accuracy by Document Type</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {Object.entries(typeStats).map(([type, stat]) => {
+              const accuracy = stat.total > 0 ? Math.round((stat.processed / stat.total) * 100) : 0;
+              return (
+                <div key={type} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="font-medium capitalize">{type.replace(/-/g, ' ')}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {stat.processed}/{stat.total} processed
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={accuracy >= 80 ? "default" : accuracy >= 60 ? "secondary" : "destructive"}
+                  >
+                    {accuracy}%
+                  </Badge>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Quality */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Data Extraction Quality</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 border rounded-lg">
+              <div className="flex items-center justify-center mb-2">
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              </div>
+              <div className="text-2xl font-bold">{qualityStats.withStructuredData}</div>
+              <div className="text-sm text-muted-foreground">With Structured Data</div>
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="flex items-center justify-center mb-2">
+                <AlertCircle className="h-8 w-8 text-yellow-500" />
+              </div>
+              <div className="text-2xl font-bold">{qualityStats.withRawOnly}</div>
+              <div className="text-sm text-muted-foreground">Raw Text Only</div>
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="flex items-center justify-center mb-2">
+                <XCircle className="h-8 w-8 text-red-500" />
+              </div>
+              <div className="text-2xl font-bold">{qualityStats.withoutData}</div>
+              <div className="text-sm text-muted-foreground">No Data Extracted</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
+
+export default AccuracyMatrix;

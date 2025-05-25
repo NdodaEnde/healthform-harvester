@@ -204,7 +204,6 @@ const BatchDocumentUploader = ({
         clientOrganizationId: clientOrganizationId || "null"
       });
 
-
       // Create a simulated progress updater
       const progressInterval = setInterval(() => {
         updateFileProgress(index, Math.min(
@@ -229,13 +228,21 @@ const BatchDocumentUploader = ({
           throw new Error("No document ID returned from processing function");
         }
         
+        // Update the document record with organization and patient context using proper typing
+        const updateData: Record<string, any> = {
+          organization_id: organizationId,
+          client_organization_id: clientOrganizationId || null
+        };
+        
+        // Link to patient if patientId is provided
+        if (patientId) {
+          updateData.owner_id = patientId;
+          console.log(`Linking document ${data.documentId} to patient ${patientId}`);
+        }
+        
         const { error: updateError } = await supabase
           .from('documents')
-          .update({
-            organization_id: organizationId,
-            client_organization_id: clientOrganizationId || null,
-            owner_id: patientId || null 
-          })
+          .update(updateData)
           .eq('id', data.documentId);
           
         if (updateError) {
@@ -449,11 +456,12 @@ const BatchDocumentUploader = ({
         description: `Restored ${restoredFiles.length} document(s) from your saved batch`,
       });
       
+      // Verify document status after loading
       restoredFiles.forEach(async (file, index) => {
         if (file.documentId) {
           const { data, error } = await supabase
             .from('documents')
-            .select('*')
+            .select('status')
             .eq('id', file.documentId)
             .single();
             
