@@ -38,7 +38,6 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
 
       if (error) throw error;
 
-      // Filter out null entries and ensure type safety
       const typedInvitations = (data || [])
         .filter((invitation): invitation is NonNullable<typeof invitation> => 
           invitation !== null && 
