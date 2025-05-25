@@ -33,27 +33,41 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId as any)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const typedInvitations: Invitation[] = (data || [])
-        .filter((invitation) => invitation !== null)
-        .map(invitation => ({
-          id: invitation.id || '',
-          email: invitation.email || '',
-          role: invitation.role || '',
-          created_at: invitation.created_at || '',
-          expires_at: invitation.expires_at || '',
-          accepted_at: invitation.accepted_at || null,
-          token: invitation.token || ''
-        }));
+      if (data && Array.isArray(data)) {
+        const typedInvitations: Invitation[] = data
+          .filter((invitation): invitation is NonNullable<typeof invitation> => 
+            invitation !== null && 
+            typeof invitation === 'object' &&
+            'id' in invitation &&
+            'email' in invitation &&
+            'role' in invitation &&
+            'created_at' in invitation &&
+            'expires_at' in invitation &&
+            'token' in invitation
+          )
+          .map(invitation => ({
+            id: String(invitation.id || ''),
+            email: String(invitation.email || ''),
+            role: String(invitation.role || ''),
+            created_at: String(invitation.created_at || ''),
+            expires_at: String(invitation.expires_at || ''),
+            accepted_at: invitation.accepted_at ? String(invitation.accepted_at) : null,
+            token: String(invitation.token || '')
+          }));
 
-      setInvitations(typedInvitations);
+        setInvitations(typedInvitations);
+      } else {
+        setInvitations([]);
+      }
     } catch (error) {
       console.error('Error fetching invitations:', error);
       toast.error('Failed to load invitations');
+      setInvitations([]);
     } finally {
       setLoading(false);
     }
@@ -70,7 +84,7 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       const { error } = await supabase
         .from('invitations')
         .delete()
-        .eq('id', invitationId);
+        .eq('id', invitationId as any);
 
       if (error) throw error;
 
