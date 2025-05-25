@@ -44,15 +44,20 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
 
       const typedInvitations: Invitation[] = (data || [])
         .filter((invitation): invitation is any => invitation && typeof invitation === 'object' && 'id' in invitation && invitation !== null)
-        .map(invitation => ({
-          id: String(invitation.id || ''),
-          email: String(invitation.email || ''),
-          role: String(invitation.role || ''),
-          created_at: String(invitation.created_at || ''),
-          expires_at: String(invitation.expires_at || ''),
-          accepted_at: invitation.accepted_at,
-          token: invitation.token
-        }));
+        .map(invitation => {
+          if (!invitation || typeof invitation !== 'object') return null;
+          return {
+            id: String(invitation.id || ''),
+            email: String(invitation.email || ''),
+            role: String(invitation.role || ''),
+            created_at: String(invitation.created_at || ''),
+            expires_at: String(invitation.expires_at || ''),
+            accepted_at: invitation.accepted_at,
+            token: invitation.token
+          };
+        })
+        .filter((inv): inv is Invitation => inv !== null);
+      
       setInvitations(typedInvitations);
     } catch (error: any) {
       console.error("Error fetching invitations:", error);

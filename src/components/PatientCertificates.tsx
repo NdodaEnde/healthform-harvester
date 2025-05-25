@@ -64,6 +64,13 @@ interface Document {
   [key: string]: any;
 }
 
+interface PatientData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  [key: string]: any;
+}
+
 type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
 
 // Function to determine the fitness status color
@@ -123,15 +130,29 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
   // Query to fetch patient details to assist with matching
   const { data: patient } = useQuery({
     queryKey: ['patient-details', patientId],
-    queryFn: async () => {
+    queryFn: async (): Promise<PatientData | null> => {
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('id', patientId)
+        .eq('id', patientId as any)
         .single();
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error fetching patient:', error);
+        return null;
+      }
+      
+      if (!data || typeof data !== 'object') {
+        console.error('Invalid patient data received');
+        return null;
+      }
+      
+      return {
+        id: String(data.id || ''),
+        first_name: String(data.first_name || ''),
+        last_name: String(data.last_name || ''),
+        ...data
+      };
     },
     enabled: !!patientId,
   });
@@ -147,9 +168,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId)
-        .eq('status', 'processed')
-        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'])
+        .eq('organization_id', organizationId as any)
+        .eq('status', 'processed' as any)
+        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'] as any)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -157,10 +178,17 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         throw error;
       }
       
+      if (!data || !Array.isArray(data)) {
+        console.error('Invalid documents data received');
+        return [];
+      }
+      
       console.log('Raw processed documents fetched:', data?.length);
       
       // Enhanced multi-strategy matching without validation filter
-      const filteredDocs = (data || []).filter(doc => {
+      const filteredDocs = data.filter(doc => {
+        if (!doc || typeof doc !== 'object') return false;
+        
         const extractedData = doc.extracted_data as ExtractedData | null;
         
         // Strategy 1: Direct patient ID match in patient_info
@@ -182,14 +210,14 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         }
         
         // Strategy 3: Patient name in filename (simplified)
-        const fileName = doc.file_name.toLowerCase();
+        const fileName = String(doc.file_name || '').toLowerCase();
         
-        if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
+        if (patient?.first_name && fileName.includes(String(patient.first_name).toLowerCase())) {
           console.log('Match by first name in filename:', doc.id);
           return true;
         }
         
-        if (patient?.last_name && fileName.includes(patient.last_name.toLowerCase())) {
+        if (patient?.last_name && fileName.includes(String(patient.last_name).toLowerCase())) {
           console.log('Match by last name in filename:', doc.id);
           return true;
         }
@@ -206,6 +234,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       
       // Add review status from localStorage to each document
       const docsWithReviewStatus = filteredDocs.map(doc => {
+        if (!doc || typeof doc !== 'object') return null;
+        
         // Add calculated examination date if missing but has valid_until
         const extractedData = doc.extracted_data as ExtractedData | null;
         if (extractedData?.structured_data?.certification?.valid_until && 
@@ -219,13 +249,20 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
         }
         
         return {
-          ...doc,
-          reviewStatus: getDocumentReviewStatus(doc.id)
+          id: String(doc.id || ''),
+          file_name: String(doc.file_name || ''),
+          file_path: String(doc.file_path || ''),
+          status: String(doc.status || ''),
+          document_type: doc.document_type ? String(doc.document_type) : null,
+          processed_at: doc.processed_at ? String(doc.processed_at) : null,
+          created_at: String(doc.created_at || ''),
+          extracted_data: extractedData,
+          reviewStatus: getDocumentReviewStatus(String(doc.id || ''))
         };
-      });
+      }).filter((doc): doc is Document & { reviewStatus: ReviewStatus } => doc !== null);
       
       console.log('Certificates after filtering:', docsWithReviewStatus.length);
-      return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
+      return docsWithReviewStatus;
     },
     enabled: !!patientId && !!organizationId && !!patient,
   });
@@ -282,9 +319,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
                           </Badge>
                         )}
                         
-                        {cert.reviewStatus === 'reviewed' ? (
-                          <Badge variant="success">Reviewed</Badge>
-                        ) : cert.reviewStatus === 'needs-correction' ? (
+                        {'reviewStatus' in cert && cert.reviewStatus === 'reviewed' ? (
+                          <Badge variant="default">Reviewed</Badge>
+                        ) : 'reviewStatus' in cert && cert.reviewStatus === 'needs-correction' ? (
                           <Badge variant="destructive">Needs Correction</Badge>
                         ) : (
                           <Badge variant="outline">Not Reviewed</Badge>
