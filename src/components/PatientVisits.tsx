@@ -1,435 +1,255 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
-import { FileText, Calendar, Plus, Info, AlertTriangle, CheckCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, FileText, Plus, User, Building2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
-interface PatientVisitsProps {
-  patientId: string;
-  organizationId: string;
-  showOnlyValidated?: boolean;
-}
-
-// Define a type for the extracted data structure
-interface ExtractedData {
-  structured_data?: {
-    validated?: boolean;
-    certification?: {
-      examination_date?: string;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  };
-  patient_info?: {
-    id?: string;
-    [key: string]: any;
-  };
-  raw_content?: string;
-  [key: string]: any;
+interface Visit {
+  id: string;
+  patient_id: string;
+  visit_date: string;
+  visit_type: string;
+  notes: string;
+  created_at: string;
 }
 
 interface Document {
   id: string;
   file_name: string;
-  file_path: string;
-  status: string;
-  document_type: string | null;
-  processed_at: string | null;
+  document_type: string;
   created_at: string;
-  extracted_data: ExtractedData | null;
-  public_url?: string | null;
-  [key: string]: any;
+  status: string;
 }
 
-type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
 
-// Helper function to get document review status from localStorage
-const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
-  return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
-};
+interface PatientVisitsProps {
+  patientId: string;
+  organizationId: string;
+}
 
-// Group documents by date to represent visits
-const groupDocumentsByDate = (documents: Document[]) => {
-  const visits = documents.reduce((acc: any, doc: Document) => {
-    // Try to get examination date from certificate first
-    let visitDate = null;
-    
-    if (doc.extracted_data?.structured_data?.certification?.examination_date) {
-      visitDate = doc.extracted_data.structured_data.certification.examination_date;
-    } else {
-      // Fall back to processed or created date
-      visitDate = doc.processed_at || doc.created_at;
-    }
-    
-    const dateKey = visitDate.split('T')[0]; // Get just the date part
+const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId }) => {
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    if (!acc[dateKey]) {
-      acc[dateKey] = {
-        date: dateKey,
-        documents: []
-      };
-    }
+  const fetchData = async () => {
+    try {
+      setLoading(true);
 
-    acc[dateKey].documents.push(doc);
-    return acc;
-  }, {});
-
-  // Convert to array and sort by date (newest first)
-  return Object.values(visits).sort((a: any, b: any) => 
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-};
-
-// Helper function to check if a document has structured data
-const hasStructuredData = (doc: Document): boolean => {
-  const structData = doc.extracted_data?.structured_data;
-  return !!structData && Object.keys(structData).length > 0;
-};
-
-// Helper function to check if document has raw content
-const hasRawContent = (doc: Document): boolean => {
-  return !!doc.extracted_data?.raw_content && doc.extracted_data.raw_content.length > 0;
-};
-
-// Helper function to check if a document is validated
-const isDocumentValidated = (doc: Document): boolean => {
-  return doc.extracted_data?.structured_data?.validated === true;
-};
-
-// Helper function to get the correct document URL
-const getDocumentUrl = (doc: Document): string | null => {
-  // Check for direct public_url first
-  if (doc.public_url) {
-    return doc.public_url;
-  }
-  
-  // If we have a file_path but no public_url, try to construct it
-  if (doc.file_path) {
-    // Try both buckets - medical-documents is the default
-    const bucketName = 'medical-documents';
-    const url = `https://wgkbsiczgyaqmgoyirjs.supabase.co/storage/v1/object/public/${bucketName}/${doc.file_path}`;
-    
-    // Also check the "documents" bucket as fallback
-    const documentsBucketUrl = `https://wgkbsiczgyaqmgoyirjs.supabase.co/storage/v1/object/public/documents/${doc.file_path}`;
-    
-    // Return the URL - we'll determine which one works when loading the document
-    return url;
-  }
-  
-  return null;
-};
-
-const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId, showOnlyValidated = false }) => {
-  const navigate = useNavigate();
-  
-  // Add a state to track if there are missing documents
-  const [hasMissingDocuments, setHasMissingDocuments] = useState(false);
-
-  // Query to fetch patient details to assist with matching
-  const { data: patient } = useQuery({
-    queryKey: ['patient-details-for-visits', patientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch patient info with proper error handling
+      const { data: patientData, error: patientError } = await supabase
         .from('patients')
-        .select('*')
-        .eq('id', patientId as any)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!patientId,
-  });
+        .select('id, first_name, last_name')
+        .eq('id', patientId)
+        .maybeSingle();
 
-  // Query all documents related to this patient
-  const { data: documents, isLoading } = useQuery({
-    queryKey: ['patient-visits-documents', patientId, showOnlyValidated, patient?.first_name, patient?.last_name],
-    queryFn: async () => {
-      console.log('Fetching documents for patient visits:', patientId);
-      
-      // First check if this patient has medical_history.documents
-      if (patient?.medical_history?.documents?.length) {
-        // Get document IDs from patient's medical history
-        const documentIds = patient.medical_history.documents.map((doc: any) => doc.document_id);
-        
-        // Fetch these specific documents
-        const { data: patientDocuments, error: patientDocsError } = await supabase
-          .from('documents')
-          .select('*')
-          .in('id', documentIds as any);
-        
-        if (patientDocsError) {
-          console.error("Error fetching patient documents:", patientDocsError);
-        } else if (patientDocuments && patientDocuments.length) {
-          console.log(`Found ${patientDocuments.length} documents in patient's medical history`);
-          
-          // Check for missing documents
-          if (patientDocuments.length < documentIds.length) {
-            console.log("Some documents referenced in medical history are missing");
-            setHasMissingDocuments(true);
-          }
-          
-          // Add review status and fix URLs
-          const docsWithReviewStatus = patientDocuments.map(doc => {
-            // Check if document needs URL fixing
-            if (!doc.public_url && doc.file_path) {
-              doc.public_url = getDocumentUrl(doc);
-            }
-            
-            return {
-              ...doc,
-              reviewStatus: getDocumentReviewStatus(doc.id)
-            };
-          });
-          
-          return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
-        }
+      if (patientError) {
+        console.error('Error fetching patient:', patientError);
+        toast.error('Failed to load patient information');
+        return;
       }
-      
-      // Fallback to organization-based document search
-      console.log("Performing organization-based document search...");
-      
-      // Get all processed documents for this organization
-      const { data, error } = await supabase
+
+      if (patientData) {
+        setPatient({
+          id: patientData.id,
+          first_name: patientData.first_name || '',
+          last_name: patientData.last_name || ''
+        });
+      }
+
+      // Fetch documents
+      const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
-        .select('*')
-        .eq('organization_id', organizationId as any)
-        .not('status', 'eq', 'failed') // Skip failed documents
+        .select('id, file_name, document_type, created_at, status')
+        .eq('owner_id', patientId)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching visit documents:', error);
-        throw error;
+
+      if (documentsError) {
+        console.error('Error fetching documents:', documentsError);
+        toast.error('Failed to load documents');
+      } else if (documentsData && Array.isArray(documentsData)) {
+        const typedDocuments: Document[] = documentsData
+          .filter((item: any) => item !== null && typeof item === 'object')
+          .map((item: any) => ({
+            id: item.id || '',
+            file_name: item.file_name || 'Unknown',
+            document_type: item.document_type || 'unknown',
+            created_at: item.created_at || '',
+            status: item.status || 'unknown'
+          }));
+        
+        setDocuments(typedDocuments);
       }
-      
-      console.log('Raw documents fetched for visits:', data?.length);
-      
-      // Enhanced multi-strategy matching like in PatientCertificates
-      const filteredDocs = (data || []).filter(doc => {
-        const extractedData = doc.extracted_data as ExtractedData | null;
-        
-        // Strategy 1: Direct patient ID match in patient_info
-        if (extractedData?.patient_info?.id === patientId) {
-          console.log('Match by patient_info.id:', doc.id);
-          return true;
-        }
-        
-        // Strategy 1.5: Check owner_id field
-        if (doc.owner_id === patientId) {
-          console.log('Match by owner_id:', doc.id);
-          return true;
-        }
-        
-        // Strategy 2: Patient name match in structured data
-        const patientName = patient ? 
-          `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
-          
-        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
-                              extractedData?.patient_info?.name?.toLowerCase() || '';
-        
-        if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
-          console.log('Match by patient name in data:', doc.id);
-          return true;
-        }
-        
-        // Strategy 3: Patient name in filename (simplified)
-        const fileName = doc.file_name.toLowerCase();
-        
-        if (patient?.first_name && fileName.includes(patient.first_name.toLowerCase())) {
-          console.log('Match by first name in filename:', doc.id);
-          return true;
-        }
-        
-        if (patient?.last_name && fileName.includes(patient.last_name.toLowerCase())) {
-          console.log('Match by last name in filename:', doc.id);
-          return true;
-        }
-        
-        // Strategy 4: Patient ID in filename
-        if (fileName.includes(patientId.toLowerCase())) {
-          console.log('Match by patient ID in filename:', doc.id);
-          return true;
-        }
-        
-        console.log('No match for document:', doc.id, doc.file_name);
-        return false;
-      });
-      
-      // Check for urls and fix if needed
-      const processedDocs = filteredDocs.map(doc => {
-        // Check if document has a URL
-        if (!doc.public_url && doc.file_path) {
-          const url = getDocumentUrl(doc);
-          console.log(`Generated URL for document ${doc.id}: ${url}`);
-          doc.public_url = url;
-        }
-        return doc;
-      });
-      
-      // Add review status from localStorage to each document
-      const docsWithReviewStatus = processedDocs.map(doc => ({
-        ...doc,
-        reviewStatus: getDocumentReviewStatus(doc.id)
-      }));
-      
-      console.log('Visit documents after filtering:', docsWithReviewStatus.length);
-      return docsWithReviewStatus as (Document & { reviewStatus: ReviewStatus })[];
-    },
-    enabled: !!patientId && !!organizationId && !!patient,
-  });
 
-  // Filter documents based on review status or validation status if needed
-  const filteredDocuments = documents ? documents.filter(doc => {
-    if (showOnlyValidated) {
-      return doc.reviewStatus === 'reviewed' || isDocumentValidated(doc);
+    } catch (error) {
+      console.error('Error in fetchData:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
     }
-    return true;
-  }) : [];
-
-  console.log('Filtered visit documents:', filteredDocuments?.length, 'out of', documents?.length);
-  
-  const visits = filteredDocuments?.length ? groupDocumentsByDate(filteredDocuments) : [];
-  console.log('Grouped visits:', visits.length);
-
-  const handleViewDocument = (documentId: string) => {
-    navigate(`/documents/${documentId}`);
   };
 
-  const handleCreateNewVisit = () => {
-    // Navigate to document upload page with patient ID prefilled
-    navigate(`/upload?patientId=${patientId}`);
-  };
-
-  const getDocumentTypeLabel = (type: string | null) => {
-    if (!type) return 'Unknown';
-    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  // Get appropriate status badge for a document
-  const getStatusBadge = (doc: Document & { reviewStatus: ReviewStatus }) => {
-    // First check review status
-    if (doc.reviewStatus === 'reviewed') {
-      return <Badge variant="success">Reviewed</Badge>;
+  useEffect(() => {
+    if (patientId && organizationId) {
+      fetchData();
     }
-    
-    if (doc.reviewStatus === 'needs-correction') {
-      return <Badge variant="destructive">Needs Correction</Badge>;
-    }
-    
-    // Then check processing status
-    switch (doc.status) {
+  }, [patientId, organizationId]);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
       case 'processed':
-        if (isDocumentValidated(doc)) {
-          return <Badge variant="success">Validated</Badge>;
-        }
-        if (hasStructuredData(doc)) {
-          return <Badge variant="outline">Processed</Badge>;
-        }
-        if (hasRawContent(doc)) {
-          return <Badge variant="warning">Extracted</Badge>;
-        }
-        return <Badge variant="outline">Processed</Badge>;
-        
-      case 'extracted':
-        return <Badge variant="warning">Text Only</Badge>;
-        
+        return <Badge variant="default">Processed</Badge>;
+      case 'pending':
+        return <Badge variant="secondary">Pending</Badge>;
       case 'failed':
         return <Badge variant="destructive">Failed</Badge>;
-        
       default:
-        return <Badge variant="outline">Not Reviewed</Badge>;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
+  const getDocumentTypeBadge = (type: string) => {
+    switch (type) {
+      case 'certificate-fitness':
+        return <Badge variant="default">Fitness Certificate</Badge>;
+      case 'medical-certificate':
+        return <Badge variant="default">Medical Certificate</Badge>;
+      case 'certificate':
+        return <Badge variant="default">Certificate</Badge>;
+      default:
+        return <Badge variant="outline">{type}</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-8">Loading patient visits...</div>
+      </div>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Visit History</CardTitle>
-        <Button onClick={handleCreateNewVisit} size="sm">
-          <Plus className="mr-1 h-4 w-4" />
-          New Visit
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-        ) : visits.length === 0 ? (
-          <div className="text-center py-8 border rounded-lg bg-muted/30">
-            <h3 className="text-lg font-medium mb-2">No visits recorded</h3>
-            <p className="text-muted-foreground mb-4">
-              {showOnlyValidated 
-                ? "This patient doesn't have any reviewed visits yet."
-                : "This patient doesn't have any recorded visits yet."}
-            </p>
-            <Button onClick={handleCreateNewVisit} variant="outline">
-              <Calendar className="mr-2 h-4 w-4" />
-              Record First Visit
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {hasMissingDocuments && (
-              <div className="mb-4 p-3 border border-amber-200 bg-amber-50 rounded-md">
-                <div className="flex items-center text-amber-700">
-                  <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <p className="text-sm">
-                    Some documents referenced in the patient record could not be found. 
-                    Use the document fixer tool above to repair associations.
-                  </p>
-                </div>
-              </div>
-            )}
-            {visits.map((visit: any, index: number) => (
-              <div key={index} className="border rounded-lg overflow-hidden">
-                <div className="bg-muted p-3 flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <h3 className="font-medium">
-                      Visit on {format(new Date(visit.date), 'PP')}
-                    </h3>
-                  </div>
-                  <Badge variant="outline">{visit.documents.length} document{visit.documents.length !== 1 ? 's' : ''}</Badge>
-                </div>
-                <div className="divide-y">
-                  {visit.documents.map((doc: any) => (
-                    <div key={doc.id} className="p-3 hover:bg-accent/30 transition-colors">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">{doc.file_name}</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {doc.document_type && (
-                              <Badge variant="secondary" className="capitalize">
-                                {getDocumentTypeLabel(doc.document_type)}
-                              </Badge>
-                            )}
-                            {getStatusBadge(doc)}
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDocument(doc.id)}
-                        >
-                          <FileText className="mr-1 h-4 w-4" />
-                          View
-                        </Button>
+    <div className="space-y-6">
+      {patient && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {patient.first_name} {patient.last_name}
+            </CardTitle>
+            <CardDescription>
+              Patient visits and document history
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Document History
+          </CardTitle>
+          <CardDescription>
+            All documents uploaded for this patient
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {documents.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Documents</h3>
+              <p className="text-muted-foreground">
+                No documents have been uploaded for this patient yet.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <div key={doc.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{doc.file_name}</h4>
+                      <div className="flex items-center gap-4 mt-2">
+                        {getDocumentTypeBadge(doc.document_type)}
+                        {getStatusBadge(doc.status)}
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                        </span>
                       </div>
                     </div>
-                  ))}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.open(`/documents/${doc.id}`, '_blank')}
+                    >
+                      View
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Visit History
+          </CardTitle>
+          <CardDescription>
+            Medical visits and appointments
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {visits.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Visits Recorded</h3>
+              <p className="text-muted-foreground mb-4">
+                No medical visits have been recorded for this patient yet.
+              </p>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Record Visit
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {visits.map((visit) => (
+                <div key={visit.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{visit.visit_type}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{visit.notes}</p>
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
+                        <Calendar className="h-3 w-3" />
+                        {format(new Date(visit.visit_date), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

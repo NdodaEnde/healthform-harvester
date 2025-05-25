@@ -1,420 +1,273 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { FileText, Download, Eye, Calendar, Building2, User, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { FileText, AlertCircle, Download } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import CertificateTemplate from '@/components/CertificateTemplate';
-import EnhancedCertificateGenerator from '@/components/certificates/EnhancedCertificateGenerator';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from '@/components/ui/dialog';
-
-interface PatientCertificatesProps {
-  patientId: string;
-  organizationId: string;
-}
-
-interface ExtractedData {
-  structured_data?: {
-    validated?: boolean;
-    certification?: {
-      valid_until?: string;
-      examination_date?: string;
-      fit?: boolean;
-      fit_with_restrictions?: boolean;
-      [key: string]: any;
-    };
-    patient?: {
-      name?: string;
-      [key: string]: any;
-    };
-    examination_results?: {
-      fitness_status?: string;
-      date?: string;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  };
-  patient_info?: {
-    id?: string;
-    name?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
 
 interface Document {
   id: string;
   file_name: string;
   file_path: string;
   status: string;
-  document_type: string | null;
+  document_type: string;
   processed_at: string | null;
   created_at: string;
-  extracted_data: ExtractedData | null;
-  [key: string]: any;
+  extracted_data?: any;
 }
 
-interface PatientData {
+interface Patient {
   id: string;
   first_name: string;
   last_name: string;
-  [key: string]: any;
+  id_number?: string;
 }
 
-type ReviewStatus = 'not-reviewed' | 'reviewed' | 'needs-correction';
+interface Organization {
+  id: string;
+  name: string;
+}
 
-// Function to determine the fitness status color
-const getFitnessStatusColor = (document: Document) => {
-  const certification = document.extracted_data?.structured_data?.certification;
-  
-  if (certification?.fit) return "success";
-  if (certification?.fit_with_restrictions) return "warning";
-  if (certification?.temporarily_unfit || certification?.unfit) return "destructive";
-  
-  return "secondary";
-};
+interface PatientCertificatesProps {
+  patientId: string;
+  organizationId: string;
+  clientOrganizationId?: string;
+}
 
-// Function to format fitness status text
-const getFitnessStatusText = (document: Document) => {
-  const certification = document.extracted_data?.structured_data?.certification;
-  const results = document.extracted_data?.structured_data?.examination_results;
-  
-  if (certification?.fit) return "Fit";
-  if (certification?.fit_with_restrictions) return "Fit with Restrictions";
-  if (certification?.temporarily_unfit) return "Temporarily Unfit";
-  if (certification?.unfit) return "Unfit";
-  
-  // Fallback to examination_results if available
-  return results?.fitness_status || "Unknown";
-};
+const PatientCertificates: React.FC<PatientCertificatesProps> = ({ 
+  patientId, 
+  organizationId, 
+  clientOrganizationId 
+}) => {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [loading, setLoading] = useState(true);
 
-// Helper function to get document review status from localStorage
-const getDocumentReviewStatus = (documentId: string): ReviewStatus => {
-  return localStorage.getItem(`doc-review-${documentId}`) as ReviewStatus || 'not-reviewed';
-};
-
-// Helper function to get examination date based on valid_until date
-// Assuming examination date is typically one year before expiry date
-export const getExaminationDate = (validUntil: string | undefined): string | null => {
-  if (!validUntil) return null;
-  
-  try {
-    const expiryDate = new Date(validUntil);
-    if (isNaN(expiryDate.getTime())) return null;
-    
-    // Get date one year before expiry
-    const examDate = new Date(expiryDate);
-    examDate.setFullYear(examDate.getFullYear() - 1);
-    return examDate.toISOString().split('T')[0];
-  } catch (e) {
-    console.error('Error calculating examination date:', e);
-    return null;
-  }
-};
-
-const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, organizationId }) => {
-  const navigate = useNavigate();
-  const [selectedCertificate, setSelectedCertificate] = useState<Document | null>(null);
-  const [isGeneratorDialogOpen, setIsGeneratorDialogOpen] = useState(false);
-
-  // Query to fetch patient details to assist with matching
-  const { data: patient } = useQuery({
-    queryKey: ['patient-details', patientId],
-    queryFn: async (): Promise<PatientData | null> => {
-      const { data, error } = await supabase
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch patient data with proper error handling
+      const { data: patientData, error: patientError } = await supabase
         .from('patients')
-        .select('*')
+        .select('id, first_name, last_name, id_number')
         .eq('id', patientId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching patient:', error);
-        return null;
-      }
-      
-      if (!data || typeof data !== 'object') {
-        console.error('Invalid patient data received');
-        return null;
-      }
-      
-      return {
-        id: String(data.id || ''),
-        first_name: String(data.first_name || ''),
-        last_name: String(data.last_name || ''),
-        ...data
-      };
-    },
-    enabled: !!patientId,
-  });
+        .maybeSingle();
 
-  // Query certificates related to this patient with enhanced matching, showing all certificates
-  const { data: certificates, isLoading, error } = useQuery({
-    queryKey: ['patient-certificates', patientId, patient?.first_name, patient?.last_name],
-    queryFn: async () => {
-      console.log('Fetching certificates for patient:', patientId);
-      console.log('Patient name:', patient?.first_name, patient?.last_name);
-      
-      // Get all processed documents of certificate types
-      const { data, error } = await supabase
+      if (patientError) {
+        console.error('Error fetching patient:', patientError);
+        toast.error('Failed to load patient information');
+        return;
+      }
+
+      if (patientData) {
+        setPatient({
+          id: patientData.id,
+          first_name: patientData.first_name || '',
+          last_name: patientData.last_name || '',
+          id_number: patientData.id_number || undefined,
+        });
+      }
+
+      // Fetch organization data
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('id', organizationId)
+        .maybeSingle();
+
+      if (orgError) {
+        console.error('Error fetching organization:', orgError);
+      } else if (orgData) {
+        setOrganization({
+          id: orgData.id,
+          name: orgData.name || ''
+        });
+      }
+
+      // Fetch documents with proper typing
+      const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
-        .select('*')
+        .select('id, file_name, file_path, status, document_type, processed_at, created_at, extracted_data')
         .eq('organization_id', organizationId)
         .eq('status', 'processed')
-        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'])
+        .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
         .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching certificates:', error);
-        throw error;
-      }
-      
-      if (!data || !Array.isArray(data)) {
-        console.error('Invalid documents data received');
-        return [];
-      }
-      
-      console.log('Raw processed documents fetched:', data?.length);
-      
-      // Enhanced multi-strategy matching without validation filter
-      const filteredDocs = data.filter(doc => {
-        if (!doc || typeof doc !== 'object') return false;
-        
-        const extractedData = doc.extracted_data as ExtractedData | null;
-        
-        // Strategy 1: Direct patient ID match in patient_info
-        if (extractedData?.patient_info?.id === patientId) {
-          console.log('Match by patient_info.id:', doc.id);
-          return true;
-        }
-        
-        // Strategy 2: Patient name match in structured data
-        const patientName = patient ? 
-          `${patient.first_name} ${patient.last_name}`.toLowerCase() : '';
-        
-        const patientNameInData = extractedData?.structured_data?.patient?.name?.toLowerCase() || 
-                                extractedData?.patient_info?.name?.toLowerCase() || '';
-        
-        if (patientName && patientNameInData && patientNameInData.includes(patientName)) {
-          console.log('Match by patient name in data:', doc.id);
-          return true;
-        }
-        
-        // Strategy 3: Patient name in filename (simplified)
-        const fileName = String(doc.file_name || '').toLowerCase();
-        
-        if (patient?.first_name && fileName.includes(String(patient.first_name).toLowerCase())) {
-          console.log('Match by first name in filename:', doc.id);
-          return true;
-        }
-        
-        if (patient?.last_name && fileName.includes(String(patient.last_name).toLowerCase())) {
-          console.log('Match by last name in filename:', doc.id);
-          return true;
-        }
-        
-        // Strategy 4: Patient ID in filename
-        if (fileName.includes(patientId.toLowerCase())) {
-          console.log('Match by patient ID in filename:', doc.id);
-          return true;
-        }
-        
-        console.log('No match for document:', doc.id, doc.file_name);
-        return false;
-      });
-      
-      // Add review status from localStorage to each document
-      const docsWithReviewStatus = filteredDocs
-        .filter((doc): doc is NonNullable<typeof doc> => 
-          doc !== null && 
-          typeof doc === 'object' &&
-          'id' in doc &&
-          'file_name' in doc &&
-          'file_path' in doc &&
-          'status' in doc &&
-          'created_at' in doc
-        )
-        .map(doc => {
-          // Add calculated examination date if missing but has valid_until
-          const extractedData = doc.extracted_data as ExtractedData | null;
-          if (extractedData?.structured_data?.certification?.valid_until && 
-              !extractedData?.structured_data?.certification?.examination_date && 
-              !extractedData?.structured_data?.examination_results?.date) {
-            
-            const examDate = getExaminationDate(extractedData.structured_data.certification.valid_until);
-            if (examDate && extractedData.structured_data.certification) {
-              extractedData.structured_data.certification.examination_date = examDate;
-            }
-          }
-          
-          return {
-            id: String(doc.id || ''),
-            file_name: String(doc.file_name || ''),
-            file_path: String(doc.file_path || ''),
-            status: String(doc.status || ''),
-            document_type: doc.document_type ? String(doc.document_type) : null,
-            processed_at: doc.processed_at ? String(doc.processed_at) : null,
-            created_at: String(doc.created_at || ''),
-            extracted_data: extractedData,
-            reviewStatus: getDocumentReviewStatus(String(doc.id || ''))
-          };
-        });
-      
-      console.log('Certificates after filtering:', docsWithReviewStatus.length);
-      return docsWithReviewStatus;
-    },
-    enabled: !!patientId && !!organizationId && !!patient,
-  });
 
-  // State for direct certificate viewing
-  const [viewingCertificate, setViewingCertificate] = useState<Document | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  
-  const handleViewCertificate = (certificate: Document) => {
-    setViewingCertificate(certificate);
-    setIsViewDialogOpen(true);
+      if (documentsError) {
+        console.error('Error fetching documents:', documentsError);
+        toast.error('Failed to load certificates');
+        return;
+      }
+
+      if (documentsData && Array.isArray(documentsData)) {
+        const typedDocuments: Document[] = documentsData
+          .filter((item: any) => item !== null && typeof item === 'object')
+          .map((item: any) => ({
+            id: item.id || '',
+            file_name: item.file_name || 'Unknown',
+            file_path: item.file_path || '',
+            status: item.status || 'unknown',
+            document_type: item.document_type || 'unknown',
+            processed_at: item.processed_at || null,
+            created_at: item.created_at || '',
+            extracted_data: item.extracted_data || null
+          }));
+        
+        setDocuments(typedDocuments);
+      }
+
+    } catch (error) {
+      console.error('Error in fetchData:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Filter for only reviewed certificates if needed
-  // Uncomment this to show only reviewed certificates
-  // const reviewedCertificates = certificates?.filter(cert => cert.reviewStatus === 'reviewed') || [];
+  useEffect(() => {
+    if (patientId && organizationId) {
+      fetchData();
+    }
+  }, [patientId, organizationId, clientOrganizationId]);
+
+  const handleDownload = async (document: Document) => {
+    try {
+      if (!document.file_path) {
+        toast.error('File path not available');
+        return;
+      }
+
+      const { data, error } = await supabase.storage
+        .from('medical-documents')
+        .download(document.file_path);
+
+      if (error) {
+        console.error('Download error:', error);
+        toast.error('Failed to download document');
+        return;
+      }
+
+      if (data) {
+        const url = URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = document.file_name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('Download started');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download document');
+    }
+  };
+
+  const handleView = (document: Document) => {
+    window.open(`/documents/${document.id}`, '_blank');
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <>
+    <div className="space-y-6">
+      {patient && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {patient.first_name} {patient.last_name}
+            </CardTitle>
+            <CardDescription>
+              {patient.id_number && `ID: ${patient.id_number} • `}
+              Patient ID: {patient.id}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {organization && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              {organization.name}
+            </CardTitle>
+            <CardDescription>
+              Organization: {organization.id}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Certificates of Fitness</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Medical Certificates
+          </CardTitle>
+          <CardDescription>
+            Fitness certificates and medical documentation
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          {documents.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Certificates Found</h3>
+              <p className="text-muted-foreground">
+                No medical certificates have been uploaded for this patient yet.
+              </p>
             </div>
-          ) : error ? (
-            <div className="text-center py-4 text-destructive">
-              <p>Error loading certificates: {error instanceof Error ? error.message : 'Unknown error'}</p>
-            </div>
-          ) : certificates && certificates.length > 0 ? (
+          ) : (
             <div className="space-y-4">
-              {certificates.map(cert => (
-                <div key={cert.id} className="border rounded-lg p-4 hover:bg-accent/20 transition-colors">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div>
-                      <h3 className="font-medium">{cert.file_name}</h3>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="outline">
-                          {cert.processed_at 
-                            ? format(new Date(cert.processed_at), 'PP') 
-                            : format(new Date(cert.created_at), 'PP')}
-                        </Badge>
-                        
-                        <Badge variant={getFitnessStatusColor(cert)}>
-                          {getFitnessStatusText(cert)}
-                        </Badge>
-                        
-                        {cert.extracted_data?.structured_data?.certification?.valid_until && (
-                          <Badge variant="secondary">
-                            Valid until: {cert.extracted_data.structured_data.certification.valid_until}
-                          </Badge>
-                        )}
-                        
-                        {'reviewStatus' in cert && cert.reviewStatus === 'reviewed' ? (
-                          <Badge variant="default">Reviewed</Badge>
-                        ) : 'reviewStatus' in cert && cert.reviewStatus === 'needs-correction' ? (
-                          <Badge variant="destructive">Needs Correction</Badge>
-                        ) : (
-                          <Badge variant="outline">Not Reviewed</Badge>
+              {documents.map((doc) => (
+                <div key={doc.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{doc.file_name}</h4>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        <Badge variant="outline">{doc.document_type}</Badge>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                        </span>
+                        {doc.processed_at && (
+                          <span>Processed: {format(new Date(doc.processed_at), 'MMM d, yyyy')}</span>
                         )}
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewCertificate(cert)}
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          View Certificate
-                        </Button>
-                        <Button
-                          variant="default"
-                          onClick={() => {
-                            // Open a dialog to show the certificate with download options
-                            setSelectedCertificate(cert);
-                            setIsGeneratorDialogOpen(true);
-                          }}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download/Print
-                        </Button>
-                      </div>
+                      <Button variant="outline" size="sm" onClick={() => handleView(doc)}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDownload(doc)}>
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8 border rounded-lg bg-muted/30">
-              <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-              <h3 className="text-lg font-medium mb-2">No certificates found</h3>
-              <p className="text-muted-foreground">
-                No certificates of fitness found for this patient.
-              </p>
-            </div>
           )}
         </CardContent>
       </Card>
-      
-      {/* Certificate Generator Dialog */}
-      <Dialog open={isGeneratorDialogOpen} onOpenChange={setIsGeneratorDialogOpen}>
-        <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Certificate Options</DialogTitle>
-            <DialogDescription>
-              Download, print, or email this certificate
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-auto">
-            {selectedCertificate && (
-              <EnhancedCertificateGenerator 
-                documentId={selectedCertificate.id}
-                document={selectedCertificate}
-                onClose={() => setIsGeneratorDialogOpen(false)}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Certificate View Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Certificate of Fitness</DialogTitle>
-            <DialogDescription>
-              {viewingCertificate?.file_name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-auto">
-            {viewingCertificate && (
-              <div className="p-4">
-                <CertificateTemplate extractedData={viewingCertificate.extracted_data} />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 };
 
