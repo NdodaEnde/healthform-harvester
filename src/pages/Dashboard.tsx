@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import BatchDocumentUploader from "@/components/BatchDocumentUploader";
 import RlsTester from "@/components/RlsTester";
 import { OrphanedDocumentFixer } from "@/components/OrphanedDocumentFixer";
 import { toast } from "@/components/ui/use-toast";
-import { AccuracyMatrix } from "@/components/AccuracyMatrix";
+import AccuracyMatrix from "@/components/AccuracyMatrix";
 import { PendingInvitationsCard } from "@/components/PendingInvitationsCard";
 
 const Dashboard = () => {
