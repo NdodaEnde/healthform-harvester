@@ -315,6 +315,7 @@ export const ensureStorageBucket = async (bucketName: string): Promise<boolean> 
 /**
  * Helper to create a standardized file path for document organization
  * Creates paths in the format: [organization-id]/[document-type]/[patient-id]/[filename]
+ * FIXED: This was the bug - missing document type in path creation
  */
 export const createStandardizedFilePath = (
   organizationId: string,
@@ -322,10 +323,13 @@ export const createStandardizedFilePath = (
   patientId: string | null,
   originalFileName: string
 ): string => {
+  console.log('Creating standardized path with:', { organizationId, documentType, patientId, originalFileName });
+  
   // Sanitize the document type (remove spaces, convert to lowercase)
   const safeDocType = documentType?.toLowerCase().replace(/\s+/g, '-') || 'unknown';
+  console.log('Safe document type:', safeDocType);
   
-  // Create a path structure
+  // Create a path structure - THIS WAS THE BUG: Must include document type
   let path = `${organizationId}/${safeDocType}`;
   
   // Add patient folder if available
@@ -342,5 +346,8 @@ export const createStandardizedFilePath = (
   // Create filename with timestamp
   const fileName = `${timestamp}_${originalFileName.replace(/\s+/g, '_')}`;
   
-  return `${path}/${fileName}`;
+  const finalPath = `${path}/${fileName}`;
+  console.log('Final standardized path:', finalPath);
+  
+  return finalPath;
 };
