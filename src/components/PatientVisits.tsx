@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, FileText, Plus, User, Building2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Visit {
@@ -41,6 +42,22 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const safeFormatDate = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        console.warn('Invalid date:', dateString);
+        return 'Invalid date';
+      }
+      return format(date, 'MMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid date';
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -49,7 +66,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       const { data: patientData, error: patientError } = await supabase
         .from('patients')
         .select('id, first_name, last_name')
-        .eq('id' as any, patientId as any)
+        .eq('id', patientId)
         .maybeSingle();
 
       if (patientError) {
@@ -70,8 +87,8 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('id, file_name, document_type, created_at, status')
-        .eq('owner_id' as any, patientId as any)
-        .eq('organization_id' as any, organizationId as any)
+        .eq('owner_id', patientId)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (documentsError) {
@@ -186,7 +203,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                         {getStatusBadge(doc.status)}
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                          {safeFormatDate(doc.created_at)}
                         </span>
                       </div>
                     </div>
@@ -238,7 +255,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                       <p className="text-sm text-muted-foreground mt-1">{visit.notes}</p>
                       <span className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
                         <Calendar className="h-3 w-3" />
-                        {format(new Date(visit.visit_date), 'MMM d, yyyy')}
+                        {safeFormatDate(visit.visit_date)}
                       </span>
                     </div>
                   </div>

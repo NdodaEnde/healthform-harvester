@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Loader2, Trash2, User, RefreshCw } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 interface OrganizationUser {
   id: string;
@@ -40,6 +41,22 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
   const [loading, setLoading] = useState(true);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
 
+  const safeFormatDate = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        console.warn('Invalid date:', dateString);
+        return 'Invalid date';
+      }
+      return format(date, 'MMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid date';
+    }
+  };
+
   const fetchUsers = async () => {
     if (!organizationId) return;
     
@@ -55,7 +72,7 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { data: organizationUsers, error } = await supabase
         .from("organization_users")
         .select("*")
-        .eq("organization_id" as any, organizationId as any)
+        .eq("organization_id", organizationId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -70,7 +87,7 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, email")
-        .in("id" as any, userIds as any);
+        .in("id", userIds);
         
       if (profilesError) throw profilesError;
 
@@ -107,8 +124,8 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { error } = await supabase
         .from("organization_users")
         .update({ role: newRole })
-        .eq("user_id" as any, userId as any)
-        .eq("organization_id" as any, organizationId as any);
+        .eq("user_id", userId)
+        .eq("organization_id", organizationId);
 
       if (error) throw error;
 
@@ -153,8 +170,8 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { error } = await supabase
         .from("organization_users")
         .delete()
-        .eq("user_id" as any, userId as any)
-        .eq("organization_id" as any, organizationId as any);
+        .eq("user_id", userId)
+        .eq("organization_id", organizationId);
 
       if (error) throw error;
 
@@ -238,7 +255,7 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
                     </Select>
                   </TableCell>
                   <TableCell>
-                    {format(new Date(user.created_at), "MMM d, yyyy")}
+                    {safeFormatDate(user.created_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

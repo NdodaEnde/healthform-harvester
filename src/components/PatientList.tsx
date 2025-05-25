@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus, User, Calendar, FileText, Building2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { toast } from "sonner";
 
 interface Patient {
@@ -39,16 +40,32 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
+  const safeFormatDate = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        console.warn('Invalid date:', dateString);
+        return 'Invalid date';
+      }
+      return format(date, 'MMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid date';
+    }
+  };
+
   const fetchPatients = async () => {
     try {
       setLoading(true);
       let query = supabase
         .from("patients")
         .select("*")
-        .eq("organization_id" as any, organizationId as any);
+        .eq("organization_id", organizationId);
 
       if (clientOrganizationId) {
-        query = query.eq("client_organization_id" as any, clientOrganizationId as any);
+        query = query.eq("client_organization_id", clientOrganizationId);
       }
 
       const { data, error } = await query.order("created_at", { ascending: false });
@@ -134,8 +151,8 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       const { data, error } = await supabase
         .from('documents')
         .select('id, status, document_type')
-        .eq('owner_id' as any, patientId as any)
-        .eq('organization_id' as any, organizationId as any);
+        .eq('owner_id', patientId)
+        .eq('organization_id', organizationId);
 
       if (error) {
         console.error('Error checking documents:', error);
@@ -223,7 +240,7 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
                   )}
                   <div className="flex items-center gap-1 text-sm">
                     <Calendar className="h-3 w-3" />
-                    DOB: {format(new Date(patient.date_of_birth), "MMM d, yyyy")}
+                    DOB: {safeFormatDate(patient.date_of_birth)}
                   </div>
                   {patient.gender && (
                     <div className="text-sm">Gender: {patient.gender}</div>
@@ -245,7 +262,7 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
                   )}
                   
                   <div className="text-sm text-muted-foreground">
-                    Added: {format(new Date(patient.created_at), "MMM d, yyyy")}
+                    Added: {safeFormatDate(patient.created_at)}
                   </div>
 
                   <div className="flex gap-2 pt-2">

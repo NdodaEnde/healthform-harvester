@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Download, Eye, Calendar, Building2, User, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 interface Document {
   id: string;
@@ -46,6 +47,22 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const safeFormatDate = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        console.warn('Invalid date:', dateString);
+        return 'Invalid date';
+      }
+      return format(date, 'MMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid date';
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -54,7 +71,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       const { data: patientData, error: patientError } = await supabase
         .from('patients')
         .select('id, first_name, last_name, id_number')
-        .eq('id' as any, patientId as any)
+        .eq('id', patientId)
         .maybeSingle();
 
       if (patientError) {
@@ -76,7 +93,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('id, name')
-        .eq('id' as any, organizationId as any)
+        .eq('id', organizationId)
         .maybeSingle();
 
       if (orgError) {
@@ -92,9 +109,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('id, file_name, file_path, status, document_type, processed_at, created_at, extracted_data')
-        .eq('organization_id' as any, organizationId as any)
-        .eq('status' as any, 'processed' as any)
-        .in('document_type' as any, ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'] as any)
+        .eq('organization_id', organizationId)
+        .eq('status', 'processed')
+        .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
         .order('created_at', { ascending: false });
 
       if (documentsError) {
@@ -243,10 +260,10 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
                         <Badge variant="outline">{doc.document_type}</Badge>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                          {safeFormatDate(doc.created_at)}
                         </span>
                         {doc.processed_at && (
-                          <span>Processed: {format(new Date(doc.processed_at), 'MMM d, yyyy')}</span>
+                          <span>Processed: {safeFormatDate(doc.processed_at)}</span>
                         )}
                       </div>
                     </div>
