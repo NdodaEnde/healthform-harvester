@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,7 +70,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       const { data: patientData, error: patientError } = await supabase
         .from('patients')
         .select('id, first_name, last_name, id_number')
-        .eq('id', patientId)
+        .eq('id', patientId as any)
         .maybeSingle();
 
       if (patientError) {
@@ -93,7 +92,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('id, name')
-        .eq('id', organizationId)
+        .eq('id', organizationId as any)
         .maybeSingle();
 
       if (orgError) {
@@ -109,9 +108,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('id, file_name, file_path, status, document_type, processed_at, created_at, extracted_data')
-        .eq('organization_id', organizationId)
-        .eq('status', 'processed')
-        .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
+        .eq('organization_id', organizationId as any)
+        .eq('status', 'processed' as any)
+        .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'] as any)
         .order('created_at', { ascending: false });
 
       if (documentsError) {

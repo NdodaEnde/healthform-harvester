@@ -28,11 +28,12 @@ const PatientsPage = () => {
         )}
         
         {/* Patient List Component - the main focus of the page */}
-        <PatientList 
-          filters={filters} 
-          sortOptions={sortOptions} 
-          currentPage={currentPage} 
-        />
+        {currentOrganization && (
+          <PatientList 
+            organizationId={currentOrganization.id}
+            clientOrganizationId={currentClient?.id}
+          />
+        )}
       </motion.div>
     </div>
   );
