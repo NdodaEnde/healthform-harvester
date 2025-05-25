@@ -235,29 +235,33 @@ const BatchDocumentUploader = ({
     if (restoredFiles) {
       setQueuedFiles(prev => [...prev, ...restoredFiles]);
       
-      // Verify document status after loading - fixed type casting
+      // Verify document status after loading - check each file's status
       restoredFiles.forEach(async (file, index) => {
         if (file.documentId) {
-          const { data, error } = await supabase
-            .from('documents')
-            .select('status')
-            .eq('id', file.documentId)
-            .single();
-            
-          if (!error && data) {
-            const updatedStatus = data.status === 'completed' 
-              ? 'complete' as FileStatus 
-              : data.status === 'processing' 
-                ? 'processing' as FileStatus 
-                : file.status;
-                
-            setQueuedFiles(prev => 
-              prev.map((item, i) => 
-                i === prev.length - restoredFiles.length + index 
-                  ? { ...item, status: updatedStatus } 
-                  : item
-              )
-            );
+          try {
+            const { data, error } = await supabase
+              .from('documents')
+              .select('status')
+              .eq('id', file.documentId)
+              .single();
+              
+            if (!error && data) {
+              const updatedStatus = data.status === 'completed' 
+                ? 'complete' as FileStatus 
+                : data.status === 'processing' 
+                  ? 'processing' as FileStatus 
+                  : file.status;
+                  
+              setQueuedFiles(prev => 
+                prev.map((item, i) => 
+                  i === prev.length - restoredFiles.length + index 
+                    ? { ...item, status: updatedStatus } 
+                    : item
+                )
+              );
+            }
+          } catch (error) {
+            console.error('Error checking document status:', error);
           }
         }
       });
