@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,26 +45,27 @@ const OrganizationsList = () => {
         return;
       }
 
-      const validOrganizations = data.filter((item): item is NonNullable<typeof item> => {
-        return item !== null && 
-               typeof item === 'object' &&
-               typeof item.id === 'string' &&
-               typeof item.name === 'string' &&
-               typeof item.organization_type === 'string' &&
-               typeof item.created_at === 'string';
-      });
-
-      const typedOrganizations: Organization[] = validOrganizations.map(item => ({
-        id: item.id,
-        name: item.name,
-        organization_type: item.organization_type,
-        contact_email: item.contact_email || null,
-        contact_phone: item.contact_phone || null,
-        address: item.address,
-        settings: item.settings,
-        created_at: item.created_at,
-        updated_at: item.updated_at || item.created_at
-      }));
+      // Safe type conversion with proper validation
+      const typedOrganizations: Organization[] = data
+        .filter(item => {
+          return item !== null && 
+                 typeof item === 'object' &&
+                 'id' in item && item.id &&
+                 'name' in item && item.name &&
+                 'organization_type' in item && item.organization_type &&
+                 'created_at' in item && item.created_at;
+        })
+        .map(item => ({
+          id: String(item.id),
+          name: String(item.name),
+          organization_type: String(item.organization_type),
+          contact_email: item.contact_email ? String(item.contact_email) : null,
+          contact_phone: item.contact_phone ? String(item.contact_phone) : null,
+          address: item.address,
+          settings: item.settings,
+          created_at: String(item.created_at),
+          updated_at: item.updated_at ? String(item.updated_at) : String(item.created_at)
+        }));
 
       setOrganizations(typedOrganizations);
     } catch (error) {
