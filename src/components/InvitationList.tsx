@@ -1,12 +1,12 @@
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, RefreshCw } from "lucide-react";
-import { format, isAfter } from "date-fns";
+import React, { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 interface Invitation {
   id: string;
@@ -15,39 +15,31 @@ interface Invitation {
   created_at: string;
   expires_at: string;
   accepted_at: string | null;
-  token?: string;
+  token: string;
 }
 
 interface InvitationListProps {
   organizationId: string;
-  onRefresh?: () => void;
+  onInvitationDeleted?: () => void;
 }
 
-export default function InvitationList({ organizationId, onRefresh }: InvitationListProps) {
+const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvitationDeleted }) => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchInvitations = async () => {
-    setLoading(true);
     try {
-      // Only fetch invitations that haven't been accepted
+      setLoading(true);
       const { data, error } = await supabase
-        .from("invitations")
-        .select("*")
-        .eq("organization_id", organizationId as any)
-        .is("accepted_at", null)
-        .order("created_at", { ascending: false });
+        .from('invitations')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      if (!data || !Array.isArray(data)) {
-        setInvitations([]);
-        return;
-      }
-
-      const typedInvitations: Invitation[] = data
+      // Filter out null entries and ensure type safety
+      const typedInvitations = (data || [])
         .filter((invitation): invitation is NonNullable<typeof invitation> => 
           invitation !== null && 
           typeof invitation === 'object' && 
@@ -55,7 +47,8 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
           'email' in invitation &&
           'role' in invitation &&
           'created_at' in invitation &&
-          'expires_at' in invitation
+          'expires_at' in invitation &&
+          'token' in invitation
         )
         .map(invitation => ({
           id: String(invitation.id || ''),
@@ -64,17 +57,13 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
           created_at: String(invitation.created_at || ''),
           expires_at: String(invitation.expires_at || ''),
           accepted_at: invitation.accepted_at ? String(invitation.accepted_at) : null,
-          token: invitation.token ? String(invitation.token) : undefined
+          token: String(invitation.token || '')
         }));
-      
+
       setInvitations(typedInvitations);
-    } catch (error: any) {
-      console.error("Error fetching invitations:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load invitations",
-        variant: "destructive",
-      });
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+      toast.error('Failed to load invitations');
     } finally {
       setLoading(false);
     }
@@ -86,119 +75,33 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
     }
   }, [organizationId]);
 
-  const handleDelete = async (id: string) => {
+  const deleteInvitation = async (invitationId: string) => {
     try {
       const { error } = await supabase
-        .from("invitations")
+        .from('invitations')
         .delete()
-        .eq("id", id as any);
+        .eq('id', invitationId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Update the local state
-      setInvitations(invitations.filter(inv => inv.id !== id));
-      
-      toast({
-        title: "Invitation Deleted",
-        description: "The invitation has been deleted successfully",
-      });
-      
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error: any) {
-      console.error("Error deleting invitation:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete invitation",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleResend = async (invitation: Invitation) => {
-    try {
-      // Update the expiration date
-      const expires_at = new Date();
-      expires_at.setDate(expires_at.getDate() + 7);
-
-      const { error } = await supabase
-        .from("invitations")
-        .update({
-          expires_at: expires_at.toISOString()
-        } as any)
-        .eq("id", invitation.id as any);
-
-      if (error) {
-        throw error;
-      }
-
-      // Get organization name
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("name")
-        .eq("id", organizationId as any)
-        .single();
-
-      if (orgError) {
-        console.error("Error getting organization:", orgError);
-      }
-
-      // In a real app, we would now send a new email with the invite link
-      // For demonstration purposes, we'll log the information
-      console.log(`Invitation resent to ${invitation.email}`);
-      
-      // Generate the invitation link - check if token exists first
-      if (invitation.token) {
-        console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${invitation.token}`);
-      } else {
-        // If no token is available, we'll need to fetch the full invitation
-        const { data, error: fetchError } = await supabase
-          .from("invitations")
-          .select("token")
-          .eq("id", invitation.id as any)
-          .single();
-          
-        if (fetchError) {
-          console.error("Error getting invitation token:", fetchError);
-        } else if (data && 'token' in data && data.token) {
-          console.log(`Invitation link would be: ${window.location.origin}/auth/accept-invite?token=${data.token}`);
-        }
-      }
-      
-      toast({
-        title: "Invitation Resent",
-        description: `The invitation to ${invitation.email} has been resent`,
-      });
-      
-      // Refresh the list
+      toast.success('Invitation deleted successfully');
       fetchInvitations();
-      
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error: any) {
-      console.error("Error resending invitation:", error);
-      toast({
-        title: "Error",
-        description: "Failed to resend invitation",
-        variant: "destructive",
-      });
+      onInvitationDeleted?.();
+    } catch (error) {
+      console.error('Error deleting invitation:', error);
+      toast.error('Failed to delete invitation');
     }
-  };
-
-  const isExpired = (expiresAt: string) => {
-    return !isAfter(new Date(expiresAt), new Date());
   };
 
   const getStatusBadge = (invitation: Invitation) => {
     if (invitation.accepted_at) {
-      return <Badge className="bg-green-600 text-white">Accepted</Badge>;
+      return <Badge variant="default">Accepted</Badge>;
     }
     
-    if (isExpired(invitation.expires_at)) {
+    const expiresAt = new Date(invitation.expires_at);
+    const now = new Date();
+    
+    if (expiresAt < now) {
       return <Badge variant="destructive">Expired</Badge>;
     }
     
@@ -206,63 +109,50 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
   };
 
   if (loading) {
-    return <div className="py-4 text-center">Loading invitations...</div>;
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin" />
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-xl flex justify-between items-center">
-          <span>Pending Invitations</span>
-          <Button variant="outline" size="sm" onClick={fetchInvitations}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle>Pending Invitations</CardTitle>
+        <Button variant="outline" size="sm" onClick={fetchInvitations}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </CardHeader>
       <CardContent>
         {invitations.length === 0 ? (
-          <div className="text-center py-4 text-muted-foreground">
-            No pending invitations
-          </div>
+          <p className="text-muted-foreground text-center py-4">No pending invitations</p>
         ) : (
           <div className="space-y-4">
             {invitations.map((invitation) => (
-              <div 
-                key={invitation.id}
-                className="flex items-center justify-between p-3 border rounded-md"
-              >
-                <div>
-                  <div className="font-medium">{invitation.email}</div>
-                  <div className="text-sm text-muted-foreground flex items-center space-x-2">
-                    <span>Role: {invitation.role}</span>
-                    <span>•</span>
-                    <span>Sent: {format(new Date(invitation.created_at), 'MMM d, yyyy')}</span>
-                    <span>•</span>
+              <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium">{invitation.email}</span>
                     {getStatusBadge(invitation)}
                   </div>
+                  <div className="text-sm text-muted-foreground">
+                    Role: {invitation.role} • 
+                    Sent: {format(new Date(invitation.created_at), 'MMM d, yyyy')} • 
+                    Expires: {format(new Date(invitation.expires_at), 'MMM d, yyyy')}
+                  </div>
                 </div>
-                <div className="flex space-x-2">
-                  {!invitation.accepted_at && (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleResend(invitation)}
-                        disabled={!isExpired(invitation.expires_at)}
-                      >
-                        Resend
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleDelete(invitation.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => deleteInvitation(invitation.id)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -270,4 +160,6 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       </CardContent>
     </Card>
   );
-}
+};
+
+export default InvitationList;

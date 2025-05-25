@@ -52,7 +52,9 @@ const OrganizationsList = () => {
           typeof org === 'object' && 
           'id' in org &&
           'name' in org &&
-          'organization_type' in org
+          'organization_type' in org &&
+          'created_at' in org &&
+          'updated_at' in org
         )
         .map(org => ({
           id: String(org.id || ''),
