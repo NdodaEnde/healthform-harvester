@@ -42,7 +42,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const safeFormatDate = (dateString: string | null): string => {
+  const safeFormatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     
     try {
@@ -75,9 +75,9 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         return;
       }
 
-      if (patientData) {
+      if (patientData && typeof patientData === 'object') {
         setPatient({
-          id: patientData.id,
+          id: patientData.id || '',
           first_name: patientData.first_name || '',
           last_name: patientData.last_name || ''
         });
@@ -96,7 +96,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         toast.error('Failed to load documents');
       } else if (documentsData && Array.isArray(documentsData)) {
         const typedDocuments: Document[] = documentsData
-          .filter((item: any) => item !== null && typeof item === 'object')
+          .filter((item: any) => item && typeof item === 'object')
           .map((item: any) => ({
             id: item.id || '',
             file_name: item.file_name || 'Unknown',

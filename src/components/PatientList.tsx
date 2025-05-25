@@ -33,7 +33,7 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const safeFormatDate = (dateString: string | null): string => {
+  const safeFormatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     
     try {
@@ -71,13 +71,13 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
         return;
       }
 
-      if (!patientsData) {
+      if (!patientsData || !Array.isArray(patientsData)) {
         setPatients([]);
         return;
       }
 
       // Fetch document counts for each patient
-      const patientIds = patientsData.map(p => p.id);
+      const patientIds = patientsData.map(p => p?.id).filter(Boolean);
       
       const documentCounts: { [key: string]: number } = {};
       
@@ -90,9 +90,9 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
 
         if (documentsError) {
           console.error('Error fetching document counts:', documentsError);
-        } else if (documentsData) {
+        } else if (documentsData && Array.isArray(documentsData)) {
           documentsData.forEach(doc => {
-            if (doc.owner_id) {
+            if (doc?.owner_id) {
               documentCounts[doc.owner_id] = (documentCounts[doc.owner_id] || 0) + 1;
             }
           });
@@ -100,17 +100,19 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
       }
 
       // Combine patient data with document counts
-      const patientsWithCounts: Patient[] = patientsData.map(patient => ({
-        id: patient.id,
-        first_name: patient.first_name || '',
-        last_name: patient.last_name || '',
-        date_of_birth: patient.date_of_birth || '',
-        id_number: patient.id_number || undefined,
-        created_at: patient.created_at || '',
-        organization_id: patient.organization_id || undefined,
-        client_organization_id: patient.client_organization_id || undefined,
-        documentCount: documentCounts[patient.id] || 0
-      }));
+      const patientsWithCounts: Patient[] = patientsData
+        .filter(patient => patient && typeof patient === 'object')
+        .map(patient => ({
+          id: patient.id || '',
+          first_name: patient.first_name || '',
+          last_name: patient.last_name || '',
+          date_of_birth: patient.date_of_birth || '',
+          id_number: patient.id_number || undefined,
+          created_at: patient.created_at || '',
+          organization_id: patient.organization_id || undefined,
+          client_organization_id: patient.client_organization_id || undefined,
+          documentCount: documentCounts[patient.id] || 0
+        }));
 
       setPatients(patientsWithCounts);
     } catch (error) {
