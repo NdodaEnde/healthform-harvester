@@ -38,27 +38,27 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
 
       if (error) throw error;
 
-      if (data && Array.isArray(data)) {
+      if (data) {
         // Safe type conversion with proper validation
         const typedInvitations: Invitation[] = data
           .filter((item): item is NonNullable<typeof item> => {
             return item !== null && 
                    typeof item === 'object' &&
-                   'id' in item && item.id &&
-                   'email' in item && item.email &&
-                   'role' in item && item.role &&
-                   'created_at' in item && item.created_at &&
-                   'expires_at' in item && item.expires_at &&
-                   'token' in item && item.token;
+                   'id' in item && typeof item.id === 'string' &&
+                   'email' in item && typeof item.email === 'string' &&
+                   'role' in item && typeof item.role === 'string' &&
+                   'created_at' in item && typeof item.created_at === 'string' &&
+                   'expires_at' in item && typeof item.expires_at === 'string' &&
+                   'token' in item && typeof item.token === 'string';
           })
           .map(item => ({
-            id: String(item.id),
-            email: String(item.email),
-            role: String(item.role),
-            created_at: String(item.created_at),
-            expires_at: String(item.expires_at),
+            id: item.id as string,
+            email: item.email as string,
+            role: item.role as string,
+            created_at: item.created_at as string,
+            expires_at: item.expires_at as string,
             accepted_at: item.accepted_at ? String(item.accepted_at) : null,
-            token: String(item.token)
+            token: item.token as string
           }));
 
         setInvitations(typedInvitations);
