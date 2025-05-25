@@ -24,7 +24,28 @@ export default function OrganizationsList() {
           .order("name");
           
         if (error) throw error;
-        setOrganizations(data || []);
+        
+        // Type the data safely
+        const typedOrganizations: Organization[] = (data || [])
+          .filter((org): org is any => org && typeof org === 'object' && 'id' in org)
+          .map(org => ({
+            id: String(org.id || ''),
+            name: String(org.name || ''),
+            organization_type: String(org.organization_type || ''),
+            contact_email: org.contact_email ? String(org.contact_email) : null,
+            contact_phone: org.contact_phone ? String(org.contact_phone) : null,
+            address: org.address || null,
+            settings: org.settings || null,
+            created_at: String(org.created_at || ''),
+            updated_at: String(org.updated_at || ''),
+            is_active: Boolean(org.is_active),
+            logo_url: org.logo_url ? String(org.logo_url) : null,
+            signature_url: org.signature_url ? String(org.signature_url) : null,
+            stamp_url: org.stamp_url ? String(org.stamp_url) : null,
+            industry: org.industry ? String(org.industry) : null
+          }));
+        
+        setOrganizations(typedOrganizations);
       } catch (error: any) {
         console.error("Error fetching organizations:", error);
         toast({

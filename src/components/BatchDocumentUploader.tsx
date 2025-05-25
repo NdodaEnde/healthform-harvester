@@ -243,7 +243,7 @@ const BatchDocumentUploader = ({
             const { data, error } = await supabase
               .from('documents')
               .select('status')
-              .eq('id', file.documentId)
+              .eq('id', file.documentId as any)
               .single();
               
             if (!error && data && 'status' in data) {

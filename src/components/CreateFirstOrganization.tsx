@@ -45,7 +45,7 @@ const CreateFirstOrganization = () => {
               name
             )
           `)
-          .eq("user_id", user.id)
+          .eq("user_id", user.id as any)
           .limit(1);
           
         if (error) {

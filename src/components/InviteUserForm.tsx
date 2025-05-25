@@ -54,7 +54,7 @@ export default function InviteUserForm({ organizationId, onSuccess }: InviteUser
           token,
           invited_by: user.id,
           expires_at: expires_at.toISOString()
-        });
+        } as any);
 
       if (error) {
         throw error;
@@ -64,7 +64,7 @@ export default function InviteUserForm({ organizationId, onSuccess }: InviteUser
       const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("name")
-        .eq("id", organizationId)
+        .eq("id", organizationId as any)
         .single();
 
       if (orgError) {
@@ -73,7 +73,7 @@ export default function InviteUserForm({ organizationId, onSuccess }: InviteUser
       }
 
       // Send invitation email
-      const organizationName = org?.name || "HealthForm Harvester";
+      const organizationName = (org && typeof org === 'object' && 'name' in org) ? org.name as string : "HealthForm Harvester";
       const { success, error: emailError } = await sendInvitationEmail(email, organizationName, token);
       
       if (!success && emailError) {
@@ -81,7 +81,7 @@ export default function InviteUserForm({ organizationId, onSuccess }: InviteUser
         toast({
           title: "Warning",
           description: `Invitation created but email delivery failed. You may need to send the invitation link manually.`,
-          variant: "warning",
+          variant: "destructive",
         });
       } else {
         toast({

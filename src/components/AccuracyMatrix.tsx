@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +30,7 @@ const AccuracyMatrix = () => {
       const { data, error } = await supabase
         .from('documents')
         .select('id, document_type, created_at, extracted_data, status')
-        .eq('organization_id', currentOrganization.id)
+        .eq('organization_id', currentOrganization.id as any)
         .not('status', 'eq', 'pending')
         .order('created_at', { ascending: false })
         .limit(50);

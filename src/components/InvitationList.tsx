@@ -34,7 +34,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { data, error } = await supabase
         .from("invitations")
         .select("*")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", organizationId as any)
         .is("accepted_at", null) // This ensures we only get pending invitations
         .order("created_at", { ascending: false });
 
@@ -43,7 +43,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       }
 
       const typedInvitations: Invitation[] = (data || [])
-        .filter((invitation): invitation is any => invitation && typeof invitation === 'object' && 'id' in invitation)
+        .filter((invitation): invitation is any => invitation && typeof invitation === 'object' && 'id' in invitation && invitation !== null)
         .map(invitation => ({
           id: String(invitation.id || ''),
           email: String(invitation.email || ''),
@@ -77,7 +77,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { error } = await supabase
         .from("invitations")
         .delete()
-        .eq("id", id);
+        .eq("id", id as any);
 
       if (error) {
         throw error;
@@ -114,8 +114,8 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         .from("invitations")
         .update({
           expires_at: expires_at.toISOString()
-        })
-        .eq("id", invitation.id);
+        } as any)
+        .eq("id", invitation.id as any);
 
       if (error) {
         throw error;
@@ -125,7 +125,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
       const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("name")
-        .eq("id", organizationId)
+        .eq("id", organizationId as any)
         .single();
 
       if (orgError) {
@@ -144,7 +144,7 @@ export default function InvitationList({ organizationId, onRefresh }: Invitation
         const { data, error: fetchError } = await supabase
           .from("invitations")
           .select("token")
-          .eq("id", invitation.id)
+          .eq("id", invitation.id as any)
           .single();
           
         if (fetchError) {

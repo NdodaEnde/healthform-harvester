@@ -45,9 +45,9 @@ const CertificateValidator = () => {
       const { data, error } = await supabase
         .from('documents')
         .select('id, file_name, extracted_data, status, created_at, owner_id')
-        .eq('organization_id', currentOrganization.id)
-        .eq('document_type', 'certificate-fitness')
-        .eq('status', 'processed')
+        .eq('organization_id', currentOrganization.id as any)
+        .eq('document_type', 'certificate-fitness' as any)
+        .eq('status', 'processed' as any)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -76,7 +76,7 @@ const CertificateValidator = () => {
       const { data, error } = await supabase
         .from('patients')
         .select('id, first_name, last_name')
-        .eq('organization_id', currentOrganization.id);
+        .eq('organization_id', currentOrganization.id as any);
 
       if (error) throw error;
 
@@ -112,8 +112,8 @@ const CertificateValidator = () => {
       
       const { error } = await supabase
         .from('documents')
-        .update(updateData)
-        .eq('id', documentId);
+        .update(updateData as any)
+        .eq('id', documentId as any);
 
       if (error) throw error;
 
