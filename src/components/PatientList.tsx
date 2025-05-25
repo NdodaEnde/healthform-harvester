@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,11 +56,11 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
       let query = supabase
         .from('patients')
         .select('id, first_name, last_name, date_of_birth, id_number, created_at, organization_id, client_organization_id')
-        .eq('organization_id', organizationId as any);
+        .eq('organization_id', organizationId);
 
       // Add client organization filter if provided
       if (clientOrganizationId) {
-        query = query.eq('client_organization_id', clientOrganizationId as any);
+        query = query.eq('client_organization_id', clientOrganizationId);
       }
 
       const { data: patientsData, error: patientsError } = await query.order('created_at', { ascending: false });
@@ -85,7 +86,7 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
           .from('documents')
           .select('owner_id')
           .in('owner_id', patientIds)
-          .eq('organization_id', organizationId as any);
+          .eq('organization_id', organizationId);
 
         if (documentsError) {
           console.error('Error fetching document counts:', documentsError);
