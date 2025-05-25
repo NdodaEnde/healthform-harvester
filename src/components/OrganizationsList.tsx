@@ -46,19 +46,26 @@ const OrganizationsList = () => {
         return;
       }
 
-      const typedOrganizations: Organization[] = data
-        .filter((org) => org !== null)
-        .map(org => ({
-          id: org.id || '',
-          name: org.name || '',
-          organization_type: org.organization_type || '',
-          contact_email: org.contact_email || null,
-          contact_phone: org.contact_phone || null,
-          address: org.address,
-          settings: org.settings,
-          created_at: org.created_at || '',
-          updated_at: org.updated_at || ''
-        }));
+      const validOrganizations = data.filter((item): item is NonNullable<typeof item> => {
+        return item !== null && 
+               typeof item === 'object' &&
+               typeof item.id === 'string' &&
+               typeof item.name === 'string' &&
+               typeof item.organization_type === 'string' &&
+               typeof item.created_at === 'string';
+      });
+
+      const typedOrganizations: Organization[] = validOrganizations.map(item => ({
+        id: item.id,
+        name: item.name,
+        organization_type: item.organization_type,
+        contact_email: item.contact_email || null,
+        contact_phone: item.contact_phone || null,
+        address: item.address,
+        settings: item.settings,
+        created_at: item.created_at,
+        updated_at: item.updated_at || item.created_at
+      }));
 
       setOrganizations(typedOrganizations);
     } catch (error) {

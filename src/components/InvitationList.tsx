@@ -39,26 +39,26 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       if (error) throw error;
 
       if (data && Array.isArray(data)) {
-        const typedInvitations: Invitation[] = data
-          .filter((invitation): invitation is NonNullable<typeof invitation> => 
-            invitation !== null && 
-            typeof invitation === 'object' &&
-            'id' in invitation &&
-            'email' in invitation &&
-            'role' in invitation &&
-            'created_at' in invitation &&
-            'expires_at' in invitation &&
-            'token' in invitation
-          )
-          .map(invitation => ({
-            id: String(invitation.id || ''),
-            email: String(invitation.email || ''),
-            role: String(invitation.role || ''),
-            created_at: String(invitation.created_at || ''),
-            expires_at: String(invitation.expires_at || ''),
-            accepted_at: invitation.accepted_at ? String(invitation.accepted_at) : null,
-            token: String(invitation.token || '')
-          }));
+        const validInvitations = data.filter((item): item is NonNullable<typeof item> => {
+          return item !== null && 
+                 typeof item === 'object' &&
+                 typeof item.id === 'string' &&
+                 typeof item.email === 'string' &&
+                 typeof item.role === 'string' &&
+                 typeof item.created_at === 'string' &&
+                 typeof item.expires_at === 'string' &&
+                 typeof item.token === 'string';
+        });
+
+        const typedInvitations: Invitation[] = validInvitations.map(item => ({
+          id: item.id,
+          email: item.email,
+          role: item.role,
+          created_at: item.created_at,
+          expires_at: item.expires_at,
+          accepted_at: item.accepted_at ? String(item.accepted_at) : null,
+          token: item.token
+        }));
 
         setInvitations(typedInvitations);
       } else {
