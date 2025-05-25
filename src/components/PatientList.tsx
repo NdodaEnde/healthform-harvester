@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,10 +45,10 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       let query = supabase
         .from("patients")
         .select("*")
-        .eq("organization_id", organizationId);
+        .eq("organization_id" as any, organizationId as any);
 
       if (clientOrganizationId) {
-        query = query.eq("client_organization_id", clientOrganizationId);
+        query = query.eq("client_organization_id" as any, clientOrganizationId as any);
       }
 
       const { data, error } = await query.order("created_at", { ascending: false });
@@ -135,8 +134,8 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       const { data, error } = await supabase
         .from('documents')
         .select('id, status, document_type')
-        .eq('owner_id', patientId)
-        .eq('organization_id', organizationId);
+        .eq('owner_id' as any, patientId as any)
+        .eq('organization_id' as any, organizationId as any);
 
       if (error) {
         console.error('Error checking documents:', error);
@@ -148,7 +147,7 @@ const PatientList = ({ organizationId, clientOrganizationId }: PatientListProps)
       }
 
       const hasDocuments = data.length > 0;
-      const hasCertificates = data.some(doc => 
+      const hasCertificates = data.some((doc: any) => 
         doc && doc.document_type && 
         ['certificate-fitness', 'certificate', 'medical-certificate'].includes(doc.document_type)
       );

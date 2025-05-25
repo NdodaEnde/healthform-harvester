@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,7 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { data: organizationUsers, error } = await supabase
         .from("organization_users")
         .select("*")
-        .eq("organization_id", organizationId)
+        .eq("organization_id" as any, organizationId as any)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -71,7 +70,7 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, email")
-        .in("id", userIds);
+        .in("id" as any, userIds as any);
         
       if (profilesError) throw profilesError;
 
@@ -108,8 +107,8 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { error } = await supabase
         .from("organization_users")
         .update({ role: newRole })
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .eq("user_id" as any, userId as any)
+        .eq("organization_id" as any, organizationId as any);
 
       if (error) throw error;
 
@@ -154,8 +153,8 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       const { error } = await supabase
         .from("organization_users")
         .delete()
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .eq("user_id" as any, userId as any)
+        .eq("organization_id" as any, organizationId as any);
 
       if (error) throw error;
 

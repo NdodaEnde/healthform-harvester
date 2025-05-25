@@ -49,7 +49,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       const { data: patientData, error: patientError } = await supabase
         .from('patients')
         .select('id, first_name, last_name')
-        .eq('id', patientId)
+        .eq('id' as any, patientId as any)
         .maybeSingle();
 
       if (patientError) {
@@ -70,8 +70,8 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('id, file_name, document_type, created_at, status')
-        .eq('owner_id', patientId)
-        .eq('organization_id', organizationId)
+        .eq('owner_id' as any, patientId as any)
+        .eq('organization_id' as any, organizationId as any)
         .order('created_at', { ascending: false });
 
       if (documentsError) {
