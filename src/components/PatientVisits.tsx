@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -111,10 +112,10 @@ const getDocumentUrl = (doc: Document): string | null => {
   if (doc.file_path) {
     // Try both buckets - medical-documents is the default
     const bucketName = 'medical-documents';
-    const url = `${supabase.storageUrl}/object/public/${bucketName}/${doc.file_path}`;
+    const url = `https://wgkbsiczgyaqmgoyirjs.supabase.co/storage/v1/object/public/${bucketName}/${doc.file_path}`;
     
     // Also check the "documents" bucket as fallback
-    const documentsBucketUrl = `${supabase.storageUrl}/object/public/documents/${doc.file_path}`;
+    const documentsBucketUrl = `https://wgkbsiczgyaqmgoyirjs.supabase.co/storage/v1/object/public/documents/${doc.file_path}`;
     
     // Return the URL - we'll determine which one works when loading the document
     return url;
@@ -136,7 +137,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('id', patientId)
+        .eq('id', patientId as any)
         .single();
       
       if (error) throw error;
@@ -160,7 +161,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
         const { data: patientDocuments, error: patientDocsError } = await supabase
           .from('documents')
           .select('*')
-          .in('id', documentIds);
+          .in('id', documentIds as any);
         
         if (patientDocsError) {
           console.error("Error fetching patient documents:", patientDocsError);
@@ -197,7 +198,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId as any)
         .not('status', 'eq', 'failed') // Skip failed documents
         .order('created_at', { ascending: false });
       

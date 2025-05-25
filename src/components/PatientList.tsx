@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,8 +64,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-
-
 const PatientList = ({ 
   filters, 
   sortOptions, 
@@ -98,9 +97,9 @@ const PatientList = ({
         .select('*');
       
       if (currentClient) {
-        query = query.eq('client_organization_id', currentClient.id);
+        query = query.eq('client_organization_id', currentClient.id as any);
       } else if (organizationId) {
-        query = query.eq('organization_id', organizationId);
+        query = query.eq('organization_id', organizationId as any);
       }
       
       if (searchTerm) {
@@ -108,7 +107,7 @@ const PatientList = ({
       }
       
       if (filterGender && filterGender !== "all") {
-        query = query.eq('gender', filterGender);
+        query = query.eq('gender', filterGender as any);
       }
       
       if (dateFilter.startDate && dateFilter.endDate) {
@@ -123,8 +122,53 @@ const PatientList = ({
         throw error;
       }
       
-      // Explicitly cast the response to PatientInfo[] to fix type issues
-      return (data || []) as PatientInfo[];
+      // Transform raw Supabase data to PatientInfo format
+      return (data || []).map((p: any): PatientInfo => {
+        let contactInfo: ContactInfo | null = null;
+        if (p.contact_info) {
+          if (typeof p.contact_info === 'string') {
+            try {
+              contactInfo = JSON.parse(p.contact_info);
+            } catch (e) {
+              console.error("Failed to parse contact_info string:", e);
+            }
+          } else {
+            contactInfo = p.contact_info as ContactInfo;
+          }
+        }
+
+        let medicalHistory: MedicalHistoryData | null = null;
+        if (p.medical_history) {
+          if (typeof p.medical_history === 'string') {
+            try {
+              medicalHistory = JSON.parse(p.medical_history);
+            } catch (e) {
+              console.error("Failed to parse medical_history string:", e);
+            }
+          } else {
+            medicalHistory = p.medical_history as MedicalHistoryData;
+          }
+        }
+
+        return {
+          id: String(p.id),
+          first_name: String(p.first_name || ''),
+          last_name: String(p.last_name || ''),
+          date_of_birth: p.date_of_birth,
+          gender: p.gender,
+          contact_info: contactInfo,
+          medical_history: medicalHistory,
+          organization_id: p.organization_id,
+          client_organization_id: p.client_organization_id,
+          created_at: String(p.created_at),
+          updated_at: String(p.updated_at),
+          id_number: p.id_number,
+          birthdate_from_id: p.birthdate_from_id,
+          gender_from_id: p.gender_from_id,
+          citizenship_status: p.citizenship_status,
+          id_number_valid: p.id_number_valid
+        };
+      });
     },
     enabled: !!organizationId,
   });
@@ -135,7 +179,7 @@ const PatientList = ({
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId as any);
       
       if (error) throw error;
       return data || [];
@@ -143,53 +187,7 @@ const PatientList = ({
     enabled: !!organizationId
   });
 
-  const patients = patientData?.map(p => {
-    let contactInfo: ContactInfo | null = null;
-    if (p.contact_info) {
-      if (typeof p.contact_info === 'string') {
-        try {
-          contactInfo = JSON.parse(p.contact_info);
-        } catch (e) {
-          console.error("Failed to parse contact_info string:", e);
-        }
-      } else {
-        contactInfo = p.contact_info as ContactInfo;
-      }
-    }
-
-    let medicalHistory: MedicalHistoryData | null = null;
-    if (p.medical_history) {
-      if (typeof p.medical_history === 'string') {
-        try {
-          medicalHistory = JSON.parse(p.medical_history);
-        } catch (e) {
-          console.error("Failed to parse medical_history string:", e);
-        }
-      } else {
-        medicalHistory = p.medical_history as MedicalHistoryData;
-      }
-    }
-
-    return {
-      id: p.id,
-      first_name: p.first_name,
-      last_name: p.last_name,
-      date_of_birth: p.date_of_birth,
-      gender: p.gender,
-      contact_info: contactInfo,
-      medical_history: medicalHistory,
-      organization_id: p.organization_id,
-      client_organization_id: p.client_organization_id,
-      created_at: p.created_at,
-      updated_at: p.updated_at,
-      // South African ID number fields
-      id_number: p.id_number,
-      birthdate_from_id: p.birthdate_from_id,
-      gender_from_id: p.gender_from_id,
-      citizenship_status: p.citizenship_status,
-      id_number_valid: p.id_number_valid
-    };
-  }) || [];
+  const patients = patientData || [];
 
   const datePresets = [
     { label: "All time", days: null },
@@ -444,12 +442,14 @@ const PatientList = ({
     };
 
     documentsData.forEach(doc => {
-      if (doc.status === 'processed') {
-        stats.processed++;
-      } else if (doc.status === 'processing') {
-        stats.processing++;
-      } else if (doc.status === 'failed') {
-        stats.failed++;
+      if (doc && typeof doc === 'object' && 'status' in doc) {
+        if (doc.status === 'processed') {
+          stats.processed++;
+        } else if (doc.status === 'processing') {
+          stats.processing++;
+        } else if (doc.status === 'failed') {
+          stats.failed++;
+        }
       }
     });
 

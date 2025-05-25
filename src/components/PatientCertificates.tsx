@@ -233,33 +233,35 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({ patientId, or
       });
       
       // Add review status from localStorage to each document
-      const docsWithReviewStatus = filteredDocs.map(doc => {
-        if (!doc || typeof doc !== 'object') return null;
-        
-        // Add calculated examination date if missing but has valid_until
-        const extractedData = doc.extracted_data as ExtractedData | null;
-        if (extractedData?.structured_data?.certification?.valid_until && 
-            !extractedData?.structured_data?.certification?.examination_date && 
-            !extractedData?.structured_data?.examination_results?.date) {
-          
-          const examDate = getExaminationDate(extractedData.structured_data.certification.valid_until);
-          if (examDate && extractedData.structured_data.certification) {
-            extractedData.structured_data.certification.examination_date = examDate;
+      const docsWithReviewStatus = filteredDocs
+        .filter((doc): doc is NonNullable<typeof doc> => 
+          doc !== null && typeof doc === 'object'
+        )
+        .map(doc => {
+          // Add calculated examination date if missing but has valid_until
+          const extractedData = doc.extracted_data as ExtractedData | null;
+          if (extractedData?.structured_data?.certification?.valid_until && 
+              !extractedData?.structured_data?.certification?.examination_date && 
+              !extractedData?.structured_data?.examination_results?.date) {
+            
+            const examDate = getExaminationDate(extractedData.structured_data.certification.valid_until);
+            if (examDate && extractedData.structured_data.certification) {
+              extractedData.structured_data.certification.examination_date = examDate;
+            }
           }
-        }
-        
-        return {
-          id: String(doc.id || ''),
-          file_name: String(doc.file_name || ''),
-          file_path: String(doc.file_path || ''),
-          status: String(doc.status || ''),
-          document_type: doc.document_type ? String(doc.document_type) : null,
-          processed_at: doc.processed_at ? String(doc.processed_at) : null,
-          created_at: String(doc.created_at || ''),
-          extracted_data: extractedData,
-          reviewStatus: getDocumentReviewStatus(String(doc.id || ''))
-        };
-      }).filter((doc): doc is Document & { reviewStatus: ReviewStatus } => doc !== null);
+          
+          return {
+            id: String(doc.id || ''),
+            file_name: String(doc.file_name || ''),
+            file_path: String(doc.file_path || ''),
+            status: String(doc.status || ''),
+            document_type: doc.document_type ? String(doc.document_type) : null,
+            processed_at: doc.processed_at ? String(doc.processed_at) : null,
+            created_at: String(doc.created_at || ''),
+            extracted_data: extractedData,
+            reviewStatus: getDocumentReviewStatus(String(doc.id || ''))
+          };
+        });
       
       console.log('Certificates after filtering:', docsWithReviewStatus.length);
       return docsWithReviewStatus;
