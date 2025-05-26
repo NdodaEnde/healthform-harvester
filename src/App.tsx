@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -225,8 +226,16 @@ function App() {
                         } />
                         
                         {/* New normalized system routes */}
-                        <Route path="/my/organizations" element={<MyOrganizationsPage />} />
-                        <Route path="/my/patients" element={<MyPatientsPage />} />
+                        <Route path="/my/organizations" element={
+                          <OrganizationProtectedRoute>
+                            <MyOrganizationsPage />
+                          </OrganizationProtectedRoute>
+                        } />
+                        <Route path="/my/patients" element={
+                          <OrganizationProtectedRoute>
+                            <MyPatientsPage />
+                          </OrganizationProtectedRoute>
+                        } />
                         
                         {/* 404 Route - This should be inside nested routes to handle protected routes properly */}
                         <Route path="*" element={<NotFound />} />
