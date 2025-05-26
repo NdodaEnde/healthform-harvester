@@ -1,283 +1,214 @@
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Loader2, Trash2, User, RefreshCw } from "lucide-react";
-import { format, isValid } from "date-fns";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Users, Trash2, UserCog } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface OrganizationUser {
   id: string;
-  organization_id: string;
   user_id: string;
   role: string;
-  created_at: string;
   email?: string;
+  full_name?: string;
+  created_at: string;
 }
 
 interface UserRoleManagerProps {
-  organizationId: string;
+  organizationId?: string;
 }
 
-export default function UserRoleManager({ organizationId }: UserRoleManagerProps) {
+const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => {
   const [users, setUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const { currentOrganization } = useOrganization();
 
-  const safeFormatDate = (dateString: string | null): string => {
-    if (!dateString) return 'N/A';
-    
-    try {
-      const date = new Date(dateString);
-      if (!isValid(date)) {
-        console.warn('Invalid date:', dateString);
-        return 'Invalid date';
-      }
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      console.error('Error formatting date:', dateString, error);
-      return 'Invalid date';
-    }
-  };
+  const orgId = organizationId || currentOrganization?.id;
 
   const fetchUsers = async () => {
-    if (!organizationId) return;
-    
-    setLoading(true);
     try {
-      // First get the current user's info so we can prevent self-deletion
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setCurrentUserEmail(user.email);
-      }
+      setLoading(true);
+      if (!orgId) return;
 
-      // Get organization users
-      const { data: organizationUsers, error } = await supabase
-        .from("organization_users")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false });
+      // First get organization users
+      const { data: orgUsers, error: orgError } = await supabase
+        .from('organization_users')
+        .select('*')
+        .eq('organization_id', orgId);
 
-      if (error) throw error;
+      if (orgError) throw orgError;
 
-      if (!organizationUsers) {
-        setUsers([]);
-        return;
-      }
-
-      // Get emails from profiles table
-      const userIds = organizationUsers.map(ou => ou.user_id).filter(Boolean);
+      // Then get user profiles for additional info
+      const userIds = orgUsers?.map(ou => ou.user_id) || [];
+      
       if (userIds.length === 0) {
         setUsers([]);
         return;
       }
 
       const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, email")
-        .in("id", userIds);
-        
-      if (profilesError) throw profilesError;
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds);
 
-      // Combine organization users with profiles
-      const usersWithEmail = organizationUsers.map(orgUser => {
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        // Continue without profile data
+      }
+
+      // Merge the data
+      const usersWithProfiles = orgUsers?.map(orgUser => {
         const profile = profiles?.find(p => p.id === orgUser.user_id);
         return {
           ...orgUser,
-          email: profile?.email || "Unknown Email"
+          email: profile?.email,
+          full_name: profile?.full_name
         };
-      });
+      }) || [];
 
-      setUsers(usersWithEmail);
-    } catch (error: any) {
-      console.error("Error fetching users:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load users",
-        variant: "destructive",
-      });
+      setUsers(usersWithProfiles);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (organizationId) {
-      fetchUsers();
-    }
-  }, [organizationId]);
+    fetchUsers();
+  }, [orgId]);
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
       const { error } = await supabase
-        .from("organization_users")
+        .from('organization_users')
         .update({ role: newRole })
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .eq('user_id', userId)
+        .eq('organization_id', orgId);
 
       if (error) throw error;
-
-      // Update local state
-      setUsers(
-        users.map(user => 
-          user.user_id === userId 
-            ? { ...user, role: newRole } 
-            : user
-        )
-      );
-
-      toast({
-        title: "Role Updated",
-        description: "User role has been updated successfully",
-      });
-    } catch (error: any) {
-      console.error("Error updating user role:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update user role",
-        variant: "destructive",
-      });
+      
+      toast.success('User role updated successfully');
+      fetchUsers(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast.error('Failed to update user role');
     }
   };
 
-  const removeUser = async (userId: string, userEmail: string) => {
-    // Prevent removing yourself
-    if (userEmail === currentUserEmail) {
-      toast({
-        title: "Cannot Remove Yourself",
-        description: "You cannot remove your own account from the organization",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const confirmed = window.confirm(`Are you sure you want to remove ${userEmail} from this organization?`);
-    if (!confirmed) return;
-
+  const removeUser = async (userId: string) => {
     try {
+      if (!confirm('Are you sure you want to remove this user from the organization?')) {
+        return;
+      }
+
       const { error } = await supabase
-        .from("organization_users")
+        .from('organization_users')
         .delete()
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .eq('user_id', userId)
+        .eq('organization_id', orgId);
 
       if (error) throw error;
-
-      // Update local state
-      setUsers(users.filter(user => user.user_id !== userId));
-
-      toast({
-        title: "User Removed",
-        description: "User has been removed from the organization",
-      });
-    } catch (error: any) {
-      console.error("Error removing user:", error);
-      toast({
-        title: "Error",
-        description: "Failed to remove user",
-        variant: "destructive",
-      });
+      
+      toast.success('User removed from organization');
+      fetchUsers(); // Refresh the list
+    } catch (error) {
+      console.error('Error removing user:', error);
+      toast.error('Failed to remove user');
     }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-6">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span>Loading users...</span>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            User Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">Loading...</div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-xl">Organization Members</CardTitle>
-        <Button variant="outline" size="sm" onClick={fetchUsers}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UserCog className="h-5 w-5" />
+          User Management ({users.length})
+        </CardTitle>
+        <CardDescription>
+          Manage user roles and permissions for this organization
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {users.length === 0 ? (
-          <div className="text-center py-4 text-muted-foreground">
-            No users found in this organization
+          <div className="text-center py-8">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Users</h3>
+            <p className="text-muted-foreground">
+              No users are currently assigned to this organization.
+            </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-2 text-muted-foreground" />
+          <div className="space-y-4">
+            {users.map((user) => (
+              <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">
+                      {user.full_name || user.email || 'Unknown User'}
+                    </span>
+                    <Badge variant="outline">{user.role}</Badge>
+                  </div>
+                  {user.email && (
+                    <div className="text-sm text-muted-foreground mt-1">
                       {user.email}
-                      {user.email === currentUserEmail && (
-                        <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                          You
-                        </span>
-                      )}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={user.role}
-                      onValueChange={(value) => updateUserRole(user.user_id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Administrator</SelectItem>
-                        <SelectItem value="staff">Staff Member</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    {safeFormatDate(user.created_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeUser(user.user_id, user.email || "")}
-                      disabled={user.email === currentUserEmail}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  )}
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Added: {new Date(user.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={user.role}
+                    onValueChange={(newRole) => updateUserRole(user.user_id, newRole)}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeUser(user.user_id)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>
   );
-}
+};
+
+export default UserRoleManager;

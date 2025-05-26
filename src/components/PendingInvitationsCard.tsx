@@ -1,106 +1,145 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { Mail, ArrowRight } from "lucide-react";
 
-export function PendingInvitationsCard() {
-  const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Mail, Clock, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+  expires_at: string;
+}
+
+const PendingInvitationsCard: React.FC = () => {
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { currentOrganization } = useOrganization();
+
+  const fetchInvitations = async () => {
+    try {
+      setLoading(true);
+      if (!currentOrganization?.id) return;
+
+      const { data, error } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('organization_id', currentOrganization.id)
+        .is('accepted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setInvitations(data || []);
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+      toast.error('Failed to load pending invitations');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadInvitations = async () => {
-      if (!user?.email) return;
+    fetchInvitations();
+  }, [currentOrganization?.id]);
+
+  const cancelInvitation = async (invitationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('invitations')
+        .delete()
+        .eq('id', invitationId);
+
+      if (error) throw error;
       
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("invitations")
-          .select("*, organizations:organization_id(*)")
-          .eq("email", user.email)
-          .is("accepted_at", null);
-          
-        if (error) throw error;
-        setPendingInvitations(data || []);
-      } catch (error) {
-        console.error("Error loading invitations:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadInvitations();
-  }, [user]);
-  
-  // If no user, don't render
-  if (!user) {
-    return null;
-  }
-  
-  // In the setup page, we do want to show a message even if there are no invitations
-  // In other contexts, we can hide if there are no invitations
-  const isSetupPage = window.location.pathname === "/setup";
-  if (pendingInvitations.length === 0 && !loading && !isSetupPage) {
-    return null;
-  }
-  
-  const handleAcceptInvite = (token: string) => {
-    navigate(`/accept-invite?token=${token}`);
+      toast.success('Invitation cancelled');
+      fetchInvitations(); // Refresh the list
+    } catch (error) {
+      console.error('Error cancelling invitation:', error);
+      toast.error('Failed to cancel invitation');
+    }
   };
-  
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Pending Invitations
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">Loading...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (invitations.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Pending Invitations
+          </CardTitle>
+          <CardDescription>
+            No pending invitations at this time
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
-      <CardHeader className="pb-2">
+    <Card>
+      <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Mail className="h-5 w-5 text-amber-500" />
-          <span>Pending Invitations</span>
+          <Mail className="h-5 w-5" />
+          Pending Invitations ({invitations.length})
         </CardTitle>
+        <CardDescription>
+          Users who have been invited but haven't joined yet
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <div className="flex justify-center py-4">
-            <div className="animate-spin h-5 w-5 border-2 border-amber-500 border-t-transparent rounded-full"></div>
-          </div>
-        ) : pendingInvitations.length === 0 ? (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">
-              {window.location.pathname === "/setup" 
-                ? "You don't have any pending invitations. Create your own organization below."
-                : "You don't have any pending invitations."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              You have {pendingInvitations.length} pending invitation{pendingInvitations.length !== 1 ? 's' : ''} to join organization{pendingInvitations.length !== 1 ? 's' : ''}:
-            </p>
-            
-            <div className="space-y-2">
-              {pendingInvitations.map(invite => (
-                <div key={invite.id} className="flex items-center justify-between p-3 rounded-md bg-white dark:bg-gray-800 border">
-                  <div>
-                    <p className="font-medium">{invite.organizations?.name || "Unknown Organization"}</p>
-                    <p className="text-sm text-muted-foreground">Invited on {new Date(invite.created_at).toLocaleDateString()}</p>
-                  </div>
-                  <Button 
-                    variant="secondary" 
-                    size="sm"
-                    onClick={() => handleAcceptInvite(invite.token)}
-                    className="flex items-center gap-1"
-                  >
-                    <span>Accept</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
+        <div className="space-y-4">
+          {invitations.map((invitation) => (
+            <div key={invitation.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{invitation.email}</span>
+                  <Badge variant="outline">{invitation.role}</Badge>
                 </div>
-              ))}
+                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Sent: {new Date(invitation.created_at).toLocaleDateString()}
+                  </span>
+                  <span>
+                    Expires: {new Date(invitation.expires_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => cancelInvitation(invitation.id)}
+                className="text-red-600 hover:text-red-700"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
-}
+};
+
+export default PendingInvitationsCard;

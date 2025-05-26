@@ -1,179 +1,147 @@
 
-import { useState } from "react";
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { useForm } from "react-hook-form";
-import { Organization } from "@/types/organization";
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
+
+const clientSchema = z.object({
+  name: z.string().min(1, 'Organization name is required'),
+  contact_email: z.string().email().optional().or(z.literal('')),
+  contact_phone: z.string().optional(),
+});
+
+type ClientFormData = z.infer<typeof clientSchema>;
 
 interface AddClientFormProps {
-  serviceProviderId: string;
-  potentialClients: Organization[];
-  onClientAdded: () => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export default function AddClientForm({ 
-  serviceProviderId, 
-  potentialClients, 
-  onClientAdded 
-}: AddClientFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const form = useForm({
-    defaultValues: {
-      clientId: "",
-      startDate: new Date().toISOString().split("T")[0]
-    }
+const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) => {
+  const [loading, setLoading] = useState(false);
+  const { currentOrganization } = useOrganization();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset
+  } = useForm<ClientFormData>({
+    resolver: zodResolver(clientSchema)
   });
-  
-  const onSubmit = async (data: { clientId: string; startDate: string }) => {
-    if (!data.clientId) {
-      toast({
-        title: "Client required",
-        description: "Please select a client organization",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
+
+  const onSubmit = async (data: ClientFormData) => {
     try {
-      const { error } = await supabase
-        .from("organization_relationships")
+      setLoading(true);
+      
+      if (!currentOrganization?.id) {
+        toast.error('No organization selected');
+        return;
+      }
+
+      // First create the client organization
+      const { data: newOrg, error: orgError } = await supabase
+        .from('organizations')
         .insert({
-          service_provider_id: serviceProviderId,
-          client_id: data.clientId,
-          relationship_start_date: data.startDate,
+          name: data.name,
+          organization_type: 'client',
+          contact_email: data.contact_email || null,
+          contact_phone: data.contact_phone || null,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (orgError) throw orgError;
+
+      // Then create the relationship
+      const { error: relError } = await supabase
+        .from('organization_relationships')
+        .insert({
+          service_provider_id: currentOrganization.id,
+          client_id: newOrg.id,
+          relationship_start_date: new Date().toISOString().split('T')[0],
           is_active: true
         });
-        
-      if (error) throw error;
-      
-      toast({
-        title: "Client added",
-        description: "Client relationship has been created successfully",
-      });
-      
-      // Reset the form
-      form.reset({
-        clientId: "",
-        startDate: new Date().toISOString().split("T")[0]
-      });
-      
-      // Refresh the client lists
-      if (onClientAdded) onClientAdded();
-    } catch (error: any) {
-      console.error("Error adding client:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add client",
-        variant: "destructive",
-      });
+
+      if (relError) throw relError;
+
+      toast.success('Client organization created successfully');
+      reset();
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      console.error('Error creating client:', error);
+      toast.error('Failed to create client organization');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-  
-  const formatOrgType = (type: string) => {
-    switch (type) {
-      case "direct_client":
-        return "Direct Client";
-      case "client":
-        return "Client";
-      default:
-        return type;
-    }
-  };
-  
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="clientId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Select Client Organization</FormLabel>
-              <Select 
-                onValueChange={field.onChange} 
-                value={field.value}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {potentialClients.length > 0 ? (
-                    potentialClients.map(client => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} ({formatOrgType(client.organization_type)})
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no_clients" disabled>
-                      No available clients
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="startDate"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Relationship Start Date</FormLabel>
-              <FormControl>
-                <Input type="date" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <Button 
-          type="submit"
-          className="w-full"
-          disabled={isSubmitting || potentialClients.length === 0}
-        >
-          {isSubmitting ? (
-            <>
-              <span className="mr-2">Adding</span>
-              <div className="h-4 w-4 border-2 border-current border-r-transparent rounded-full animate-spin"></div>
-            </>
-          ) : (
-            "Add Client"
-          )}
-        </Button>
-        
-        {potentialClients.length === 0 && (
-          <p className="text-sm text-gray-500 text-center">
-            No available clients to add. Create new organizations first.
-          </p>
-        )}
-      </form>
-    </Form>
+    <Card>
+      <CardHeader>
+        <CardTitle>Add New Client Organization</CardTitle>
+        <CardDescription>
+          Create a new client organization and establish a relationship
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Organization Name *</Label>
+            <Input
+              id="name"
+              {...register('name')}
+              placeholder="Enter organization name"
+            />
+            {errors.name && (
+              <p className="text-sm text-red-600">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contact_email">Contact Email</Label>
+            <Input
+              id="contact_email"
+              type="email"
+              {...register('contact_email')}
+              placeholder="Enter contact email"
+            />
+            {errors.contact_email && (
+              <p className="text-sm text-red-600">{errors.contact_email.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contact_phone">Contact Phone</Label>
+            <Input
+              id="contact_phone"
+              {...register('contact_phone')}
+              placeholder="Enter contact phone number"
+            />
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creating...' : 'Create Client'}
+            </Button>
+            {onCancel && (
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
-}
+};
+
+export default AddClientForm;

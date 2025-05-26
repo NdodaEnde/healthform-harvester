@@ -1,90 +1,79 @@
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, User, FileText, Calendar } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Search, User, Edit, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isValid } from 'date-fns';
-import { patientDataService } from '@/services/patientDataService';
-import type { DatabasePatient } from '@/types/database';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
-interface PatientWithDocCount extends DatabasePatient {
-  documentCount: number;
+interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender?: string;
+  id_number?: string;
+  created_at: string;
 }
 
 interface PatientListProps {
-  organizationId: string;
-  clientOrganizationId?: string;
+  onSelectPatient?: (patient: Patient) => void;
+  onEditPatient?: (patient: Patient) => void;
+  allowSelection?: boolean;
+  allowEdit?: boolean;
 }
 
-const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganizationId }) => {
-  const navigate = useNavigate();
-  const [patients, setPatients] = useState<PatientWithDocCount[]>([]);
+const PatientList: React.FC<PatientListProps> = ({
+  onSelectPatient,
+  onEditPatient,
+  allowSelection = false,
+  allowEdit = true
+}) => {
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const safeFormatDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'N/A';
-    
-    try {
-      const date = new Date(dateString);
-      if (!isValid(date)) {
-        console.warn('Invalid date:', dateString);
-        return 'Invalid date';
-      }
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      console.error('Error formatting date:', dateString, error);
-      return 'Invalid date';
-    }
-  };
+  const { getEffectiveOrganizationId } = useOrganization();
 
   const fetchPatients = async () => {
     try {
       setLoading(true);
+      const orgId = getEffectiveOrganizationId();
       
-      const patientsData = await patientDataService.fetchPatientsList(organizationId, clientOrganizationId);
-      
-      // Fetch document counts for each patient
-      const patientIds = patientsData.map(p => p.id).filter(Boolean) as string[];
-      const documentCounts: { [key: string]: number } = {};
-      
-      if (patientIds.length > 0) {
-        try {
-          const { data: documentsData, error: documentsError } = await supabase
-            .from('documents')
-            .select('owner_id')
-            .in('owner_id', patientIds)
-            .eq('organization_id', organizationId);
-
-          if (documentsError) {
-            console.error('Error fetching document counts:', documentsError);
-          } else if (documentsData && Array.isArray(documentsData)) {
-            documentsData.forEach(doc => {
-              if (doc?.owner_id) {
-                const ownerId = doc.owner_id;
-                documentCounts[ownerId] = (documentCounts[ownerId] || 0) + 1;
-              }
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching document counts:', error);
-        }
+      if (!orgId) {
+        console.log('No organization ID available');
+        return;
       }
 
-      // Combine patient data with document counts
-      const patientsWithCounts: PatientWithDocCount[] = patientsData.map(patient => ({
-        ...patient,
-        documentCount: documentCounts[patient.id] || 0
-      }));
+      // Check if current user has access to documents for this organization
+      const { data: accessCheck } = await supabase
+        .from('documents')
+        .select('owner_id')
+        .eq('organization_id', orgId)
+        .limit(1);
 
-      setPatients(patientsWithCounts);
+      if (!accessCheck) {
+        console.log('No access to organization documents');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('last_name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching patients:', error);
+        toast.error('Failed to load patients');
+        return;
+      }
+
+      setPatients(data || []);
     } catch (error) {
-      console.error('Error in fetchPatients:', error);
+      console.error('Error fetching patients:', error);
       toast.error('Failed to load patients');
     } finally {
       setLoading(false);
@@ -92,10 +81,8 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
   };
 
   useEffect(() => {
-    if (organizationId) {
-      fetchPatients();
-    }
-  }, [organizationId, clientOrganizationId]);
+    fetchPatients();
+  }, []);
 
   const filteredPatients = patients.filter(patient => {
     const searchLower = searchTerm.toLowerCase();
@@ -106,12 +93,17 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
     );
   });
 
-  const handlePatientClick = (patientId: string) => {
-    navigate(`/patients/${patientId}`);
+  const handlePatientClick = (patient: Patient) => {
+    if (allowSelection && onSelectPatient) {
+      onSelectPatient(patient);
+    }
   };
 
-  const handleAddPatient = () => {
-    navigate('/patients/new');
+  const handleEditClick = (e: React.MouseEvent, patient: Patient) => {
+    e.stopPropagation();
+    if (onEditPatient) {
+      onEditPatient(patient);
+    }
   };
 
   if (loading) {
@@ -133,10 +125,10 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
                 Patients
               </CardTitle>
               <CardDescription>
-                Manage patient records and medical documentation
+                Manage patient records and information
               </CardDescription>
             </div>
-            <Button onClick={handleAddPatient}>
+            <Button onClick={() => {}}>
               <Plus className="h-4 w-4 mr-2" />
               Add Patient
             </Button>
@@ -164,23 +156,19 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
               <p className="text-muted-foreground mb-4">
                 {searchTerm 
                   ? 'No patients match your search criteria.'
-                  : 'No patients have been added to your organization yet.'
+                  : 'No patients have been added yet.'
                 }
               </p>
-              {!searchTerm && (
-                <Button onClick={handleAddPatient}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Patient
-                </Button>
-              )}
             </div>
           ) : (
             <div className="space-y-4">
               {filteredPatients.map((patient) => (
                 <div 
                   key={patient.id} 
-                  className="border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
-                  onClick={() => handlePatientClick(patient.id)}
+                  className={`border rounded-lg p-4 transition-colors ${
+                    allowSelection ? 'hover:bg-accent cursor-pointer' : ''
+                  }`}
+                  onClick={() => handlePatientClick(patient)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -188,28 +176,31 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
                         {patient.first_name} {patient.last_name}
                       </h4>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        <span>DOB: {new Date(patient.date_of_birth).toLocaleDateString()}</span>
+                        {patient.gender && (
+                          <Badge variant="outline">
+                            {patient.gender}
+                          </Badge>
+                        )}
                         {patient.id_number && (
                           <span>ID: {patient.id_number}</span>
                         )}
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          DOB: {safeFormatDate(patient.date_of_birth)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          {patient.documentCount} document{patient.documentCount !== 1 ? 's' : ''}
-                        </span>
-                        <span>
-                          Added: {safeFormatDate(patient.created_at)}
-                        </span>
+                        <span>Added: {new Date(patient.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {patient.documentCount > 0 ? (
-                        <Badge variant="default">{patient.documentCount} docs</Badge>
-                      ) : (
-                        <Badge variant="secondary">No docs</Badge>
+                      {allowEdit && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={(e) => handleEditClick(e, patient)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       )}
+                      <Button variant="ghost" size="sm">
+                        <FileText className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
