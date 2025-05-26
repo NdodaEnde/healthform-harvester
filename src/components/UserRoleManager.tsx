@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,8 +42,14 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
 
       if (orgError) throw orgError;
 
+      // Handle case where orgUsers might be null or not an array
+      if (!orgUsers || !Array.isArray(orgUsers)) {
+        setUsers([]);
+        return;
+      }
+
       // Then get user profiles for additional info
-      const userIds = (orgUsers || []).map(ou => ou.user_id);
+      const userIds = orgUsers.map(ou => ou.user_id);
       
       if (userIds.length === 0) {
         setUsers([]);
@@ -59,8 +66,8 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
         // Continue without profile data
       }
 
-      // Merge the data with proper typing
-      const usersWithProfiles: OrganizationUser[] = (orgUsers || []).map(orgUser => {
+      // Merge the data with proper typing and error handling
+      const usersWithProfiles: OrganizationUser[] = orgUsers.map(orgUser => {
         const profile = (profiles || []).find(p => p.id === orgUser.user_id);
         return {
           id: orgUser.id || '',
@@ -76,6 +83,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Failed to load users');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
