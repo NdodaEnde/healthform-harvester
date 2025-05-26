@@ -9,16 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Plus, Search, User, FileText, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isValid } from 'date-fns';
+import { patientDataService } from '@/services/patientDataService';
+import type { DatabasePatient } from '@/types/database';
 
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  id_number?: string;
-  created_at: string;
-  organization_id?: string;
-  client_organization_id?: string;
+interface PatientWithDocCount extends DatabasePatient {
   documentCount: number;
 }
 
@@ -29,7 +23,7 @@ interface PatientListProps {
 
 const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganizationId }) => {
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<PatientWithDocCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -53,68 +47,39 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
     try {
       setLoading(true);
       
-      let query = supabase
-        .from('patients')
-        .select('id, first_name, last_name, date_of_birth, id_number, created_at, organization_id, client_organization_id')
-        .eq('organization_id', organizationId);
-
-      // Add client organization filter if provided
-      if (clientOrganizationId) {
-        query = query.eq('client_organization_id', clientOrganizationId);
-      }
-
-      const { data: patientsData, error: patientsError } = await query.order('created_at', { ascending: false });
-
-      if (patientsError) {
-        console.error('Error fetching patients:', patientsError);
-        toast.error('Failed to load patients');
-        return;
-      }
-
-      if (!patientsData || !Array.isArray(patientsData)) {
-        setPatients([]);
-        return;
-      }
-
-      // Fetch document counts for each patient
-      const patientIds = patientsData
-        .filter(p => p && typeof p === 'object' && p.id)
-        .map(p => p.id);
+      const patientsData = await patientDataService.fetchPatientsList(organizationId, clientOrganizationId);
       
+      // Fetch document counts for each patient
+      const patientIds = patientsData.map(p => p.id);
       const documentCounts: { [key: string]: number } = {};
       
       if (patientIds.length > 0) {
-        const { data: documentsData, error: documentsError } = await supabase
-          .from('documents')
-          .select('owner_id')
-          .in('owner_id', patientIds)
-          .eq('organization_id', organizationId);
+        try {
+          const { data: documentsData, error: documentsError } = await supabase
+            .from('documents')
+            .select('owner_id')
+            .in('owner_id', patientIds)
+            .eq('organization_id', organizationId);
 
-        if (documentsError) {
-          console.error('Error fetching document counts:', documentsError);
-        } else if (documentsData && Array.isArray(documentsData)) {
-          documentsData
-            .filter(doc => doc && typeof doc === 'object' && doc.owner_id)
-            .forEach(doc => {
-              documentCounts[doc.owner_id] = (documentCounts[doc.owner_id] || 0) + 1;
-            });
+          if (documentsError) {
+            console.error('Error fetching document counts:', documentsError);
+          } else if (documentsData && Array.isArray(documentsData)) {
+            documentsData
+              .filter(doc => doc && doc.owner_id)
+              .forEach(doc => {
+                documentCounts[doc.owner_id!] = (documentCounts[doc.owner_id!] || 0) + 1;
+              });
+          }
+        } catch (error) {
+          console.error('Error fetching document counts:', error);
         }
       }
 
       // Combine patient data with document counts
-      const patientsWithCounts: Patient[] = patientsData
-        .filter(patient => patient && typeof patient === 'object' && patient.id)
-        .map(patient => ({
-          id: patient.id || '',
-          first_name: patient.first_name || '',
-          last_name: patient.last_name || '',
-          date_of_birth: patient.date_of_birth || '',
-          id_number: patient.id_number || undefined,
-          created_at: patient.created_at || '',
-          organization_id: patient.organization_id || undefined,
-          client_organization_id: patient.client_organization_id || undefined,
-          documentCount: documentCounts[patient.id] || 0
-        }));
+      const patientsWithCounts: PatientWithDocCount[] = patientsData.map(patient => ({
+        ...patient,
+        documentCount: documentCounts[patient.id] || 0
+      }));
 
       setPatients(patientsWithCounts);
     } catch (error) {

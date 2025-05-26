@@ -2,35 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Eye, Calendar, Building2, User, AlertCircle, Info } from 'lucide-react';
+import { FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isValid } from 'date-fns';
-import { cleanCertificateData, extractCertificateInfo, cleanCertificateText } from '@/utils/certificate-data-cleaner';
-
-interface Document {
-  id: string;
-  file_name: string;
-  file_path: string;
-  status: string;
-  document_type: string;
-  processed_at: string | null;
-  created_at: string;
-  extracted_data?: any;
-}
-
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  id_number?: string;
-}
-
-interface Organization {
-  id: string;
-  name: string;
-}
+import { cleanCertificateData } from '@/utils/certificate-data-cleaner';
+import { patientDataService } from '@/services/patientDataService';
+import type { DatabasePatient, DatabaseDocument, DatabaseOrganization } from '@/types/database';
+import PatientHeader from '@/components/patients/PatientHeader';
+import OrganizationHeader from '@/components/organizations/OrganizationHeader';
+import DocumentItem from '@/components/documents/DocumentItem';
 
 interface PatientCertificatesProps {
   patientId: string;
@@ -43,102 +22,43 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
   organizationId, 
   clientOrganizationId 
 }) => {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [documents, setDocuments] = useState<DatabaseDocument[]>([]);
+  const [patient, setPatient] = useState<DatabasePatient | null>(null);
+  const [organization, setOrganization] = useState<DatabaseOrganization | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const safeFormatDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'N/A';
-    
-    try {
-      const date = new Date(dateString);
-      if (!isValid(date)) {
-        console.warn('Invalid date:', dateString);
-        return 'Invalid date';
-      }
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      console.error('Error formatting date:', dateString, error);
-      return 'Invalid date';
-    }
-  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
       
-      // Fetch patient data with proper error handling
-      const { data: patientData, error: patientError } = await supabase
-        .from('patients')
-        .select('id, first_name, last_name, id_number')
-        .eq('id', patientId)
-        .maybeSingle();
-
-      if (patientError) {
-        console.error('Error fetching patient:', patientError);
+      // Fetch patient data
+      try {
+        const patientData = await patientDataService.fetchPatient(patientId);
+        setPatient(patientData);
+      } catch (error) {
+        console.error('Error fetching patient:', error);
         toast.error('Failed to load patient information');
-        return;
-      }
-
-      if (patientData && typeof patientData === 'object') {
-        setPatient({
-          id: patientData.id || '',
-          first_name: patientData.first_name || '',
-          last_name: patientData.last_name || '',
-          id_number: patientData.id_number || undefined,
-        });
       }
 
       // Fetch organization data
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .eq('id', organizationId)
-        .maybeSingle();
-
-      if (orgError) {
-        console.error('Error fetching organization:', orgError);
-      } else if (orgData && typeof orgData === 'object') {
-        setOrganization({
-          id: orgData.id || '',
-          name: orgData.name || ''
-        });
+      try {
+        const orgData = await patientDataService.fetchOrganization(organizationId);
+        setOrganization(orgData);
+      } catch (error) {
+        console.error('Error fetching organization:', error);
       }
 
-      // Fetch documents with proper typing - build the query step by step
-      let documentsQuery = supabase
-        .from('documents')
-        .select('id, file_name, file_path, status, document_type, processed_at, created_at, extracted_data')
-        .eq('organization_id', organizationId)
-        .eq('status', 'processed');
-
-      // Add document type filters one by one to avoid TypeScript issues
-      documentsQuery = documentsQuery.in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate']);
-
-      const { data: documentsData, error: documentsError } = await documentsQuery.order('created_at', { ascending: false });
-
-      if (documentsError) {
-        console.error('Error fetching documents:', documentsError);
+      // Fetch documents
+      try {
+        const documentsData = await patientDataService.fetchPatientCertificates(organizationId);
+        const cleanedDocuments = documentsData.map(doc => ({
+          ...doc,
+          extracted_data: doc.extracted_data ? cleanCertificateData(doc.extracted_data) : null
+        }));
+        setDocuments(cleanedDocuments);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
         toast.error('Failed to load certificates');
-        return;
-      }
-
-      if (documentsData && Array.isArray(documentsData)) {
-        const typedDocuments: Document[] = documentsData
-          .filter((item: any) => item && typeof item === 'object')
-          .map((item: any) => ({
-            id: item.id || '',
-            file_name: item.file_name || 'Unknown',
-            file_path: item.file_path || '',
-            status: item.status || 'unknown',
-            document_type: item.document_type || 'unknown',
-            processed_at: item.processed_at || null,
-            created_at: item.created_at || '',
-            extracted_data: item.extracted_data ? cleanCertificateData(item.extracted_data) : null
-          }));
-        
-        setDocuments(typedDocuments);
       }
 
     } catch (error) {
@@ -155,7 +75,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
     }
   }, [patientId, organizationId, clientOrganizationId]);
 
-  const handleDownload = async (doc: Document) => {
+  const handleDownload = async (doc: DatabaseDocument) => {
     try {
       if (!doc.file_path) {
         toast.error('File path not available');
@@ -189,45 +109,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
     }
   };
 
-  const handleView = (doc: Document) => {
+  const handleView = (doc: DatabaseDocument) => {
     window.open(`/documents/${doc.id}`, '_blank');
-  };
-
-  const renderCertificateInfo = (doc: Document) => {
-    const certInfo = extractCertificateInfo(doc.extracted_data);
-    
-    if (!certInfo) return null;
-
-    return (
-      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-        <h5 className="text-sm font-medium flex items-center gap-1 mb-2">
-          <Info className="h-3 w-3" />
-          Certificate Information
-        </h5>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          {certInfo.validUntil && (
-            <div>
-              <span className="font-medium">Valid until:</span> {cleanCertificateText(certInfo.validUntil)}
-            </div>
-          )}
-          {certInfo.issueDate && (
-            <div>
-              <span className="font-medium">Issue date:</span> {cleanCertificateText(certInfo.issueDate)}
-            </div>
-          )}
-          {certInfo.examinationDate && (
-            <div>
-              <span className="font-medium">Examination:</span> {cleanCertificateText(certInfo.examinationDate)}
-            </div>
-          )}
-          {certInfo.patientName && (
-            <div>
-              <span className="font-medium">Patient:</span> {cleanCertificateText(certInfo.patientName)}
-            </div>
-          )}
-        </div>
-      </div>
-    );
   };
 
   if (loading) {
@@ -242,34 +125,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
 
   return (
     <div className="space-y-6">
-      {patient && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              {patient.first_name} {patient.last_name}
-            </CardTitle>
-            <CardDescription>
-              {patient.id_number && `ID: ${patient.id_number} • `}
-              Patient ID: {patient.id}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-
-      {organization && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              {organization.name}
-            </CardTitle>
-            <CardDescription>
-              Organization: {organization.id}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+      {patient && <PatientHeader patient={patient} />}
+      {organization && <OrganizationHeader organization={organization} />}
 
       <Card>
         <CardHeader>
@@ -293,34 +150,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
           ) : (
             <div className="space-y-4">
               {documents.map((doc) => (
-                <div key={doc.id} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{doc.file_name}</h4>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <Badge variant="outline">{doc.document_type}</Badge>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {safeFormatDate(doc.created_at)}
-                        </span>
-                        {doc.processed_at && (
-                          <span>Processed: {safeFormatDate(doc.processed_at)}</span>
-                        )}
-                      </div>
-                      {renderCertificateInfo(doc)}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleView(doc)}>
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDownload(doc)}>
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <DocumentItem
+                  key={doc.id}
+                  document={doc}
+                  onView={handleView}
+                  onDownload={handleDownload}
+                  showCertificateInfo={true}
+                />
               ))}
             </div>
           )}

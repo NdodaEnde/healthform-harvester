@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, FileText, Plus, User, Building2 } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+import { Calendar, FileText, Plus, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { cleanCertificateData } from '@/utils/certificate-data-cleaner';
+import { patientDataService } from '@/services/patientDataService';
+import type { DatabasePatient, DatabaseDocument } from '@/types/database';
+import PatientHeader from '@/components/patients/PatientHeader';
+import DocumentItem from '@/components/documents/DocumentItem';
 
 interface Visit {
   id: string;
@@ -18,20 +19,6 @@ interface Visit {
   created_at: string;
 }
 
-interface Document {
-  id: string;
-  file_name: string;
-  document_type: string;
-  created_at: string;
-  status: string;
-}
-
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-}
-
 interface PatientVisitsProps {
   patientId: string;
   organizationId: string;
@@ -39,74 +26,30 @@ interface PatientVisitsProps {
 
 const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId }) => {
   const [visits, setVisits] = useState<Visit[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const [documents, setDocuments] = useState<DatabaseDocument[]>([]);
+  const [patient, setPatient] = useState<DatabasePatient | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const safeFormatDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'N/A';
-    
-    try {
-      const date = new Date(dateString);
-      if (!isValid(date)) {
-        console.warn('Invalid date:', dateString);
-        return 'Invalid date';
-      }
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      console.error('Error formatting date:', dateString, error);
-      return 'Invalid date';
-    }
-  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Fetch patient info with proper error handling
-      const { data: patientData, error: patientError } = await supabase
-        .from('patients')
-        .select('id, first_name, last_name')
-        .eq('id', patientId)
-        .maybeSingle();
-
-      if (patientError) {
-        console.error('Error fetching patient:', patientError);
+      // Fetch patient info
+      try {
+        const patientData = await patientDataService.fetchPatient(patientId);
+        setPatient(patientData);
+      } catch (error) {
+        console.error('Error fetching patient:', error);
         toast.error('Failed to load patient information');
-        return;
-      }
-
-      if (patientData && typeof patientData === 'object') {
-        setPatient({
-          id: patientData.id || '',
-          first_name: patientData.first_name || '',
-          last_name: patientData.last_name || ''
-        });
       }
 
       // Fetch documents
-      const { data: documentsData, error: documentsError } = await supabase
-        .from('documents')
-        .select('id, file_name, document_type, created_at, status')
-        .eq('owner_id', patientId)
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false });
-
-      if (documentsError) {
-        console.error('Error fetching documents:', documentsError);
+      try {
+        const documentsData = await patientDataService.fetchPatientDocuments(patientId, organizationId);
+        setDocuments(documentsData);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
         toast.error('Failed to load documents');
-      } else if (documentsData && Array.isArray(documentsData)) {
-        const typedDocuments: Document[] = documentsData
-          .filter((item: any) => item && typeof item === 'object')
-          .map((item: any) => ({
-            id: item.id || '',
-            file_name: item.file_name || 'Unknown',
-            document_type: item.document_type || 'unknown',
-            created_at: item.created_at || '',
-            status: item.status || 'unknown'
-          }));
-        
-        setDocuments(typedDocuments);
       }
 
     } catch (error) {
@@ -149,6 +92,15 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
     }
   };
 
+  const handleView = (doc: DatabaseDocument) => {
+    window.open(`/documents/${doc.id}`, '_blank');
+  };
+
+  const handleDownload = () => {
+    // Download functionality would be implemented here
+    toast.info('Download functionality not implemented yet');
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -159,19 +111,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
 
   return (
     <div className="space-y-6">
-      {patient && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              {patient.first_name} {patient.last_name}
-            </CardTitle>
-            <CardDescription>
-              Patient visits and document history
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+      {patient && <PatientHeader patient={patient} />}
 
       <Card>
         <CardHeader>
@@ -195,28 +135,12 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
           ) : (
             <div className="space-y-4">
               {documents.map((doc) => (
-                <div key={doc.id} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{doc.file_name}</h4>
-                      <div className="flex items-center gap-4 mt-2">
-                        {getDocumentTypeBadge(doc.document_type)}
-                        {getStatusBadge(doc.status)}
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          {safeFormatDate(doc.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => window.open(`/documents/${doc.id}`, '_blank')}
-                    >
-                      View
-                    </Button>
-                  </div>
-                </div>
+                <DocumentItem
+                  key={doc.id}
+                  document={doc}
+                  onView={handleView}
+                  onDownload={handleDownload}
+                />
               ))}
             </div>
           )}
@@ -256,7 +180,7 @@ const PatientVisits: React.FC<PatientVisitsProps> = ({ patientId, organizationId
                       <p className="text-sm text-muted-foreground mt-1">{visit.notes}</p>
                       <span className="flex items-center gap-1 text-sm text-muted-foreground mt-2">
                         <Calendar className="h-3 w-3" />
-                        {safeFormatDate(visit.visit_date)}
+                        {visit.visit_date}
                       </span>
                     </div>
                   </div>
