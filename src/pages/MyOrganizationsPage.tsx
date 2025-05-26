@@ -1,15 +1,74 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import MyOrganizationsList from '@/components/my/MyOrganizationsList';
 import MyOrganizationForm from '@/components/my/MyOrganizationForm';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { toast } from 'sonner';
 import type { MyOrganizationWithType } from '@/types/normalized-database';
 
 const MyOrganizationsPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingOrganization, setEditingOrganization] = useState<MyOrganizationWithType | undefined>();
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { currentOrganization } = useOrganization();
+
+  useEffect(() => {
+    checkUserAccess();
+  }, [currentOrganization]);
+
+  const checkUserAccess = async () => {
+    try {
+      setLoading(true);
+      
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('No authenticated user found');
+        setHasAccess(false);
+        return;
+      }
+
+      console.log('Checking access for user:', user.id);
+
+      // Check if user has any organization access
+      const { data: userOrgs, error: orgError } = await supabase
+        .from('organization_users')
+        .select('organization_id, role')
+        .eq('user_id', user.id);
+
+      if (orgError) {
+        console.error('Error checking user organizations:', orgError);
+        toast.error('Failed to verify user access');
+        setHasAccess(false);
+        return;
+      }
+
+      if (!userOrgs || userOrgs.length === 0) {
+        console.log('User has no organization access');
+        setHasAccess(false);
+        return;
+      }
+
+      console.log('User organizations:', userOrgs);
+      
+      // User has access if they belong to at least one organization
+      setHasAccess(true);
+      
+    } catch (error) {
+      console.error('Error checking user access:', error);
+      toast.error('Failed to verify access permissions');
+      setHasAccess(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddNew = () => {
     setEditingOrganization(undefined);
@@ -31,6 +90,51 @@ const MyOrganizationsPage: React.FC = () => {
     setShowForm(false);
     setEditingOrganization(undefined);
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p>Checking access permissions...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (hasAccess === false) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="h-5 w-5" />
+                Access Denied
+              </CardTitle>
+              <CardDescription>
+                You don't have permission to access this page
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                This page requires organization membership. Please contact your administrator if you believe this is an error.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => window.history.back()}
+                className="w-full"
+              >
+                Go Back
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

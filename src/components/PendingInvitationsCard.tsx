@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,11 +36,11 @@ const PendingInvitationsCard: React.FC = () => {
       
       // Transform the data to match our interface
       const transformedInvitations: Invitation[] = (data || []).map(invitation => ({
-        id: invitation.id,
-        email: invitation.email,
-        role: invitation.role,
-        created_at: invitation.created_at,
-        expires_at: invitation.expires_at
+        id: invitation.id || '',
+        email: invitation.email || '',
+        role: invitation.role || '',
+        created_at: invitation.created_at || '',
+        expires_at: invitation.expires_at || ''
       }));
       
       setInvitations(transformedInvitations);

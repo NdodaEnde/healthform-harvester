@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,7 +87,19 @@ const PatientList: React.FC<PatientListProps> = ({
       }
 
       console.log('Patients data received:', patientsData);
-      setPatients(patientsData || []);
+      
+      // Transform the data to match our interface
+      const transformedPatients: Patient[] = (patientsData || []).map(patient => ({
+        id: patient.id,
+        first_name: patient.first_name || '',
+        last_name: patient.last_name || '',
+        date_of_birth: patient.date_of_birth || '',
+        gender: patient.gender || undefined,
+        id_number: patient.id_number || undefined,
+        client_organization_id: patient.client_organization_id || ''
+      }));
+      
+      setPatients(transformedPatients);
     } catch (error) {
       console.error('Error fetching patients:', error);
       toast.error('Failed to load patients');

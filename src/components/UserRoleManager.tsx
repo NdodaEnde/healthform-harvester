@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,10 +63,10 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       const usersWithProfiles: OrganizationUser[] = (orgUsers || []).map(orgUser => {
         const profile = (profiles || []).find(p => p.id === orgUser.user_id);
         return {
-          id: orgUser.id,
-          user_id: orgUser.user_id,
-          role: orgUser.role,
-          created_at: orgUser.created_at,
+          id: orgUser.id || '',
+          user_id: orgUser.user_id || '',
+          role: orgUser.role || '',
+          created_at: orgUser.created_at || '',
           email: profile?.email || undefined,
           full_name: profile?.full_name || undefined
         };
