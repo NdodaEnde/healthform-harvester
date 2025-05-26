@@ -4,20 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, User, Edit, FileText } from 'lucide-react';
+import { Plus, Search, Users, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
-
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  gender?: string;
-  id_number?: string;
-  created_at: string;
-}
+import { Patient } from '@/types/patient';
 
 interface PatientListProps {
   onSelectPatient?: (patient: Patient) => void;
@@ -40,38 +31,55 @@ const PatientList: React.FC<PatientListProps> = ({
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const orgId = getEffectiveOrganizationId();
+      const effectiveOrgId = getEffectiveOrganizationId();
       
-      if (!orgId) {
-        console.log('No organization ID available');
+      if (!effectiveOrgId) {
+        console.log('No effective organization ID available');
+        setPatients([]);
         return;
       }
 
-      // Check if current user has access to documents for this organization
-      const { data: accessCheck } = await supabase
+      console.log('Fetching patients for organization:', effectiveOrgId);
+
+      // Get patient count first
+      const { count: patientCount, error: countError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_organization_id', effectiveOrgId);
+
+      if (countError) {
+        console.error('Error counting patients:', countError);
+      } else {
+        console.log('Total patients found:', patientCount);
+      }
+
+      // Fetch documents count for each patient
+      const { count: docCount, error: docError } = await supabase
         .from('documents')
-        .select('owner_id')
-        .eq('organization_id', orgId)
-        .limit(1);
+        .select('*', { count: 'exact', head: true })
+        .eq('client_organization_id', effectiveOrgId);
 
-      if (!accessCheck) {
-        console.log('No access to organization documents');
-        return;
+      if (docError) {
+        console.error('Error counting documents:', docError);
+      } else {
+        console.log('Total documents found:', docCount);
       }
 
-      const { data, error } = await supabase
+      // Fetch actual patients data
+      const { data: patientsData, error: patientsError } = await supabase
         .from('patients')
         .select('*')
-        .eq('organization_id', orgId)
-        .order('last_name', { ascending: true });
+        .eq('client_organization_id', effectiveOrgId)
+        .order('last_name', { ascending: true })
+        .order('first_name', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching patients:', error);
-        toast.error('Failed to load patients');
-        return;
+      if (patientsError) {
+        console.error('Error fetching patients:', patientsError);
+        throw patientsError;
       }
 
-      setPatients(data || []);
+      console.log('Patients data received:', patientsData);
+      setPatients(patientsData as Patient[] || []);
     } catch (error) {
       console.error('Error fetching patients:', error);
       toast.error('Failed to load patients');
@@ -82,7 +90,7 @@ const PatientList: React.FC<PatientListProps> = ({
 
   useEffect(() => {
     fetchPatients();
-  }, []);
+  }, [getEffectiveOrganizationId]);
 
   const filteredPatients = patients.filter(patient => {
     const searchLower = searchTerm.toLowerCase();
@@ -121,7 +129,7 @@ const PatientList: React.FC<PatientListProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+                <Users className="h-5 w-5" />
                 Patients
               </CardTitle>
               <CardDescription>
@@ -149,7 +157,7 @@ const PatientList: React.FC<PatientListProps> = ({
 
           {filteredPatients.length === 0 ? (
             <div className="text-center py-8">
-              <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">
                 {searchTerm ? 'No Patients Found' : 'No Patients'}
               </h3>
@@ -176,16 +184,15 @@ const PatientList: React.FC<PatientListProps> = ({
                         {patient.first_name} {patient.last_name}
                       </h4>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span>DOB: {new Date(patient.date_of_birth).toLocaleDateString()}</span>
-                        {patient.gender && (
-                          <Badge variant="outline">
-                            {patient.gender}
-                          </Badge>
-                        )}
                         {patient.id_number && (
                           <span>ID: {patient.id_number}</span>
                         )}
-                        <span>Added: {new Date(patient.created_at).toLocaleDateString()}</span>
+                        {patient.date_of_birth && (
+                          <span>DOB: {new Date(patient.date_of_birth).toLocaleDateString()}</span>
+                        )}
+                        {patient.gender && (
+                          <Badge variant="outline">{patient.gender}</Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -198,9 +205,6 @@ const PatientList: React.FC<PatientListProps> = ({
                           <Edit className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm">
-                        <FileText className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 </div>

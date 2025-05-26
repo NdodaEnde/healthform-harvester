@@ -43,7 +43,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       if (orgError) throw orgError;
 
       // Then get user profiles for additional info
-      const userIds = orgUsers?.map(ou => ou.user_id) || [];
+      const userIds = (orgUsers || []).map(ou => ou.user_id);
       
       if (userIds.length === 0) {
         setUsers([]);
@@ -61,14 +61,14 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       }
 
       // Merge the data
-      const usersWithProfiles = orgUsers?.map(orgUser => {
-        const profile = profiles?.find(p => p.id === orgUser.user_id);
+      const usersWithProfiles = (orgUsers || []).map(orgUser => {
+        const profile = (profiles || []).find(p => p.id === orgUser.user_id);
         return {
           ...orgUser,
           email: profile?.email,
           full_name: profile?.full_name
         };
-      }) || [];
+      });
 
       setUsers(usersWithProfiles);
     } catch (error) {

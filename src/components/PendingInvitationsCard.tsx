@@ -34,7 +34,7 @@ const PendingInvitationsCard: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInvitations(data || []);
+      setInvitations((data as Invitation[]) || []);
     } catch (error) {
       console.error('Error fetching invitations:', error);
       toast.error('Failed to load pending invitations');
