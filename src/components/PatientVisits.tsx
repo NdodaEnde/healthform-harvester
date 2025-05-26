@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, FileText, Plus, User, Building2 } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import { toast } from 'sonner';
+import { cleanCertificateData } from '@/utils/certificate-data-cleaner';
 
 interface Visit {
   id: string;

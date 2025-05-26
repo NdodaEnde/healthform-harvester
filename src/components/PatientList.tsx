@@ -77,7 +77,9 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
       }
 
       // Fetch document counts for each patient
-      const patientIds = patientsData.map(p => p?.id).filter(Boolean);
+      const patientIds = patientsData
+        .filter(p => p && typeof p === 'object' && p.id)
+        .map(p => p.id);
       
       const documentCounts: { [key: string]: number } = {};
       
@@ -91,17 +93,17 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
         if (documentsError) {
           console.error('Error fetching document counts:', documentsError);
         } else if (documentsData && Array.isArray(documentsData)) {
-          documentsData.forEach(doc => {
-            if (doc?.owner_id) {
+          documentsData
+            .filter(doc => doc && typeof doc === 'object' && doc.owner_id)
+            .forEach(doc => {
               documentCounts[doc.owner_id] = (documentCounts[doc.owner_id] || 0) + 1;
-            }
-          });
+            });
         }
       }
 
       // Combine patient data with document counts
       const patientsWithCounts: Patient[] = patientsData
-        .filter(patient => patient && typeof patient === 'object')
+        .filter(patient => patient && typeof patient === 'object' && patient.id)
         .map(patient => ({
           id: patient.id || '',
           first_name: patient.first_name || '',
