@@ -64,12 +64,12 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
           if (documentsError) {
             console.error('Error fetching document counts:', documentsError);
           } else if (documentsData && Array.isArray(documentsData)) {
-            documentsData
-              .filter(doc => doc && doc.owner_id)
-              .forEach(doc => {
-                const ownerId = doc.owner_id as string;
+            documentsData.forEach(doc => {
+              if (doc?.owner_id) {
+                const ownerId = doc.owner_id;
                 documentCounts[ownerId] = (documentCounts[ownerId] || 0) + 1;
-              });
+              }
+            });
           }
         } catch (error) {
           console.error('Error fetching document counts:', error);
