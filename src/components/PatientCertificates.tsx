@@ -106,14 +106,17 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         });
       }
 
-      // Fetch documents with proper typing - using exact string values for the filter
-      const { data: documentsData, error: documentsError } = await supabase
+      // Fetch documents with proper typing - build the query step by step
+      let documentsQuery = supabase
         .from('documents')
         .select('id, file_name, file_path, status, document_type, processed_at, created_at, extracted_data')
         .eq('organization_id', organizationId)
-        .eq('status', 'processed')
-        .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
-        .order('created_at', { ascending: false });
+        .eq('status', 'processed');
+
+      // Add document type filters one by one to avoid TypeScript issues
+      documentsQuery = documentsQuery.in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate']);
+
+      const { data: documentsData, error: documentsError } = await documentsQuery.order('created_at', { ascending: false });
 
       if (documentsError) {
         console.error('Error fetching documents:', documentsError);
