@@ -225,13 +225,13 @@ function App() {
                           </OrganizationProtectedRoute>
                         } />
                         
-                        {/* New normalized system routes */}
-                        <Route path="/my/organizations" element={
+                        {/* New normalized system routes with hyphen format */}
+                        <Route path="/my-organizations" element={
                           <OrganizationProtectedRoute>
                             <MyOrganizationsPage />
                           </OrganizationProtectedRoute>
                         } />
-                        <Route path="/my/patients" element={
+                        <Route path="/my-patients" element={
                           <OrganizationProtectedRoute>
                             <MyPatientsPage />
                           </OrganizationProtectedRoute>
