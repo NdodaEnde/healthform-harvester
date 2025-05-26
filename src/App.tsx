@@ -37,6 +37,8 @@ import ClinicalAnalyticsPage from './pages/analytics/ClinicalAnalyticsPage';
 import IntegratedOccupationalHealthPage from './pages/analytics/IntegratedOccupationalHealthPage';
 import { Helmet } from 'react-helmet';
 import { isPublicRoute } from './utils/organizationContextEnforcer';
+import MyOrganizationsPage from './pages/MyOrganizationsPage';
+import MyPatientsPage from './pages/MyPatientsPage';
 
 // Create a client instance outside of the component
 const queryClient = new QueryClient();
@@ -221,6 +223,10 @@ function App() {
                             </DashboardLayout>
                           </OrganizationProtectedRoute>
                         } />
+                        
+                        {/* New normalized system routes */}
+                        <Route path="/my/organizations" element={<MyOrganizationsPage />} />
+                        <Route path="/my/patients" element={<MyPatientsPage />} />
                         
                         {/* 404 Route - This should be inside nested routes to handle protected routes properly */}
                         <Route path="*" element={<NotFound />} />
