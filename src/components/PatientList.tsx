@@ -8,7 +8,16 @@ import { Plus, Search, Users, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { Patient } from '@/types/patient';
+
+interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender?: string;
+  id_number?: string;
+  client_organization_id: string;
+}
 
 interface PatientListProps {
   onSelectPatient?: (patient: Patient) => void;
@@ -79,7 +88,7 @@ const PatientList: React.FC<PatientListProps> = ({
       }
 
       console.log('Patients data received:', patientsData);
-      setPatients(patientsData as Patient[] || []);
+      setPatients(patientsData || []);
     } catch (error) {
       console.error('Error fetching patients:', error);
       toast.error('Failed to load patients');

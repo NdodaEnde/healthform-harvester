@@ -34,7 +34,17 @@ const PendingInvitationsCard: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInvitations((data as Invitation[]) || []);
+      
+      // Transform the data to match our interface
+      const transformedInvitations: Invitation[] = (data || []).map(invitation => ({
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role,
+        created_at: invitation.created_at,
+        expires_at: invitation.expires_at
+      }));
+      
+      setInvitations(transformedInvitations);
     } catch (error) {
       console.error('Error fetching invitations:', error);
       toast.error('Failed to load pending invitations');

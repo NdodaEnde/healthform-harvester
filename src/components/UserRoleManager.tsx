@@ -60,13 +60,16 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
         // Continue without profile data
       }
 
-      // Merge the data
-      const usersWithProfiles = (orgUsers || []).map(orgUser => {
+      // Merge the data with proper typing
+      const usersWithProfiles: OrganizationUser[] = (orgUsers || []).map(orgUser => {
         const profile = (profiles || []).find(p => p.id === orgUser.user_id);
         return {
-          ...orgUser,
-          email: profile?.email,
-          full_name: profile?.full_name
+          id: orgUser.id,
+          user_id: orgUser.user_id,
+          role: orgUser.role,
+          created_at: orgUser.created_at,
+          email: profile?.email || undefined,
+          full_name: profile?.full_name || undefined
         };
       });
 
@@ -89,7 +92,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
         .from('organization_users')
         .update({ role: newRole })
         .eq('user_id', userId)
-        .eq('organization_id', orgId);
+        .eq('organization_id', orgId!);
 
       if (error) throw error;
       
@@ -111,7 +114,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
         .from('organization_users')
         .delete()
         .eq('user_id', userId)
-        .eq('organization_id', orgId);
+        .eq('organization_id', orgId!);
 
       if (error) throw error;
       
