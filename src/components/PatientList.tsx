@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +50,7 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
       const patientsData = await patientDataService.fetchPatientsList(organizationId, clientOrganizationId);
       
       // Fetch document counts for each patient
-      const patientIds = patientsData.map(p => p.id).filter(Boolean);
+      const patientIds = patientsData.map(p => p.id).filter(Boolean) as string[];
       const documentCounts: { [key: string]: number } = {};
       
       if (patientIds.length > 0) {
@@ -57,8 +58,8 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
           const { data: documentsData, error: documentsError } = await supabase
             .from('documents')
             .select('owner_id')
-            .in('owner_id', patientIds.filter(Boolean) as unknown as readonly string[])
-            .eq('organization_id', organizationId as unknown as string);
+            .in('owner_id', patientIds)
+            .eq('organization_id', organizationId);
 
           if (documentsError) {
             console.error('Error fetching document counts:', documentsError);

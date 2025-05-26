@@ -83,7 +83,12 @@ export default function UserRoleManager({ organizationId }: UserRoleManagerProps
       }
 
       // Get emails from profiles table
-      const userIds = organizationUsers.map(ou => ou.user_id);
+      const userIds = organizationUsers.map(ou => ou.user_id).filter(Boolean);
+      if (userIds.length === 0) {
+        setUsers([]);
+        return;
+      }
+
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, email")
