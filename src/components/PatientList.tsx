@@ -67,7 +67,8 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
             documentsData
               .filter(doc => doc && doc.owner_id)
               .forEach(doc => {
-                documentCounts[doc.owner_id!] = (documentCounts[doc.owner_id!] || 0) + 1;
+                const ownerId = doc.owner_id as string;
+                documentCounts[ownerId] = (documentCounts[ownerId] || 0) + 1;
               });
           }
         } catch (error) {
