@@ -57,8 +57,8 @@ const PatientList: React.FC<PatientListProps> = ({ organizationId, clientOrganiz
           const { data: documentsData, error: documentsError } = await supabase
             .from('documents')
             .select('owner_id')
-            .in('owner_id', patientIds as readonly (string | null)[])
-            .eq('organization_id', organizationId);
+            .in('owner_id', patientIds as unknown as readonly (string | null)[])
+            .eq('organization_id', organizationId as unknown as string);
 
           if (documentsError) {
             console.error('Error fetching document counts:', documentsError);
