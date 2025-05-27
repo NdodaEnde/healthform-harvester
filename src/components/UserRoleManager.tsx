@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,7 +99,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
 
       const { error } = await supabase
         .from('organization_users')
-        .update({ role: newRole })
+        .update({ role: newRole } as any)
         .eq('user_id', userId)
         .eq('organization_id', orgId);
 
