@@ -69,12 +69,12 @@ export function DashboardSidebar() {
     },
     {
       name: "My Organizations (Test)",
-      href: "/my/organizations",
+      href: "/my-organizations",
       icon: Building
     },
     {
       name: "My Patients (Test)", 
-      href: "/my/patients",
+      href: "/my-patients",
       icon: UserRound
     },
     ...(isServiceProvider ? [
