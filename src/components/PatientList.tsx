@@ -239,7 +239,8 @@ const PatientList: React.FC<PatientListProps> = ({
                         size="sm"
                         onClick={(e) => handleViewClick(e, patient)}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
                       </Button>
                       {allowEdit && (
                         <Button 

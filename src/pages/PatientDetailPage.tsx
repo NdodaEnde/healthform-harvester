@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,10 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Edit, Calendar, User, Phone, Mail, FileText, MapPin, Globe, Shield, CheckCircle, AlertCircle, Clock, X } from 'lucide-react';
+import { ArrowLeft, Edit, Upload, User, IdCard, Building } from 'lucide-react';
 import PatientCertificates from '@/components/PatientCertificates';
 import PatientVisits from '@/components/PatientVisits';
 import PatientHeader from '@/components/patients/PatientHeader';
+import DocumentUploader from '@/components/DocumentUploader';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { DatabasePatient } from '@/types/database';
 
@@ -24,9 +24,8 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { currentOrganization } = useOrganization();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedPatient, setEditedPatient] = useState<Partial<DatabasePatient>>({});
+  const { currentOrganization, currentClient } = useOrganization();
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   // Fetch patient data
   const { data: patient, isLoading, isError, error } = useQuery({
@@ -114,6 +113,26 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
     }
   };
 
+  // Fetch organization name for the patient
+  const { data: patientOrganization } = useQuery({
+    queryKey: ['organization', patient?.client_organization_id],
+    queryFn: async () => {
+      if (!patient?.client_organization_id) return null;
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', patient.client_organization_id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!patient?.client_organization_id,
+  });
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPatient, setEditedPatient] = useState<Partial<DatabasePatient>>({});
+
   if (isLoading) {
     return <div className="text-center">Loading patient data...</div>;
   }
@@ -124,123 +143,85 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
   
   return (
     <div className="container mx-auto px-4 py-6">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
-      </Button>
-      
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" onClick={() => navigate(-1)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate(`/patients/${patientId}/edit`)}
+          >
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Patient
+          </Button>
+          <Button onClick={() => setShowUploadDialog(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Document
+          </Button>
+        </div>
+      </div>
+
       {patient && (
         <div className="space-y-6">
-          <PatientHeader patient={patient} />
-          
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="visits">Visits</TabsTrigger>
-              <TabsTrigger value="certificates">Certificates</TabsTrigger>
-              <TabsTrigger value="security">Security</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Patient Details</CardTitle>
-                    {!isEditing ? (
-                      <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSave} disabled={updatePatientMutation.isPending}>
-                          {updatePatientMutation.isPending ? "Saving..." : "Save"}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleCancel} disabled={updatePatientMutation.isPending}>
-                          Cancel
-                        </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Patient Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Personal Information</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Name:</span>
+                      <span>{patient.first_name} {patient.last_name}</span>
+                    </div>
+                    {patient.id_number && (
+                      <div className="flex items-center gap-2">
+                        <IdCard className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">ID Number:</span>
+                        <span>{patient.id_number}</span>
+                      </div>
+                    )}
+                    {patient.date_of_birth && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Date of Birth:</span>
+                        <span>{new Date(patient.date_of_birth).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {patient.gender && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Gender:</span>
+                        <Badge variant="outline">{patient.gender}</Badge>
                       </div>
                     )}
                   </div>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">First Name</label>
-                      <input
-                        type="text"
-                        name="first_name"
-                        value={(editedPatient.first_name || '') as string}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        disabled={!isEditing}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
-                      <input
-                        type="text"
-                        name="last_name"
-                        value={(editedPatient.last_name || '') as string}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        disabled={!isEditing}
-                      />
-                    </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Organization</h3>
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Organization:</span>
+                    <span>{patientOrganization?.name || 'Not specified'}</span>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-                      <input
-                        type="date"
-                        name="date_of_birth"
-                        value={(editedPatient.date_of_birth || '') as string}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        disabled={!isEditing}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">ID Number</label>
-                      <input
-                        type="text"
-                        name="id_number"
-                        value={(editedPatient.id_number || '') as string}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Contact Number</label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={((editedPatient.contact_info as any)?.phone || '') as string}
-                        onChange={handleContactInfoChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        disabled={!isEditing}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Email</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={((editedPatient.contact_info as any)?.email || '') as string}
-                        onChange={handleContactInfoChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Tabs defaultValue="visits" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="visits">Visits</TabsTrigger>
+              <TabsTrigger value="certificates">Certificates</TabsTrigger>
+            </TabsList>
             
             <TabsContent value="visits" className="space-y-6">
               {patient && (
@@ -256,25 +237,35 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
                 <PatientCertificates patientId={patient.id} organizationId={currentOrganization.id} />
               )}
             </TabsContent>
-            
-            <TabsContent value="security">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Security Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        This section is under development. Security features will be added soon.
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
+
+          {/* Upload Document Dialog */}
+          {showUploadDialog && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 className="text-lg font-semibold mb-4">Upload Document</h3>
+                <DocumentUploader
+                  onUploadComplete={() => {
+                    setShowUploadDialog(false);
+                    toast({
+                      title: "Document uploaded",
+                      description: "Document has been successfully uploaded for this patient.",
+                    });
+                  }}
+                  organizationId={currentOrganization?.id}
+                  clientOrganizationId={patient.client_organization_id}
+                  patientId={patient.id}
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowUploadDialog(false)}
+                  className="mt-4 w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
