@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,8 +18,6 @@ import PatientVisits from '@/components/PatientVisits';
 import PatientSAIDInfo from '@/components/PatientSAIDInfo';
 import DocumentUploader from '@/components/DocumentUploader';
 import { Separator } from '@/components/ui/separator';
-
-
 
 const PatientDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -395,11 +394,6 @@ const PatientDetailPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* DEBUG: Check if patient is loaded */}
-          {patient && (
-            <div style={{ border: "1px solid red", padding: "4px" }}>Upload UI visible</div>
-          )}
-          {/* DEBUG: Check if patient is loaded */}
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
