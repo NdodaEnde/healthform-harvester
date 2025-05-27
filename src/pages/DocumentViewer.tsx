@@ -449,87 +449,83 @@ const DocumentViewer = () => {
     return "No ID";
   };
 
-  // MINIMAL FIX: Only improve the URL handling in your existing fetchDocumentFromSupabase
-const fetchDocumentFromSupabase = async (documentId: string) => {
-  try {
-    const { data: documentData, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error fetching document:', error);
-      return null;
-    }
-    
-    if (!documentData) {
-      return null;
-    }
-    
-    console.log('Fetched document data:', documentData);
-    console.log('File path:', documentData.file_path);
-    
-    // ENHANCED: Better URL handling (only change from your working version)
-    let signedUrl = null;
+  const fetchDocumentFromSupabase = async (documentId: string) => {
     try {
-      const { data: urlData, error: urlError } = await supabase
-        .storage
-        .from('medical-documents')
-        .createSignedUrl(documentData.file_path, 3600);
+      const { data: documentData, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .maybeSingle();
       
-      if (urlError) {
-        console.error('Signed URL error:', urlError);
-        // Try public URL as fallback
-        const { data: publicUrlData } = supabase
+      if (error) {
+        console.error('Error fetching document:', error);
+        return null;
+      }
+      
+      if (!documentData) {
+        return null;
+      }
+      
+      console.log('Fetched document data:', documentData);
+      console.log('File path:', documentData.file_path);
+      
+      let signedUrl = null;
+      try {
+        const { data: urlData, error: urlError } = await supabase
           .storage
           .from('medical-documents')
-          .getPublicUrl(documentData.file_path);
+          .createSignedUrl(documentData.file_path, 3600);
         
-        signedUrl = publicUrlData?.publicUrl || null;
-        console.log('Using public URL fallback:', signedUrl);
-      } else {
-        signedUrl = urlData?.signedUrl || null;
-        console.log('Using signed URL:', signedUrl);
+        if (urlError) {
+          console.error('Signed URL error:', urlError);
+          const { data: publicUrlData } = supabase
+            .storage
+            .from('medical-documents')
+            .getPublicUrl(documentData.file_path);
+          
+          signedUrl = publicUrlData?.publicUrl || null;
+          console.log('Using public URL fallback:', signedUrl);
+        } else {
+          signedUrl = urlData?.signedUrl || null;
+          console.log('Using signed URL:', signedUrl);
+        }
+      } catch (urlException) {
+        console.error('Exception getting URL:', urlException);
+        signedUrl = null;
       }
-    } catch (urlException) {
-      console.error('Exception getting URL:', urlException);
-      signedUrl = null;
+      
+      let extractedData = documentData.extracted_data || {};
+      
+      if (documentData.document_type === 'certificate-of-fitness') {
+        console.log('Before mapping:', extractedData);
+        extractedData = mapExtractedDataToValidatorFormat(extractedData);
+        console.log('After mapping:', extractedData);
+      }
+      
+      let patientName = extractPatientName(extractedData);
+      let patientId = extractPatientId(extractedData);
+      
+      console.log('Processed extracted data:', extractedData);
+      
+      return {
+        id: documentData.id,
+        name: documentData.file_name,
+        type: documentData.document_type === 'medical-questionnaire' 
+          ? 'Medical Examination Questionnaire' 
+          : 'Certificate of Fitness',
+        uploadedAt: documentData.created_at,
+        status: documentData.status,
+        patientName: patientName,
+        patientId: patientId,
+        imageUrl: signedUrl,
+        extractedData: extractedData,
+        jsonData: JSON.stringify(extractedData, null, 2)
+      };
+    } catch (error) {
+      console.error('Error fetching document from Supabase:', error);
+      return null;
     }
-    
-    // Rest of your existing code remains the same...
-    let extractedData = documentData.extracted_data || {};
-    
-    if (documentData.document_type === 'certificate-of-fitness') {
-      console.log('Before mapping:', extractedData);
-      extractedData = mapExtractedDataToValidatorFormat(extractedData);
-      console.log('After mapping:', extractedData);
-    }
-    
-    let patientName = extractPatientName(extractedData);
-    let patientId = extractPatientId(extractedData);
-    
-    console.log('Processed extracted data:', extractedData);
-    
-    return {
-      id: documentData.id,
-      name: documentData.file_name,
-      type: documentData.document_type === 'medical-questionnaire' 
-        ? 'Medical Examination Questionnaire' 
-        : 'Certificate of Fitness',
-      uploadedAt: documentData.created_at,
-      status: documentData.status,
-      patientName: patientName,
-      patientId: patientId,
-      imageUrl: signedUrl, // Now with better error handling
-      extractedData: extractedData,
-      jsonData: JSON.stringify(extractedData, null, 2)
-    };
-  } catch (error) {
-    console.error('Error fetching document from Supabase:', error);
-    return null;
-  }
-};
+  };
 
   const updateEditableData = (path: string[], value: any) => {
     setEditableData((prev: any) => {
@@ -978,7 +974,6 @@ const fetchDocumentFromSupabase = async (documentId: string) => {
       
       return (
         <CertificateValidator 
-          documentId={document.id}
           extractedData={dataForValidator}
           onSave={handleValidationSave}
           onCancel={() => {
