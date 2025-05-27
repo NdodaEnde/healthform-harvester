@@ -21,6 +21,11 @@ const PatientHeader: React.FC<PatientHeaderProps> = ({ patient }) => {
     }
   };
 
+  // Get contact info from JSON field
+  const contactInfo = patient.contact_info as any;
+  const contactNumber = contactInfo?.phone || contactInfo?.contact_number;
+  const email = contactInfo?.email;
+
   return (
     <Card>
       <CardHeader>
@@ -33,7 +38,7 @@ const PatientHeader: React.FC<PatientHeaderProps> = ({ patient }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <h3 className="font-semibold text-lg">{patient.first_name} {patient.last_name}</h3>
-            {patient.status && getStatusBadge(patient.status)}
+            <Badge variant="outline">Patient</Badge>
           </div>
           
           {patient.date_of_birth && (
@@ -45,17 +50,17 @@ const PatientHeader: React.FC<PatientHeaderProps> = ({ patient }) => {
             </div>
           )}
           
-          {patient.contact_number && (
+          {contactNumber && (
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{patient.contact_number}</span>
+              <span className="text-sm">{contactNumber}</span>
             </div>
           )}
           
-          {patient.email && (
+          {email && (
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{patient.email}</span>
+              <span className="text-sm">{email}</span>
             </div>
           )}
           

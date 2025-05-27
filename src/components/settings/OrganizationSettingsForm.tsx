@@ -68,7 +68,7 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
     setIsSubmitting(true);
     
     try {
-      let updatedData: Partial<Organization> = { 
+      let updatedData: any = { 
         ...data,
         address: data.address as unknown as Json
       };
@@ -104,8 +104,8 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
       // Update organization in database
       const { error } = await supabase
         .from("organizations")
-        .update(updatedData)
-        .eq("id", organization.id);
+        .update(updatedData as any)
+        .eq("id", organization.id as any);
         
       if (error) throw error;
       

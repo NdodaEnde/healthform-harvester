@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -47,17 +48,18 @@ export function useOrganizationData() {
             settings
           )
         `)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id as any);
         
       if (orgUsersError) {
         console.error("Error fetching organizations:", orgUsersError);
         throw orgUsersError;
       }
       
-      const orgs = orgUsers?.map(ou => ({
-        ...ou.organizations,
-        userRole: ou.role
-      })) || [];
+      const orgs = orgUsers?.filter(ou => ou && ou.organizations && 'id' in ou.organizations)
+        .map(ou => ({
+          ...(ou.organizations as any),
+          userRole: ou.role
+        })) || [];
       
       console.log("User organizations loaded:", orgs.length);
       setUserOrganizations(orgs);
@@ -113,15 +115,15 @@ export function useOrganizationData() {
       const { data: relationships, error: relationshipsError } = await supabase
         .from("organization_relationships")
         .select("client_id")
-        .eq("service_provider_id", serviceProviderId)
-        .eq("is_active", true);
+        .eq("service_provider_id", serviceProviderId as any)
+        .eq("is_active", true as any);
         
       if (relationshipsError) {
         throw relationshipsError;
       }
       
-      // Extract client IDs
-      const clientIds = relationships.map(rel => rel.client_id);
+      // Extract client IDs safely
+      const clientIds = relationships?.filter(rel => rel && 'client_id' in rel).map(rel => rel.client_id) || [];
       
       if (clientIds.length === 0) {
         setClientOrganizations([]);
@@ -139,14 +141,14 @@ export function useOrganizationData() {
         throw clientsError;
       }
       
-      setClientOrganizations(clients || []);
+      setClientOrganizations((clients || []) as unknown as Organization[]);
       
       // Check for stored client selection
       const storedClientId = localStorage.getItem("currentClientId");
       if (storedClientId && storedClientId !== "all_clients") {
         const client = clients?.find(c => c.id === storedClientId);
         if (client) {
-          setCurrentClient(client);
+          setCurrentClient(client as unknown as Organization);
         } else {
           // Clear stored client if not found
           localStorage.removeItem("currentClientId");
