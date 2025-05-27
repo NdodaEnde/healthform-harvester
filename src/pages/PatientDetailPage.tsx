@@ -395,6 +395,11 @@ const PatientDetailPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* DEBUG: Check if patient is loaded */}
+          {patient && (
+            <div style={{ border: "1px solid red", padding: "4px" }}>Upload UI visible</div>
+          )}
+          {/* DEBUG: Check if patient is loaded */}
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
@@ -404,7 +409,7 @@ const PatientDetailPage = () => {
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Upload Document for {patient.first_name} {patient.last_name}</DialogTitle>
+                <DialogTitle>Upload Document for {patient?.first_name} {patient?.last_name}</DialogTitle>
               </DialogHeader>
               <DocumentUploader 
                 onUploadComplete={handleUploadComplete}
