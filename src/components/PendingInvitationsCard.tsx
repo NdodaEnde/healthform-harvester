@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ interface Invitation {
   expires_at: string;
 }
 
-const PendingInvitationsCard: React.FC = () => {
+export const PendingInvitationsCard: React.FC = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentOrganization } = useOrganization();
