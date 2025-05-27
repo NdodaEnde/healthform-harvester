@@ -968,20 +968,8 @@ const DocumentViewer = () => {
 
   const renderExtractedData = () => {
     if (isValidating && document) {
-      console.log('Data passed to validator:', validatorData || document.extractedData);
-      
-      const dataForValidator = validatorData || mapExtractedDataToValidatorFormat(document.extractedData);
-      
-      return (
-        <CertificateValidator 
-          extractedData={dataForValidator}
-          onSave={handleValidationSave}
-          onCancel={() => {
-            setIsValidating(false);
-            setValidatorData(null);
-          }}
-        />
-      );
+      console.log('Showing CertificateValidator component');
+      return <CertificateValidator />;
     }
     
     if (!document || !document.extractedData) {
@@ -1291,8 +1279,7 @@ const DocumentViewer = () => {
   };
 
   const startValidation = () => {
-    const data = prepareValidatorData();
-    console.log("Starting validation with data:", data);
+    console.log("Starting validation mode");
     setIsValidating(true);
   };
 
