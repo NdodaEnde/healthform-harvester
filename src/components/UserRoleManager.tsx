@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,7 +37,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       const { data: orgUsers, error: orgError } = await supabase
         .from('organization_users')
         .select('*')
-        .eq('organization_id', orgId);
+        .eq('organization_id', orgId as any);
 
       if (orgError) throw orgError;
 
@@ -74,8 +73,8 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
           user_id: orgUser.user_id || '',
           role: orgUser.role || '',
           created_at: orgUser.created_at || '',
-          email: profile?.email || undefined,
-          full_name: profile?.full_name || undefined
+          email: (profile as any)?.email || undefined,
+          full_name: (profile as any)?.full_name || undefined
         };
       });
 
@@ -100,8 +99,8 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       const { error } = await supabase
         .from('organization_users')
         .update({ role: newRole } as any)
-        .eq('user_id', userId)
-        .eq('organization_id', orgId);
+        .eq('user_id', userId as any)
+        .eq('organization_id', orgId as any);
 
       if (error) throw error;
       
@@ -124,8 +123,8 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       const { error } = await supabase
         .from('organization_users')
         .delete()
-        .eq('user_id', userId)
-        .eq('organization_id', orgId);
+        .eq('user_id', userId as any)
+        .eq('organization_id', orgId as any);
 
       if (error) throw error;
       

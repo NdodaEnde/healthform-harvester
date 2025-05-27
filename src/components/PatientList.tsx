@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,7 +53,7 @@ const PatientList: React.FC<PatientListProps> = ({
       const { count: patientCount, error: countError } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('client_organization_id', effectiveOrgId);
+        .eq('client_organization_id', effectiveOrgId as any);
 
       if (countError) {
         console.error('Error counting patients:', countError);
@@ -66,7 +65,7 @@ const PatientList: React.FC<PatientListProps> = ({
       const { count: docCount, error: docError } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true })
-        .eq('client_organization_id', effectiveOrgId);
+        .eq('client_organization_id', effectiveOrgId as any);
 
       if (docError) {
         console.error('Error counting documents:', docError);
@@ -78,7 +77,7 @@ const PatientList: React.FC<PatientListProps> = ({
       const { data: patientsData, error: patientsError } = await supabase
         .from('patients')
         .select('*')
-        .eq('client_organization_id', effectiveOrgId)
+        .eq('client_organization_id', effectiveOrgId as any)
         .order('last_name', { ascending: true })
         .order('first_name', { ascending: true });
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +28,7 @@ export const PendingInvitationsCard: React.FC = () => {
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('organization_id', currentOrganization.id)
+        .eq('organization_id', currentOrganization.id as any)
         .is('accepted_at', null)
         .order('created_at', { ascending: false });
 
@@ -67,7 +66,7 @@ export const PendingInvitationsCard: React.FC = () => {
       const { error } = await supabase
         .from('invitations')
         .delete()
-        .eq('id', invitationId);
+        .eq('id', invitationId as any);
 
       if (error) throw error;
       
