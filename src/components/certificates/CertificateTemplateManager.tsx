@@ -96,11 +96,11 @@ export default function CertificateTemplateManager() {
       const { data, error } = await supabase
         .from("certificate_templates")
         .select("*")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", organizationId as any)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return data as CertificateTemplate[];
+      return (data || []) as CertificateTemplate[];
     },
     enabled: !!organizationId,
   });
@@ -114,8 +114,8 @@ export default function CertificateTemplateManager() {
       if (values.is_default) {
         await supabase
           .from("certificate_templates")
-          .update({ is_default: false })
-          .eq("organization_id", organizationId);
+          .update({ is_default: false } as any)
+          .eq("organization_id", organizationId as any);
       }
       
       // Create the new template
@@ -126,7 +126,7 @@ export default function CertificateTemplateManager() {
           organization_id: organizationId,
           template_data: values.template_data,
           is_default: values.is_default,
-        })
+        } as any)
         .select("*")
         .single();
       
@@ -159,9 +159,9 @@ export default function CertificateTemplateManager() {
       if (values.is_default) {
         await supabase
           .from("certificate_templates")
-          .update({ is_default: false })
-          .eq("organization_id", organizationId)
-          .neq("id", values.id);
+          .update({ is_default: false } as any)
+          .eq("organization_id", organizationId as any)
+          .neq("id", values.id as any);
       }
       
       // Update the template
@@ -172,8 +172,8 @@ export default function CertificateTemplateManager() {
           template_data: values.template_data,
           is_default: values.is_default,
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", values.id)
+        } as any)
+        .eq("id", values.id as any)
         .select("*")
         .single();
       
@@ -203,7 +203,7 @@ export default function CertificateTemplateManager() {
       const { error } = await supabase
         .from("certificate_templates")
         .delete()
-        .eq("id", templateId);
+        .eq("id", templateId as any);
       
       if (error) throw error;
       return templateId;
@@ -236,7 +236,7 @@ export default function CertificateTemplateManager() {
           organization_id: organizationId,
           template_data: template.template_data,
           is_default: false,
-        })
+        } as any)
         .select("*")
         .single();
       

@@ -52,11 +52,11 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
       if (error) throw error;
 
       // Transform the data to flatten client info
-      const transformedData = data?.map((rel: any) => ({
+      const transformedData = (data || []).map((rel: any) => ({
         ...rel,
         client_name: rel.client?.name,
         client_email: rel.client?.contact_email
-      })) || [];
+      }));
 
       setRelationships(transformedData);
     } catch (error) {

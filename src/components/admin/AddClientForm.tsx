@@ -60,7 +60,7 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
         .single();
 
       if (orgError) throw orgError;
-      if (!newOrg) throw new Error('Failed to create organization');
+      if (!newOrg || !('id' in newOrg)) throw new Error('Failed to create organization');
 
       // Then create the relationship
       const { error: relError } = await supabase

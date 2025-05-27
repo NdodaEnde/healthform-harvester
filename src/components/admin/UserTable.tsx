@@ -56,9 +56,9 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
       setIsLoading(true);
       const { error } = await supabase
         .from("organization_users")
-        .update({ role: newRole })
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .update({ role: newRole } as any)
+        .eq("user_id", userId as any)
+        .eq("organization_id", organizationId as any);
         
       if (error) throw error;
       
@@ -100,8 +100,8 @@ export default function UserTable({ users, organizationId, onUserUpdated }: User
       const { error } = await supabase
         .from("organization_users")
         .delete()
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .eq("user_id", userId as any)
+        .eq("organization_id", organizationId as any);
         
       if (error) throw error;
       

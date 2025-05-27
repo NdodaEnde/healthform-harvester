@@ -124,7 +124,7 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
         throw error;
       }
 
-      if (!invitation) {
+      if (!invitation || !('id' in invitation)) {
         throw new Error("Failed to create invitation");
       }
 

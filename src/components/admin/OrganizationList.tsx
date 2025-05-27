@@ -27,8 +27,8 @@ export default function OrganizationList({ organizations }: OrganizationListProp
     try {
       const { error } = await supabase
         .from("organizations")
-        .update({ is_active: !isActive })
-        .eq("id", id);
+        .update({ is_active: !isActive } as any)
+        .eq("id", id as any);
         
       if (error) throw error;
       

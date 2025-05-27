@@ -49,9 +49,9 @@ export default function UserManagementList({ users, organizationId, onUpdate }: 
     try {
       const { error } = await supabase
         .from("organization_users")
-        .update({ role: newRole })
-        .eq("user_id", userId)
-        .eq("organization_id", organizationId);
+        .update({ role: newRole } as any)
+        .eq("user_id", userId as any)
+        .eq("organization_id", organizationId as any);
         
       if (error) throw error;
       
@@ -91,7 +91,7 @@ export default function UserManagementList({ users, organizationId, onUpdate }: 
       const { error } = await supabase
         .from("organization_users")
         .delete()
-        .eq("id", id);
+        .eq("id", id as any);
         
       if (error) throw error;
       

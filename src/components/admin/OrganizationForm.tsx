@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,8 +78,8 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
         // Update existing organization
         const { error } = await supabase
           .from("organizations")
-          .update(formData)
-          .eq("id", organization.id);
+          .update(formData as any)
+          .eq("id", organization.id as any);
           
         if (error) throw error;
         
@@ -112,7 +113,7 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
           
           const { data: newOrg, error } = await supabase
             .from("organizations")
-            .insert(formData)
+            .insert(formData as any)
             .select()
             .single();
             
