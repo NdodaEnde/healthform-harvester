@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import MyOrganizationsList from '@/components/my/MyOrganizationsList';
 import MyOrganizationForm from '@/components/my/MyOrganizationForm';
+import AuthChecker from '@/components/AuthChecker';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Bug } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -13,6 +14,7 @@ import type { MyOrganizationWithType } from '@/types/normalized-database';
 
 const MyOrganizationsPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const [editingOrganization, setEditingOrganization] = useState<MyOrganizationWithType | undefined>();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,13 +124,29 @@ const MyOrganizationsPage: React.FC = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 This page requires organization membership. Please contact your administrator if you believe this is an error.
               </p>
-              <Button 
-                variant="outline" 
-                onClick={() => window.history.back()}
-                className="w-full"
-              >
-                Go Back
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => window.history.back()}
+                  className="w-full"
+                >
+                  Go Back
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowDebug(true)}
+                  className="w-full"
+                >
+                  <Bug className="h-4 w-4 mr-2" />
+                  Debug Authentication
+                </Button>
+              </div>
+              
+              {showDebug && (
+                <div className="mt-4">
+                  <AuthChecker />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -152,7 +170,20 @@ const MyOrganizationsPage: React.FC = () => {
               : 'Organizations Management'
             }
           </h1>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <Bug className="h-4 w-4" />
+          </Button>
         </div>
+
+        {showDebug && (
+          <div className="mb-6">
+            <AuthChecker />
+          </div>
+        )}
 
         {showForm ? (
           <MyOrganizationForm
