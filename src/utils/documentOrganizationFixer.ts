@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -53,7 +54,7 @@ export const fixDocumentUrls = async (organizationId: string, targetBucket: stri
     // Get documents missing URLs but having file paths
     const { data: missingUrlDocs, error: missingUrlError } = await supabase
       .from('documents')
-      .select('id, file_path')
+      .select('id, file_path, public_url')
       .eq('organization_id', organizationId)
       .is('public_url', null)
       .not('file_path', 'is', null);

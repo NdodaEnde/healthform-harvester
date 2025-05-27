@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -54,8 +55,8 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
   }, [patient]);
 
   // Update patient mutation
-  const updatePatientMutation = useMutation(
-    async (updates: Partial<DatabasePatient>) => {
+  const updatePatientMutation = useMutation({
+    mutationFn: async (updates: Partial<DatabasePatient>) => {
       const { data, error } = await supabase
         .from('patients')
         .update(updates)
@@ -68,24 +69,22 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
       }
       return data;
     },
-    {
-      onSuccess: () => {
-        toast({
-          title: "Patient updated",
-          description: "Patient details have been successfully updated.",
-        });
-        setIsEditing(false);
-        queryClient.invalidateQueries(['patient', patientId]);
-      },
-      onError: (error: any) => {
-        toast({
-          title: "Update failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      },
-    }
-  );
+    onSuccess: () => {
+      toast({
+        title: "Patient updated",
+        description: "Patient details have been successfully updated.",
+      });
+      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -154,10 +153,10 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
                       </Button>
                     ) : (
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSave} disabled={updatePatientMutation.isLoading}>
-                          {updatePatientMutation.isLoading ? "Saving..." : "Save"}
+                        <Button size="sm" onClick={handleSave} disabled={updatePatientMutation.isPending}>
+                          {updatePatientMutation.isPending ? "Saving..." : "Save"}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={handleCancel} disabled={updatePatientMutation.isLoading}>
+                        <Button variant="ghost" size="sm" onClick={handleCancel} disabled={updatePatientMutation.isPending}>
                           Cancel
                         </Button>
                       </div>
@@ -238,18 +237,6 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
                         disabled={!isEditing}
                       />
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Address</label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={(editedPatient.address || '') as string}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      disabled={!isEditing}
-                    />
                   </div>
                 </CardContent>
               </Card>

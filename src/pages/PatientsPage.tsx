@@ -29,9 +29,7 @@ const PatientsPage = () => {
         
         {/* Patient List Component - the main focus of the page */}
         {currentOrganization && (
-          <PatientList 
-            clientOrganizationId={currentClient?.id}
-          />
+          <PatientList />
         )}
       </motion.div>
     </div>
