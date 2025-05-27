@@ -60,3 +60,91 @@ export const checkFileExists = async (bucketName: string, filePath: string) => {
     return false;
   }
 };
+
+// Upload organization asset (logo, signature, stamp)
+export const uploadOrganizationAsset = async (
+  file: File,
+  organizationId: string,
+  assetType: 'logo' | 'signature' | 'stamp'
+): Promise<string | null> => {
+  try {
+    // Ensure the bucket exists
+    await ensureDocumentsBucket();
+    
+    // Create a unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${organizationId}/${assetType}.${fileExt}`;
+    
+    // Upload the file
+    const { data, error } = await supabase.storage
+      .from('medical-documents')
+      .upload(fileName, file, { upsert: true });
+    
+    if (error) {
+      console.error("Error uploading asset:", error);
+      return null;
+    }
+    
+    // Get the public URL
+    const { data: urlData } = supabase.storage
+      .from('medical-documents')
+      .getPublicUrl(fileName);
+    
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error("Error in uploadOrganizationAsset:", error);
+    return null;
+  }
+};
+
+// Delete organization asset
+export const deleteOrganizationAsset = async (
+  assetUrl: string,
+  organizationId: string
+): Promise<boolean> => {
+  try {
+    // Extract the file path from the URL
+    const url = new URL(assetUrl);
+    const pathParts = url.pathname.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    const filePath = `${organizationId}/${fileName}`;
+    
+    // Delete from storage
+    const { error } = await supabase.storage
+      .from('medical-documents')
+      .remove([filePath]);
+    
+    if (error) {
+      console.error("Error deleting asset:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error in deleteOrganizationAsset:", error);
+    return false;
+  }
+};
+
+// Update organization assets in database
+export const updateOrganizationAssets = async (
+  organizationId: string,
+  updates: { [key: string]: string | null }
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('organizations')
+      .update(updates as any)
+      .eq('id', organizationId as any);
+    
+    if (error) {
+      console.error("Error updating organization assets:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error in updateOrganizationAssets:", error);
+    return false;
+  }
+};
