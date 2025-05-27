@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,7 +48,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       }
 
       // Then get user profiles for additional info
-      const userIds = orgUsers.map(ou => ou.user_id);
+      const userIds = orgUsers.map((ou: any) => ou.user_id);
       
       if (userIds.length === 0) {
         setUsers([]);
@@ -67,8 +66,8 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
       }
 
       // Merge the data with proper typing and error handling
-      const usersWithProfiles: OrganizationUser[] = orgUsers.map(orgUser => {
-        const profile = Array.isArray(profiles) ? profiles.find(p => p && p.id === orgUser.user_id) : null;
+      const usersWithProfiles: OrganizationUser[] = orgUsers.map((orgUser: any) => {
+        const profile = Array.isArray(profiles) ? profiles.find((p: any) => p && p.id === orgUser.user_id) : null;
         return {
           id: orgUser.id || '',
           user_id: orgUser.user_id || '',

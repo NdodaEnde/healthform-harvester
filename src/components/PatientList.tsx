@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -91,7 +90,7 @@ const PatientList: React.FC<PatientListProps> = ({
       
       // Transform the data to match our interface with proper error handling
       if (patientsData && Array.isArray(patientsData)) {
-        const transformedPatients: Patient[] = patientsData.map(patient => ({
+        const transformedPatients: Patient[] = patientsData.map((patient: any) => ({
           id: patient.id || '',
           first_name: patient.first_name || '',
           last_name: patient.last_name || '',

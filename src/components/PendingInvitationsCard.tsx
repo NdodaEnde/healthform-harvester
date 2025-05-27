@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,7 +36,7 @@ export const PendingInvitationsCard: React.FC = () => {
       
       // Transform the data to match our interface with proper error handling
       if (data && Array.isArray(data)) {
-        const transformedInvitations: Invitation[] = data.map(invitation => ({
+        const transformedInvitations: Invitation[] = data.map((invitation: any) => ({
           id: invitation.id || '',
           email: invitation.email || '',
           role: invitation.role || '',
