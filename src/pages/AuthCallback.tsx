@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,12 +74,12 @@ export default function AuthCallback() {
               const { data: invitesByEmail } = await supabase
                 .from("invitations")
                 .select("token")
-                .eq("email", sessionData.session.user.email)
+                .eq("email", sessionData.session.user.email as any)
                 .is("accepted_at", null)
                 .limit(1);
                 
-              if (invitesByEmail && invitesByEmail.length > 0) {
-                navigate(`/accept-invite?token=${invitesByEmail[0].token}`);
+              if (invitesByEmail && invitesByEmail.length > 0 && invitesByEmail[0] && typeof invitesByEmail[0] === 'object' && 'token' in invitesByEmail[0]) {
+                navigate(`/accept-invite?token=${(invitesByEmail[0] as any).token}`);
                 return;
               }
               
@@ -86,7 +87,7 @@ export default function AuthCallback() {
               const { data: orgData } = await supabase
                 .from("organization_users")
                 .select("organization_id")
-                .eq("user_id", sessionData.session.user.id)
+                .eq("user_id", sessionData.session.user.id as any)
                 .limit(1);
                 
               if (orgData && orgData.length > 0) {
@@ -135,7 +136,7 @@ export default function AuthCallback() {
     };
     
     // Helper function to ensure user profile exists
-    const ensureUserProfile = async (user) => {
+    const ensureUserProfile = async (user: any) => {
       if (!user) return;
       
       try {
@@ -149,7 +150,7 @@ export default function AuthCallback() {
         if (!profileData && (!profileError || !profileError.message.includes("found"))) {
           console.log("Creating user profile");
           
-          // Try to create profile
+          // Try to create profile using type casting
           const { error: createError } = await supabase
             .from('profiles')
             .insert({
@@ -157,7 +158,7 @@ export default function AuthCallback() {
               email: user.email,
               full_name: user.email?.split('@')[0] || 'User',
               updated_at: new Date().toISOString()
-            });
+            } as any);
             
           if (createError) {
             console.error("Error creating profile:", createError);

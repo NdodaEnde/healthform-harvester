@@ -20,10 +20,6 @@ export const supabase = createClient<Database>(
     },
     db: {
       schema: 'public'
-    },
-    // Storage configuration focused on medical-documents bucket
-    storage: {
-      detectContentType: true
     }
   }
 );

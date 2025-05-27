@@ -101,7 +101,7 @@ export default function OrganizationSettingsForm({ organization }: OrganizationS
         updatedData.logo_url = urlData.publicUrl;
       }
       
-      // Update organization in database
+      // Update organization in database with type casting
       const { error } = await supabase
         .from("organizations")
         .update(updatedData as any)

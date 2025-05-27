@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("Email confirmation not required. User created with session.");
         
         try {
-          // Try to create a profile for the user
+          // Try to create a profile for the user using type casting
           const { error: profileError } = await supabase
             .from('profiles')
             .insert({
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: email,
               full_name: email.split('@')[0] || 'User',
               updated_at: new Date().toISOString()
-            });
+            } as any);
             
           if (profileError) {
             console.warn("Non-critical error creating profile:", profileError);

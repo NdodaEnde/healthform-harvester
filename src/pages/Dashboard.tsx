@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,14 +46,14 @@ const Dashboard = () => {
       const { data: documents, error: docError } = await supabase
         .from('documents')
         .select('id, status, created_at')
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId as any);
       
       if (docError) throw docError;
       
       const { count: patientCount, error: patientError } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId as any);
       
       if (patientError) throw patientError;
       
@@ -65,23 +64,25 @@ const Dashboard = () => {
         pending: 0
       };
       
-      documents?.forEach(doc => {
-        if (statusCounts[doc.status] !== undefined) {
-          statusCounts[doc.status]++;
+      (documents || []).forEach((doc: any) => {
+        if (doc && typeof doc === 'object' && 'status' in doc && statusCounts[doc.status as keyof typeof statusCounts] !== undefined) {
+          statusCounts[doc.status as keyof typeof statusCounts]++;
         }
       });
       
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const thisMonthDocs = documents?.filter(doc => 
-        new Date(doc.created_at) >= firstDayOfMonth
-      ).length || 0;
+      const thisMonthDocs = (documents || []).filter((doc: any) => 
+        doc && typeof doc === 'object' && 'created_at' in doc && new Date(doc.created_at) >= firstDayOfMonth
+      ).length;
       
       const monthlyData = Array(12).fill(0);
-      documents?.forEach(doc => {
-        const docDate = new Date(doc.created_at);
-        if (docDate.getFullYear() === now.getFullYear()) {
-          monthlyData[docDate.getMonth()]++;
+      (documents || []).forEach((doc: any) => {
+        if (doc && typeof doc === 'object' && 'created_at' in doc) {
+          const docDate = new Date(doc.created_at);
+          if (docDate.getFullYear() === now.getFullYear()) {
+            monthlyData[docDate.getMonth()]++;
+          }
         }
       });
       
@@ -99,10 +100,10 @@ const Dashboard = () => {
       ].filter(item => item.value > 0);
       
       return {
-        totalDocuments: documents?.length || 0,
+        totalDocuments: (documents || []).length,
         thisMonthDocuments: thisMonthDocs,
         totalPatients: patientCount || 0,
-        pendingReviews: (documents?.filter(d => d.status !== 'processed').length || 0),
+        pendingReviews: ((documents || []).filter((d: any) => d && typeof d === 'object' && 'status' in d && d.status !== 'processed').length),
         activityData,
         statusData,
         statusCounts
@@ -135,7 +136,7 @@ const Dashboard = () => {
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId as any)
         .order('created_at', { ascending: false })
         .limit(5);
       

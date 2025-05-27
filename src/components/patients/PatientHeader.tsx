@@ -10,17 +10,6 @@ interface PatientHeaderProps {
 }
 
 const PatientHeader: React.FC<PatientHeaderProps> = ({ patient }) => {
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="default">Active</Badge>;
-      case 'inactive':
-        return <Badge variant="secondary">Inactive</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   // Get contact info from JSON field
   const contactInfo = patient.contact_info as any;
   const contactNumber = contactInfo?.phone || contactInfo?.contact_number;

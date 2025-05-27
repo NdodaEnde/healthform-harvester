@@ -55,11 +55,12 @@ export function useOrganizationData() {
         throw orgUsersError;
       }
       
-      const orgs = orgUsers?.filter(ou => ou && ou.organizations && 'id' in ou.organizations)
+      const orgs = (orgUsers || [])
+        .filter(ou => ou && ou.organizations && typeof ou.organizations === 'object' && 'id' in ou.organizations)
         .map(ou => ({
           ...(ou.organizations as any),
           userRole: ou.role
-        })) || [];
+        }));
       
       console.log("User organizations loaded:", orgs.length);
       setUserOrganizations(orgs);
@@ -123,7 +124,9 @@ export function useOrganizationData() {
       }
       
       // Extract client IDs safely
-      const clientIds = relationships?.filter(rel => rel && 'client_id' in rel).map(rel => rel.client_id) || [];
+      const clientIds = (relationships || [])
+        .filter(rel => rel && typeof rel === 'object' && 'client_id' in rel)
+        .map(rel => (rel as any).client_id);
       
       if (clientIds.length === 0) {
         setClientOrganizations([]);
@@ -146,7 +149,7 @@ export function useOrganizationData() {
       // Check for stored client selection
       const storedClientId = localStorage.getItem("currentClientId");
       if (storedClientId && storedClientId !== "all_clients") {
-        const client = clients?.find(c => c.id === storedClientId);
+        const client = (clients || []).find(c => c && typeof c === 'object' && 'id' in c && c.id === storedClientId);
         if (client) {
           setCurrentClient(client as unknown as Organization);
         } else {
