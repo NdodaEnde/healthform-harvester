@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -350,4 +349,92 @@ export const createStandardizedFilePath = (
   console.log('Final standardized path:', finalPath);
   
   return finalPath;
+};
+
+/**
+ * Utility to fix document organizations
+ */
+export const fixDocumentOrganizations = async () => {
+  try {
+    console.log('Starting document organization fix...');
+    
+    // Get all documents without organization_id
+    const { data: orphanedDocs, error: orphanedError } = await supabase
+      .from('documents')
+      .select('id, file_path, owner_id, user_id')
+      .is('organization_id', null);
+
+    if (orphanedError) {
+      console.error('Error fetching orphaned documents:', orphanedError);
+      return { success: false, error: orphanedError.message };
+    }
+
+    if (!orphanedDocs || orphanedDocs.length === 0) {
+      console.log('No orphaned documents found');
+      return { success: true, message: 'No orphaned documents found' };
+    }
+
+    console.log(`Found ${orphanedDocs.length} orphaned documents`);
+
+    let fixedCount = 0;
+    let errorCount = 0;
+
+    for (const doc of orphanedDocs) {
+      try {
+        const userId = doc.owner_id || doc.user_id;
+        
+        if (!userId) {
+          console.log(`Document ${doc.id} has no user ID, skipping`);
+          continue;
+        }
+
+        // Find the user's organization
+        const { data: orgUser, error: orgError } = await supabase
+          .from('organization_users')
+          .select('organization_id')
+          .eq('user_id', userId as any)
+          .limit(1)
+          .maybeSingle();
+
+        if (orgError || !orgUser) {
+          console.log(`No organization found for user ${userId}, document ${doc.id}`);
+          continue;
+        }
+
+        // Update the document with the organization_id
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({ organization_id: orgUser.organization_id })
+          .eq('id', doc.id as any);
+
+        if (updateError) {
+          console.error(`Error updating document ${doc.id}:`, updateError);
+          errorCount++;
+        } else {
+          console.log(`Fixed document ${doc.id}: assigned to organization ${orgUser.organization_id}`);
+          fixedCount++;
+        }
+
+        // Add a small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+      } catch (err) {
+        console.error(`Error processing document ${doc.id}:`, err);
+        errorCount++;
+      }
+    }
+
+    console.log(`Document organization fix completed. Fixed: ${fixedCount}, Errors: ${errorCount}`);
+    
+    return {
+      success: true,
+      message: `Fixed ${fixedCount} documents. ${errorCount} errors occurred.`,
+      fixedCount,
+      errorCount
+    };
+
+  } catch (error: any) {
+    console.error('Error in fixDocumentOrganizations:', error);
+    return { success: false, error: error.message };
+  }
 };

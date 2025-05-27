@@ -30,7 +30,6 @@ const PatientsPage = () => {
         {/* Patient List Component - the main focus of the page */}
         {currentOrganization && (
           <PatientList 
-            organizationId={currentOrganization.id}
             clientOrganizationId={currentClient?.id}
           />
         )}

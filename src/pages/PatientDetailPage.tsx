@@ -1,790 +1,295 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, User, Phone, Mail, CalendarIcon, Edit, Clipboard, Calendar, Clock, Upload } from 'lucide-react';
-import { format, differenceInDays, isFuture, parseISO, isValid, parse, differenceInYears } from 'date-fns';
-import { PatientInfo, CertificateData } from '@/types/patient';
-import { formatSafeDateEnhanced, calculateAgeEnhanced, getEffectiveGenderEnhanced } from '@/utils/date-utils';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import MedicalHistoryEditor from '@/components/MedicalHistoryEditor';
-import PatientCertificates, { getExaminationDate } from '@/components/PatientCertificates';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from '@/components/ui/use-toast';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Edit, Calendar, User, Phone, Mail, FileText, MapPin, Globe, Shield, CheckCircle, AlertCircle, Clock, X } from 'lucide-react';
+import PatientCertificates from '@/components/PatientCertificates';
 import PatientVisits from '@/components/PatientVisits';
-import PatientSAIDInfo from '@/components/PatientSAIDInfo';
-import DocumentUploader from '@/components/DocumentUploader';
-import { Separator } from '@/components/ui/separator';
+import PatientHeader from '@/components/patients/PatientHeader';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import type { DatabasePatient } from '@/types/database';
 
-const PatientDetailPage = () => {
-  const { id } = useParams<{ id: string }>();
+interface PatientDetailPageProps {
+  patientId?: string;
+}
+
+const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
+  const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
-  const { getEffectiveOrganizationId } = useOrganization();
   const queryClient = useQueryClient();
-  const organizationId = getEffectiveOrganizationId();
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const { currentOrganization } = useOrganization();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPatient, setEditedPatient] = useState<Partial<DatabasePatient>>({});
 
-  const { data: patient, isLoading } = useQuery({
-    queryKey: ['patient', id],
+  // Fetch patient data
+  const { data: patient, isLoading, isError, error } = useQuery({
+    queryKey: ['patient', patientId],
     queryFn: async () => {
+      if (!patientId) throw new Error("Patient ID is required");
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('id', id)
+        .eq('id', patientId)
         .single();
-      
-      if (error) throw error;
-      console.log('Patient data loaded:', data?.id, data?.first_name, data?.last_name);
-      return data as PatientInfo;
-    },
-    enabled: !!id,
-  });
 
-  const { data: certificates, isLoading: isLoadingCertificates } = useQuery({
-    queryKey: ['patient-certificates-data', id, organizationId],
-    queryFn: async () => {
-      if (!id || !organizationId) return [];
-      
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('status', 'processed')
-        .in('document_type', ['certificate-fitness', 'certificate_of_fitness', 'fitness-certificate', 'fitness_certificate'])
-        .order('created_at', { ascending: false });
-      
       if (error) {
-        console.error('Error fetching certificates:', error);
-        throw error;
+        throw new Error(error.message);
       }
-      
-      return (data || []).filter(doc => {
-        const extractedData = doc.extracted_data;
-        
-        if (!extractedData || typeof extractedData !== 'object') return false;
-        
-        if ('patient_info' in extractedData && 
-            extractedData.patient_info && 
-            typeof extractedData.patient_info === 'object' && 
-            'id' in extractedData.patient_info && 
-            extractedData.patient_info.id === id) {
-          return true;
-        }
-        
-        if (patient && 'structured_data' in extractedData && 
-            extractedData.structured_data && 
-            typeof extractedData.structured_data === 'object' &&
-            'patient' in extractedData.structured_data &&
-            extractedData.structured_data.patient && 
-            typeof extractedData.structured_data.patient === 'object' &&
-            'name' in extractedData.structured_data.patient) {
-          const patientName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-          const nameInData = String(extractedData.structured_data.patient.name).toLowerCase();
-          if (nameInData.includes(patientName)) return true;
-        }
-        
-        if (patient && doc.file_name) {
-          const fileName = doc.file_name.toLowerCase();
-          if (
-            (patient.first_name && fileName.includes(patient.first_name.toLowerCase())) ||
-            (patient.last_name && fileName.includes(patient.last_name.toLowerCase())) ||
-            fileName.includes(id.toLowerCase())
-          ) {
-            return true;
-          }
-        }
-        
-        return false;
-      });
+
+      return data as DatabasePatient;
     },
-    enabled: !!id && !!organizationId && !!patient,
+    enabled: !!patientId,
   });
 
-  const certificateSummary = React.useMemo(() => {
-    if (!certificates || certificates.length === 0) {
-      return { 
-        count: 0, 
-        latestExpiration: null, 
-        daysToExpiration: null,
-        lastExaminationDate: null 
-      };
+  useEffect(() => {
+    if (patient) {
+      setEditedPatient(patient);
     }
+  }, [patient]);
 
-    let latestExpiration = null;
-    let latestExpirationDate = null;
-    let lastExaminationDate = null;
-    let daysToExpiration = null;
-    
-    for (const cert of certificates) {
-      if (!cert.extracted_data || typeof cert.extracted_data !== 'object') continue;
-      
-      const certData = cert.extracted_data as CertificateData;
-      
-      if (certData.structured_data?.certification?.valid_until) {
-        try {
-          const expiryDate = certData.structured_data.certification.valid_until;
-          const expiryDateObj = parseISO(String(expiryDate));
-          
-          if (isValid(expiryDateObj) && (!latestExpirationDate || expiryDateObj > latestExpirationDate)) {
-            latestExpirationDate = expiryDateObj;
-            latestExpiration = expiryDate;
-            
-            if (isFuture(expiryDateObj)) {
-              const today = new Date();
-              daysToExpiration = differenceInDays(expiryDateObj, today);
-            } else {
-              daysToExpiration = 0; // Expired
-            }
-          }
-        } catch (e) {
-          console.log('Invalid expiry date format:', certData.structured_data.certification.valid_until);
-        }
-      }
-      
-      let examDate = null;
-      
-      if (certData.structured_data?.certification?.examination_date) {
-        examDate = certData.structured_data.certification.examination_date;
-      } 
-      else if (certData.structured_data?.examination_results?.date) {
-        examDate = certData.structured_data.examination_results.date;
-      }
-      else if (certData.structured_data?.certification?.valid_until) {
-        examDate = getExaminationDate(String(certData.structured_data.certification.valid_until));
-      }
-      
-      if (examDate) {
-        try {
-          const examDateObj = parseISO(String(examDate));
-          
-          if (isValid(examDateObj) && (!lastExaminationDate || examDateObj > new Date(String(lastExaminationDate)))) {
-            lastExaminationDate = examDate;
-          }
-        } catch (e) {
-          console.log('Invalid examination date format:', examDate);
-        }
-      }
-    }
-    
-    return {
-      count: certificates.length,
-      latestExpiration: latestExpiration ? String(latestExpiration) : null,
-      lastExaminationDate: lastExaminationDate ? String(lastExaminationDate) : null,
-      daysToExpiration
-    };
-  }, [certificates]);
-  
-  // Force refresh of patient data when component mounts
-  React.useEffect(() => {
-    if (id) {
-      // Invalidate the query to force a refresh
-      queryClient.invalidateQueries({ queryKey: ['patient', id] });
-      queryClient.invalidateQueries({ queryKey: ['patient-certificates-data', id, organizationId] });
-    }
-  }, [id, organizationId, queryClient]);
+  // Update patient mutation
+  const updatePatientMutation = useMutation(
+    async (updates: Partial<DatabasePatient>) => {
+      const { data, error } = await supabase
+        .from('patients')
+        .update(updates)
+        .eq('id', patientId)
+        .select()
+        .single();
 
-  const handleBackToList = () => {
-    navigate('/patients');
+      if (error) {
+        throw new Error(error.message);
+      }
+      return data;
+    },
+    {
+      onSuccess: () => {
+        toast({
+          title: "Patient updated",
+          description: "Patient details have been successfully updated.",
+        });
+        setIsEditing(false);
+        queryClient.invalidateQueries(['patient', patientId]);
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Update failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    }
+  );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditedPatient(prev => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  const handleEditPatient = () => {
-    navigate(`/patients/${id}/edit`);
+  const handleContactInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditedPatient(prev => {
+      const contactInfo = { ...prev.contact_info, [name]: value };
+      return { ...prev, contact_info: contactInfo };
+    });
   };
 
-  const handleViewMedicalRecords = () => {
-    navigate(`/patients/${id}/records`);
+  const handleSave = async () => {
+    if (!patientId) return;
+    await updatePatientMutation.mutateAsync(editedPatient);
   };
 
-  const handleUploadComplete = () => {
-    setUploadDialogOpen(false);
-    // Refresh the certificates data
-    queryClient.invalidateQueries({ queryKey: ['patient-certificates-data', id, organizationId] });
-  };
-
-  // Improved age calculation with fallbacks and better date validation
-  const calculateAge = (dateOfBirth?: string) => {
-    if (!dateOfBirth) return null;
-    
-    const today = new Date();
-    
-    // Try parsing with built-in Date constructor first
-    let birthDate = new Date(dateOfBirth);
-    
-    // If it's an invalid date, try parseISO from date-fns
-    if (isNaN(birthDate.getTime())) {
-      birthDate = parseISO(dateOfBirth);
-      
-      // If still invalid, return null
-      if (!isValid(birthDate)) {
-        console.warn('Invalid date format for age calculation:', dateOfBirth);
-        return null;
-      }
+  const handleCancel = () => {
+    setIsEditing(false);
+    if (patient) {
+      setEditedPatient(patient);
     }
-    
-    // Make sure the parsed date is valid
-    if (!isValid(birthDate)) {
-      console.warn('Invalid date after parsing:', dateOfBirth);
-      return null;
-    }
-    
-    // Check for dates in the future
-    if (birthDate > today) {
-      console.warn('Birth date is in the future:', dateOfBirth);
-      return null;
-    }
-    
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDifference = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-  
-  // Helper function to format dates with appropriate error handling
-  const formatSafeDate = (dateString?: string, formatStr = 'PPP') => {
-    if (!dateString) return 'Not available';
-    
-    try {
-      // Try with Date constructor first
-      let dateObj = new Date(dateString);
-      
-      // If invalid, try with parseISO
-      if (isNaN(dateObj.getTime())) {
-        dateObj = parseISO(dateString);
-      }
-      
-      // Check if date is valid
-      if (!isValid(dateObj)) {
-        return 'Invalid date';
-      }
-      
-      return format(dateObj, formatStr);
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Error formatting date';
-    }
-  };
-
-  // Helper function to get effective gender with proper capitalization
-  const getEffectiveGender = () => {
-    if (!patient) return 'Unknown';
-    
-    const gender = patient.gender_from_id || patient.gender;
-    if (!gender) return 'Unknown';
-    
-    // Capitalize first letter
-    return gender.charAt(0).toUpperCase() + gender.slice(1);
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
+    return <div className="text-center">Loading patient data...</div>;
   }
 
-  if (!patient) {
-    return (
-      <div className="text-center py-8">
-        <h2 className="text-xl font-semibold mb-2">Patient Not Found</h2>
-        <p className="text-muted-foreground mb-4">The patient you're looking for doesn't exist or you don't have permission to view it.</p>
-        <Button variant="outline" onClick={handleBackToList}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Patient List
-        </Button>
-      </div>
-    );
+  if (isError) {
+    return <div className="text-center">Error: {error?.message}</div>;
   }
-
-  const hasContact = patient.contact_info && (
-    patient.contact_info.email || 
-    patient.contact_info.phone || 
-    patient.contact_info.address
-  );
-
-  // Get the patient's age
-  const patientAge = calculateAge(patient.birthdate_from_id || patient.date_of_birth);
-
-  const ehrData = {
-    personal: {
-      fullName: `${patient.first_name} ${patient.last_name}`,
-      dateOfBirth: formatSafeDateEnhanced(patient.birthdate_from_id || patient.date_of_birth), 
-      gender: getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender),
-      idNumber: patient.id_number || 'N/A',
-      employeeId: patient.contact_info?.employee_id || 'N/A',
-      address: patient.contact_info?.address || 'N/A',
-      phoneNumber: patient.contact_info?.phone || 'N/A',
-      email: patient.contact_info?.email || 'N/A',
-      occupation: patient.contact_info?.occupation || 'N/A',
-      employer: patient.contact_info?.company || 'N/A'
-    },
-    medical: {
-      allergies: (patient.medical_history?.allergies && patient.medical_history.allergies.length > 0) 
-        ? patient.medical_history.allergies.map(a => a.allergen).join(", ") 
-        : 'None reported',
-      currentMedications: (patient.medical_history?.medications && patient.medical_history.medications.length > 0) 
-        ? patient.medical_history.medications.map(m => `${m.name}${m.dosage ? ` (${m.dosage})` : ''}`).join(", ") 
-        : 'None reported',
-      chronicConditions: (patient.medical_history?.conditions && patient.medical_history.conditions.length > 0) 
-        ? patient.medical_history.conditions.map(c => c.name).join(", ") 
-        : 'None reported',
-      previousSurgeries: patient.medical_history?.surgeries || 'None reported',
-      familyHistory: patient.medical_history?.family_history || 'Not available',
-      smoker: patient.medical_history?.smoker ? 'Yes' : 'No',
-      alcoholConsumption: patient.medical_history?.alcohol_consumption || 'Not reported',
-      exerciseFrequency: patient.medical_history?.exercise_frequency || 'Not reported'
-    },
-    vitals: {
-      height: patient.medical_history?.vitals?.height || 'N/A',
-      weight: patient.medical_history?.vitals?.weight || 'N/A',
-      bmi: patient.medical_history?.vitals?.bmi || 'N/A',
-      bloodPressure: patient.medical_history?.vitals?.blood_pressure || 'N/A',
-      heartRate: patient.medical_history?.vitals?.heart_rate || 'N/A',
-      respiratoryRate: patient.medical_history?.vitals?.respiratory_rate || 'N/A',
-      temperature: patient.medical_history?.vitals?.temperature || 'N/A',
-      oxygenSaturation: patient.medical_history?.vitals?.oxygen_saturation || 'N/A'
-    },
-    examResults: {
-      vision: patient.medical_history?.exam_results?.vision || 'N/A',
-      hearing: patient.medical_history?.exam_results?.hearing || 'N/A',
-      lungFunction: patient.medical_history?.exam_results?.lung_function || 'N/A',
-      chestXRay: patient.medical_history?.exam_results?.chest_xray || 'N/A',
-      laboratory: patient.medical_history?.exam_results?.laboratory || 'N/A'
-    },
-    assessment: {
-      diagnosis: patient.medical_history?.assessment?.diagnosis || 'N/A',
-      recommendations: patient.medical_history?.assessment?.recommendations || 'N/A',
-      restrictions: patient.medical_history?.assessment?.restrictions || 'N/A',
-      fitnessConclusion: patient.medical_history?.assessment?.fitness_conclusion || 'N/A'
-    }
-  };
-
-  const renderSectionItem = (label: string, value: string) => (
-    <div className="mb-4">
-      <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-base mt-1">{value}</dd>
-    </div>
-  );
-
+  
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-2 sm:flex-row sm:justify-between sm:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleBackToList}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {patient.first_name} {patient.last_name}
-            </h1>
-          </div>
-          <p className="text-muted-foreground">
-            {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
-            {' • '}
-            {calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth) !== 'N/A'
-              ? `${calculateAgeEnhanced(patient.birthdate_from_id || patient.date_of_birth)} years old` 
-              : 'Age not available'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Document
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Upload Document for {patient?.first_name} {patient?.last_name}</DialogTitle>
-              </DialogHeader>
-              <DocumentUploader 
-                onUploadComplete={handleUploadComplete}
-                organizationId={organizationId}
-                patientId={id}
-              />
-            </DialogContent>
-          </Dialog>
-          <Button variant="outline" onClick={handleViewMedicalRecords}>
-            <FileText className="mr-2 h-4 w-4" />
-            Medical Records
-          </Button>
-          <Button onClick={handleEditPatient}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Patient
-          </Button>
-        </div>
-      </div>
+    <div className="container mx-auto px-4 py-6">
+      <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
       
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="ehr">EHR</TabsTrigger>
-          <TabsTrigger value="certificates">Certificates</TabsTrigger>
-          <TabsTrigger value="visits">Visits</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          {/* South African ID info card - will only display if ID number exists */}
-          {patient.id_number && (
-            <Card className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <CardTitle>South African ID Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PatientSAIDInfo 
-                  idNumber={patient.id_number} 
-                  showDetailed={true}
-                  className="pt-1" 
-                />
-              </CardContent>
-            </Card>
-          )}
+      {patient && (
+        <div className="space-y-6">
+          <PatientHeader patient={patient} />
           
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Patient Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="space-y-4">
-                  <div>
-                    <dt className="text-sm font-medium text-muted-foreground">Full Name</dt>
-                    <dd className="text-base mt-1">{patient.first_name} {patient.last_name}</dd>
-                  </div>
-                  
-                  <div>
-                    <dt className="text-sm font-medium text-muted-foreground">Date of Birth</dt>
-                    <dd className="text-base mt-1">
-                      {formatSafeDateEnhanced(patient.birthdate_from_id || patient.date_of_birth)}
-                    </dd>
-                  </div>
-                  
-                  <div>
-                    <dt className="text-sm font-medium text-muted-foreground">Gender</dt>
-                    <dd className="text-base capitalize mt-1">
-                      {getEffectiveGenderEnhanced(patient.gender_from_id || patient.gender)}
-                    </dd>
-                  </div>
-                </dl>
-              </CardContent>
-            </Card>
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="visits">Visits</TabsTrigger>
+              <TabsTrigger value="certificates">Certificates</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+            </TabsList>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {hasContact ? (
-                  <dl className="space-y-4">
-                    {patient.contact_info?.phone && (
-                      <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
-                        <dd className="text-base flex items-center mt-1">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {patient.contact_info.phone}
-                        </dd>
-                      </div>
-                    )}
-                    
-                    {patient.contact_info?.email && (
-                      <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Email</dt>
-                        <dd className="text-base flex items-center mt-1">
-                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {patient.contact_info.email}
-                        </dd>
-                      </div>
-                    )}
-                    
-                    {patient.contact_info?.address && (
-                      <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Address</dt>
-                        <dd className="text-base mt-1">
-                          {patient.contact_info.address}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-muted-foreground">No contact information available</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Medical Records Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {patient.medical_history ? (
-                  <dl className="space-y-4">
-                    <div>
-                      <dt className="text-sm font-medium text-muted-foreground">Medical Conditions</dt>
-                      <dd className="text-base mt-1">
-                        {patient.medical_history.conditions && patient.medical_history.conditions.length > 0 ? (
-                          <ul className="list-disc pl-4">
-                            {patient.medical_history.conditions.map((condition, index) => (
-                              <li key={index}>
-                                {condition.name}
-                                {condition.diagnosed_date && ` (diagnosed: ${condition.diagnosed_date})`}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-muted-foreground">None reported</span>
-                        )}
-                      </dd>
-                    </div>
-                    
-                    <div>
-                      <dt className="text-sm font-medium text-muted-foreground">Medications</dt>
-                      <dd className="text-base mt-1">
-                        {patient.medical_history.medications && patient.medical_history.medications.length > 0 ? (
-                          <ul className="list-disc pl-4">
-                            {patient.medical_history.medications.map((med, index) => (
-                              <li key={index}>
-                                {med.name}
-                                {med.dosage && ` (${med.dosage})`}
-                                {med.frequency && `, ${med.frequency}`}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-muted-foreground">None reported</span>
-                        )}
-                      </dd>
-                    </div>
-                    
-                    <div>
-                      <dt className="text-sm font-medium text-muted-foreground">Allergies</dt>
-                      <dd className="text-base mt-1">
-                        {patient.medical_history.allergies && patient.medical_history.allergies.length > 0 ? (
-                          <ul className="list-disc pl-4">
-                            {patient.medical_history.allergies.map((allergy, index) => (
-                              <li key={index}>
-                                {allergy.allergen}
-                                {allergy.severity && ` (${allergy.severity})`}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-muted-foreground">None reported</span>
-                        )}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-muted-foreground">No medical history recorded</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={handleEditPatient}
-                    >
-                      <Clipboard className="mr-2 h-4 w-4" />
-                      Add Medical History
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Certificates Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingCertificates ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center py-2 px-4 bg-muted/30 rounded-lg">
-                        <h3 className="text-3xl font-semibold text-primary mb-1">
-                          {certificateSummary.count}
-                        </h3>
-                        <p className="text-muted-foreground text-sm">Total Certificates</p>
-                      </div>
-                      
-                      <div className="text-center py-2 px-4 bg-muted/30 rounded-lg">
-                        <div className="flex items-center justify-center gap-2 text-amber-500 mb-1">
-                          <Calendar className="h-5 w-5" />
-                          <h3 className="text-lg font-medium leading-none">
-                            {certificateSummary.lastExaminationDate ? 
-                              formatSafeDate(certificateSummary.lastExaminationDate, 'PP') : 
-                              'N/A'}
-                          </h3>
-                        </div>
-                        <p className="text-muted-foreground text-sm">Last Examination</p>
-                      </div>
-                      
-                      <div className="text-center py-2 px-4 bg-muted/30 rounded-lg">
-                        <div className="flex items-center justify-center gap-2 text-green-500 mb-1">
-                          <Clock className="h-5 w-5" />
-                          <h3 className="text-lg font-medium leading-none">
-                            {certificateSummary.daysToExpiration !== null ? 
-                              `${certificateSummary.daysToExpiration} days` : 
-                              'N/A'}
-                          </h3>
-                        </div>
-                        <p className="text-muted-foreground text-sm">Until Expiry</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-center mt-4">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full"
-                        onClick={() => {
-                          const certificatesTab = document.querySelector('[data-value="certificates"]');
-                          if (certificatesTab) {
-                            (certificatesTab as HTMLElement).click();
-                          }
-                        }}
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        View All Certificates
+            <TabsContent value="overview" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Patient Details</CardTitle>
+                    {!isEditing ? (
+                      <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
                       </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleSave} disabled={updatePatientMutation.isLoading}>
+                          {updatePatientMutation.isLoading ? "Saving..." : "Save"}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleCancel} disabled={updatePatientMutation.isLoading}>
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">First Name</label>
+                      <input
+                        type="text"
+                        name="first_name"
+                        value={(editedPatient.first_name || '') as string}
+                        onChange={handleInputChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                      <input
+                        type="text"
+                        name="last_name"
+                        value={(editedPatient.last_name || '') as string}
+                        onChange={handleInputChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        disabled={!isEditing}
+                      />
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="ehr" className="mt-6">
-          <Card>
-            <CardContent className="pt-6">
-              <Tabs defaultValue="personal">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="personal">Personal</TabsTrigger>
-                  <TabsTrigger value="medical">Medical</TabsTrigger>
-                  <TabsTrigger value="vitals">Vitals</TabsTrigger>
-                  <TabsTrigger value="examResults">Exam Results</TabsTrigger>
-                  <TabsTrigger value="assessment">Assessment</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="personal">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Personal Information</h3>
-                    <Separator />
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {renderSectionItem("Full Name", ehrData.personal.fullName)}
-                      {renderSectionItem("Date of Birth", ehrData.personal.dateOfBirth)}
-                      {renderSectionItem("Gender", ehrData.personal.gender)}
-                      {renderSectionItem("ID Number", ehrData.personal.idNumber)}
-                      {renderSectionItem("Employee ID", ehrData.personal.employeeId)}
-                      {renderSectionItem("Address", ehrData.personal.address)}
-                      {renderSectionItem("Phone Number", ehrData.personal.phoneNumber)}
-                      {renderSectionItem("Email", ehrData.personal.email)}
-                      {renderSectionItem("Occupation", ehrData.personal.occupation)}
-                      {renderSectionItem("Employer", ehrData.personal.employer)}
-                    </dl>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                      <input
+                        type="date"
+                        name="date_of_birth"
+                        value={(editedPatient.date_of_birth || '') as string}
+                        onChange={handleInputChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">ID Number</label>
+                      <input
+                        type="text"
+                        name="id_number"
+                        value={(editedPatient.id_number || '') as string}
+                        onChange={handleInputChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        disabled={!isEditing}
+                      />
+                    </div>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="medical">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Medical Information</h3>
-                    <Separator />
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {renderSectionItem("Allergies", ehrData.medical.allergies)}
-                      {renderSectionItem("Current Medications", ehrData.medical.currentMedications)}
-                      {renderSectionItem("Chronic Conditions", ehrData.medical.chronicConditions)}
-                      {renderSectionItem("Previous Surgeries", ehrData.medical.previousSurgeries)}
-                      {renderSectionItem("Family History", ehrData.medical.familyHistory)}
-                      {renderSectionItem("Smoker", ehrData.medical.smoker)}
-                      {renderSectionItem("Alcohol Consumption", ehrData.medical.alcoholConsumption)}
-                      {renderSectionItem("Exercise Frequency", ehrData.medical.exerciseFrequency)}
-                    </dl>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={((editedPatient.contact_info as any)?.phone || '') as string}
+                        onChange={handleContactInfoChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Email</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={((editedPatient.contact_info as any)?.email || '') as string}
+                        onChange={handleContactInfoChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        disabled={!isEditing}
+                      />
+                    </div>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="vitals">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Vitals</h3>
-                    <Separator />
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {renderSectionItem("Height", ehrData.vitals.height)}
-                      {renderSectionItem("Weight", ehrData.vitals.weight)}
-                      {renderSectionItem("BMI", ehrData.vitals.bmi)}
-                      {renderSectionItem("Blood Pressure", ehrData.vitals.bloodPressure)}
-                      {renderSectionItem("Heart Rate", ehrData.vitals.heartRate)}
-                      {renderSectionItem("Respiratory Rate", ehrData.vitals.respiratoryRate)}
-                      {renderSectionItem("Temperature", ehrData.vitals.temperature)}
-                      {renderSectionItem("Oxygen Saturation", ehrData.vitals.oxygenSaturation)}
-                    </dl>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Address</label>
+                    <input
+                      type="text"
+                      name="address"
+                      value={(editedPatient.address || '') as string}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      disabled={!isEditing}
+                    />
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="examResults">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Exam Results</h3>
-                    <Separator />
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {renderSectionItem("Vision", ehrData.examResults.vision)}
-                      {renderSectionItem("Hearing", ehrData.examResults.hearing)}
-                      {renderSectionItem("Lung Function", ehrData.examResults.lungFunction)}
-                      {renderSectionItem("Chest X-Ray", ehrData.examResults.chestXRay)}
-                      {renderSectionItem("Laboratory", ehrData.examResults.laboratory)}
-                    </dl>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="visits" className="space-y-6">
+              {patient && (
+                <PatientVisits 
+                  patientId={patient.id} 
+                  organizationId={patient.organization_id || ''} 
+                />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="certificates">
+              {patient && currentOrganization && (
+                <PatientCertificates patientId={patient.id} organizationId={currentOrganization.id} />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="security">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Security Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        This section is under development. Security features will be added soon.
+                      </span>
+                    </div>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="assessment">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Assessment</h3>
-                    <Separator />
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {renderSectionItem("Diagnosis", ehrData.assessment.diagnosis)}
-                      {renderSectionItem("Recommendations", ehrData.assessment.recommendations)}
-                      {renderSectionItem("Restrictions", ehrData.assessment.restrictions)}
-                      {renderSectionItem("Fitness Conclusion", ehrData.assessment.fitnessConclusion)}
-                    </dl>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="certificates" className="mt-6">
-          <PatientCertificates patientId={id!} organizationId={organizationId} />
-        </TabsContent>
-        
-        <TabsContent value="medical-history" className="mt-6">
-          <MedicalHistoryEditor 
-            patientId={id!}
-            initialData={patient.medical_history || {}}
-            onSave={async () => {}}
-          />
-        </TabsContent>
-        
-        <TabsContent value="visits" className="mt-6">
-          <PatientVisits 
-            patientId={id!} 
-            organizationId={organizationId}
-            showOnlyValidated={false} 
-          />
-        </TabsContent>
-      </Tabs>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
     </div>
   );
 };
