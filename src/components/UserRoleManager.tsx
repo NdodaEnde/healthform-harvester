@@ -68,7 +68,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
 
       // Merge the data with proper typing and error handling
       const usersWithProfiles: OrganizationUser[] = orgUsers.map(orgUser => {
-        const profile = (profiles || []).find(p => p.id === orgUser.user_id);
+        const profile = Array.isArray(profiles) ? profiles.find(p => p.id === orgUser.user_id) : null;
         return {
           id: orgUser.id || '',
           user_id: orgUser.user_id || '',
@@ -95,11 +95,13 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
+      if (!orgId) return;
+
       const { error } = await supabase
         .from('organization_users')
         .update({ role: newRole })
         .eq('user_id', userId)
-        .eq('organization_id', orgId!);
+        .eq('organization_id', orgId);
 
       if (error) throw error;
       
@@ -113,6 +115,8 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
 
   const removeUser = async (userId: string) => {
     try {
+      if (!orgId) return;
+
       if (!confirm('Are you sure you want to remove this user from the organization?')) {
         return;
       }
@@ -121,7 +125,7 @@ const UserRoleManager: React.FC<UserRoleManagerProps> = ({ organizationId }) => 
         .from('organization_users')
         .delete()
         .eq('user_id', userId)
-        .eq('organization_id', orgId!);
+        .eq('organization_id', orgId);
 
       if (error) throw error;
       
