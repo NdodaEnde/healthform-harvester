@@ -67,16 +67,6 @@ export function DashboardSidebar() {
       href: "/certificates/templates",
       icon: ScrollText
     },
-    {
-      name: "My Organizations (Test)",
-      href: "/my-organizations",
-      icon: Building
-    },
-    {
-      name: "My Patients (Test)", 
-      href: "/my-patients",
-      icon: UserRound
-    },
     ...(isServiceProvider ? [
       { 
         name: "Organizations", 
