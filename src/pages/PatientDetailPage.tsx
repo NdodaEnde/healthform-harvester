@@ -397,7 +397,7 @@ const PatientDetailPage = () => {
         <div className="flex items-center gap-2">
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Document
               </Button>
