@@ -46,13 +46,13 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
             contact_email
           )
         `)
-        .eq('service_provider_id', providerId)
+        .eq('service_provider_id', providerId as any)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       // Transform the data to flatten client info
-      const transformedData = data?.map(rel => ({
+      const transformedData = data?.map((rel: any) => ({
         ...rel,
         client_name: rel.client?.name,
         client_email: rel.client?.contact_email
@@ -75,8 +75,8 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
     try {
       const { error } = await supabase
         .from('organization_relationships')
-        .update({ is_active: !currentStatus })
-        .eq('id', relationshipId);
+        .update({ is_active: !currentStatus } as any)
+        .eq('id', relationshipId as any);
 
       if (error) throw error;
       
@@ -97,7 +97,7 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
       const { error } = await supabase
         .from('organization_relationships')
         .delete()
-        .eq('id', relationshipId);
+        .eq('id', relationshipId as any);
 
       if (error) throw error;
       

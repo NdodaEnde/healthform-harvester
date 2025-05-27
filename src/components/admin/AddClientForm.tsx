@@ -55,11 +55,12 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
           contact_email: data.contact_email || null,
           contact_phone: data.contact_phone || null,
           is_active: true
-        })
+        } as any)
         .select()
         .single();
 
       if (orgError) throw orgError;
+      if (!newOrg) throw new Error('Failed to create organization');
 
       // Then create the relationship
       const { error: relError } = await supabase
@@ -69,7 +70,7 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
           client_id: newOrg.id,
           relationship_start_date: new Date().toISOString().split('T')[0],
           is_active: true
-        });
+        } as any);
 
       if (relError) throw relError;
 

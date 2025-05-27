@@ -29,14 +29,12 @@ export default function OrganizationClientsPage() {
   const navigate = useNavigate();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [clients, setClients] = useState<ClientRelationship[]>([]);
-  const [potentialClients, setPotentialClients] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     if (id) {
       fetchOrganization();
       fetchClients();
-      fetchPotentialClients();
     }
   }, [id]);
   
@@ -45,7 +43,7 @@ export default function OrganizationClientsPage() {
       const { data, error } = await supabase
         .from("organizations")
         .select("*")
-        .eq("id", id)
+        .eq("id", id as any)
         .single();
         
       if (error) throw error;
@@ -85,7 +83,7 @@ export default function OrganizationClientsPage() {
           is_active,
           relationship_start_date
         `)
-        .eq("service_provider_id", id);
+        .eq("service_provider_id", id as any);
         
       if (relationshipsError) throw relationshipsError;
       
@@ -125,38 +123,9 @@ export default function OrganizationClientsPage() {
     }
   };
   
-  const fetchPotentialClients = async () => {
-    if (!id) return;
-    
-    try {
-      // Get IDs of existing clients
-      const { data: relationships } = await supabase
-        .from("organization_relationships")
-        .select("client_id")
-        .eq("service_provider_id", id);
-        
-      const existingClientIds = relationships?.map(r => r.client_id) || [];
-      
-      // Find organizations that aren't already clients of this service provider
-      const { data, error } = await supabase
-        .from("organizations")
-        .select("id, name, organization_type")
-        .neq("id", id); // Not the service provider itself
-        
-      if (error) throw error;
-      
-      // Filter out existing clients
-      const available = data.filter(org => !existingClientIds.includes(org.id));
-      setPotentialClients(available);
-    } catch (error: any) {
-      console.error("Error fetching potential clients:", error);
-    }
-  };
-  
   const handleClientAdded = () => {
     // Refresh both lists after adding a client
     fetchClients();
-    fetchPotentialClients();
   };
   
   return (
@@ -180,8 +149,8 @@ export default function OrganizationClientsPage() {
         )}
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
           <Card>
             <CardHeader>
               <CardTitle>Client Relationships</CardTitle>
@@ -196,9 +165,7 @@ export default function OrganizationClientsPage() {
                 </div>
               ) : (
                 <ClientRelationshipTable 
-                  clients={clients} 
                   serviceProviderId={id || ""}
-                  onClientUpdated={handleClientAdded}
                 />
               )}
             </CardContent>
@@ -206,21 +173,9 @@ export default function OrganizationClientsPage() {
         </div>
         
         <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Client</CardTitle>
-              <CardDescription>
-                Connect with a new client organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AddClientForm 
-                serviceProviderId={id || ""} 
-                potentialClients={potentialClients}
-                onClientAdded={handleClientAdded}
-              />
-            </CardContent>
-          </Card>
+          <AddClientForm 
+            onSuccess={handleClientAdded}
+          />
         </div>
       </div>
     </div>

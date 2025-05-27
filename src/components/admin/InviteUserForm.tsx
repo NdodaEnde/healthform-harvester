@@ -86,8 +86,8 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
       const { data: existingInvite, error: checkError } = await supabase
         .from("invitations")
         .select("id")
-        .eq("email", data.email)
-        .eq("organization_id", organizationId)
+        .eq("email", data.email as any)
+        .eq("organization_id", organizationId as any)
         .is("accepted_at", null)
         .maybeSingle();
         
@@ -95,7 +95,7 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
         console.error("Error checking for existing invitation:", checkError);
       }
       
-      if (existingInvite) {
+      if (existingInvite && 'id' in existingInvite) {
         // Delete the existing invitation to prevent duplicates
         await supabase
           .from("invitations")
@@ -115,7 +115,7 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
           token: token,
           invited_by: user.id,
           expires_at: expires_at.toISOString()
-        })
+        } as any)
         .select()
         .single();
 
@@ -124,13 +124,17 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
         throw error;
       }
 
+      if (!invitation) {
+        throw new Error("Failed to create invitation");
+      }
+
       console.log("Created invitation:", invitation);
 
       // Get organization name for the email
       const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("name")
-        .eq("id", organizationId)
+        .eq("id", organizationId as any)
         .single();
 
       if (orgError) {
@@ -139,7 +143,7 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
       }
 
       // Send the invitation email
-      const organizationName = org?.name || "HealthForm Harvester";
+      const organizationName = (org && 'name' in org) ? org.name : "HealthForm Harvester";
       const emailResult = await sendInvitationEmail(data.email, organizationName, token);
       
       if (!emailResult.success) {
@@ -153,7 +157,7 @@ export default function InviteUserForm({ organizationId, onInvite, onUserAdded }
           toast({
             title: "Warning",
             description: `Invitation created but email delivery failed. You may need to send the invitation link manually.`,
-            variant: "warning",
+            variant: "destructive",
           });
         }
       } else {
