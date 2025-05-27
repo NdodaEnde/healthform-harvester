@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Users, Edit } from 'lucide-react';
+import { Plus, Search, Users, Edit, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -35,6 +36,7 @@ const PatientList: React.FC<PatientListProps> = ({
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { getEffectiveOrganizationId } = useOrganization();
+  const navigate = useNavigate();
 
   const fetchPatients = async () => {
     try {
@@ -132,11 +134,22 @@ const PatientList: React.FC<PatientListProps> = ({
     }
   };
 
+  const handleViewClick = (e: React.MouseEvent, patient: Patient) => {
+    e.stopPropagation();
+    navigate(`/patients/${patient.id}`);
+  };
+
   const handleEditClick = (e: React.MouseEvent, patient: Patient) => {
     e.stopPropagation();
     if (onEditPatient) {
       onEditPatient(patient);
+    } else {
+      navigate(`/patients/${patient.id}/edit`);
     }
+  };
+
+  const handleAddPatient = () => {
+    navigate('/patients/new');
   };
 
   if (loading) {
@@ -161,7 +174,7 @@ const PatientList: React.FC<PatientListProps> = ({
                 Manage patient records and information
               </CardDescription>
             </div>
-            <Button onClick={() => {}}>
+            <Button onClick={handleAddPatient}>
               <Plus className="h-4 w-4 mr-2" />
               Add Patient
             </Button>
@@ -221,6 +234,13 @@ const PatientList: React.FC<PatientListProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => handleViewClick(e, patient)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {allowEdit && (
                         <Button 
                           variant="ghost" 
