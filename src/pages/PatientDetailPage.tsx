@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -133,6 +134,16 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedPatient, setEditedPatient] = useState<Partial<DatabasePatient>>({});
 
+  const handleUploadComplete = () => {
+    setShowUploadDialog(false);
+    toast({
+      title: "Document uploaded",
+      description: "Document has been successfully uploaded for this patient.",
+    });
+    // Refresh any document-related queries if needed
+    queryClient.invalidateQueries({ queryKey: ['documents', patientId] });
+  };
+
   if (isLoading) {
     return <div className="text-center">Loading patient data...</div>;
   }
@@ -153,6 +164,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
           <Button 
             variant="outline" 
             onClick={() => navigate(`/patients/${patientId}/edit`)}
+            className="hover:bg-green-500 hover:text-white hover:border-green-500 transition-colors"
           >
             <Edit className="mr-2 h-4 w-4" />
             Edit Patient
@@ -243,15 +255,9 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
           {showUploadDialog && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 className="text-lg font-semibold mb-4">Upload Document</h3>
+                <h3 className="text-lg font-semibold mb-4">Upload Document for {patient.first_name} {patient.last_name}</h3>
                 <DocumentUploader
-                  onUploadComplete={() => {
-                    setShowUploadDialog(false);
-                    toast({
-                      title: "Document uploaded",
-                      description: "Document has been successfully uploaded for this patient.",
-                    });
-                  }}
+                  onUploadComplete={handleUploadComplete}
                   organizationId={currentOrganization?.id}
                   clientOrganizationId={patient.client_organization_id}
                   patientId={patient.id}
