@@ -14,10 +14,12 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import type { DatabasePatient } from '@/types/database';
 
 const PatientDetailPage: React.FC = () => {
-  const { patientId } = useParams<{ patientId: string }>();
+  const { id: patientId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const { currentOrganization } = useOrganization();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+
+  console.log('PatientDetailPage - patientId from params:', patientId);
 
   // Early return if no patientId
   if (!patientId) {
@@ -28,6 +30,7 @@ const PatientDetailPage: React.FC = () => {
   const { data: patient, isLoading, isError, error } = useQuery({
     queryKey: ['patient', patientId],
     queryFn: async () => {
+      console.log('Fetching patient with ID:', patientId);
       const { data, error } = await supabase
         .from('patients')
         .select('*')
@@ -35,9 +38,11 @@ const PatientDetailPage: React.FC = () => {
         .single();
 
       if (error) {
+        console.error('Error fetching patient:', error);
         throw new Error(error.message);
       }
 
+      console.log('Patient data received:', data);
       return data as DatabasePatient;
     },
     enabled: !!patientId,
