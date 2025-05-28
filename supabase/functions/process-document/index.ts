@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -121,11 +122,6 @@ function extractCertificateInfo(rawContent: string): any {
     const tableContent = medicalTableMatch[1];
     
     // Parse the specific structure of this table
-    // Row 1: Headers - BLOODS | Done | Results | | Hearing | Done | Results
-    // Row 2: Empty | X | N/A | | ✓ | ?:?
-    // Row 3: FAR, NEAR VISION | ✓ | 20/25 | Working at Heights | X | N/A
-    // etc.
-    
     const rows = tableContent.match(/<tr>(.*?)<\/tr>/g);
     if (rows) {
       // Process each row
@@ -137,7 +133,6 @@ function extractCertificateInfo(rawContent: string): any {
           // Handle different row patterns
           if (index === 1) {
             // Row with BLOODS and Hearing results
-            // [empty, X, N/A, empty, ✓, ?:?]
             if (cellContents.length >= 6) {
               medicalTests.bloods_done = cellContents[1] === '✓';
               medicalTests.bloods_results = cellContents[2] || 'N/A';
@@ -212,24 +207,12 @@ function extractCertificateInfo(rawContent: string): any {
     console.log("Processing fitness declaration table...");
     const tableContent = fitnessTableMatch[1];
     
-    // The table structure is:
-    // Row 1: FIT | Fit with Restriction | Fit with Condition | Temporary Unfit | UNFIT
-    // Row 2: Comments: N/A (spanning all columns)
-    
-    // For this document, we need to determine which option is selected
-    // Based on the original image, "FIT" appears to be highlighted/selected
-    
     // Look for visual indicators in the raw content or make reasonable assumptions
-    // Since this is a certificate of fitness and no restrictions are mentioned prominently,
-    // we can infer the person is "FIT"
-    
-    // First check if there are any explicit markers
     const fitnessOptions = ['FIT', 'Fit with Restriction', 'Fit with Condition', 'Temporary Unfit', 'UNFIT'];
     
-    // Look for any visual indicators like highlighting, checkmarks, etc.
+    // Check for any explicit selection markers
     let selectedOption = null;
     
-    // Check for any explicit selection markers
     fitnessOptions.forEach(option => {
       const patterns = [
         new RegExp(`<td[^>]*class="[^"]*selected[^"]*"[^>]*>${option}</td>`, 'i'),
@@ -306,16 +289,12 @@ function extractCertificateInfo(rawContent: string): any {
     restrictionsList.forEach(restriction => {
       let isSelected = false;
       
-      // Look for visual selection indicators - in your documents, restrictions appear
-      // to be highlighted with yellow background or checkmarks
+      // Look for visual selection indicators
       const patterns = [
-        // Look for the restriction name followed by a checkmark or selection indicator
         new RegExp(`<td[^>]*(?:class="[^"]*(?:selected|highlighted)[^"]*"|style="[^"]*background[^"]*yellow[^"]*")[^>]*>${restriction}[^<]*</td>`, 'i'),
         new RegExp(`<td[^>]*>${restriction}[^<]*✓[^<]*</td>`, 'i'),
         new RegExp(`<td[^>]*>${restriction}[^<]*<[^>]*✓[^>]*>[^<]*</td>`, 'i'),
-        // Look for checkmarks near the restriction name
         new RegExp(`${restriction}[^<\n]{0,50}[✓]`, 'i'),
-        // Look for explicit selection markers
         new RegExp(`${restriction}.*?\\[.*?[xX✓].*?\\]`, 'i')
       ];
       
@@ -325,10 +304,6 @@ function extractCertificateInfo(rawContent: string): any {
           console.log(`✓ Found selected restriction: ${restriction}`);
         }
       });
-      
-      // Special case: Based on your documents, some restrictions may be indicated
-      // by visual highlighting that doesn't come through in the raw text
-      // We can infer from context if needed
       
       // Map restriction names to keys
       const restrictionMapping = {
@@ -348,13 +323,11 @@ function extractCertificateInfo(rawContent: string): any {
     });
     
     // Additional check: if we see any mention of restrictions in the fitness assessment
-    // or comments, we might need to flag some restrictions
     const hasRestrictionsContext = rawContent.toLowerCase().includes('restriction') && 
                                   !rawContent.toLowerCase().includes('no restriction');
     
     if (hasRestrictionsContext) {
       console.log("⚠️ Document mentions restrictions - may need manual review");
-      // Don't automatically set restrictions, but flag for attention
     }
   }
   
@@ -402,7 +375,6 @@ serve(async (req) => {
     const documentType = formData.get('documentType') || 'unknown';
     const userId = formData.get('userId');
     const filePath = formData.get('filePath') || '';
-    // Get patient ID if provided
     const patientId = formData.get('patientId');
 
     if (!file || !(file instanceof File)) {
@@ -427,40 +399,75 @@ serve(async (req) => {
     console.log("Sending document to microservice for processing...");
     console.log("Using microservice URL:", microserviceUrl);
     
-    // Step 1: Send the file to the microservice
-    const initialResponse = await fetch(`${microserviceUrl}/process-documents`, {
-      method: 'POST',
-      body: forwardFormData
-    });
-
-    if (!initialResponse.ok) {
-      const errorText = await initialResponse.text();
-      console.error("Microservice error:", errorText);
-      throw new Error(`Microservice error: ${initialResponse.status} - ${errorText}`);
-    }
-
-    const initialResult = await initialResponse.json();
-    console.log("Initial processing complete. Batch ID:", initialResult.batch_id);
+    let documentResult = null;
+    let rawContent = "";
+    let chunks = [];
     
-    // Step 2: Retrieve the processed data using the batch ID
-    const dataResponse = await fetch(`${microserviceUrl}/get-document-data/${initialResult.batch_id}`);
-    
-    if (!dataResponse.ok) {
-      const errorText = await dataResponse.text();
-      console.error("Error retrieving document data:", errorText);
-      throw new Error(`Data retrieval error: ${dataResponse.status} - ${errorText}`);
-    }
+    try {
+      // Step 1: Send the file to the microservice
+      const initialResponse = await fetch(`${microserviceUrl}/process-documents`, {
+        method: 'POST',
+        body: forwardFormData
+      });
 
-    const documentData = await dataResponse.json();
-    console.log("Document data retrieved successfully");
-    
-    // Extract the first document result (assuming single file upload)
-    const documentResult = documentData.result && documentData.result.length > 0 
-      ? documentData.result[0] 
-      : null;
+      if (!initialResponse.ok) {
+        const errorText = await initialResponse.text();
+        console.error("Microservice error:", errorText);
+        throw new Error(`Microservice unavailable (${initialResponse.status}). Processing document locally.`);
+      }
+
+      const initialResult = await initialResponse.json();
+      console.log("Initial processing complete. Batch ID:", initialResult.batch_id);
       
-    if (!documentResult) {
-      throw new Error("No document processing results returned");
+      // Step 2: Retrieve the processed data using the batch ID
+      const dataResponse = await fetch(`${microserviceUrl}/get-document-data/${initialResult.batch_id}`);
+      
+      if (!dataResponse.ok) {
+        const errorText = await dataResponse.text();
+        console.error("Error retrieving document data:", errorText);
+        throw new Error(`Data retrieval failed (${dataResponse.status}). Processing document locally.`);
+      }
+
+      const documentData = await dataResponse.json();
+      console.log("Document data retrieved successfully");
+      
+      // Extract the first document result
+      documentResult = documentData.result && documentData.result.length > 0 
+        ? documentData.result[0] 
+        : null;
+        
+      if (!documentResult) {
+        throw new Error("No document processing results returned from microservice");
+      }
+
+      rawContent = documentResult.markdown || "";
+      chunks = documentResult.chunks || [];
+      
+      // Cleanup on the microservice side (in background)
+      fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
+        method: 'DELETE'
+      }).catch(error => {
+        console.error("Error cleaning up temporary files:", error);
+      });
+      
+    } catch (microserviceError) {
+      console.error("Microservice processing failed:", microserviceError);
+      console.log("Falling back to local processing - creating basic document record");
+      
+      // Fallback: Create a basic document record without processing
+      rawContent = `Document uploaded: ${file.name}`;
+      chunks = [];
+      documentResult = {
+        markdown: rawContent,
+        chunks: chunks,
+        metadata: {
+          fallback: true,
+          error: microserviceError.message,
+          filename: file.name,
+          size: file.size,
+          type: file.type
+        }
+      };
     }
     
     // Store file in Storage - UPDATED to always use medical-documents bucket
@@ -468,7 +475,6 @@ serve(async (req) => {
     
     console.log(`Uploading file to storage: ${storagePath}`);
     
-    // FIX: Use try/catch specifically for storage operations
     let uploadData = null;
     let publicUrl = null;
     
@@ -493,14 +499,14 @@ serve(async (req) => {
       
       uploadData = storageData;
       
-      // Get public URL if upload successful - IMPROVED URL GENERATION
+      // Get public URL if upload successful
       const { data: urlData } = await supabase.storage
         .from('medical-documents')
         .getPublicUrl(storagePath);
       
       if (urlData) {
         publicUrl = urlData.publicUrl;
-        // Validate the URL is working by making a HEAD request - this can help detect issues
+        // Validate the URL is working by making a HEAD request
         try {
           const urlCheck = await fetch(publicUrl, { method: 'HEAD' });
           if (!urlCheck.ok) {
@@ -514,16 +520,9 @@ serve(async (req) => {
       }
     } catch (storageError) {
       console.error("Failed to upload to storage, proceeding without file storage:", storageError);
-      // Set default values but continue processing - don't terminate completely
       uploadData = null;
       publicUrl = null;
-      // Continue with document processing even if storage fails
     }
-    
-    // Extract data properly from the microservice response
-    const rawContent = documentResult.markdown || "";
-    const chunks = documentResult.chunks || [];
-    const extractedText = documentResult.markdown || "";
     
     console.log("=== DEBUGGING DATA EXTRACTION ===");
     console.log("Raw content length:", rawContent.length);
@@ -564,7 +563,6 @@ serve(async (req) => {
       console.log("Added figures to structured data, count:", chunksByType.figure.length);
     }
     
-    // NEW: Handle the consolidated chunk types from agentic-doc v0.2.1
     if (chunksByType.text) {
       structuredData.text_chunks = chunksByType.text;
       console.log("Added text chunks to structured data, count:", chunksByType.text.length);
@@ -580,9 +578,7 @@ serve(async (req) => {
     if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
       console.log("Processing as certificate document");
       
-      // Use the enhanced extraction function - This function is defined elsewhere in the file
-      // and remains unchanged
-      const certificateInfo = extractCertificateInfo ? extractCertificateInfo(rawContent) : {};
+      const certificateInfo = extractCertificateInfo(rawContent);
       
       if (Object.keys(certificateInfo).length > 0) {
         structuredData.certificate_info = certificateInfo;
@@ -600,12 +596,16 @@ serve(async (req) => {
     
     // Determine document status based on extracted data
     const hasStructuredData = Object.keys(structuredData).length > 0;
-    const hasValidContent = rawContent && rawContent.length > 50; // Minimum threshold
+    const hasValidContent = rawContent && rawContent.length > 50;
     const hasChunks = chunks && chunks.length > 0;
+    const isFallback = documentResult?.metadata?.fallback;
     
     let documentStatus = 'pending';
     
-    if (hasStructuredData && hasValidContent) {
+    if (isFallback) {
+      documentStatus = 'uploaded'; // New status for fallback documents
+      console.log("Document uploaded without processing due to microservice unavailability");
+    } else if (hasStructuredData && hasValidContent) {
       documentStatus = 'processed';
       console.log("Document has structured data and content, marking as 'processed'");
     } else if (hasValidContent && hasChunks) {
@@ -622,23 +622,23 @@ serve(async (req) => {
     // Create document record in database
     const documentRecord = {
       user_id: userId,
-      file_path: storagePath, // Always use the standardized path
+      file_path: storagePath,
       file_name: file.name,
       file_size: file.size,
       mime_type: file.type,
       document_type: documentType,
       status: documentStatus,
       public_url: publicUrl,
-      owner_id: patientId || null, // Set patient ID if provided
+      owner_id: patientId || null,
       extracted_data: {
         raw_content: rawContent,
         structured_data: structuredData,
         chunks: chunks,
-        metadata: documentResult.metadata || {},
+        metadata: documentResult?.metadata || {},
         processing_info: {
-          batch_id: initialResult.batch_id,
-          processing_time: initialResult.processing_time_seconds || 0,
-          chunk_count: chunks.length
+          processing_time: 0,
+          chunk_count: chunks.length,
+          fallback: isFallback || false
         }
       }
     };
@@ -661,18 +661,11 @@ serve(async (req) => {
     
     console.log("Document processed and stored successfully:", insertedDoc.id);
     
-    // Cleanup on the microservice side (in background)
-    fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
-      method: 'DELETE'
-    }).catch(error => {
-      console.error("Error cleaning up temporary files:", error);
-    });
-    
-    // FIXED: Return the expected JSON format with documentId at the top level
+    // Return the expected JSON format with documentId at the top level
     return new Response(
       JSON.stringify({
         success: true,
-        documentId: insertedDoc.id, // Add documentId at the root level
+        documentId: insertedDoc.id,
         document: {
           id: insertedDoc.id,
           status: documentStatus,
