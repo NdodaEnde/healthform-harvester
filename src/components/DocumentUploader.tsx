@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,6 @@ import { supabase, safeQueryResult } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { createStandardizedFilePath } from "@/utils/documentOrganizationFixer";
-import { ensureDocumentsBucket } from "@/utils/organization-assets";
-import { isDefined, isDataResult } from "@/utils/type-guards";
 
 const DOCUMENT_TYPES = [
   { label: "Certificate of Fitness", value: "certificate-fitness" },
@@ -40,41 +38,6 @@ const DocumentUploader = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [documentStatus, setDocumentStatus] = useState<string | null>(null);
-  const [bucketReady, setBucketReady] = useState<boolean>(false);
-  const [bucketCheckLoading, setBucketCheckLoading] = useState(true);
-
-  // Ensure the medical-documents bucket exists when component mounts
-  useEffect(() => {
-    const checkBucket = async () => {
-      setBucketCheckLoading(true);
-      try {
-        const exists = await ensureDocumentsBucket();
-        setBucketReady(exists);
-        if (!exists) {
-          console.warn("Medical-documents storage bucket setup failed");
-          toast({
-            title: "Storage Warning",
-            description: "Storage system setup encountered issues. Uploads may fail.",
-            variant: "destructive"
-          });
-        } else {
-          console.log("Storage bucket ready for uploads");
-        }
-      } catch (error) {
-        console.error("Error checking bucket availability:", error);
-        setBucketReady(false);
-        toast({
-          title: "Storage Warning", 
-          description: "Could not verify storage availability. Uploads may fail.",
-          variant: "destructive"
-        });
-      } finally {
-        setBucketCheckLoading(false);
-      }
-    };
-    
-    checkBucket();
-  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -391,27 +354,6 @@ const DocumentUploader = ({
         </div>
       )}
       
-      {bucketCheckLoading && (
-        <div className="text-xs text-blue-600">
-          <Info className="inline h-3 w-3 mr-1" />
-          Checking storage system availability...
-        </div>
-      )}
-      
-      {!bucketCheckLoading && !bucketReady && !uploading && (
-        <div className="text-xs text-amber-600">
-          <AlertTriangle className="inline h-3 w-3 mr-1" />
-          Storage system may not be ready. Some uploads may fail.
-        </div>
-      )}
-      
-      {!bucketCheckLoading && bucketReady && !uploading && (
-        <div className="text-xs text-green-600">
-          <CheckCircle className="inline h-3 w-3 mr-1" />
-          Storage system is ready for uploads.
-        </div>
-      )}
-      
       {uploading && (
         <div className="space-y-2">
           <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -432,7 +374,7 @@ const DocumentUploader = ({
       
       <Button 
         onClick={handleUpload} 
-        disabled={!file || uploading || (!bucketReady && !bucketCheckLoading)} 
+        disabled={!file || uploading} 
         className="w-full"
       >
         {uploading ? (
