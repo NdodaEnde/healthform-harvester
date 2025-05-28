@@ -28,11 +28,15 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
   const { currentOrganization, currentClient } = useOrganization();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
+  // Early return if no patientId
+  if (!patientId) {
+    return <div className="text-center">Invalid patient ID</div>;
+  }
+
   // Fetch patient data
   const { data: patient, isLoading, isError, error } = useQuery({
     queryKey: ['patient', patientId],
     queryFn: async () => {
-      if (!patientId) throw new Error("Patient ID is required");
       const { data, error } = await supabase
         .from('patients')
         .select('*')
@@ -144,6 +148,11 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
     queryClient.invalidateQueries({ queryKey: ['documents', patientId] });
   };
 
+  const handleUploadClick = () => {
+    console.log('Upload button clicked');
+    setShowUploadDialog(true);
+  };
+
   if (isLoading) {
     return <div className="text-center">Loading patient data...</div>;
   }
@@ -169,7 +178,10 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = () => {
             <Edit className="mr-2 h-4 w-4" />
             Edit Patient
           </Button>
-          <Button onClick={() => setShowUploadDialog(true)}>
+          <Button 
+            onClick={handleUploadClick}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
             <Upload className="mr-2 h-4 w-4" />
             Upload Document
           </Button>
