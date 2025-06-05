@@ -22,17 +22,30 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
   const [validatedData, setValidatedData] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (document.extracted_data) {
-      const certificateData = extractCertificateData(document);
-      const formattedData = formatCertificateData(certificateData);
-      const fitnessStatus = determineFitnessStatus(certificateData);
-      
-      setValidatedData({
-        ...formattedData,
-        fitnessStatus
-      });
+      try {
+        console.log('Processing certificate data for document:', document.id);
+        setIsProcessing(true);
+        
+        const certificateData = extractCertificateData(document);
+        const formattedData = formatCertificateData(certificateData);
+        const fitnessStatus = determineFitnessStatus(certificateData);
+        
+        setValidatedData({
+          ...formattedData,
+          fitnessStatus
+        });
+        
+        console.log('Certificate data processed successfully:', formattedData);
+      } catch (error) {
+        console.error('Error processing certificate data:', error);
+        setValidatedData(null);
+      } finally {
+        setIsProcessing(false);
+      }
     }
   }, [document]);
 
@@ -47,12 +60,34 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
     onValidationComplete?.();
   };
 
-  if (!document.extracted_data || !validatedData) {
+  if (!document.extracted_data) {
     return (
       <Alert>
         <FileText className="h-4 w-4" />
         <AlertDescription>
           No certificate data available for validation.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <Alert>
+        <FileText className="h-4 w-4" />
+        <AlertDescription>
+          Processing certificate data...
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!validatedData) {
+    return (
+      <Alert variant="destructive">
+        <FileText className="h-4 w-4" />
+        <AlertDescription>
+          Unable to process certificate data. The document may not contain valid medical certificate information.
         </AlertDescription>
       </Alert>
     );
@@ -73,22 +108,22 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Patient:</span>
-                <span>{validatedData.patientName}</span>
+                <span>{validatedData.patientName || 'Not specified'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">ID Number:</span>
-                <span>{validatedData.patientId}</span>
+                <span>{validatedData.patientId || 'Not specified'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Company:</span>
-                <span>{validatedData.companyName}</span>
+                <span>{validatedData.companyName || 'Not specified'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Occupation:</span>
-                <span>{validatedData.occupation}</span>
+                <span>{validatedData.occupation || 'Not specified'}</span>
               </div>
             </div>
             
@@ -96,13 +131,13 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Examination Date:</span>
-                <span>{validatedData.examinationDate}</span>
+                <span>{validatedData.examinationDate || 'Not specified'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Fitness Status:</span>
                 <Badge variant={validatedData.fitnessStatus === 'fit' ? 'default' : 'secondary'}>
-                  {validatedData.fitnessStatus}
+                  {validatedData.fitnessStatus || 'Unknown'}
                 </Badge>
               </div>
               {validatedData.expiryDate && (

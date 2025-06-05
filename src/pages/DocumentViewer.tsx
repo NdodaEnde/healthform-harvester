@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +32,7 @@ const DocumentViewer = () => {
       setError(null);
 
       try {
+        console.log('Fetching document:', documentId);
         const { data, error } = await supabase
           .from('documents')
           .select('*')
@@ -42,6 +44,7 @@ const DocumentViewer = () => {
           console.error('Error fetching document:', error);
           setError('Failed to load document. Please try again.');
         } else if (data) {
+          console.log('Document loaded:', data);
           setDocument(data as DatabaseDocument);
         } else {
           setError('Document not found.');
@@ -67,30 +70,6 @@ const DocumentViewer = () => {
 
   const toggleExtractedDataVisibility = () => {
     setShowExtractedData(!showExtractedData);
-  };
-
-  const renderCertificateValidator = () => {
-    if (!document || !document.extracted_data) {
-      return null;
-    }
-
-    // Check if this is a medical certificate
-    const extractedData = document.extracted_data as any;
-    const hasPatientData = extractedData?.structured_data?.patient;
-    
-    if (hasPatientData) {
-      return (
-        <CertificateValidator 
-          document={document}
-          onValidationComplete={() => {
-            toast.success('Patient record created successfully');
-            navigate('/patients');
-          }}
-        />
-      );
-    }
-
-    return null;
   };
 
   if (isLoading) {
@@ -125,6 +104,15 @@ const DocumentViewer = () => {
       </div>
     );
   }
+
+  // Check if this is a medical certificate with patient data
+  const hasPatientData = document.extracted_data && 
+    typeof document.extracted_data === 'object' && 
+    document.extracted_data !== null &&
+    'structured_data' in document.extracted_data &&
+    document.extracted_data.structured_data &&
+    typeof document.extracted_data.structured_data === 'object' &&
+    'patient' in document.extracted_data.structured_data;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -163,8 +151,16 @@ const DocumentViewer = () => {
         </CardContent>
       </Card>
 
-      {/* Certificate Validator */}
-      {renderCertificateValidator()}
+      {/* Certificate Validator - only show for medical certificates with patient data */}
+      {hasPatientData && (
+        <CertificateValidator 
+          document={document}
+          onValidationComplete={() => {
+            toast.success('Patient record created successfully');
+            navigate('/patients');
+          }}
+        />
+      )}
 
       <Card>
         <CardHeader>
