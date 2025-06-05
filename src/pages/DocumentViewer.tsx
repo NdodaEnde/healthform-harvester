@@ -150,8 +150,7 @@ const mockDocumentData = {
     "restrictions": "None",
     "conclusion": "Fit for duty without restrictions"
   }
-}`
-};
+}`};
 
 const DocumentViewer = () => {
   const { id } = useParams<{ id: string }>();
@@ -1286,6 +1285,12 @@ const DocumentViewer = () => {
       return;
     }
     setIsValidating(true);
+    // Switch to editing mode when validating to show the editable template
+    if (document.type === 'Certificate of Fitness') {
+      setIsEditing(true);
+      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
+      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
+    }
   };
 
   if (isLoading) {
@@ -1485,11 +1490,7 @@ const DocumentViewer = () => {
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              {isValidating ? (
-                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
-                  {renderExtractedData()}
-                </CardContent>
-              ) : isEditing ? (
+              {isValidating || isEditing ? (
                 <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
@@ -1548,29 +1549,22 @@ const DocumentViewer = () => {
                 </Button>
                 {document.status === 'processed' && !isEditing && (
                   <Button
-                    onClick={toggleEditMode}
-                  >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit Data
-                  </Button>
-                )}
-                {document.status === 'processed' && !isValidating && !isEditing && (
-                  <Button
                     onClick={startValidation}
                   >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
-                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
+                    Validate Data
                   </Button>
                 )}
               </div>
             )}
             
-            {isEditing && (
+            {(isEditing || isValidating) && (
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setIsEditing(false);
+                    setIsValidating(false);
                     setEditableData(null);
                   }}
                 >
