@@ -150,8 +150,7 @@ const mockDocumentData = {
     "restrictions": "None",
     "conclusion": "Fit for duty without restrictions"
   }
-}`
-};
+}`};
 
 const DocumentViewer = () => {
   const { id } = useParams<{ id: string }>();
@@ -161,7 +160,6 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [validatorData, setValidatorData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -1376,14 +1374,14 @@ const DocumentViewer = () => {
               <Copy className="h-4 w-4 mr-2" />
               Copy JSON
             </Button>
-            {!isValidating && !isEditing && document.status === 'processed' && (
+            {!isEditing && document.status === 'processed' && (
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={toggleEditMode}
               >
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit Data
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Validate Data & Create Patient Record
               </Button>
             )}
             {isEditing && (
@@ -1396,7 +1394,7 @@ const DocumentViewer = () => {
                 Cancel Edit
               </Button>
             )}
-            {!isValidating && !isEditing && document.validationStatus === 'validated' && (
+            {document.validationStatus === 'validated' && (
               <Badge variant="default" className="text-xs">
                 <Check className="h-3 w-3 mr-1" />
                 Validated
@@ -1453,9 +1451,9 @@ const DocumentViewer = () => {
           >
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">
-                {isValidating ? "Validate Document Data" : (isEditing ? "Edit Document Data" : "Extracted Data")}
+                {isEditing ? "Validate Document Data" : "Extracted Data"}
               </h2>
-              {!isValidating && !isEditing && (
+              {!isEditing && (
                 <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
                   {document.status === 'processed' ? (
                     <>
@@ -1473,10 +1471,10 @@ const DocumentViewer = () => {
               {isEditing && (
                 <Badge variant="secondary" className="text-xs">
                   <Pencil className="h-3 w-3 mr-1" />
-                  Editing
+                  Validating
                 </Badge>
               )}
-              {!isValidating && !isEditing && document.validationStatus === 'validated' && (
+              {!isEditing && document.validationStatus === 'validated' && (
                 <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
                   <Check className="h-3 w-3 mr-1" />
                   Validated
@@ -1485,11 +1483,7 @@ const DocumentViewer = () => {
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              {isValidating ? (
-                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
-                  {renderExtractedData()}
-                </CardContent>
-              ) : isEditing ? (
+              {isEditing ? (
                 <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
@@ -1537,7 +1531,7 @@ const DocumentViewer = () => {
               )}
             </Card>
             
-            {!isValidating && !isEditing && (
+            {!isEditing && (
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
@@ -1546,20 +1540,12 @@ const DocumentViewer = () => {
                   <ChevronLeft className="h-4 w-4 mr-2" />
                   Back to Dashboard
                 </Button>
-                {document.status === 'processed' && !isEditing && (
+                {document.status === 'processed' && (
                   <Button
                     onClick={toggleEditMode}
                   >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit Data
-                  </Button>
-                )}
-                {document.status === 'processed' && !isValidating && !isEditing && (
-                  <Button
-                    onClick={startValidation}
-                  >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
-                    {document.validationStatus === 'validated' ? 'Edit Validation' : 'Validate Data'}
+                    Validate Data & Create Patient Record
                   </Button>
                 )}
               </div>
