@@ -979,10 +979,10 @@ const DocumentViewer = () => {
       );
     }
     
-    const extractedData = isEditing ? editableData : document.extractedData;
+    const extractedData = (isEditing || isValidating) ? editableData : document.extractedData;
     
     if (document.type === 'Certificate of Fitness') {
-      if (isEditing) {
+      if (isEditing || isValidating) {
         return renderCertificateSection(extractedData);
       }
       
@@ -1278,20 +1278,91 @@ const DocumentViewer = () => {
   };
 
   const startValidation = () => {
-    console.log("Starting validation mode");
-    if (!document) {
-      console.error("Cannot start validation: document is null");
-      toast.error("Cannot validate: document not loaded");
-      return;
+  console.log("Starting validation mode");
+  if (!document) {
+    console.error("Cannot start validation: document is null");
+    toast.error("Cannot validate: document not loaded");
+    return;
+  }
+  
+  setIsValidating(true);
+  setIsEditing(true); // Enable editing mode for validation
+  
+  // Initialize editable data for validation
+  if (document.extractedData) {
+    setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
+    setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
+  }
+};
+
+  // And add a validation-specific save handler:
+const handleValidationSave = async () => {
+  if (!editableData) return;
+  
+  try {
+    console.log('Saving validated data:', editableData);
+    
+    // Add validation metadata
+    const validationData = {
+      ...editableData,
+      validation_metadata: {
+        validated_at: new Date().toISOString(),
+        validated_by: 'user',
+        validation_session_id: Date.now().toString()
+      }
+    };
+    
+    setDocument(prev => {
+      if (!prev) return null;
+      
+      const updatedDoc = {
+        ...prev,
+        extractedData: validationData,
+        jsonData: JSON.stringify(validationData, null, 2),
+        validationStatus: 'validated'
+      };
+      
+      if (id) {
+        sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
+      }
+      
+      return updatedDoc;
+    });
+    
+    if (id) {
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          extracted_data: validationData as Json,
+          is_validated: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+        
+      if (error) {
+        console.error('Error saving validated data to Supabase:', error);
+        toast.error("Failed to save validation", {
+          description: "There was an error saving your changes to the database."
+        });
+        return;
+      }
     }
-    setIsValidating(true);
-    // Switch to editing mode when validating to show the editable template
-    if (document.type === 'Certificate of Fitness') {
-      setIsEditing(true);
-      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
-      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
-    }
-  };
+    
+    setIsValidating(false);
+    setIsEditing(false);
+    setEditableData(null);
+    setOriginalData(null);
+    
+    toast.success("Validation completed", {
+      description: "The document data has been validated and saved."
+    });
+  } catch (error) {
+    console.error('Exception saving validated data:', error);
+    toast.error("Failed to save validation", {
+      description: "There was an error saving your changes to the database."
+    });
+  }
+};
 
   if (isLoading) {
     return (
@@ -1559,26 +1630,27 @@ const DocumentViewer = () => {
             )}
             
             {(isEditing || isValidating) && (
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setIsValidating(false);
-                    setEditableData(null);
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveEdits}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
-              </div>
-            )}
+  <div className="flex justify-end space-x-2">
+    <Button
+      variant="outline"
+      onClick={() => {
+        setIsEditing(false);
+        setIsValidating(false);
+        setEditableData(null);
+        setOriginalData(null);
+      }}
+    >
+      <X className="h-4 w-4 mr-2" />
+      {isValidating ? 'Cancel Validation' : 'Cancel'}
+    </Button>
+    <Button
+      onClick={isValidating ? handleValidationSave : handleSaveEdits}
+    >
+      <Save className="h-4 w-4 mr-2" />
+      {isValidating ? 'Save Validation' : 'Save Changes'}
+    </Button>
+  </div>
+)}
           </motion.div>
         </motion.div>
       </main>
