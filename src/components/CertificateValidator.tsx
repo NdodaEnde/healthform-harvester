@@ -31,13 +31,22 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
       return;
     }
 
-    if (!document.extracted_data) {
-      console.error('CertificateValidator: No extracted_data in document');
+    // Check for both extracted_data (snake_case from DB) and extractedData (camelCase from DocumentViewer)
+    const extractedData = document.extracted_data || document.extractedData;
+    
+    if (!extractedData) {
+      console.error('CertificateValidator: No extracted data in document');
       return;
     }
 
     try {
-      const certificateData = extractCertificateData(document);
+      // Create a normalized document object with extracted_data for the utility functions
+      const normalizedDocument = {
+        ...document,
+        extracted_data: extractedData
+      };
+      
+      const certificateData = extractCertificateData(normalizedDocument);
       const formattedData = formatCertificateData(certificateData);
       const fitnessStatus = determineFitnessStatus(certificateData);
       
@@ -72,7 +81,9 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
     );
   }
 
-  if (!document.extracted_data || !validatedData) {
+  const extractedData = document.extracted_data || document.extractedData;
+  
+  if (!extractedData || !validatedData) {
     return (
       <Alert>
         <FileText className="h-4 w-4" />
