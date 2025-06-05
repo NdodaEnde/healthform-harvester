@@ -24,7 +24,6 @@ export interface DatabaseDocument {
   processed_at?: string;
   created_at: string;
   extracted_data?: any;
-  extractedData?: any; // Add this to support both naming conventions
   owner_id?: string;
   organization_id?: string;
   client_organization_id?: string;
