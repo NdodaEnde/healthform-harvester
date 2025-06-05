@@ -150,7 +150,7 @@ const mockDocumentData = {
     "restrictions": "None",
     "conclusion": "Fit for duty without restrictions"
   }
-}`};
+}`;
 
 const DocumentViewer = () => {
   const { id } = useParams<{ id: string }>();
@@ -966,9 +966,35 @@ const DocumentViewer = () => {
   };
 
   const renderExtractedData = () => {
+    // When validating, show the CertificateValidator component
     if (isValidating && document) {
       console.log('Rendering CertificateValidator with document:', document);
-      return <CertificateValidator document={document} />;
+      
+      // Create a proper document object for the validator
+      const validatorDocument = {
+        id: document.id,
+        file_name: document.name,
+        file_path: document.file_path || '',
+        status: document.status,
+        document_type: document.type === 'Certificate of Fitness' ? 'certificate-of-fitness' : 'medical-questionnaire',
+        processed_at: document.uploadedAt,
+        created_at: document.uploadedAt,
+        extracted_data: document.extractedData,
+        owner_id: null,
+        organization_id: null,
+        client_organization_id: null,
+        mime_type: 'application/pdf',
+        file_size: null,
+        public_url: document.imageUrl
+      };
+      
+      return <CertificateValidator 
+        document={validatorDocument} 
+        onValidationComplete={() => {
+          setIsValidating(false);
+          setRefreshKey(prev => prev + 1);
+        }}
+      />;
     }
     
     if (!document || !document.extractedData) {
@@ -1285,12 +1311,7 @@ const DocumentViewer = () => {
       return;
     }
     setIsValidating(true);
-    // Switch to editing mode when validating to show the editable template
-    if (document.type === 'Certificate of Fitness') {
-      setIsEditing(true);
-      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
-      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
-    }
+    // Don't switch to editing mode when validating - let CertificateValidator handle it
   };
 
   if (isLoading) {
@@ -1490,7 +1511,11 @@ const DocumentViewer = () => {
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              {isValidating || isEditing ? (
+              {isValidating ? (
+                <CardContent className="p-0 h-[calc(100vh-270px)] overflow-hidden">
+                  {renderExtractedData()}
+                </CardContent>
+              ) : isEditing ? (
                 <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
@@ -1558,13 +1583,12 @@ const DocumentViewer = () => {
               </div>
             )}
             
-            {(isEditing || isValidating) && (
+            {(isEditing && !isValidating) && (
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setIsEditing(false);
-                    setIsValidating(false);
                     setEditableData(null);
                   }}
                 >
