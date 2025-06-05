@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { CheckCircle, Edit, FileText, User, Calendar, Building, Briefcase } from 'lucide-react';
+import { CheckCircle, Edit, FileText } from 'lucide-react';
 import { extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
 import type { DatabaseDocument } from '@/types/database';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificatePromotionDialog from './certificates/CertificatePromotionDialog';
+import CertificateTemplate from './CertificateTemplate';
 
 interface CertificateValidatorProps {
   document: DatabaseDocument;
@@ -22,6 +22,7 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
   const [validatedData, setValidatedData] = useState<any>(null);
+  const [editableData, setEditableData] = useState<any>(null);
 
   useEffect(() => {
     console.log('CertificateValidator received document:', document);
@@ -50,17 +51,24 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
       const formattedData = formatCertificateData(certificateData);
       const fitnessStatus = determineFitnessStatus(certificateData);
       
-      setValidatedData({
+      const processedData = {
         ...formattedData,
         fitnessStatus
-      });
+      };
+      
+      setValidatedData(processedData);
+      setEditableData(processedData);
     } catch (error) {
       console.error('Error processing certificate data:', error);
     }
   }, [document]);
 
+  const handleDataChange = (updatedData: any) => {
+    setEditableData(updatedData);
+  };
+
   const handleOpenPromotionDialog = () => {
-    if (validatedData && currentOrganization) {
+    if (editableData && currentOrganization) {
       setIsPromotionDialogOpen(true);
     }
   };
@@ -103,65 +111,19 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
             Certificate Validation
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Patient:</span>
-                <span>{validatedData.patientName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">ID Number:</span>
-                <span>{validatedData.patientId}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Company:</span>
-                <span>{validatedData.companyName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Occupation:</span>
-                <span>{validatedData.occupation}</span>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Examination Date:</span>
-                <span>{validatedData.examinationDate}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Fitness Status:</span>
-                <Badge variant={validatedData.fitnessStatus === 'fit' ? 'default' : 'secondary'}>
-                  {validatedData.fitnessStatus}
-                </Badge>
-              </div>
-              {validatedData.expiryDate && (
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Valid Until:</span>
-                  <span>{validatedData.expiryDate}</span>
-                </div>
-              )}
-              {validatedData.restrictionsText && validatedData.restrictionsText !== 'None' && (
-                <div className="flex items-start gap-2">
-                  <span className="font-medium">Restrictions:</span>
-                  <span className="text-sm">{validatedData.restrictionsText}</span>
-                </div>
-              )}
-            </div>
-          </div>
+        <CardContent>
+          <Alert className="mb-4">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              Review and edit the extracted certificate data below. Make any necessary corrections before creating a patient record.
+            </AlertDescription>
+          </Alert>
 
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 mb-4">
             <Button 
               onClick={handleOpenPromotionDialog}
               className="flex items-center gap-2"
-              disabled={!currentOrganization}
+              disabled={!currentOrganization || !editableData}
             >
               <Edit className="h-4 w-4" />
               Validate Data & Create Patient Record
@@ -170,12 +132,21 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
         </CardContent>
       </Card>
 
-      {isPromotionDialogOpen && validatedData && currentOrganization && (
+      {/* Editable Certificate Template */}
+      <div className="border rounded-lg p-4">
+        <CertificateTemplate 
+          extractedData={editableData}
+          editable={true}
+          onDataChange={handleDataChange}
+        />
+      </div>
+
+      {isPromotionDialogOpen && editableData && currentOrganization && (
         <CertificatePromotionDialog
           isOpen={isPromotionDialogOpen}
           onClose={() => setIsPromotionDialogOpen(false)}
           documentId={document.id}
-          validatedData={validatedData}
+          validatedData={editableData}
           organizationId={currentOrganization.id}
           clientOrganizationId={document.client_organization_id}
           onPromotionComplete={handlePromotionComplete}
