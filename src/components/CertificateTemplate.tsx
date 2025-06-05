@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import OrganizationLogo from "./OrganizationLogo";
 
@@ -7,13 +8,17 @@ type CertificateTemplateProps = {
   extractedData: any;
   documentId?: string;
   editable?: boolean;
+  onDataChange?: (data: any) => void;
 };
 
 const CertificateTemplate = ({
   extractedData,
   documentId,
-  editable = false
+  editable = false,
+  onDataChange
 }: CertificateTemplateProps) => {
+  const [editableData, setEditableData] = useState<any>(null);
+
   useEffect(() => {
     console.log("CertificateTemplate received data:", extractedData);
   }, [extractedData]);
@@ -467,16 +472,50 @@ const CertificateTemplate = ({
     return extracted;
   };
 
+  // Initialize editable data state
+  useEffect(() => {
+    if (editable && extractedData) {
+      const structuredData = extractCertificateData(extractedData);
+      setEditableData(structuredData);
+    }
+  }, [editable, extractedData]);
+
+  // Handle field changes in editable mode
+  const handleFieldChange = (path: string, value: any) => {
+    if (!editable || !editableData) return;
+    
+    const keys = path.split('.');
+    const newData = { ...editableData };
+    let current = newData;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) current[keys[i]] = {};
+      current = current[keys[i]];
+    }
+    
+    current[keys[keys.length - 1]] = value;
+    setEditableData(newData);
+    
+    if (onDataChange) {
+      onDataChange(newData);
+    }
+  };
+
+  // Handle checkbox changes
+  const handleCheckboxChange = (path: string, checked: boolean) => {
+    handleFieldChange(path, checked);
+  };
+
+  // Use editable data if in edit mode, otherwise use extracted data
+  const dataToRender = editable && editableData ? editableData : extractCertificateData(extractedData);
+
   // Log detailed structure to debug extraction issues
   console.log("Full extracted data structure received:", JSON.stringify(extractedData, null, 2));
 
-  // Use the enhanced extraction function
-  const structuredData = extractCertificateData(extractedData);
-
-  const patient = structuredData.patient || {};
-  const examination = structuredData.examination_results || {};
-  const restrictions = structuredData.restrictions || {};
-  const certification = structuredData.certification || {};
+  const patient = dataToRender.patient || {};
+  const examination = dataToRender.examination_results || {};
+  const restrictions = dataToRender.restrictions || {};
+  const certification = dataToRender.certification || {};
   const testResults = examination.test_results || {};
 
   const fitnessStatus = {
@@ -565,6 +604,35 @@ const CertificateTemplate = ({
   const nurse = 'Sibongile Mahlangu';
   const nurseNumber = '999 088 0000 8177 91';
 
+  // Helper function to render field (editable input or static text)
+  const renderField = (value: string, path: string, className: string = "") => {
+    if (editable) {
+      return (
+        <Input
+          value={value || ''}
+          onChange={(e) => handleFieldChange(path, e.target.value)}
+          className={`border-0 border-b border-gray-400 rounded-none bg-transparent px-1 py-0 h-auto text-sm focus:border-blue-500 focus:ring-0 ${className}`}
+        />
+      );
+    }
+    return <span className={`${className}`}>{value || 'Not Provided'}</span>;
+  };
+
+  // Helper function to render checkbox
+  const renderCheckbox = (checked: boolean, path: string) => {
+    if (editable) {
+      return (
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => handleCheckboxChange(path, e.target.checked)}
+          className="w-4 h-4"
+        />
+      );
+    }
+    return checked ? '✓' : '';
+  };
+
   return (
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
@@ -613,40 +681,52 @@ const CertificateTemplate = ({
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Initials & Surname:</span>
-                    <span className="border-b border-gray-400 flex-1">{patient.name || 'Not Provided'}</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(patient.name, 'patient.name')}
+                    </div>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">ID NO:</span>
-                    <span className="border-b border-gray-400 flex-1">{patient.id_number || 'Not Provided'}</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(patient.id_number, 'patient.id_number')}
+                    </div>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Company Name:</span>
-                <span className="border-b border-gray-400 flex-1">{patient.company || 'Not Provided'}</span>
+                <div className="border-b border-gray-400 flex-1">
+                  {renderField(patient.company, 'patient.company')}
+                </div>
               </div>
               
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
-                    <span className="border-b border-gray-400 flex-1">{examination.date || certification.examination_date || 'Not Provided'}</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(examination.date || certification.examination_date, 'examination_results.date')}
+                    </div>
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Expiry Date:</span>
-                    <span className="border-b border-gray-400 flex-1">{certification.valid_until || 'Not Provided'}</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(certification.valid_until, 'certification.valid_until')}
+                    </div>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Job Title:</span>
-                <span className="border-b border-gray-400 flex-1">{patient.occupation || 'Not Provided'}</span>
+                <div className="border-b border-gray-400 flex-1">
+                  {renderField(patient.occupation, 'patient.occupation')}
+                </div>
               </div>
             </div>
             
@@ -662,13 +742,13 @@ const CertificateTemplate = ({
                 <tbody>
                   <tr>
                     <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.preEmployment ? '✓' : ''}
+                      {renderCheckbox(examinationType.preEmployment, 'examination_results.type.pre_employment')}
                     </td>
                     <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.periodical ? '✓' : ''}
+                      {renderCheckbox(examinationType.periodical, 'examination_results.type.periodical')}
                     </td>
                     <td className="border border-gray-400 h-8 text-center">
-                      {examinationType.exit ? '✓' : ''}
+                      {renderCheckbox(examinationType.exit, 'examination_results.type.exit')}
                     </td>
                   </tr>
                 </tbody>
@@ -695,37 +775,61 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.bloods.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.bloods.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.bloods_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.bloods.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.farNearVision.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.farNearVision.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.farNearVision.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.sideDepth.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.sideDepth.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.sideDepth.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.nightVision.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.nightVision.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.nightVision.results}
                           </td>
                         </tr>
                       </tbody>
@@ -744,46 +848,76 @@ const CertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.hearing.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.hearing.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.hearing_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.hearing.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.heights.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.heights.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.heights_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.heights.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.lungFunction.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.lungFunction.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.lung_function_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.lungFunction.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.xRay.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.xRay.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.x_ray_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.xRay.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
                           <td className="border border-gray-400 text-center">
-                            {medicalTests.drugScreen.done ? '✓' : 'X'}
+                            {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.drugScreen.results}
+                            {editable ? (
+                              <Input
+                                value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.drug_screen_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.drugScreen.results}
                           </td>
                         </tr>
                       </tbody>
@@ -797,12 +931,14 @@ const CertificateTemplate = ({
               <div className="flex items-center">
                 <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
                 <div className="border-b border-gray-400 flex-1">
-                  {certification.follow_up || ''}
+                  {renderField(certification.follow_up || '', 'certification.follow_up')}
                 </div>
                 <div className="ml-2">
                   <div className="text-sm">
                     <span className="font-semibold mr-1">Review Date:</span>
-                    <span className="text-red-600">{certification.review_date || ''}</span>
+                    <span className="text-red-600">
+                      {renderField(certification.review_date || '', 'certification.review_date', 'text-red-600')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -819,37 +955,53 @@ const CertificateTemplate = ({
                     <tr>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Heights</div>
-                        {restrictionsData.heights && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.heights, 'restrictions.heights')}
+                        </div>
                       </td>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Dust Exposure</div>
-                        {restrictionsData.dustExposure && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.dustExposure, 'restrictions.dust_exposure')}
+                        </div>
                       </td>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Motorized Equipment</div>
-                        {restrictionsData.motorizedEquipment && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.motorizedEquipment, 'restrictions.motorized_equipment')}
+                        </div>
                       </td>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Wear Hearing Protection</div>
-                        {restrictionsData.hearingProtection && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.hearingProtection, 'restrictions.wear_hearing_protection')}
+                        </div>
                       </td>
                     </tr>
                     <tr>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Confined Spaces</div>
-                        {restrictionsData.confinedSpaces && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.confinedSpaces, 'restrictions.confined_spaces')}
+                        </div>
                       </td>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Chemical Exposure</div>
-                        {restrictionsData.chemicalExposure && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.chemicalExposure, 'restrictions.chemical_exposure')}
+                        </div>
                       </td>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Wear Spectacles</div>
-                        {restrictionsData.wearSpectacles && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.wearSpectacles, 'restrictions.wear_spectacles')}
+                        </div>
                       </td>
                       <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Remain on Treatment</div>
-                        {restrictionsData.chronicConditions && <div className="text-[0.6rem]">✓</div>}
+                        <div className="text-[0.6rem]">
+                          {renderCheckbox(restrictionsData.chronicConditions, 'restrictions.remain_on_treatment_for_chronic_conditions')}
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -868,23 +1020,33 @@ const CertificateTemplate = ({
                     <tr>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
                         <div className="text-xs">FIT</div>
-                        {fitnessStatus.fit && <div className="text-green-600 text-sm">✓</div>}
+                        <div className="text-green-600 text-sm">
+                          {renderCheckbox(fitnessStatus.fit, 'certification.fit')}
+                        </div>
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs">Fit with Restriction</div>
-                        {fitnessStatus.fitWithRestriction && <div className="text-yellow-600 text-sm">✓</div>}
+                        <div className="text-yellow-600 text-sm">
+                          {renderCheckbox(fitnessStatus.fitWithRestriction, 'certification.fit_with_restrictions')}
+                        </div>
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs">Fit with Condition</div>
-                        {fitnessStatus.fitWithCondition && <div className="text-yellow-600 text-sm">✓</div>}
+                        <div className="text-yellow-600 text-sm">
+                          {renderCheckbox(fitnessStatus.fitWithCondition, 'certification.fit_with_condition')}
+                        </div>
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
                         <div className="text-xs">Temporary Unfit</div>
-                        {fitnessStatus.temporarilyUnfit && <div className="text-red-600 text-sm">✓</div>}
+                        <div className="text-red-600 text-sm">
+                          {renderCheckbox(fitnessStatus.temporarilyUnfit, 'certification.temporarily_unfit')}
+                        </div>
                       </th>
                       <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
                         <div className="text-xs">UNFIT</div>
-                        {fitnessStatus.unfit && <div className="text-red-600 text-sm">✓</div>}
+                        <div className="text-red-600 text-sm">
+                          {renderCheckbox(fitnessStatus.unfit, 'certification.unfit')}
+                        </div>
                       </th>
                     </tr>
                   </tbody>
@@ -895,7 +1057,13 @@ const CertificateTemplate = ({
             <div className="px-4 mb-1">
               <div className="font-semibold text-xs mb-0.5">Comments:</div>
               <div className="border border-gray-400 p-1 min-h-8 text-xs">
-                {certification.comments || 'N/A'}
+                {editable ? (
+                  <Input
+                    value={certification.comments || ''}
+                    onChange={(e) => handleFieldChange('certification.comments', e.target.value)}
+                    className="border-0 bg-transparent px-1 py-0 h-auto text-xs w-full"
+                  />
+                ) : (certification.comments || 'N/A')}
               </div>
             </div>
             
