@@ -1,4 +1,3 @@
-
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from 'date-fns';
@@ -57,8 +56,12 @@ export interface FormattedCertificateData {
   occupation: string;
   examinationDate: string;
   validUntil: string;
+  expiryDate: string;
   restrictionsText: string;
   rawContent: string;
+  examinationType: string;
+  comments: string;
+  followUpActions: string;
 }
 
 export type FitnessStatus = 'fit' | 'fit-with-restrictions' | 'fit-with-condition' | 'temporarily-unfit' | 'unfit' | 'unknown';
@@ -135,18 +138,29 @@ export function formatCertificateData(certificateData: CertificateData): Formatt
   const patientObj = patient || {};
   const certificationObj = certification || {};
   const restrictionsObj = restrictions || {};
+  const examResultsObj = examination_results || {};
+  
+  // Determine examination type from examination_results
+  const examType = examResultsObj.type || {};
+  let examinationType = 'pre-employment';
+  if (examType.periodical) examinationType = 'periodical';
+  else if (examType.exit) examinationType = 'exit';
   
   return {
     patientName: patientObj.name?.toString() || 'N/A',
     patientId: patientObj.id_number?.toString() || 'N/A',
     companyName: patientObj.company?.toString() || 'N/A',
     occupation: patientObj.occupation?.toString() || 'N/A',
-    examinationDate: certificationObj.examination_date?.toString() || 'N/A',
+    examinationDate: certificationObj.examination_date?.toString() || examResultsObj.date?.toString() || 'N/A',
     validUntil: certificationObj.valid_until?.toString() || 'N/A',
+    expiryDate: certificationObj.valid_until?.toString() || certificationObj.expiry_date?.toString() || '',
     restrictionsText: Array.isArray(restrictions) 
       ? restrictions.join(', ') 
       : (typeof restrictionsObj === 'string' ? restrictionsObj : 'None'),
-    rawContent: raw_content || ''
+    rawContent: raw_content || '',
+    examinationType: examinationType,
+    comments: certificationObj.comments?.toString() || '',
+    followUpActions: certificationObj.follow_up_actions?.toString() || ''
   };
 }
 

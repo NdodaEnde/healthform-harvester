@@ -107,36 +107,42 @@ export const promoteToPatientRecord = async (
       .eq('id', documentId)
       .single();
 
-    if (document?.extracted_data?.structured_data?.certificate_info?.medical_tests) {
-      const medicalTests = document.extracted_data.structured_data.certificate_info.medical_tests;
-      const testResults = [];
+    if (document?.extracted_data) {
+      // Type assertion for the extracted_data
+      const extractedData = document.extracted_data as any;
+      const structuredData = extractedData?.structured_data;
+      
+      if (structuredData?.certificate_info?.medical_tests) {
+        const medicalTests = structuredData.certificate_info.medical_tests;
+        const testResults = [];
 
-      // Convert medical tests to test results
-      for (const [testKey, testData] of Object.entries(medicalTests)) {
-        if (testKey.endsWith('_done') && testData === true) {
-          const testType = testKey.replace('_done', '');
-          const resultKey = `${testType}_results`;
-          const result = medicalTests[resultKey];
+        // Convert medical tests to test results
+        for (const [testKey, testData] of Object.entries(medicalTests)) {
+          if (testKey.endsWith('_done') && testData === true) {
+            const testType = testKey.replace('_done', '');
+            const resultKey = `${testType}_results`;
+            const result = medicalTests[resultKey];
 
-          testResults.push({
-            examination_id: examination.id,
-            test_type: testType.replace(/_/g, ' '),
-            test_done: true,
-            test_result: result || 'N/A'
-          });
+            testResults.push({
+              examination_id: examination.id,
+              test_type: testType.replace(/_/g, ' '),
+              test_done: true,
+              test_result: result || 'N/A'
+            });
+          }
         }
-      }
 
-      if (testResults.length > 0) {
-        const { error: testError } = await supabase
-          .from('medical_test_results')
-          .insert(testResults);
+        if (testResults.length > 0) {
+          const { error: testError } = await supabase
+            .from('medical_test_results')
+            .insert(testResults);
 
-        if (testError) {
-          console.error('Error creating test results:', testError);
-          // Don't fail the whole process for test results
-        } else {
-          console.log('Created test results:', testResults.length);
+          if (testError) {
+            console.error('Error creating test results:', testError);
+            // Don't fail the whole process for test results
+          } else {
+            console.log('Created test results:', testResults.length);
+          }
         }
       }
     }
