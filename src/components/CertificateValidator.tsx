@@ -31,8 +31,8 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
       return;
     }
 
-    // Check for both extracted_data (snake_case from DB) and extractedData (camelCase from DocumentViewer)
-    const extractedData = document.extracted_data || document.extractedData;
+    // Use extracted_data (snake_case from DB)
+    const extractedData = document.extracted_data;
     
     if (!extractedData) {
       console.error('CertificateValidator: No extracted data in document');
@@ -81,7 +81,7 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
     );
   }
 
-  const extractedData = document.extracted_data || document.extractedData;
+  const extractedData = document.extracted_data;
   
   if (!extractedData || !validatedData) {
     return (
@@ -164,7 +164,7 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
               disabled={!currentOrganization}
             >
               <Edit className="h-4 w-4" />
-              Validate Data & Create Patient Record
+              Create Patient Record
             </Button>
           </div>
         </CardContent>
