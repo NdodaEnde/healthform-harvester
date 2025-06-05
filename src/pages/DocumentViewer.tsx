@@ -23,34 +23,52 @@ const DocumentViewer = () => {
   const [showExtractedData, setShowExtractedData] = useState(false);
 
   useEffect(() => {
-    if (!documentId || !currentOrganization) {
-      return;
-    }
-
     const fetchDocument = async () => {
-      setIsLoading(true);
-      setError(null);
+      console.log('DocumentViewer: Starting fetch for documentId:', documentId);
+      console.log('DocumentViewer: Current organization:', currentOrganization?.id);
+      
+      if (!documentId) {
+        console.error('DocumentViewer: No documentId provided');
+        setError('No document ID provided');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!currentOrganization) {
+        console.log('DocumentViewer: Waiting for organization...');
+        return; // Don't fetch yet, wait for organization
+      }
 
       try {
-        console.log('Fetching document:', documentId);
-        const { data, error } = await supabase
+        setIsLoading(true);
+        setError(null);
+
+        console.log('DocumentViewer: Fetching document from Supabase...');
+        const { data, error: fetchError } = await supabase
           .from('documents')
           .select('*')
           .eq('id', documentId)
           .eq('organization_id', currentOrganization.id)
           .single();
 
-        if (error) {
-          console.error('Error fetching document:', error);
-          setError('Failed to load document. Please try again.');
+        console.log('DocumentViewer: Fetch result:', { data, error: fetchError });
+
+        if (fetchError) {
+          console.error('DocumentViewer: Supabase error:', fetchError);
+          if (fetchError.code === 'PGRST116') {
+            setError('Document not found or you do not have permission to view it.');
+          } else {
+            setError(`Failed to load document: ${fetchError.message}`);
+          }
         } else if (data) {
-          console.log('Document loaded:', data);
+          console.log('DocumentViewer: Document loaded successfully:', data.file_name);
           setDocument(data as DatabaseDocument);
         } else {
+          console.error('DocumentViewer: No data returned');
           setError('Document not found.');
         }
       } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('DocumentViewer: Unexpected error:', err);
         setError('An unexpected error occurred. Please try again.');
       } finally {
         setIsLoading(false);
@@ -58,7 +76,7 @@ const DocumentViewer = () => {
     };
 
     fetchDocument();
-  }, [documentId, currentOrganization]);
+  }, [documentId, currentOrganization?.id]);
 
   const handleDownload = () => {
     if (document?.public_url) {
@@ -72,6 +90,7 @@ const DocumentViewer = () => {
     setShowExtractedData(!showExtractedData);
   };
 
+  // Show loading state
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -83,9 +102,14 @@ const DocumentViewer = () => {
     );
   }
 
+  // Show error state
   if (error) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 space-y-4">
+        <Button variant="ghost" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
         <Alert variant="destructive">
           <FileText className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
@@ -94,9 +118,14 @@ const DocumentViewer = () => {
     );
   }
 
+  // Show not found state
   if (!document) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 space-y-4">
+        <Button variant="ghost" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
         <Alert variant="destructive">
           <FileText className="h-4 w-4" />
           <AlertDescription>Document not found.</AlertDescription>
@@ -113,6 +142,8 @@ const DocumentViewer = () => {
     document.extracted_data.structured_data &&
     typeof document.extracted_data.structured_data === 'object' &&
     'patient' in document.extracted_data.structured_data;
+
+  console.log('DocumentViewer: Rendering document view for:', document.file_name);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -186,7 +217,9 @@ const DocumentViewer = () => {
         </CardHeader>
         <CardContent>
           {showExtractedData ? (
-            <pre className="whitespace-pre-wrap">{JSON.stringify(document.extracted_data, null, 2)}</pre>
+            <pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded text-sm overflow-auto">
+              {JSON.stringify(document.extracted_data, null, 2)}
+            </pre>
           ) : (
             <Alert>
               <FileText className="h-4 w-4" />
