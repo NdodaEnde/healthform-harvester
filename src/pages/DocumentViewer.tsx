@@ -197,11 +197,67 @@ const DocumentViewer = () => {
     }
     
     if (document.extractedData) {
+      // Create a normalized data structure for validation
+      const normalizedData = normalizeDataForValidation(document.extractedData);
+      console.log("Normalized data for validation:", normalizedData);
+    
       setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
       setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
       setEditingMode('validate');
     }
   };
+
+  // Add this helper function to normalize data for validation
+const normalizeDataForValidation = (extractedData: any): any => {
+  // If we already have structured data in the right format, use it
+  if (extractedData?.structured_data) {
+    const structuredData = extractedData.structured_data;
+    
+    // Check if we have certificate_info and need to normalize it
+    if (structuredData.certificate_info) {
+      const certInfo = structuredData.certificate_info;
+      
+      return {
+        structured_data: {
+          patient: {
+            name: certInfo.employee_name || '',
+            id_number: certInfo.id_number || '',
+            company: certInfo.company_name || '',
+            occupation: certInfo.job_title || ''
+          },
+          examination_results: {
+            date: certInfo.examination_date || '',
+            type: {
+              pre_employment: certInfo.pre_employment_checked || false,
+              periodical: certInfo.periodical_checked || false,
+              exit: certInfo.exit_checked || false
+            },
+            test_results: certInfo.medical_tests || {}
+          },
+          certification: {
+            examination_date: certInfo.examination_date || '',
+            valid_until: certInfo.expiry_date || '',
+            fit: certInfo.fitness_status?.fit || false,
+            fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
+            fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
+            temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
+            unfit: certInfo.fitness_status?.unfit || false,
+            comments: certInfo.comments || '',
+            follow_up: certInfo.follow_up || '',
+            review_date: certInfo.review_date || ''
+          },
+          restrictions: certInfo.restrictions || {}
+        }
+      };
+    }
+    
+    // If structured_data already has the right format, return as-is
+    return extractedData;
+  }
+  
+  // Return the original data if no normalization needed
+  return extractedData;
+};
 
   const handleSaveChanges = async () => {
     if (!editableData) return;
@@ -612,6 +668,36 @@ if (id) {
 
   const renderCertificateSection = (data: any) => {
     if (!data || !data.structured_data) return null;
+
+    // NEW: If we're in validation mode, use CertificateTemplate instead
+  if (isValidating && editableData) {
+    return (
+      <div className="space-y-6">
+        <CertificateTemplate 
+          extractedData={editableData}
+          editable={true}
+          onDataChange={(updatedData) => {
+            console.log('Certificate template data changed:', updatedData);
+            setEditableData(updatedData);
+          }}
+        />
+        
+        <div className="mt-6 flex justify-end space-x-2 px-6">
+          <Button
+            variant="outline"
+            onClick={resetEditingState}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button onClick={handleSaveChanges}>
+            <Save className="h-4 w-4 mr-2" />
+            Save Validation
+          </Button>
+        </div>
+      </div>
+    );
+  }
     
     const structuredData = data.structured_data;
     
@@ -1023,29 +1109,62 @@ if (id) {
     );
   };
 
-  const renderExtractedData = () => {
-    if (!document || !document.extractedData) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No data available</p>
-        </div>
-      );
-    }
-    
-    const extractedData = (isEditing || isValidating) ? editableData : document.extractedData;
-    
-    if (document.type === 'Certificate of Fitness') {
-      if (isEditing || isValidating) {
-        return renderCertificateSection(extractedData);
-      }
-      
-      console.log("Passing to CertificateTemplate:", extractedData);
+  // Update the renderExtractedData function to handle validation mode properly
+const renderExtractedData = () => {
+  if (!document || !document.extractedData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">No data available</p>
+      </div>
+    );
+  }
+  
+  const extractedData = (isEditing || isValidating) ? editableData : document.extractedData;
+  
+  if (document.type === 'Certificate of Fitness') {
+    // For validation mode, use the CertificateTemplate with editable=true
+    if (isValidating) {
       return (
         <div className="certificate-container pb-6">
-          <CertificateTemplate extractedData={extractedData} />
+          <CertificateTemplate 
+            extractedData={extractedData}
+            editable={true}
+            onDataChange={(updatedData) => {
+              console.log('Certificate template data changed:', updatedData);
+              setEditableData(updatedData);
+            }}
+          />
+          
+          <div className="mt-6 flex justify-end space-x-2 px-6">
+            <Button
+              variant="outline"
+              onClick={resetEditingState}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveChanges}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Validation
+            </Button>
+          </div>
         </div>
       );
     }
+    
+    // For editing mode or viewing, use the existing logic
+    if (isEditing) {
+      return renderCertificateSection(extractedData);
+    }
+    
+    // For normal viewing
+    console.log("Passing to CertificateTemplate for viewing:", extractedData);
+    return (
+      <div className="certificate-container pb-6">
+        <CertificateTemplate extractedData={extractedData} />
+      </div>
+    );
+  }
     
     if (
       typeof extractedData === 'object' && 
