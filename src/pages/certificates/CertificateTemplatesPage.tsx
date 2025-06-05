@@ -6,16 +6,10 @@ import CertificateTemplateManager from "@/components/certificates/CertificateTem
 import EnhancedCertificateGenerator from "@/components/certificates/EnhancedCertificateGenerator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { extractCertificateData } from "@/lib/utils";
-import type { DatabaseDocument } from "@/types/database";
 
-// Sample data for the enhanced certificate generator with all required properties
-const sampleDocument: DatabaseDocument = {
-  id: "sample-doc-id",
-  file_name: "Sample Certificate.pdf",
-  file_path: "/sample/certificate.pdf",
-  status: "processed",
-  mime_type: "application/pdf",
-  created_at: new Date().toISOString(),
+// Sample data for the enhanced certificate generator
+const sampleDocument = {
+  id: "sample-doc-id", // Added ID here for the document
   extracted_data: {
     structured_data: {
       patient: {
@@ -54,7 +48,8 @@ const sampleDocument: DatabaseDocument = {
         wear_hearing_protection: true
       }
     }
-  }
+  },
+  file_name: "Sample Certificate"
 };
 
 export default function CertificateTemplatesPage() {
@@ -87,7 +82,7 @@ export default function CertificateTemplatesPage() {
         
         <TabsContent value="generate" className="pt-4">
           <div className="bg-white rounded-lg shadow p-6">
-            <EnhancedCertificateGenerator document={sampleDocument} />
+            <EnhancedCertificateGenerator documentId={sampleDocument.id} document={sampleDocument} />
           </div>
         </TabsContent>
       </Tabs>
