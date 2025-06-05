@@ -66,6 +66,97 @@ export type Database = {
           },
         ]
       }
+      certificate_compliance: {
+        Row: {
+          client_organization_id: string | null
+          compliance_notes: string | null
+          current_examination_id: string | null
+          current_expiry_date: string | null
+          current_fitness_status: string | null
+          days_until_expiry: number | null
+          id: string
+          is_compliant: boolean | null
+          next_exit_due: string | null
+          next_periodic_due: string | null
+          organization_id: string | null
+          patient_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_organization_id?: string | null
+          compliance_notes?: string | null
+          current_examination_id?: string | null
+          current_expiry_date?: string | null
+          current_fitness_status?: string | null
+          days_until_expiry?: number | null
+          id?: string
+          is_compliant?: boolean | null
+          next_exit_due?: string | null
+          next_periodic_due?: string | null
+          organization_id?: string | null
+          patient_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_organization_id?: string | null
+          compliance_notes?: string | null
+          current_examination_id?: string | null
+          current_expiry_date?: string | null
+          current_fitness_status?: string | null
+          days_until_expiry?: number | null
+          id?: string
+          is_compliant?: boolean | null
+          next_exit_due?: string | null
+          next_periodic_due?: string | null
+          organization_id?: string | null
+          patient_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificate_compliance_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_current_examination_id_fkey"
+            columns: ["current_examination_id"]
+            isOneToOne: false
+            referencedRelation: "medical_examinations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificate_expirations: {
         Row: {
           certificate_id: string | null
@@ -245,6 +336,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string | null
+          validation_status: string | null
         }
         Insert: {
           client_organization_id?: string | null
@@ -264,6 +356,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+          validation_status?: string | null
         }
         Update: {
           client_organization_id?: string | null
@@ -283,6 +376,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string | null
+          validation_status?: string | null
         }
         Relationships: [
           {
@@ -413,6 +507,150 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medical_examinations: {
+        Row: {
+          client_organization_id: string | null
+          comments: string | null
+          company_name: string | null
+          created_at: string
+          document_id: string | null
+          examination_date: string
+          examination_type: string
+          expiry_date: string | null
+          fitness_status: string
+          follow_up_actions: string | null
+          id: string
+          job_title: string | null
+          organization_id: string | null
+          patient_id: string
+          restrictions: string[] | null
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          client_organization_id?: string | null
+          comments?: string | null
+          company_name?: string | null
+          created_at?: string
+          document_id?: string | null
+          examination_date: string
+          examination_type: string
+          expiry_date?: string | null
+          fitness_status: string
+          follow_up_actions?: string | null
+          id?: string
+          job_title?: string | null
+          organization_id?: string | null
+          patient_id: string
+          restrictions?: string[] | null
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          client_organization_id?: string | null
+          comments?: string | null
+          company_name?: string | null
+          created_at?: string
+          document_id?: string | null
+          examination_date?: string
+          examination_type?: string
+          expiry_date?: string | null
+          fitness_status?: string
+          follow_up_actions?: string | null
+          id?: string
+          job_title?: string | null
+          organization_id?: string | null
+          patient_id?: string
+          restrictions?: string[] | null
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medical_test_results: {
+        Row: {
+          created_at: string
+          examination_id: string
+          id: string
+          notes: string | null
+          test_done: boolean
+          test_result: string | null
+          test_type: string
+        }
+        Insert: {
+          created_at?: string
+          examination_id: string
+          id?: string
+          notes?: string | null
+          test_done?: boolean
+          test_result?: string | null
+          test_type: string
+        }
+        Update: {
+          created_at?: string
+          examination_id?: string
+          id?: string
+          notes?: string | null
+          test_done?: boolean
+          test_result?: string | null
+          test_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_test_results_examination_id_fkey"
+            columns: ["examination_id"]
+            isOneToOne: false
+            referencedRelation: "medical_examinations"
             referencedColumns: ["id"]
           },
         ]
