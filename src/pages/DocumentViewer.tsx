@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+  import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -152,6 +152,9 @@ const mockDocumentData = {
   }
 }`};
 
+// Define the editing mode types
+type EditingMode = 'view' | 'edit' | 'validate';
+
 const DocumentViewer = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -160,29 +163,51 @@ const DocumentViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [validatorData, setValidatorData] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  
+  // Consolidated editing state
+  const [editingMode, setEditingMode] = useState<EditingMode>('view');
   const [editableData, setEditableData] = useState<any>(null);
   const [originalData, setOriginalData] = useState<any>(null);
 
-  const toggleEditMode = () => {
-    if (!isEditing) {
-      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
-      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
-    } else {
-      setEditableData(null);
-      setOriginalData(null);
-    }
-    setIsEditing(!isEditing);
+  // Helper computed values
+  const isEditing = editingMode === 'edit';
+  const isValidating = editingMode === 'validate';
+
+  const resetEditingState = () => {
+    setEditableData(null);
+    setOriginalData(null);
+    setEditingMode('view');
   };
 
-  const handleSaveEdits = async () => {
+  const startEditMode = () => {
+    if (!document?.extractedData) return;
+    
+    setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
+    setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
+    setEditingMode('edit');
+  };
+
+  const startValidationMode = () => {
+    console.log("Starting validation mode");
+    if (!document) {
+      console.error("Cannot start validation: document is null");
+      toast.error("Cannot validate: document not loaded");
+      return;
+    }
+    
+    if (document.extractedData) {
+      setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
+      setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
+      setEditingMode('validate');
+    }
+  };
+
+  const handleSaveChanges = async () => {
     if (!editableData) return;
     
     try {
-      console.log('Saving edited data:', editableData);
+      console.log('Saving changes:', editableData);
       
       const trackEdits = (original: any, edited: any, path: string[] = []): Record<string, any> => {
         if (!original || !edited) return {};
@@ -229,10 +254,21 @@ const DocumentViewer = () => {
       const edits = trackEdits(originalData, editableData);
       const hasEdits = Object.keys(edits).length > 0;
       
-      if (hasEdits) {
+      let dataToSave = editableData;
+      
+      // Add edit tracking for regular edits, validation metadata for validation
+      if (isValidating) {
+        dataToSave = {
+          ...editableData,
+          validation_metadata: {
+            validated_at: new Date().toISOString(),
+            validated_by: 'user',
+            validation_session_id: Date.now().toString()
+          }
+        };
+      } else if (hasEdits) {
         const existingTracking = editableData.edit_tracking || {};
-        
-        const dataWithTracking = {
+        dataToSave = {
           ...editableData,
           edit_tracking: {
             ...existingTracking,
@@ -240,87 +276,66 @@ const DocumentViewer = () => {
             last_edited_at: new Date().toISOString(),
           }
         };
+      }
+      
+      // Update local document state
+      setDocument(prev => {
+        if (!prev) return null;
         
-        setDocument(prev => {
-          if (!prev) return null;
-          
-          const updatedDoc = {
-            ...prev,
-            extractedData: dataWithTracking,
-            jsonData: JSON.stringify(dataWithTracking, null, 2)
-          };
-          
-          if (id) {
-            sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
-          }
-          
-          return updatedDoc;
-        });
+        const updatedDoc = {
+          ...prev,
+          extractedData: dataToSave,
+          jsonData: JSON.stringify(dataToSave, null, 2),
+          ...(isValidating && { validationStatus: 'validated' })
+        };
         
         if (id) {
-          const { error } = await supabase
-            .from('documents')
-            .update({
-              extracted_data: dataWithTracking as Json,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', id);
-            
-          if (error) {
-            console.error('Error saving edited data to Supabase:', error);
-            toast.error("Failed to save changes", {
-              description: "There was an error saving your changes to the database."
-            });
-            return;
-          }
+          sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
         }
-      } else {
-        setDocument(prev => {
-          if (!prev) return null;
-          
-          const updatedDoc = {
-            ...prev,
-            extractedData: editableData,
-            jsonData: JSON.stringify(editableData, null, 2)
-          };
-          
-          if (id) {
-            sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
-          }
-          
-          return updatedDoc;
-        });
         
-        if (id) {
-          const { error } = await supabase
-            .from('documents')
-            .update({
-              extracted_data: editableData as Json,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', id);
-            
-          if (error) {
-            console.error('Error saving edited data to Supabase:', error);
-            toast.error("Failed to save changes", {
-              description: "There was an error saving your changes to the database."
-            });
-            return;
-          }
+        return updatedDoc;
+      });
+      
+      // Save to database
+      if (id) {
+        const updatePayload: any = {
+          extracted_data: dataToSave as Json,
+          updated_at: new Date().toISOString()
+        };
+        
+        if (isValidating) {
+          updatePayload.is_validated = true;
+        }
+        
+        const { error } = await supabase
+          .from('documents')
+          .update(updatePayload)
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error saving data to Supabase:', error);
+          toast.error("Failed to save changes", {
+            description: "There was an error saving your changes to the database."
+          });
+          return;
         }
       }
       
-      setIsEditing(false);
-      setEditableData(null);
-      setOriginalData(null);
+      // Reset state and show success message
+      resetEditingState();
       
-      toast.success("Changes saved", {
-        description: hasEdits 
+      const successMessage = isValidating 
+        ? "Document data has been validated and saved."
+        : hasEdits 
           ? "Your edits have been saved and will contribute to accuracy metrics." 
-          : "Your edits have been saved successfully."
+          : "Your changes have been saved successfully.";
+          
+      toast.success(isValidating ? "Validation completed" : "Changes saved", {
+        description: successMessage
       });
+      
     } catch (error) {
-      console.error('Exception saving edited data:', error);
+      console.error('Exception saving data:', error);
       toast.error("Failed to save changes", {
         description: "There was an error saving your changes. Please try again."
       });
@@ -518,7 +533,8 @@ const DocumentViewer = () => {
         patientId: patientId,
         imageUrl: signedUrl,
         extractedData: extractedData,
-        jsonData: JSON.stringify(extractedData, null, 2)
+        jsonData: JSON.stringify(extractedData, null, 2),
+        validationStatus: documentData.is_validated ? 'validated' : 'not_validated'
       };
     } catch (error) {
       console.error('Error fetching document from Supabase:', error);
@@ -569,7 +585,7 @@ const DocumentViewer = () => {
             return (
               <div key={key} className="flex items-center">
                 <span className="font-semibold mr-1 min-w-32">{displayKey}:</span>
-                {isEditing ? (
+                {(isEditing || isValidating) ? (
                   <Input 
                     className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
                     value={value as string || ''}
@@ -604,72 +620,96 @@ const DocumentViewer = () => {
             <div className="flex-1">
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Initials & Surname:</span>
-                <Input 
-                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                  value={patient.name || ''}
-                  onChange={(e) => updateEditableData(['structured_data', 'patient', 'name'], e.target.value)}
-                />
+                {(isEditing || isValidating) ? (
+                  <Input 
+                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                    value={patient.name || ''}
+                    onChange={(e) => updateEditableData(['structured_data', 'patient', 'name'], e.target.value)}
+                  />
+                ) : (
+                  <span className="text-gray-700">{patient.name || 'N/A'}</span>
+                )}
               </div>
             </div>
             <div className="flex-1">
               <div className="flex items-center">
                 <span className="font-semibold mr-1">ID NO:</span>
-                <Input 
-                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                  value={patient.id_number || patient.employee_id || patient.id || ''}
-                  onChange={(e) => {
-                    if ('id_number' in patient) {
-                      updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value);
-                    } else if ('employee_id' in patient) {
-                      updateEditableData(['structured_data', 'patient', 'employee_id'], e.target.value);
-                    } else {
-                      updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value);
-                    }
-                  }}
-                />
+                {(isEditing || isValidating) ? (
+                  <Input 
+                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                    value={patient.id_number || patient.employee_id || patient.id || ''}
+                    onChange={(e) => {
+                      if ('id_number' in patient) {
+                        updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value);
+                      } else if ('employee_id' in patient) {
+                        updateEditableData(['structured_data', 'patient', 'employee_id'], e.target.value);
+                      } else {
+                        updateEditableData(['structured_data', 'patient', 'id_number'], e.target.value);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="text-gray-700">{patient.id_number || patient.employee_id || patient.id || 'N/A'}</span>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex items-center">
             <span className="font-semibold mr-1">Company Name:</span>
-            <Input 
-              className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-              value={patient.company || ''}
-              onChange={(e) => updateEditableData(['structured_data', 'patient', 'company'], e.target.value)}
-            />
+            {(isEditing || isValidating) ? (
+              <Input 
+                className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                value={patient.company || ''}
+                onChange={(e) => updateEditableData(['structured_data', 'patient', 'company'], e.target.value)}
+              />
+            ) : (
+              <span className="text-gray-700">{patient.company || 'N/A'}</span>
+            )}
           </div>
           
           <div className="flex justify-between space-x-4">
             <div className="flex-1">
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Date of Examination:</span>
-                <Input 
-                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                  value={(structuredData.examination_results?.date) || ''}
-                  onChange={(e) => updateEditableData(['structured_data', 'examination_results', 'date'], e.target.value)}
-                />
+                {(isEditing || isValidating) ? (
+                  <Input 
+                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                    value={(structuredData.examination_results?.date) || ''}
+                    onChange={(e) => updateEditableData(['structured_data', 'examination_results', 'date'], e.target.value)}
+                  />
+                ) : (
+                  <span className="text-gray-700">{structuredData.examination_results?.date || 'N/A'}</span>
+                )}
               </div>
             </div>
             <div className="flex-1">
               <div className="flex items-center">
                 <span className="font-semibold mr-1">Expiry Date:</span>
-                <Input 
-                  className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-                  value={(structuredData.certification?.valid_until) || ''}
-                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'valid_until'], e.target.value)}
-                />
+                {(isEditing || isValidating) ? (
+                  <Input 
+                    className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                    value={(structuredData.certification?.valid_until) || ''}
+                    onChange={(e) => updateEditableData(['structured_data', 'certification', 'valid_until'], e.target.value)}
+                  />
+                ) : (
+                  <span className="text-gray-700">{structuredData.certification?.valid_until || 'N/A'}</span>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex items-center">
             <span className="font-semibold mr-1">Job Title:</span>
-            <Input 
-              className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
-              value={patient.occupation || ''}
-              onChange={(e) => updateEditableData(['structured_data', 'patient', 'occupation'], e.target.value)}
-            />
+            {(isEditing || isValidating) ? (
+              <Input 
+                className="border-b border-gray-400 flex-1 bg-transparent p-0 h-6 focus-visible:ring-0 rounded-none shadow-none" 
+                value={patient.occupation || ''}
+                onChange={(e) => updateEditableData(['structured_data', 'patient', 'occupation'], e.target.value)}
+              />
+            ) : (
+              <span className="text-gray-700">{patient.occupation || 'N/A'}</span>
+            )}
           </div>
         </div>
       );
@@ -692,25 +732,37 @@ const DocumentViewer = () => {
             <tbody>
               <tr>
                 <td className="border border-gray-400 h-8 text-center">
-                  <Checkbox 
-                    checked={!!examinationType.pre_employment} 
-                    onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'pre_employment'], !!checked)}
-                    className="mx-auto"
-                  />
+                  {(isEditing || isValidating) ? (
+                    <Checkbox 
+                      checked={!!examinationType.pre_employment} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'pre_employment'], !!checked)}
+                      className="mx-auto"
+                    />
+                  ) : (
+                    <span className="text-center">{examinationType.pre_employment ? '✓' : ''}</span>
+                  )}
                 </td>
                 <td className="border border-gray-400 h-8 text-center">
-                  <Checkbox 
-                    checked={!!examinationType.periodical} 
-                    onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'periodical'], !!checked)}
-                    className="mx-auto"
-                  />
+                  {(isEditing || isValidating) ? (
+                    <Checkbox 
+                      checked={!!examinationType.periodical} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'periodical'], !!checked)}
+                      className="mx-auto"
+                    />
+                  ) : (
+                    <span className="text-center">{examinationType.periodical ? '✓' : ''}</span>
+                  )}
                 </td>
                 <td className="border border-gray-400 h-8 text-center">
-                  <Checkbox 
-                    checked={!!examinationType.exit} 
-                    onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'exit'], !!checked)}
-                    className="mx-auto"
-                  />
+                  {(isEditing || isValidating) ? (
+                    <Checkbox 
+                      checked={!!examinationType.exit} 
+                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'type', 'exit'], !!checked)}
+                      className="mx-auto"
+                    />
+                  ) : (
+                    <span className="text-center">{examinationType.exit ? '✓' : ''}</span>
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -726,18 +778,26 @@ const DocumentViewer = () => {
         <tr>
           <td className="border border-gray-400 pl-2 text-sm">{label}</td>
           <td className="border border-gray-400 text-center">
-            <Checkbox 
-              checked={!!testResults[doneKey]} 
-              onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'test_results', doneKey], !!checked)}
-              className="mx-auto"
-            />
+            {(isEditing || isValidating) ? (
+              <Checkbox 
+                checked={!!testResults[doneKey]} 
+                onCheckedChange={(checked) => updateEditableData(['structured_data', 'examination_results', 'test_results', doneKey], !!checked)}
+                className="mx-auto"
+              />
+            ) : (
+              <span>{testResults[doneKey] ? '✓' : ''}</span>
+            )}
           </td>
           <td className="border border-gray-400 p-1 text-sm">
-            <Input 
-              className="w-full border-0 p-0 h-6 bg-transparent shadow-none focus-visible:ring-0" 
-              value={testResults[resultsKey] || ''}
-              onChange={(e) => updateEditableData(['structured_data', 'examination_results', 'test_results', resultsKey], e.target.value)}
-            />
+            {(isEditing || isValidating) ? (
+              <Input 
+                className="w-full border-0 p-0 h-6 bg-transparent shadow-none focus-visible:ring-0" 
+                value={testResults[resultsKey] || ''}
+                onChange={(e) => updateEditableData(['structured_data', 'examination_results', 'test_results', resultsKey], e.target.value)}
+              />
+            ) : (
+              <span>{testResults[resultsKey] || 'N/A'}</span>
+            )}
           </td>
         </tr>
       );
@@ -794,20 +854,28 @@ const DocumentViewer = () => {
           <div className="flex items-center">
             <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
             <div className="border-b border-gray-400 flex-1">
-              <Input 
-                className="border-0 p-0 h-6 w-full bg-transparent shadow-none focus-visible:ring-0" 
-                value={certification.follow_up || ''}
-                onChange={(e) => updateEditableData(['structured_data', 'certification', 'follow_up'], e.target.value)}
-              />
+              {(isEditing || isValidating) ? (
+                <Input 
+                  className="border-0 p-0 h-6 w-full bg-transparent shadow-none focus-visible:ring-0" 
+                  value={certification.follow_up || ''}
+                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'follow_up'], e.target.value)}
+                />
+              ) : (
+                <span className="pl-2">{certification.follow_up || 'N/A'}</span>
+              )}
             </div>
             <div className="ml-2">
               <div className="text-sm">
                 <span className="font-semibold mr-1">Review Date:</span>
-                <Input 
-                  className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600" 
-                  value={certification.review_date || ''}
-                  onChange={(e) => updateEditableData(['structured_data', 'certification', 'review_date'], e.target.value)}
-                />
+                {(isEditing || isValidating) ? (
+                  <Input 
+                    className="border-0 border-b border-gray-400 p-0 h-6 w-24 bg-transparent shadow-none focus-visible:ring-0 text-red-600" 
+                    value={certification.review_date || ''}
+                    onChange={(e) => updateEditableData(['structured_data', 'certification', 'review_date'], e.target.value)}
+                  />
+                ) : (
+                  <span className="text-red-600">{certification.review_date || 'N/A'}</span>
+                )}
               </div>
             </div>
           </div>
@@ -820,12 +888,16 @@ const DocumentViewer = () => {
       
       const renderRestrictionCell = (label: string, key: string) => (
         <td className={`border border-gray-400 p-2 text-center`}>
-          <div className="font-semibold">{label}</div>
+          <div className="font-semibold text-xs">{label}</div>
           <div className="flex justify-center mt-1">
-            <Checkbox 
-              checked={!!restrictions[key]} 
-              onCheckedChange={(checked) => updateEditableData(['structured_data', 'restrictions', key], !!checked)}
-            />
+            {(isEditing || isValidating) ? (
+              <Checkbox 
+                checked={!!restrictions[key]} 
+                onCheckedChange={(checked) => updateEditableData(['structured_data', 'restrictions', key], !!checked)}
+              />
+            ) : (
+              <span>{restrictions[key] ? '✓' : ''}</span>
+            )}
           </div>
         </td>
       );
@@ -856,57 +928,33 @@ const DocumentViewer = () => {
     const renderFitnessAssessmentSection = () => {
       const certification = structuredData.certification || {};
       
+      const renderFitnessCell = (label: string, key: string) => (
+        <th className="border border-gray-400 p-2 text-center">
+          <div className="text-xs font-semibold">{label}</div>
+          <div className="flex justify-center mt-1">
+            {(isEditing || isValidating) ? (
+              <Checkbox 
+                checked={!!certification[key]} 
+                onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', key], !!checked)}
+              />
+            ) : (
+              <span>{certification[key] ? '✓' : ''}</span>
+            )}
+          </div>
+        </th>
+      );
+      
       return (
         <div className="mb-4">
           <h3 className="text-lg font-medium mb-2">Fitness Assessment</h3>
           <table className="w-full border border-gray-400">
             <tbody>
               <tr>
-                <th className="border border-gray-400 p-2 text-center">
-                  FIT
-                  <div className="flex justify-center mt-1">
-                    <Checkbox 
-                      checked={!!certification.fit} 
-                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit'], !!checked)}
-                    />
-                  </div>
-                </th>
-                <th className="border border-gray-400 p-2 text-center">
-                  Fit with Restriction
-                  <div className="flex justify-center mt-1">
-                    <Checkbox 
-                      checked={!!certification.fit_with_restrictions} 
-                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit_with_restrictions'], !!checked)}
-                    />
-                  </div>
-                </th>
-                <th className="border border-gray-400 p-2 text-center">
-                  Fit with Condition
-                  <div className="flex justify-center mt-1">
-                    <Checkbox 
-                      checked={!!certification.fit_with_condition} 
-                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'fit_with_condition'], !!checked)}
-                    />
-                  </div>
-                </th>
-                <th className="border border-gray-400 p-2 text-center">
-                  Temporary Unfit
-                  <div className="flex justify-center mt-1">
-                    <Checkbox 
-                      checked={!!certification.temporarily_unfit} 
-                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'temporarily_unfit'], !!checked)}
-                    />
-                  </div>
-                </th>
-                <th className="border border-gray-400 p-2 text-center">
-                  UNFIT
-                  <div className="flex justify-center mt-1">
-                    <Checkbox 
-                      checked={!!certification.unfit} 
-                      onCheckedChange={(checked) => updateEditableData(['structured_data', 'certification', 'unfit'], !!checked)}
-                    />
-                  </div>
-                </th>
+                {renderFitnessCell("FIT", "fit")}
+                {renderFitnessCell("Fit with Restriction", "fit_with_restrictions")}
+                {renderFitnessCell("Fit with Condition", "fit_with_condition")}
+                {renderFitnessCell("Temporary Unfit", "temporarily_unfit")}
+                {renderFitnessCell("UNFIT", "unfit")}
               </tr>
             </tbody>
           </table>
@@ -920,11 +968,17 @@ const DocumentViewer = () => {
       return (
         <div className="mb-4">
           <div className="font-semibold text-sm mb-1">Comments:</div>
-          <Textarea 
-            className="border border-gray-400 p-2 min-h-16 text-sm w-full resize-none focus-visible:ring-0" 
-            value={certification.comments || ''}
-            onChange={(e) => updateEditableData(['structured_data', 'certification', 'comments'], e.target.value)}
-          />
+          {(isEditing || isValidating) ? (
+            <Textarea 
+              className="border border-gray-400 p-2 min-h-16 text-sm w-full resize-none focus-visible:ring-0" 
+              value={certification.comments || ''}
+              onChange={(e) => updateEditableData(['structured_data', 'certification', 'comments'], e.target.value)}
+            />
+          ) : (
+            <div className="border border-gray-400 p-2 min-h-16 text-sm w-full bg-gray-50">
+              {certification.comments || 'N/A'}
+            </div>
+          )}
         </div>
       );
     };
@@ -945,32 +999,26 @@ const DocumentViewer = () => {
         <Separator />
         {renderCommentsSection()}
         
-        <div className="mt-6 flex justify-end space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsEditing(false);
-              setEditableData(null);
-            }}
-          >
-            <X className="h-4 w-4 mr-2" />
-            Cancel
-          </Button>
-          <Button onClick={handleSaveEdits}>
-            <Save className="h-4 w-4 mr-2" />
-            Save Changes
-          </Button>
-        </div>
+        {(isEditing || isValidating) && (
+          <div className="mt-6 flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={resetEditingState}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveChanges}>
+              <Save className="h-4 w-4 mr-2" />
+              {isValidating ? 'Save Validation' : 'Save Changes'}
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
 
   const renderExtractedData = () => {
-    if (isValidating && document) {
-      console.log('Rendering CertificateValidator with document:', document);
-      return <CertificateValidator document={document} />;
-    }
-    
     if (!document || !document.extractedData) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -1031,21 +1079,18 @@ const DocumentViewer = () => {
             </>
           )}
           
-          {isEditing && (
+          {(isEditing || isValidating) && (
             <div className="mt-6 flex justify-end space-x-2">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditableData(null);
-                }}
+                onClick={resetEditingState}
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
-              <Button onClick={handleSaveEdits}>
+              <Button onClick={handleSaveChanges}>
                 <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {isValidating ? 'Save Validation' : 'Save Changes'}
               </Button>
             </div>
           )}
@@ -1199,171 +1244,6 @@ const DocumentViewer = () => {
     };
   }, [id, document?.status, processingTimeout, refreshKey]);
 
-  const handleValidationSave = async (validatedData: any) => {
-    console.log('Saving validated data:', validatedData);
-    
-    const processedData = mapExtractedDataToValidatorFormat(validatedData) as unknown as Json;
-    
-    setDocument(prev => {
-      if (!prev) return null;
-      
-      const updatedDoc = {
-        ...prev,
-        extractedData: processedData,
-        jsonData: JSON.stringify(processedData, null, 2),
-        validationStatus: 'validated'
-      };
-      
-      if (id) {
-        sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
-      }
-      
-      return updatedDoc;
-    });
-    
-    setRefreshKey(prevKey => prevKey + 1);
-    setValidatorData(null);
-    setIsValidating(false);
-    
-    if (id) {
-      try {
-        const { error } = await supabase
-          .from('documents')
-          .update({
-            extracted_data: processedData,
-            is_validated: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', id);
-          
-        if (error) {
-          console.error('Error saving validated data to Supabase:', error);
-          toast.error("Failed to save validation", {
-            description: "There was an error saving your changes to the database."
-          });
-          return;
-        }
-      } catch (error) {
-        console.error('Exception saving validated data:', error);
-        toast.error("Failed to save validation", {
-          description: "There was an error saving your changes to the database."
-        });
-        return;
-      }
-    }
-    
-    toast.success("Validation completed", {
-      description: "The document data has been validated and saved."
-    });
-  };
-
-  const prepareValidatorData = () => {
-    if (!document) return null;
-    
-    console.log("Preparing data for validator:", document.extractedData);
-    
-    const formattedData = mapExtractedDataToValidatorFormat(document.extractedData) as unknown as Record<string, any>;
-    
-    if (formattedData.structured_data.examination_results) {
-      formattedData.structured_data.examination_results.test_results = 
-        formattedData.structured_data.examination_results.test_results || {};
-      
-      formattedData.structured_data.examination_results.type = 
-        formattedData.structured_data.examination_results.type || {};
-    }
-    
-    console.log("Formatted data for validator:", formattedData);
-    setValidatorData(formattedData);
-    return formattedData;
-  };
-
-  const startValidation = () => {
-  console.log("Starting validation mode");
-  if (!document) {
-    console.error("Cannot start validation: document is null");
-    toast.error("Cannot validate: document not loaded");
-    return;
-  }
-  
-  setIsValidating(true);
-  setIsEditing(true); // Enable editing mode for validation
-  
-  // Initialize editable data for validation
-  if (document.extractedData) {
-    setEditableData(JSON.parse(JSON.stringify(document.extractedData)));
-    setOriginalData(JSON.parse(JSON.stringify(document.extractedData)));
-  }
-};
-
-  // And add a validation-specific save handler:
-const handleValidationSave = async () => {
-  if (!editableData) return;
-  
-  try {
-    console.log('Saving validated data:', editableData);
-    
-    // Add validation metadata
-    const validationData = {
-      ...editableData,
-      validation_metadata: {
-        validated_at: new Date().toISOString(),
-        validated_by: 'user',
-        validation_session_id: Date.now().toString()
-      }
-    };
-    
-    setDocument(prev => {
-      if (!prev) return null;
-      
-      const updatedDoc = {
-        ...prev,
-        extractedData: validationData,
-        jsonData: JSON.stringify(validationData, null, 2),
-        validationStatus: 'validated'
-      };
-      
-      if (id) {
-        sessionStorage.setItem(`document-${id}`, JSON.stringify(updatedDoc));
-      }
-      
-      return updatedDoc;
-    });
-    
-    if (id) {
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          extracted_data: validationData as Json,
-          is_validated: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-        
-      if (error) {
-        console.error('Error saving validated data to Supabase:', error);
-        toast.error("Failed to save validation", {
-          description: "There was an error saving your changes to the database."
-        });
-        return;
-      }
-    }
-    
-    setIsValidating(false);
-    setIsEditing(false);
-    setEditableData(null);
-    setOriginalData(null);
-    
-    toast.success("Validation completed", {
-      description: "The document data has been validated and saved."
-    });
-  } catch (error) {
-    console.error('Exception saving validated data:', error);
-    toast.error("Failed to save validation", {
-      description: "There was an error saving your changes to the database."
-    });
-  }
-};
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1456,20 +1336,20 @@ const handleValidationSave = async () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={toggleEditMode}
+                onClick={startEditMode}
               >
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit Data
               </Button>
             )}
-            {isEditing && (
+            {(isEditing || isValidating) && (
               <Button 
-                variant="warning" 
+                variant="outline" 
                 size="sm"
-                onClick={toggleEditMode}
+                onClick={resetEditingState}
               >
                 <X className="h-4 w-4 mr-2" />
-                Cancel Edit
+                Cancel {isValidating ? 'Validation' : 'Edit'}
               </Button>
             )}
             {!isValidating && !isEditing && document.validationStatus === 'validated' && (
@@ -1525,13 +1405,13 @@ const handleValidationSave = async () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className={`flex flex-col space-y-4 ${showOriginal ? "" : "lg:col-span-2 md:w-3/4 mx-auto"}`}
-            key={`document-content-${refreshKey}-${isEditing ? 'edit' : 'view'}`}
+            key={`document-content-${refreshKey}-${editingMode}`}
           >
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">
                 {isValidating ? "Validate Document Data" : (isEditing ? "Edit Document Data" : "Extracted Data")}
               </h2>
-              {!isValidating && !isEditing && (
+              {editingMode === 'view' && (
                 <Badge variant={document.status === 'processed' ? 'default' : 'secondary'} className="text-xs">
                   {document.status === 'processed' ? (
                     <>
@@ -1552,7 +1432,13 @@ const handleValidationSave = async () => {
                   Editing
                 </Badge>
               )}
-              {!isValidating && !isEditing && document.validationStatus === 'validated' && (
+              {isValidating && (
+                <Badge variant="secondary" className="text-xs">
+                  <ClipboardCheck className="h-3 w-3 mr-1" />
+                  Validating
+                </Badge>
+              )}
+              {editingMode === 'view' && document.validationStatus === 'validated' && (
                 <Badge variant="default" className="text-xs ml-2 bg-green-100 text-green-800 hover:bg-green-200">
                   <Check className="h-3 w-3 mr-1" />
                   Validated
@@ -1561,7 +1447,7 @@ const handleValidationSave = async () => {
             </div>
             
             <Card className="flex-1 overflow-hidden">
-              {isValidating || isEditing ? (
+              {(isValidating || isEditing) ? (
                 <CardContent className="p-6 h-[calc(100vh-270px)] overflow-auto">
                   {renderExtractedData()}
                 </CardContent>
@@ -1609,7 +1495,7 @@ const handleValidationSave = async () => {
               )}
             </Card>
             
-            {!isValidating && !isEditing && (
+            {editingMode === 'view' && (
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
@@ -1618,9 +1504,17 @@ const handleValidationSave = async () => {
                   <ChevronLeft className="h-4 w-4 mr-2" />
                   Back to Dashboard
                 </Button>
-                {document.status === 'processed' && !isEditing && (
+                {document.status === 'processed' && (
                   <Button
-                    onClick={startValidation}
+                    onClick={startEditMode}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Data
+                  </Button>
+                )}
+                {document.status === 'processed' && document.validationStatus !== 'validated' && (
+                  <Button
+                    onClick={startValidationMode}
                   >
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                     Validate Data
@@ -1628,29 +1522,6 @@ const handleValidationSave = async () => {
                 )}
               </div>
             )}
-            
-            {(isEditing || isValidating) && (
-  <div className="flex justify-end space-x-2">
-    <Button
-      variant="outline"
-      onClick={() => {
-        setIsEditing(false);
-        setIsValidating(false);
-        setEditableData(null);
-        setOriginalData(null);
-      }}
-    >
-      <X className="h-4 w-4 mr-2" />
-      {isValidating ? 'Cancel Validation' : 'Cancel'}
-    </Button>
-    <Button
-      onClick={isValidating ? handleValidationSave : handleSaveEdits}
-    >
-      <Save className="h-4 w-4 mr-2" />
-      {isValidating ? 'Save Validation' : 'Save Changes'}
-    </Button>
-  </div>
-)}
           </motion.div>
         </motion.div>
       </main>
