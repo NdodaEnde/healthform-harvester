@@ -150,7 +150,7 @@ const mockDocumentData = {
     "restrictions": "None",
     "conclusion": "Fit for duty without restrictions"
   }
-}`};
+}`;
 
 const DocumentViewer = () => {
   const { id } = useParams<{ id: string }>();
@@ -965,11 +965,6 @@ const DocumentViewer = () => {
   };
 
   const renderExtractedData = () => {
-    if (isValidating && document) {
-      console.log('Rendering CertificateValidator with document:', document);
-      return <CertificateValidator document={document} />;
-    }
-    
     if (!document || !document.extractedData) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -1222,7 +1217,7 @@ const DocumentViewer = () => {
     
     setRefreshKey(prevKey => prevKey + 1);
     setValidatorData(null);
-    setIsValidating(false);
+    setIsEditing(false);
     
     if (id) {
       try {
@@ -1283,7 +1278,7 @@ const DocumentViewer = () => {
       toast.error("Cannot validate: document not loaded");
       return;
     }
-    setIsValidating(true);
+    setIsEditing(true);
   };
 
   if (isLoading) {
