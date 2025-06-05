@@ -472,45 +472,140 @@ const CertificateTemplate = ({
     return extracted;
   };
 
+  const normalizeExtractedDataForTemplate = (extractedData: any): any => {
+  console.log("Normalizing extracted data for template:", extractedData);
+  
+  // Handle the case where data comes from document processing
+  let sourceData = extractedData;
+  
+  // If we have structured_data wrapper, use that
+  if (extractedData?.structured_data) {
+    sourceData = extractedData.structured_data;
+  }
+  
+  // If we have certificate_info from document processing, map it properly
+  if (sourceData?.certificate_info) {
+    const certInfo = sourceData.certificate_info;
+    
+    return {
+      patient: {
+        name: certInfo.employee_name || '',
+        id_number: certInfo.id_number || '',
+        company: certInfo.company_name || '',
+        occupation: certInfo.job_title || ''
+      },
+      examination_results: {
+        date: certInfo.examination_date || '',
+        type: {
+          pre_employment: certInfo.pre_employment_checked || false,
+          periodical: certInfo.periodical_checked || false,
+          exit: certInfo.exit_checked || false
+        },
+        test_results: certInfo.medical_tests || {}
+      },
+      certification: {
+        examination_date: certInfo.examination_date || '',
+        valid_until: certInfo.expiry_date || '',
+        fit: certInfo.fitness_status?.fit || false,
+        fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
+        fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
+        temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
+        unfit: certInfo.fitness_status?.unfit || false,
+        comments: certInfo.comments || '',
+        follow_up: certInfo.follow_up || '',
+        review_date: certInfo.review_date || ''
+      },
+      restrictions: certInfo.restrictions || {}
+    };
+  }
+  
+  // If data is already in the right structure, return as-is
+  if (sourceData?.patient || sourceData?.examination_results || sourceData?.certification) {
+    return sourceData;
+  }
+  
+  // Try to extract from raw_content if available
+  const rawContent = extractedData?.raw_content || 
+                    extractedData?.structured_data?.raw_content ||
+                    extractedData?.extracted_data?.raw_content;
+  
+  if (rawContent && typeof rawContent === 'string') {
+    return extractDataFromMarkdown(rawContent);
+  }
+  
+  // Return empty structure if no valid data found
+  return {
+    patient: { name: '', id_number: '', company: '', occupation: '' },
+    examination_results: { 
+      date: '', 
+      type: { pre_employment: false, periodical: false, exit: false },
+      test_results: {}
+    },
+    certification: {
+      examination_date: '',
+      valid_until: '',
+      fit: false,
+      fit_with_restrictions: false,
+      fit_with_condition: false,
+      temporarily_unfit: false,
+      unfit: false,
+      comments: '',
+      follow_up: '',
+      review_date: ''
+    },
+    restrictions: {}
+  };
+};
+
   // Initialize editable data state
   useEffect(() => {
-    if (editable && extractedData) {
-      const structuredData = extractCertificateData(extractedData);
-      setEditableData(structuredData);
+  console.log("CertificateTemplate received data:", extractedData);
+  
+  if (extractedData) {
+    const normalizedData = normalizeExtractedDataForTemplate(extractedData);
+    console.log("Normalized data:", normalizedData);
+    
+    if (editable) {
+      setEditableData(normalizedData);
     }
-  }, [editable, extractedData]);
+  }
+}, [extractedData, editable]);
 
   // Handle field changes in editable mode
-  const handleFieldChange = (path: string, value: any) => {
-    if (!editable || !editableData) return;
-    
-    const keys = path.split('.');
-    const newData = { ...editableData };
-    let current = newData;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) current[keys[i]] = {};
-      current = current[keys[i]];
-    }
-    
-    current[keys[keys.length - 1]] = value;
-    setEditableData(newData);
-    
-    if (onDataChange) {
-      onDataChange(newData);
-    }
-  };
+const handleFieldChange = (path: string, value: any) => {
+  if (!editable || !editableData) return;
+  
+  const keys = path.split('.');
+  const newData = JSON.parse(JSON.stringify(editableData));
+  let current = newData;
+  
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!current[keys[i]]) current[keys[i]] = {};
+    current = current[keys[i]];
+  }
+  
+  current[keys[keys.length - 1]] = value;
+  setEditableData(newData);
+  
+  if (onDataChange) {
+    console.log('Calling onDataChange with:', newData);
+    onDataChange(newData);
+  }
+};
 
-  // Handle checkbox changes
-  const handleCheckboxChange = (path: string, checked: boolean) => {
-    handleFieldChange(path, checked);
-  };
+// Handle checkbox changes
+const handleCheckboxChange = (path: string, checked: boolean) => {
+  handleFieldChange(path, checked);
+};
 
-  // Use editable data if in edit mode, otherwise use extracted data
-  const dataToRender = editable && editableData ? editableData : extractCertificateData(extractedData);
+// Update the dataToRender logic (replace your existing line):
 
-  // Log detailed structure to debug extraction issues
-  console.log("Full extracted data structure received:", JSON.stringify(extractedData, null, 2));
+// Use editable data if in edit mode, otherwise normalize and use extracted data
+const dataToRender = editable && editableData ? 
+  editableData : 
+  normalizeExtractedDataForTemplate(extractedData);
+
+console.log("Data to render in template:", dataToRender);
 
   const patient = dataToRender.patient || {};
   const examination = dataToRender.examination_results || {};
