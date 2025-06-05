@@ -968,8 +968,8 @@ const DocumentViewer = () => {
 
   const renderExtractedData = () => {
     if (isValidating && document) {
-      console.log('Showing CertificateValidator component');
-      return <CertificateValidator />;
+      console.log('Rendering CertificateValidator with document:', document);
+      return <CertificateValidator document={document} />;
     }
     
     if (!document || !document.extractedData) {
@@ -1280,6 +1280,11 @@ const DocumentViewer = () => {
 
   const startValidation = () => {
     console.log("Starting validation mode");
+    if (!document) {
+      console.error("Cannot start validation: document is null");
+      toast.error("Cannot validate: document not loaded");
+      return;
+    }
     setIsValidating(true);
   };
 

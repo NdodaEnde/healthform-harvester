@@ -9,7 +9,22 @@ import { extractCertificateData } from "@/lib/utils";
 
 // Sample data for the enhanced certificate generator
 const sampleDocument = {
-  id: "sample-doc-id", // Added ID here for the document
+  id: "sample-doc-id",
+  file_name: "Sample Certificate.pdf",
+  file_path: "sample/path/certificate.pdf",
+  status: "processed",
+  document_type: "certificate-of-fitness",
+  processed_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  mime_type: "application/pdf",
+  file_size: 1024000,
+  public_url: null,
+  owner_id: null,
+  organization_id: null,
+  client_organization_id: null,
+  validation_status: "pending",
+  processing_error: null,
+  user_id: null,
   extracted_data: {
     structured_data: {
       patient: {
@@ -48,8 +63,7 @@ const sampleDocument = {
         wear_hearing_protection: true
       }
     }
-  },
-  file_name: "Sample Certificate"
+  }
 };
 
 export default function CertificateTemplatesPage() {
@@ -82,7 +96,7 @@ export default function CertificateTemplatesPage() {
         
         <TabsContent value="generate" className="pt-4">
           <div className="bg-white rounded-lg shadow p-6">
-            <EnhancedCertificateGenerator documentId={sampleDocument.id} document={sampleDocument} />
+            <EnhancedCertificateGenerator document={sampleDocument} />
           </div>
         </TabsContent>
       </Tabs>

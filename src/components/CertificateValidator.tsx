@@ -24,7 +24,19 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
   const [validatedData, setValidatedData] = useState<any>(null);
 
   useEffect(() => {
-    if (document.extracted_data) {
+    console.log('CertificateValidator received document:', document);
+    
+    if (!document) {
+      console.error('CertificateValidator: No document provided');
+      return;
+    }
+
+    if (!document.extracted_data) {
+      console.error('CertificateValidator: No extracted_data in document');
+      return;
+    }
+
+    try {
       const certificateData = extractCertificateData(document);
       const formattedData = formatCertificateData(certificateData);
       const fitnessStatus = determineFitnessStatus(certificateData);
@@ -33,6 +45,8 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
         ...formattedData,
         fitnessStatus
       });
+    } catch (error) {
+      console.error('Error processing certificate data:', error);
     }
   }, [document]);
 
@@ -46,6 +60,17 @@ const CertificateValidator: React.FC<CertificateValidatorProps> = ({
     setIsPromotionDialogOpen(false);
     onValidationComplete?.();
   };
+
+  if (!document) {
+    return (
+      <Alert>
+        <FileText className="h-4 w-4" />
+        <AlertDescription>
+          No document provided for validation.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (!document.extracted_data || !validatedData) {
     return (
