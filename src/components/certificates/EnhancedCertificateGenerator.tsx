@@ -57,7 +57,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
     setEditableData(updatedData);
   };
 
-  const handleCreatePatientRecord = () => {
+  const handleValidateAndCreateRecord = () => {
     if (editableData && currentOrganization) {
       setIsPromotionDialogOpen(true);
     }
@@ -69,7 +69,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
     onValidationComplete?.();
   };
 
-  const handleDownloadCertificate = () => {
+  const handleDownloadDocument = () => {
     if (document.public_url) {
       window.open(document.public_url, '_blank');
     }
@@ -91,20 +91,20 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
       <Alert>
         <FileText className="h-4 w-4" />
         <AlertDescription>
-          Unable to extract certificate data from this document.
+          Unable to extract data from this document.
         </AlertDescription>
       </Alert>
     );
   }
 
-  // Show basic certificate info for non-processed documents
+  // Show basic document info for non-processed documents
   if (!isProcessed) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Certificate Information
+            Document Information
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -146,12 +146,12 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
           {document.public_url && (
             <div className="pt-4">
               <Button 
-                onClick={handleDownloadCertificate}
+                onClick={handleDownloadDocument}
                 variant="outline"
                 className="flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
-                Download Certificate
+                Download Document
               </Button>
             </div>
           )}
@@ -167,7 +167,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            Medical Certificate - Ready for Validation
+            Document - Ready for Validation
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -177,7 +177,7 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
               Processed
             </Badge>
             <Badge variant="outline">
-              {document.document_type || 'Medical Certificate'}
+              {document.document_type || 'Medical Document'}
             </Badge>
           </div>
           
@@ -201,30 +201,30 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
                   Back to View
                 </Button>
                 <Button 
-                  onClick={handleCreatePatientRecord}
+                  onClick={handleValidateAndCreateRecord}
                   className="flex items-center gap-2"
                   disabled={!currentOrganization || !editableData}
                 >
-                  <Edit className="h-4 w-4" />
-                  Create Patient Record
+                  <User className="h-4 w-4" />
+                  Validate & Create Patient Record
                 </Button>
               </>
             )}
             {document.public_url && (
               <Button 
-                onClick={handleDownloadCertificate}
+                onClick={handleDownloadDocument}
                 variant="outline"
                 className="flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
-                Download Certificate
+                Download Document
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Certificate Template - editable when in validation mode */}
+      {/* Certificate/Document Template - editable when in validation mode */}
       <CertificateTemplate 
         extractedData={isValidationMode ? editableData : certificateData}
         editable={isValidationMode}
