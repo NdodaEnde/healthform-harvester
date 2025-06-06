@@ -145,11 +145,16 @@ export const promoteToPatientRecord = async (
 
     // Step 2: Create medical examination record
     // First check if examination already exists for this document
-    const { data: existingExam } = await supabase
+    const { data: existingExam, error: checkError } = await supabase
       .from('medical_examinations')
       .select('id')
       .eq('document_id', documentId)
       .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking for existing examination:', checkError);
+      // Continue anyway - this is just a check
+    }
 
     let examination;
     
@@ -179,37 +184,54 @@ export const promoteToPatientRecord = async (
 
       if (updateError) {
         console.error('Error updating medical examination:', updateError);
-        throw new Error('Failed to update medical examination record');
+        throw new Error(`Failed to update medical examination record: ${updateError.message}`);
       }
       
       examination = updatedExam;
       console.log('Updated existing medical examination:', examination.id);
     } else {
-      // Create new examination
+      // Create new examination - prepare the data object first
+      const examinationData = {
+        patient_id: patientId,
+        document_id: documentId,
+        organization_id: organizationId,
+        examination_date: normalizedExamDate,
+        examination_type: validatedData.examinationType,
+        fitness_status: validatedData.fitnessStatus,
+        company_name: validatedData.companyName,
+        job_title: validatedData.occupation,
+        restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+        follow_up_actions: validatedData.followUpActions || null,
+        comments: validatedData.comments || null
+      };
+
+      // Add optional fields only if they have values
+      if (clientOrganizationId) {
+        examinationData.client_organization_id = clientOrganizationId;
+      }
+      
+      if (normalizedExpiryDate) {
+        examinationData.expiry_date = normalizedExpiryDate;
+      }
+
+      // Get current user for validated_by field
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (currentUser.user?.id) {
+        examinationData.validated_by = currentUser.user.id;
+      }
+
+      console.log('Creating medical examination with data:', examinationData);
+
       const { data: newExam, error: createError } = await supabase
         .from('medical_examinations')
-        .insert({
-          patient_id: patientId,
-          document_id: documentId,
-          organization_id: organizationId,
-          client_organization_id: clientOrganizationId,
-          examination_date: normalizedExamDate,
-          examination_type: validatedData.examinationType,
-          expiry_date: normalizedExpiryDate,
-          fitness_status: validatedData.fitnessStatus,
-          company_name: validatedData.companyName,
-          job_title: validatedData.occupation,
-          restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
-          follow_up_actions: validatedData.followUpActions,
-          comments: validatedData.comments,
-          validated_by: (await supabase.auth.getUser()).data.user?.id
-        })
+        .insert(examinationData)
         .select('id')
         .single();
 
       if (createError) {
         console.error('Error creating medical examination:', createError);
-        throw new Error('Failed to create medical examination record');
+        console.error('Failed data:', examinationData);
+        throw new Error(`Failed to create medical examination record: ${createError.message} (Code: ${createError.code})`);
       }
       
       examination = newExam;
