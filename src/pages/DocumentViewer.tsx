@@ -1,4 +1,4 @@
-  import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import CertificateTemplate from "@/components/CertificateTemplate";
 import CertificateValidator from "@/components/CertificateValidator";
+import DocumentValidationWorkflow from "@/components/documents/DocumentValidationWorkflow";
 import { mapExtractedDataToValidatorFormat } from "@/lib/utils";
 import { Json } from "@/integrations/supabase/types";
 import { Input } from "@/components/ui/input";
@@ -150,7 +151,7 @@ const mockDocumentData = {
     "restrictions": "None",
     "conclusion": "Fit for duty without restrictions"
   }
-}`};
+}`;
 
 // Define the editing mode types
 type EditingMode = 'view' | 'edit' | 'validate';
@@ -1110,61 +1111,52 @@ if (id) {
   };
 
   // Update the renderExtractedData function to handle validation mode properly
-const renderExtractedData = () => {
-  if (!document || !document.extractedData) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No data available</p>
-      </div>
-    );
-  }
-  
-  const extractedData = (isEditing || isValidating) ? editableData : document.extractedData;
-  
-  if (document.type === 'Certificate of Fitness') {
-    // For validation mode, use the CertificateTemplate with editable=true
-    if (isValidating) {
+  const renderExtractedData = () => {
+    if (!document || !document.extractedData) {
       return (
-        <div className="certificate-container pb-6">
-          <CertificateTemplate 
-            extractedData={extractedData}
-            editable={true}
-            onDataChange={(updatedData) => {
-              console.log('Certificate template data changed:', updatedData);
-              setEditableData(updatedData);
-            }}
-          />
-          
-          <div className="mt-6 flex justify-end space-x-2 px-6">
-            <Button
-              variant="outline"
-              onClick={resetEditingState}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-            <Button onClick={handleSaveChanges}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Validation
-            </Button>
-          </div>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available</p>
         </div>
       );
     }
     
-    // For editing mode or viewing, use the existing logic
-    if (isEditing) {
-      return renderCertificateSection(extractedData);
-    }
+    const extractedData = (isEditing || isValidating) ? editableData : document.extractedData;
     
-    // For normal viewing
-    console.log("Passing to CertificateTemplate for viewing:", extractedData);
-    return (
-      <div className="certificate-container pb-6">
-        <CertificateTemplate extractedData={extractedData} />
-      </div>
-    );
-  }
+    if (document.type === 'Certificate of Fitness') {
+      // For validation mode, use the DocumentValidationWorkflow
+      if (isValidating) {
+        return (
+          <DocumentValidationWorkflow 
+            document={{
+              id: document.id,
+              extracted_data: extractedData,
+              public_url: document.imageUrl,
+              document_type: document.type,
+              status: document.status,
+              client_organization_id: document.client_organization_id
+            }}
+            onValidationComplete={() => {
+              resetEditingState();
+              setRefreshKey(prev => prev + 1);
+              toast.success("Document validation completed successfully!");
+            }}
+          />
+        );
+      }
+      
+      // For editing mode, use the existing logic
+      if (isEditing) {
+        return renderCertificateSection(extractedData);
+      }
+      
+      // For normal viewing
+      console.log("Passing to CertificateTemplate for viewing:", extractedData);
+      return (
+        <div className="certificate-container pb-6">
+          <CertificateTemplate extractedData={extractedData} />
+        </div>
+      );
+    }
     
     if (
       typeof extractedData === 'object' && 
