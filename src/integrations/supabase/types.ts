@@ -1189,6 +1189,26 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      upsert_medical_examination: {
+        Args: {
+          p_patient_id: string
+          p_document_id: string
+          p_organization_id: string
+          p_examination_date: string
+          p_examination_type: string
+          p_fitness_status: string
+          p_company_name: string
+          p_job_title: string
+          p_client_organization_id?: string
+          p_expiry_date?: string
+          p_restrictions?: string[]
+          p_follow_up_actions?: string
+          p_comments?: string
+        }
+        Returns: {
+          id: string
+        }[]
+      }
       user_belongs_to_organization: {
         Args: { org_id: string }
         Returns: boolean

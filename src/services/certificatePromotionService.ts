@@ -143,54 +143,45 @@ export const promoteToPatientRecord = async (
       console.log('Using existing patient:', patientId);
     }
 
-    // Step 2: Create medical examination record
-    // First check if examination already exists for this document
-    const { data: existingExam, error: checkError } = await supabase
-      .from('medical_examinations')
-      .select('id')
-      .eq('document_id', documentId)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Error checking for existing examination:', checkError);
-      // Continue anyway - this is just a check
-    }
-
-    let examination;
+    // Step 2: Handle medical examination using RPC function to avoid ON CONFLICT issues
+    console.log('Creating/updating medical examination via RPC function');
     
-    if (existingExam) {
-      // Update existing examination
-      const { data: updatedExam, error: updateError } = await supabase
-        .from('medical_examinations')
-        .update({
-          patient_id: patientId,
-          organization_id: organizationId,
-          client_organization_id: clientOrganizationId,
-          examination_date: normalizedExamDate,
-          examination_type: validatedData.examinationType,
-          expiry_date: normalizedExpiryDate,
-          fitness_status: validatedData.fitnessStatus,
-          company_name: validatedData.companyName,
-          job_title: validatedData.occupation,
-          restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
-          follow_up_actions: validatedData.followUpActions,
-          comments: validatedData.comments,
-          validated_by: (await supabase.auth.getUser()).data.user?.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingExam.id)
-        .select('id')
-        .single();
+    // Use the custom RPC function that handles the upsert logic server-side
+    const { data: examination, error: rpcError } = await supabase.rpc('upsert_medical_examination', {
+      p_patient_id: patientId,
+      p_document_id: documentId,
+      p_organization_id: organizationId,
+      p_examination_date: normalizedExamDate,
+      p_examination_type: validatedData.examinationType,
+      p_fitness_status: validatedData.fitnessStatus,
+      p_company_name: validatedData.companyName,
+      p_job_title: validatedData.occupation,
+      p_client_organization_id: clientOrganizationId,
+      p_expiry_date: normalizedExpiryDate,
+      p_restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+      p_follow_up_actions: validatedData.followUpActions || null,
+      p_comments: validatedData.comments || null
+    });
 
-      if (updateError) {
-        console.error('Error updating medical examination:', updateError);
-        throw new Error(`Failed to update medical examination record: ${updateError.message}`);
-      }
+    if (rpcError) {
+      console.error('RPC function failed, falling back to manual approach:', rpcError);
       
-      examination = updatedExam;
-      console.log('Updated existing medical examination:', examination.id);
-    } else {
-      // Create new examination - prepare the data object with all possible fields
+      // Fallback: Delete any existing examination for this document, then create new one
+      console.log('Attempting fallback: delete then insert');
+      
+      // First, delete any existing examination for this document
+      const { error: deleteError } = await supabase
+        .from('medical_examinations')
+        .delete()
+        .eq('document_id', documentId);
+
+      if (deleteError) {
+        console.warn('Could not delete existing examination (may not exist):', deleteError);
+      } else {
+        console.log('Deleted existing examination for document');
+      }
+
+      // Now create a fresh examination record
       const { data: currentUser } = await supabase.auth.getUser();
 
       const examinationData = {
@@ -200,17 +191,17 @@ export const promoteToPatientRecord = async (
         client_organization_id: clientOrganizationId || null,
         examination_date: normalizedExamDate,
         examination_type: validatedData.examinationType,
+        expiry_date: normalizedExpiryDate,
         fitness_status: validatedData.fitnessStatus,
         company_name: validatedData.companyName,
         job_title: validatedData.occupation,
         restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
-        follow_up_actions: validatedData.followUpActions || null,
-        comments: validatedData.comments || null,
-        expiry_date: normalizedExpiryDate,
+        follow_up_actions: validatedData.followUpActions,
+        comments: validatedData.comments,
         validated_by: currentUser.user?.id || null
       };
 
-      console.log('Creating medical examination with data:', examinationData);
+      console.log('Creating fresh examination with data:', examinationData);
 
       const { data: newExam, error: createError } = await supabase
         .from('medical_examinations')
@@ -219,80 +210,16 @@ export const promoteToPatientRecord = async (
         .single();
 
       if (createError) {
-        console.error('Error creating medical examination:', createError);
-        console.error('Failed data:', examinationData);
-        throw new Error(`Failed to create medical examination record: ${createError.message} (Code: ${createError.code})`);
+        console.error('Final fallback failed:', createError);
+        throw new Error(`Failed to create medical examination record: ${createError.message}`);
       }
-      
-      examination = newExam;
-      console.log('Created new medical examination:', examination.id);
+
+      console.log('Created new examination via fallback:', newExam.id);
+      return { patientId, examinationId: newExam.id };
+    } else {
+      console.log('RPC function succeeded:', examination);
+      return { patientId, examinationId: examination[0]?.id };
     }
-
-    console.log('Created medical examination:', examination.id);
-
-    // Step 3: Create test results from document data
-    const { data: document } = await supabase
-      .from('documents')
-      .select('extracted_data')
-      .eq('id', documentId)
-      .single();
-
-    if (document?.extracted_data) {
-      // Type assertion for the extracted_data
-      const extractedData = document.extracted_data as any;
-      const structuredData = extractedData?.structured_data;
-      
-      if (structuredData?.certificate_info?.medical_tests) {
-        const medicalTests = structuredData.certificate_info.medical_tests;
-        const testResults = [];
-
-        // Convert medical tests to test results
-        for (const [testKey, testData] of Object.entries(medicalTests)) {
-          if (testKey.endsWith('_done') && testData === true) {
-            const testType = testKey.replace('_done', '');
-            const resultKey = `${testType}_results`;
-            const result = medicalTests[resultKey];
-
-            testResults.push({
-              examination_id: examination.id,
-              test_type: testType.replace(/_/g, ' '),
-              test_done: true,
-              test_result: result || 'N/A'
-            });
-          }
-        }
-
-        if (testResults.length > 0) {
-          const { error: testError } = await supabase
-            .from('medical_test_results')
-            .insert(testResults);
-
-          if (testError) {
-            console.error('Error creating test results:', testError);
-            // Don't fail the whole process for test results
-          } else {
-            console.log('Created test results:', testResults.length);
-          }
-        }
-      }
-    }
-
-    // Step 4: Update document status
-    const { error: statusError } = await supabase
-      .from('documents')
-      .update({ 
-        validation_status: 'promoted_to_patient',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', documentId);
-
-    if (statusError) {
-      console.error('Error updating document status:', statusError);
-      // Don't fail the process for status update
-    }
-
-    console.log('Successfully promoted certificate to patient record');
-    return { patientId, examinationId: examination.id };
 
   } catch (error) {
     console.error('Error in promoteToPatientRecord:', error);
