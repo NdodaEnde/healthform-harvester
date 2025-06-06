@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { Alert, AlertDescription } from '../ui/alert';
 import { CheckCircle, AlertTriangle, User, FileText, Calendar } from 'lucide-react';
 import { promoteToPatientRecord, checkForDuplicates } from '@/services/certificatePromotionService';
@@ -120,6 +119,12 @@ const CertificatePromotionDialog: React.FC<CertificatePromotionDialogProps> = ({
             <User className="h-5 w-5" />
             Create Patient Record
           </DialogTitle>
+          <DialogDescription>
+            {duplicateCheck 
+              ? `Found ${duplicateCheck.duplicates.length} existing examination(s) for this patient on the same date.`
+              : "This will create a permanent patient record from the validated certificate data."
+            }
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
