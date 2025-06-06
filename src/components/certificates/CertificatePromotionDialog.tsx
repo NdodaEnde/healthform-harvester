@@ -65,13 +65,13 @@ const CertificatePromotionDialog: React.FC<CertificatePromotionDialogProps> = ({
         clientOrganizationId
       );
 
-      toast.success('Document data successfully promoted to patient record!');
+      toast.success('Certificate successfully promoted to patient record!');
       onPromotionComplete?.();
       onClose();
 
     } catch (error) {
-      console.error('Error promoting document:', error);
-      toast.error('Failed to promote document to patient record');
+      console.error('Error promoting certificate:', error);
+      toast.error('Failed to promote certificate to patient record');
     } finally {
       setIsPromoting(false);
     }
@@ -100,13 +100,13 @@ const CertificatePromotionDialog: React.FC<CertificatePromotionDialogProps> = ({
         clientOrganizationId
       );
 
-      toast.success('Document promoted despite duplicates!');
+      toast.success('Certificate promoted despite duplicates!');
       onPromotionComplete?.();
       onClose();
 
     } catch (error) {
-      console.error('Error force promoting document:', error);
-      toast.error('Failed to promote document');
+      console.error('Error force promoting certificate:', error);
+      toast.error('Failed to promote certificate');
     } finally {
       setIsPromoting(false);
     }
@@ -136,7 +136,7 @@ const CertificatePromotionDialog: React.FC<CertificatePromotionDialogProps> = ({
               <Alert>
                 <CheckCircle className="h-4 w-4" />
                 <AlertDescription>
-                  This will create a permanent patient record from the validated document data.
+                  This will create a permanent patient record from the validated certificate data.
                 </AlertDescription>
               </Alert>
 
