@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { extractCertificateData, formatCertificateData } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -145,30 +144,76 @@ export const promoteToPatientRecord = async (
     }
 
     // Step 2: Create medical examination record
-    const { data: examination, error: examError } = await supabase
+    // First check if examination already exists for this document
+    const { data: existingExam } = await supabase
       .from('medical_examinations')
-      .insert({
-        patient_id: patientId,
-        document_id: documentId,
-        organization_id: organizationId,
-        client_organization_id: clientOrganizationId,
-        examination_date: normalizedExamDate,
-        examination_type: validatedData.examinationType,
-        expiry_date: normalizedExpiryDate,
-        fitness_status: validatedData.fitnessStatus,
-        company_name: validatedData.companyName,
-        job_title: validatedData.occupation,
-        restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
-        follow_up_actions: validatedData.followUpActions,
-        comments: validatedData.comments,
-        validated_by: (await supabase.auth.getUser()).data.user?.id
-      })
       .select('id')
-      .single();
+      .eq('document_id', documentId)
+      .maybeSingle();
 
-    if (examError) {
-      console.error('Error creating medical examination:', examError);
-      throw new Error('Failed to create medical examination record');
+    let examination;
+    
+    if (existingExam) {
+      // Update existing examination
+      const { data: updatedExam, error: updateError } = await supabase
+        .from('medical_examinations')
+        .update({
+          patient_id: patientId,
+          organization_id: organizationId,
+          client_organization_id: clientOrganizationId,
+          examination_date: normalizedExamDate,
+          examination_type: validatedData.examinationType,
+          expiry_date: normalizedExpiryDate,
+          fitness_status: validatedData.fitnessStatus,
+          company_name: validatedData.companyName,
+          job_title: validatedData.occupation,
+          restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+          follow_up_actions: validatedData.followUpActions,
+          comments: validatedData.comments,
+          validated_by: (await supabase.auth.getUser()).data.user?.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingExam.id)
+        .select('id')
+        .single();
+
+      if (updateError) {
+        console.error('Error updating medical examination:', updateError);
+        throw new Error('Failed to update medical examination record');
+      }
+      
+      examination = updatedExam;
+      console.log('Updated existing medical examination:', examination.id);
+    } else {
+      // Create new examination
+      const { data: newExam, error: createError } = await supabase
+        .from('medical_examinations')
+        .insert({
+          patient_id: patientId,
+          document_id: documentId,
+          organization_id: organizationId,
+          client_organization_id: clientOrganizationId,
+          examination_date: normalizedExamDate,
+          examination_type: validatedData.examinationType,
+          expiry_date: normalizedExpiryDate,
+          fitness_status: validatedData.fitnessStatus,
+          company_name: validatedData.companyName,
+          job_title: validatedData.occupation,
+          restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+          follow_up_actions: validatedData.followUpActions,
+          comments: validatedData.comments,
+          validated_by: (await supabase.auth.getUser()).data.user?.id
+        })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('Error creating medical examination:', createError);
+        throw new Error('Failed to create medical examination record');
+      }
+      
+      examination = newExam;
+      console.log('Created new medical examination:', examination.id);
     }
 
     console.log('Created medical examination:', examination.id);
