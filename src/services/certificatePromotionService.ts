@@ -190,11 +190,14 @@ export const promoteToPatientRecord = async (
       examination = updatedExam;
       console.log('Updated existing medical examination:', examination.id);
     } else {
-      // Create new examination - prepare the data object first
+      // Create new examination - prepare the data object with all possible fields
+      const { data: currentUser } = await supabase.auth.getUser();
+
       const examinationData = {
         patient_id: patientId,
         document_id: documentId,
         organization_id: organizationId,
+        client_organization_id: clientOrganizationId || null,
         examination_date: normalizedExamDate,
         examination_type: validatedData.examinationType,
         fitness_status: validatedData.fitnessStatus,
@@ -202,23 +205,10 @@ export const promoteToPatientRecord = async (
         job_title: validatedData.occupation,
         restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
         follow_up_actions: validatedData.followUpActions || null,
-        comments: validatedData.comments || null
+        comments: validatedData.comments || null,
+        expiry_date: normalizedExpiryDate,
+        validated_by: currentUser.user?.id || null
       };
-
-      // Add optional fields only if they have values
-      if (clientOrganizationId) {
-        examinationData.client_organization_id = clientOrganizationId;
-      }
-      
-      if (normalizedExpiryDate) {
-        examinationData.expiry_date = normalizedExpiryDate;
-      }
-
-      // Get current user for validated_by field
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (currentUser.user?.id) {
-        examinationData.validated_by = currentUser.user.id;
-      }
 
       console.log('Creating medical examination with data:', examinationData);
 
