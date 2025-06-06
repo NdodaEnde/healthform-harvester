@@ -199,38 +199,57 @@ export default function DocumentViewer() {
         </CardContent>
       </Card>
 
-      {/* Certificate Template - only for medical certificates */}
-      {isProcessed && isCertificate && validatedData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Certificate Preview
-              {isValidationMode && (
-                <Badge variant="outline" className="ml-2">
-                  <Edit className="h-3 w-3 mr-1" />
-                  Validation Mode
-                </Badge>
+      {/* Side-by-side view for certificate validation */}
+      {isProcessed && isCertificate && validatedData && isValidationMode && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Original Document */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Original Document
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {document.public_url ? (
+                <div className="w-full">
+                  <img 
+                    src={document.public_url} 
+                    alt={document.file_name}
+                    className="w-full h-auto border rounded-lg shadow-sm"
+                    style={{ maxHeight: '600px', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
+                  <p className="text-muted-foreground">Original document not available</p>
+                </div>
               )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isValidationMode && (
+            </CardContent>
+          </Card>
+
+          {/* Extracted Data Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Edit className="h-5 w-5" />
+                Extracted Data (Editable)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <Edit className="h-4 w-4 inline mr-2" />
-                  You can now edit the extracted data below. Click "Create Patient Record" when ready to save.
+                  Compare with the original document and edit the extracted data as needed.
                 </p>
               </div>
-            )}
-            
-            <CertificateTemplate 
-              extractedData={validatedData}
-              editable={isValidationMode}
-              onDataChange={isValidationMode ? handleDataChange : undefined}
-            />
+              
+              <CertificateTemplate 
+                extractedData={validatedData}
+                editable={true}
+                onDataChange={handleDataChange}
+              />
 
-            {isValidationMode && (
               <div className="mt-4 pt-4 border-t">
                 <Button 
                   variant="outline" 
@@ -239,7 +258,25 @@ export default function DocumentViewer() {
                   Exit Validation Mode
                 </Button>
               </div>
-            )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Certificate Template - regular view mode */}
+      {isProcessed && isCertificate && validatedData && !isValidationMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Certificate Preview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CertificateTemplate 
+              extractedData={validatedData}
+              editable={false}
+            />
           </CardContent>
         </Card>
       )}
@@ -266,7 +303,7 @@ export default function DocumentViewer() {
             This document is still being processed. Data extraction and validation features will be available once processing is complete.
           </AlertDescription>
         </Alert>
-      )}
+        )}
     </div>
   );
 }
