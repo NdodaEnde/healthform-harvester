@@ -22,7 +22,6 @@ export default function DocumentViewer() {
   const [error, setError] = useState<string | null>(null);
   const [isValidationMode, setIsValidationMode] = useState(false);
   const [validatedData, setValidatedData] = useState<any>(null);
-  const [certificateData, setCertificateData] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -31,20 +30,10 @@ export default function DocumentViewer() {
   }, [id]);
 
   useEffect(() => {
-    // Initialize certificate data when document loads
+    // Initialize validated data when document loads - use the raw extracted_data
     if (document?.extracted_data) {
-      const data = extractCertificateData(document);
-      const formattedData = formatCertificateData(data);
-      const fitnessStatus = determineFitnessStatus(data);
-      
-      const processedData = {
-        ...formattedData,
-        fitnessStatus,
-        rawData: data
-      };
-      
-      setCertificateData(processedData);
-      setValidatedData(processedData);
+      // Use the extracted_data directly, don't process it through utility functions yet
+      setValidatedData(document.extracted_data);
     }
   }, [document]);
 
@@ -198,7 +187,7 @@ export default function DocumentViewer() {
           </div>
 
           {/* Validation Controls - only for processed documents */}
-          {isProcessed && certificateData && (
+          {isProcessed && validatedData && (
             <DocumentValidationControls
               document={document}
               isValidated={!!validatedData}
@@ -211,7 +200,7 @@ export default function DocumentViewer() {
       </Card>
 
       {/* Certificate Template - only for medical certificates */}
-      {isProcessed && isCertificate && certificateData && (
+      {isProcessed && isCertificate && validatedData && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -236,7 +225,7 @@ export default function DocumentViewer() {
             )}
             
             <CertificateTemplate 
-              extractedData={validatedData || certificateData}
+              extractedData={validatedData}
               editable={isValidationMode}
               onDataChange={isValidationMode ? handleDataChange : undefined}
             />
@@ -256,7 +245,7 @@ export default function DocumentViewer() {
       )}
 
       {/* Extracted Data - for non-certificate documents or if no template available */}
-      {isProcessed && document.extracted_data && (!isCertificate || !certificateData) && (
+      {isProcessed && document.extracted_data && (!isCertificate || !validatedData) && (
         <Card>
           <CardHeader>
             <CardTitle>Extracted Data</CardTitle>
