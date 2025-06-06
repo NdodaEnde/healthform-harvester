@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
@@ -6,7 +7,7 @@ import { CheckCircle, AlertTriangle, User, FileText, Calendar } from 'lucide-rea
 import { promoteToPatientRecord, checkForDuplicates } from '@/services/certificatePromotionService';
 import { toast } from 'sonner';
 
-interface DocumentPromotionDialogProps {
+interface CertificatePromotionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   documentId: string;
@@ -16,7 +17,7 @@ interface DocumentPromotionDialogProps {
   onPromotionComplete?: () => void;
 }
 
-const CertificatePromotionDialog: React.FC<DocumentPromotionDialogProps> = ({
+const CertificatePromotionDialog: React.FC<CertificatePromotionDialogProps> = ({
   isOpen,
   onClose,
   documentId,
@@ -28,50 +29,14 @@ const CertificatePromotionDialog: React.FC<DocumentPromotionDialogProps> = ({
   const [isPromoting, setIsPromoting] = useState(false);
   const [duplicateCheck, setDuplicateCheck] = useState<any>(null);
 
-  // Extract patient information from various data structures
-  const getPatientInfo = (data: any) => {
-    // Handle different data structures
-    const patientName = data.patientName || 
-                       data.patient?.name || 
-                       data.name || 
-                       'Unknown Patient';
-    
-    const patientId = data.patientId || 
-                     data.patient?.id_number || 
-                     data.patient?.employee_id || 
-                     data.patient?.id || 
-                     data.id_number || 
-                     data.employee_id || 
-                     'No ID';
-    
-    const status = data.fitnessStatus || 
-                  data.status || 
-                  data.conclusion || 
-                  'Processed';
-    
-    const examDate = data.examinationDate || 
-                    data.examination_date || 
-                    data.date || 
-                    new Date().toISOString().split('T')[0];
-    
-    return {
-      name: patientName,
-      id: patientId,
-      status: status,
-      examDate: examDate
-    };
-  };
-
-  const patientInfo = getPatientInfo(validatedData);
-
   const handlePromote = async () => {
     try {
       setIsPromoting(true);
 
       // Check for duplicates first
       const duplicates = await checkForDuplicates(
-        patientInfo.id,
-        patientInfo.examDate,
+        validatedData.patientId,
+        validatedData.examinationDate || new Date().toISOString().split('T')[0],
         organizationId
       );
 
@@ -80,43 +45,33 @@ const CertificatePromotionDialog: React.FC<DocumentPromotionDialogProps> = ({
         return;
       }
 
-      // Proceed with promotion - prepare data based on what's available
-      const promotionData = {
-        patientName: patientInfo.name,
-        patientId: patientInfo.id,
-        companyName: validatedData.companyName || validatedData.company || '',
-        occupation: validatedData.occupation || validatedData.job_title || '',
-        fitnessStatus: patientInfo.status,
-        restrictionsText: validatedData.restrictionsText || 
-                         validatedData.restrictions || 
-                         'None',
-        examinationDate: patientInfo.examDate,
-        expiryDate: validatedData.expiryDate || 
-                   validatedData.valid_until || 
-                   validatedData.expiry_date || '',
-        examinationType: validatedData.examinationType || 
-                        validatedData.examination_type || 
-                        'general',
-        comments: validatedData.comments || '',
-        followUpActions: validatedData.followUpActions || 
-                        validatedData.follow_up || 
-                        validatedData.followup_actions || ''
-      };
-
+      // Proceed with promotion
       const result = await promoteToPatientRecord(
         documentId,
-        promotionData,
+        {
+          patientName: validatedData.patientName,
+          patientId: validatedData.patientId,
+          companyName: validatedData.companyName,
+          occupation: validatedData.occupation,
+          fitnessStatus: validatedData.fitnessStatus,
+          restrictionsText: validatedData.restrictionsText || 'None',
+          examinationDate: validatedData.examinationDate || new Date().toISOString().split('T')[0],
+          expiryDate: validatedData.expiryDate,
+          examinationType: validatedData.examinationType || 'pre-employment',
+          comments: validatedData.comments,
+          followUpActions: validatedData.followUpActions
+        },
         organizationId,
         clientOrganizationId
       );
 
-      toast.success('Document successfully promoted to patient record!');
+      toast.success('Certificate successfully promoted to patient record!');
       onPromotionComplete?.();
       onClose();
 
     } catch (error) {
-      console.error('Error promoting document:', error);
-      toast.error('Failed to promote document to patient record');
+      console.error('Error promoting certificate:', error);
+      toast.error('Failed to promote certificate to patient record');
     } finally {
       setIsPromoting(false);
     }
@@ -126,43 +81,32 @@ const CertificatePromotionDialog: React.FC<DocumentPromotionDialogProps> = ({
     try {
       setIsPromoting(true);
       
-      // Prepare data for promotion (same as above)
-      const promotionData = {
-        patientName: patientInfo.name,
-        patientId: patientInfo.id,
-        companyName: validatedData.companyName || validatedData.company || '',
-        occupation: validatedData.occupation || validatedData.job_title || '',
-        fitnessStatus: patientInfo.status,
-        restrictionsText: validatedData.restrictionsText || 
-                         validatedData.restrictions || 
-                         'None',
-        examinationDate: patientInfo.examDate,
-        expiryDate: validatedData.expiryDate || 
-                   validatedData.valid_until || 
-                   validatedData.expiry_date || '',
-        examinationType: validatedData.examinationType || 
-                        validatedData.examination_type || 
-                        'general',
-        comments: validatedData.comments || '',
-        followUpActions: validatedData.followUpActions || 
-                        validatedData.follow_up || 
-                        validatedData.followup_actions || ''
-      };
-
       const result = await promoteToPatientRecord(
         documentId,
-        promotionData,
+        {
+          patientName: validatedData.patientName,
+          patientId: validatedData.patientId,
+          companyName: validatedData.companyName,
+          occupation: validatedData.occupation,
+          fitnessStatus: validatedData.fitnessStatus,
+          restrictionsText: validatedData.restrictionsText || 'None',
+          examinationDate: validatedData.examinationDate || new Date().toISOString().split('T')[0],
+          expiryDate: validatedData.expiryDate,
+          examinationType: validatedData.examinationType || 'pre-employment',
+          comments: validatedData.comments,
+          followUpActions: validatedData.followUpActions
+        },
         organizationId,
         clientOrganizationId
       );
 
-      toast.success('Document promoted despite duplicates!');
+      toast.success('Certificate promoted despite duplicates!');
       onPromotionComplete?.();
       onClose();
 
     } catch (error) {
-      console.error('Error force promoting document:', error);
-      toast.error('Failed to promote document');
+      console.error('Error force promoting certificate:', error);
+      toast.error('Failed to promote certificate');
     } finally {
       setIsPromoting(false);
     }
@@ -192,22 +136,22 @@ const CertificatePromotionDialog: React.FC<DocumentPromotionDialogProps> = ({
               <Alert>
                 <CheckCircle className="h-4 w-4" />
                 <AlertDescription>
-                  This will create a permanent patient record from the validated document data.
+                  This will create a permanent patient record from the validated certificate data.
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span><strong>Patient:</strong> {patientInfo.name}</span>
+                  <span><strong>Patient:</strong> {validatedData.patientName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span><strong>ID:</strong> {patientInfo.id}</span>
+                  <span><strong>ID:</strong> {validatedData.patientId}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span><strong>Status:</strong> {patientInfo.status}</span>
+                  <span><strong>Status:</strong> {validatedData.fitnessStatus}</span>
                 </div>
               </div>
             </>
