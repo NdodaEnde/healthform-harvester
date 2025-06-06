@@ -4,12 +4,11 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
-import { CheckCircle, FileText, Download, User, Calendar, Building, Edit } from 'lucide-react';
+import { CheckCircle, FileText, Download, User, Calendar, Building } from 'lucide-react';
 import { extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
 import type { DatabaseDocument } from '@/types/database';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificateTemplate from '../CertificateTemplate';
-import CertificatePromotionDialog from './CertificatePromotionDialog';
 
 interface EnhancedCertificateGeneratorProps {
   document: DatabaseDocument;
@@ -23,9 +22,6 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
   const { currentOrganization } = useOrganization();
   const [certificateData, setCertificateData] = useState<any>(null);
   const [isProcessed, setIsProcessed] = useState(false);
-  const [isValidationMode, setIsValidationMode] = useState(false);
-  const [editableData, setEditableData] = useState<any>(null);
-  const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
 
   useEffect(() => {
     if (document.extracted_data) {
@@ -40,34 +36,9 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
       };
       
       setCertificateData(processedData);
-      setEditableData(processedData);
       setIsProcessed(document.status === 'processed' || document.status === 'completed');
     }
   }, [document]);
-
-  const handleValidateData = () => {
-    setIsValidationMode(true);
-  };
-
-  const handleBackToView = () => {
-    setIsValidationMode(false);
-  };
-
-  const handleDataChange = (updatedData: any) => {
-    setEditableData(updatedData);
-  };
-
-  const handleCreatePatientRecord = () => {
-    if (editableData && currentOrganization) {
-      setIsPromotionDialogOpen(true);
-    }
-  };
-
-  const handlePromotionComplete = () => {
-    setIsPromotionDialogOpen(false);
-    setIsValidationMode(false);
-    onValidationComplete?.();
-  };
 
   const handleDownloadCertificate = () => {
     if (document.public_url) {
@@ -160,14 +131,14 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
     );
   }
 
-  // Regular view mode
+  // Regular view mode - just display the certificate
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            Medical Certificate - Ready for Validation
+            Medical Certificate - Ready for Use
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -182,34 +153,6 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
           </div>
           
           <div className="flex gap-2">
-            {!isValidationMode && (
-              <Button 
-                onClick={handleValidateData}
-                className="flex items-center gap-2"
-              >
-                <Edit className="h-4 w-4" />
-                Validate Data
-              </Button>
-            )}
-            {isValidationMode && (
-              <>
-                <Button 
-                  onClick={handleBackToView}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  Back to View
-                </Button>
-                <Button 
-                  onClick={handleCreatePatientRecord}
-                  className="flex items-center gap-2"
-                  disabled={!currentOrganization || !editableData}
-                >
-                  <Edit className="h-4 w-4" />
-                  Create Patient Record
-                </Button>
-              </>
-            )}
             {document.public_url && (
               <Button 
                 onClick={handleDownloadCertificate}
@@ -224,24 +167,11 @@ const EnhancedCertificateGenerator: React.FC<EnhancedCertificateGeneratorProps> 
         </CardContent>
       </Card>
 
-      {/* Certificate Template - editable when in validation mode */}
+      {/* Certificate Template - display only */}
       <CertificateTemplate 
-        extractedData={isValidationMode ? editableData : certificateData}
-        editable={isValidationMode}
-        onDataChange={isValidationMode ? handleDataChange : undefined}
+        extractedData={certificateData}
+        editable={false}
       />
-
-      {isPromotionDialogOpen && editableData && currentOrganization && (
-        <CertificatePromotionDialog
-          isOpen={isPromotionDialogOpen}
-          onClose={() => setIsPromotionDialogOpen(false)}
-          documentId={document.id}
-          validatedData={editableData}
-          organizationId={currentOrganization.id}
-          clientOrganizationId={document.client_organization_id}
-          onPromotionComplete={handlePromotionComplete}
-        />
-      )}
     </div>
   );
 };
