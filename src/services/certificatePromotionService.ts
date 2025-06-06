@@ -17,6 +17,55 @@ export interface PromotionData {
   followUpActions?: string;
 }
 
+// Helper function to normalize date formats
+const normalizeDate = (dateString: string): string => {
+  if (!dateString) return new Date().toISOString().split('T')[0];
+  
+  // Handle various date formats
+  const cleanDate = dateString.trim();
+  
+  // If already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+    return cleanDate;
+  }
+  
+  // Handle DD.MM.YYYY or DD. MM. YYYY format
+  const ddmmyyyyMatch = cleanDate.match(/^(\d{1,2})\.?\s*(\d{1,2})\.?\s*(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Handle DD/MM/YYYY format
+  const slashMatch = cleanDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Try to parse as Date and format
+  try {
+    const parsed = new Date(cleanDate);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+  } catch (error) {
+    console.warn('Could not parse date:', cleanDate);
+  }
+  
+  // Fallback to current date
+  console.warn('Using current date as fallback for:', cleanDate);
+  return new Date().toISOString().split('T')[0];
+};
+
+// Helper function to normalize patient ID
+const normalizePatientId = (patientId: string): string => {
+  if (!patientId) return '';
+  
+  // Remove spaces and special characters, keep only alphanumeric
+  return patientId.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
+};
+
 export const promoteToPatientRecord = async (
   documentId: string,
   validatedData: PromotionData,
@@ -36,11 +85,25 @@ export const promoteToPatientRecord = async (
       throw new Error('Patient name and ID are required');
     }
 
+    // Normalize the patient ID and dates
+    const normalizedPatientId = normalizePatientId(validatedData.patientId);
+    const normalizedExamDate = normalizeDate(validatedData.examinationDate);
+    const normalizedExpiryDate = validatedData.expiryDate ? normalizeDate(validatedData.expiryDate) : null;
+
+    console.log('Normalized data:', {
+      originalPatientId: validatedData.patientId,
+      normalizedPatientId,
+      originalExamDate: validatedData.examinationDate,
+      normalizedExamDate,
+      originalExpiryDate: validatedData.expiryDate,
+      normalizedExpiryDate
+    });
+
     // Step 1: Find or create patient
     const { data: existingPatient, error: patientSearchError } = await supabase
       .from('patients')
       .select('id')
-      .eq('id_number', validatedData.patientId)
+      .eq('id_number', normalizedPatientId)
       .eq('organization_id', organizationId)
       .maybeSingle();
 
@@ -62,7 +125,7 @@ export const promoteToPatientRecord = async (
         .insert({
           first_name: firstName,
           last_name: lastName,
-          id_number: validatedData.patientId,
+          id_number: normalizedPatientId,
           organization_id: organizationId,
           client_organization_id: clientOrganizationId,
           date_of_birth: new Date().toISOString().split('T')[0] // Will be updated from ID processing
@@ -89,9 +152,9 @@ export const promoteToPatientRecord = async (
         document_id: documentId,
         organization_id: organizationId,
         client_organization_id: clientOrganizationId,
-        examination_date: validatedData.examinationDate,
+        examination_date: normalizedExamDate,
         examination_type: validatedData.examinationType,
-        expiry_date: validatedData.expiryDate || null,
+        expiry_date: normalizedExpiryDate,
         fitness_status: validatedData.fitnessStatus,
         company_name: validatedData.companyName,
         job_title: validatedData.occupation,
@@ -186,11 +249,42 @@ export const checkForDuplicates = async (
   organizationId: string
 ) => {
   try {
+    // Normalize the inputs
+    const normalizedPatientId = normalizePatientId(patientId);
+    const normalizedExamDate = normalizeDate(examinationDate);
+
+    console.log('Checking duplicates with normalized data:', {
+      originalPatientId: patientId,
+      normalizedPatientId,
+      originalExamDate: examinationDate,
+      normalizedExamDate,
+      organizationId
+    });
+
+    // First, find the patient by ID number instead of using patient ID as UUID
+    const { data: patient, error: patientError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('id_number', normalizedPatientId)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (patientError) {
+      console.error('Error finding patient for duplicate check:', patientError);
+      return { hasDuplicates: false, duplicates: [] };
+    }
+
+    if (!patient) {
+      // Patient doesn't exist, so no duplicates
+      return { hasDuplicates: false, duplicates: [] };
+    }
+
+    // Now check for duplicates using the actual patient UUID
     const { data: duplicates, error } = await supabase
       .from('medical_examinations')
       .select('id, examination_date, fitness_status')
-      .eq('patient_id', patientId)
-      .eq('examination_date', examinationDate)
+      .eq('patient_id', patient.id)
+      .eq('examination_date', normalizedExamDate)
       .eq('organization_id', organizationId);
 
     if (error) {
