@@ -26,6 +26,16 @@ export const promoteToPatientRecord = async (
   try {
     console.log('Starting promotion to patient record:', { documentId, validatedData });
 
+    // Validate the data structure
+    if (!validatedData || typeof validatedData !== 'object') {
+      throw new Error('Invalid validated data provided');
+    }
+
+    if (!validatedData.patientName || !validatedData.patientId) {
+      console.error('Missing required patient data:', validatedData);
+      throw new Error('Patient name and ID are required');
+    }
+
     // Step 1: Find or create patient
     const { data: existingPatient, error: patientSearchError } = await supabase
       .from('patients')
@@ -175,20 +185,25 @@ export const checkForDuplicates = async (
   examinationDate: string,
   organizationId: string
 ) => {
-  const { data: duplicates, error } = await supabase
-    .from('medical_examinations')
-    .select('id, examination_date, fitness_status')
-    .eq('patient_id', patientId)
-    .eq('examination_date', examinationDate)
-    .eq('organization_id', organizationId);
+  try {
+    const { data: duplicates, error } = await supabase
+      .from('medical_examinations')
+      .select('id, examination_date, fitness_status')
+      .eq('patient_id', patientId)
+      .eq('examination_date', examinationDate)
+      .eq('organization_id', organizationId);
 
-  if (error) {
+    if (error) {
+      console.error('Error checking for duplicates:', error);
+      return { hasDuplicates: false, duplicates: [] };
+    }
+
+    return { 
+      hasDuplicates: duplicates.length > 0, 
+      duplicates: duplicates || [] 
+    };
+  } catch (error) {
     console.error('Error checking for duplicates:', error);
     return { hasDuplicates: false, duplicates: [] };
   }
-
-  return { 
-    hasDuplicates: duplicates.length > 0, 
-    duplicates: duplicates || [] 
-  };
 };

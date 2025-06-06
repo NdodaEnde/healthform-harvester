@@ -27,6 +27,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 
   const handleCreatePatientRecord = () => {
     if (validatedData && currentOrganization) {
+      console.log('Opening promotion dialog with validated data:', validatedData);
       setIsPromotionDialogOpen(true);
     }
   };
@@ -34,6 +35,37 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   const handlePromotionComplete = () => {
     setIsPromotionDialogOpen(false);
     onValidationComplete?.();
+  };
+
+  // Transform the validated data to match what the promotion service expects
+  const transformDataForPromotion = (data: any) => {
+    if (!data) return null;
+    
+    // Handle both old and new data structures
+    const patient = data.patient || {};
+    const certification = data.certification || {};
+    const examination_results = data.examination_results || {};
+    
+    return {
+      patientName: patient.name || data.patientName || 'Unknown',
+      patientId: patient.id_number || data.patientId || 'Unknown',
+      companyName: patient.company || data.companyName || 'Unknown',
+      occupation: patient.occupation || data.occupation || 'Unknown',
+      fitnessStatus: certification.fit ? 'fit' : 
+                    certification.fit_with_restrictions ? 'fit_with_restrictions' : 
+                    certification.temporarily_unfit ? 'temporarily_unfit' : 
+                    certification.unfit ? 'unfit' : 
+                    data.fitnessStatus || 'unknown',
+      restrictionsText: data.restrictionsText || 'None',
+      examinationDate: certification.examination_date || examination_results.date || data.examinationDate || new Date().toISOString().split('T')[0],
+      expiryDate: certification.valid_until || data.expiryDate,
+      examinationType: examination_results.type?.pre_employment ? 'pre-employment' :
+                      examination_results.type?.periodical ? 'periodical' :
+                      examination_results.type?.exit ? 'exit' : 
+                      data.examinationType || 'pre-employment',
+      comments: certification.comments || data.comments,
+      followUpActions: certification.follow_up || data.followUpActions
+    };
   };
 
   // Only show for processed documents
@@ -83,7 +115,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
           isOpen={isPromotionDialogOpen}
           onClose={() => setIsPromotionDialogOpen(false)}
           documentId={document.id}
-          validatedData={validatedData}
+          validatedData={transformDataForPromotion(validatedData)}
           organizationId={currentOrganization.id}
           clientOrganizationId={document.client_organization_id}
           onPromotionComplete={handlePromotionComplete}
