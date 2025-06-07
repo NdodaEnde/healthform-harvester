@@ -861,18 +861,18 @@ console.log("Data to render in template:", dataToRender);
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
-                          <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                          <th className="border-t border-l border-r border-b border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
+                          <th className="border-t border-b border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
+                          <th className="border-t border-b border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">BLOODS</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
@@ -883,11 +883,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
@@ -898,11 +898,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
@@ -913,11 +913,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">NIGHT VISION</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
@@ -934,18 +934,18 @@ console.log("Data to render in template:", dataToRender);
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
-                          <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                          <th className="border-t border-l border-b border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
+                          <th className="border-t border-b border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
+                          <th className="border-t border-r border-b border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Hearing</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
@@ -956,11 +956,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Working at Heights</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
@@ -971,11 +971,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Lung Function</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
@@ -986,11 +986,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">X-Ray</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
@@ -1001,11 +1001,11 @@ console.log("Data to render in template:", dataToRender);
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
-                          <td className="border border-gray-400 text-center">
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Drug Screen</td>
+                          <td className="border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
@@ -1020,7 +1020,6 @@ console.log("Data to render in template:", dataToRender);
                   </div>
                 </div>
               </div>
-            </div>
             
             <div className="px-4 mb-4">
               <div className="flex items-center">
