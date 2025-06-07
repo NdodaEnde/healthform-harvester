@@ -86,8 +86,8 @@ export const promoteToPatientRecord = async (
       throw new Error('Patient name and ID are required');
     }
 
-    // Normalize the patient ID and process SA ID data using your existing utilities
-    const normalizedPatientId = normalizeIDNumber(validatedData.patientId);
+    // Normalize the patient ID and dates
+    const normalizedPatientId = normalizePatientId(validatedData.patientId);
     const normalizedExamDate = normalizeDate(validatedData.examinationDate);
     const normalizedExpiryDate = validatedData.expiryDate ? normalizeDate(validatedData.expiryDate) : null;
 
@@ -129,11 +129,11 @@ export const promoteToPatientRecord = async (
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Create a basic patient info object
+      // Create a basic patient info object for processing
       const basicPatientInfo = {
         first_name: firstName,
         last_name: lastName,
-        id_number: normalizedPatientId || validatedData.patientId,
+        id_number: normalizedPatientId,
         date_of_birth: new Date().toISOString().split('T')[0], // Default fallback
         gender: 'unknown'
       };
@@ -148,7 +148,7 @@ export const promoteToPatientRecord = async (
       const patientData = {
         first_name: firstName,
         last_name: lastName,
-        id_number: normalizedPatientId || validatedData.patientId,
+        id_number: normalizedPatientId,
         organization_id: organizationId,
         client_organization_id: clientOrganizationId,
         date_of_birth: processedPatientInfo.date_of_birth || basicPatientInfo.date_of_birth,
@@ -176,7 +176,7 @@ export const promoteToPatientRecord = async (
       }
 
       patientId = newPatient.id;
-      console.log('Created new patient with processed SA ID data:', patientId);
+      console.log('Created new patient with SA ID data:', patientId);
     } else {
       console.log('Using existing patient:', patientId);
       
@@ -223,18 +223,18 @@ export const promoteToPatientRecord = async (
     // Step 2: Handle medical examination using RPC function to avoid ON CONFLICT issues
     console.log('Creating/updating medical examination via RPC function');
     
-    // Use a custom RPC function that handles the upsert logic server-side
+    // Use the custom RPC function that handles the upsert logic server-side
     const { data: examination, error: rpcError } = await supabase.rpc('upsert_medical_examination', {
       p_patient_id: patientId,
       p_document_id: documentId,
       p_organization_id: organizationId,
-      p_client_organization_id: clientOrganizationId,
       p_examination_date: normalizedExamDate,
       p_examination_type: validatedData.examinationType,
-      p_expiry_date: normalizedExpiryDate,
       p_fitness_status: validatedData.fitnessStatus,
       p_company_name: validatedData.companyName,
       p_job_title: validatedData.occupation,
+      p_client_organization_id: clientOrganizationId,
+      p_expiry_date: normalizedExpiryDate,
       p_restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
       p_follow_up_actions: validatedData.followUpActions || null,
       p_comments: validatedData.comments || null
@@ -259,194 +259,44 @@ export const promoteToPatientRecord = async (
       }
 
       // Now create a fresh examination record
-      const baseExaminationData = {
+      const { data: currentUser } = await supabase.auth.getUser();
+
+      const examinationData = {
         patient_id: patientId,
         document_id: documentId,
         organization_id: organizationId,
+        client_organization_id: clientOrganizationId || null,
         examination_date: normalizedExamDate,
         examination_type: validatedData.examinationType,
+        expiry_date: normalizedExpiryDate,
         fitness_status: validatedData.fitnessStatus,
         company_name: validatedData.companyName,
         job_title: validatedData.occupation,
-        restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : []
+        restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+        follow_up_actions: validatedData.followUpActions,
+        comments: validatedData.comments,
+        validated_by: currentUser.user?.id || null
       };
 
-      // Only add non-null optional fields
-      const optionalFields: any = {};
-      if (clientOrganizationId) optionalFields.client_organization_id = clientOrganizationId;
-      if (normalizedExpiryDate) optionalFields.expiry_date = normalizedExpiryDate;
-      if (validatedData.followUpActions) optionalFields.follow_up_actions = validatedData.followUpActions;
-      if (validatedData.comments) optionalFields.comments = validatedData.comments;
+      console.log('Creating fresh examination with data:', examinationData);
 
-      const finalExaminationData = { ...baseExaminationData, ...optionalFields };
-
-      // Now create a fresh examination record using direct SQL query
-      console.log('Attempting direct SQL insert to bypass Supabase ORM');
-      
-      const examId = crypto.randomUUID();
-      const currentTimestamp = new Date().toISOString();
-      
-      // Prepare values for SQL insertion
-      const restrictionsArray = validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [];
-      
-      const sqlQuery = `
-        INSERT INTO medical_examinations (
-          id, patient_id, document_id, organization_id, client_organization_id,
-          examination_date, examination_type, expiry_date, fitness_status,
-          company_name, job_title, restrictions, follow_up_actions, comments,
-          created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
-        ) RETURNING id;
-      `;
-
-      const { data: sqlResult, error: sqlError } = await supabase.rpc('exec_sql', {
-        query: sqlQuery,
-        params: [
-          examId,
-          patientId,
-          documentId,
-          organizationId,
-          clientOrganizationId,
-          normalizedExamDate,
-          validatedData.examinationType,
-          normalizedExpiryDate,
-          validatedData.fitnessStatus,
-          validatedData.companyName,
-          validatedData.occupation,
-          JSON.stringify(restrictionsArray),
-          validatedData.followUpActions,
-          validatedData.comments,
-          currentTimestamp,
-          currentTimestamp
-        ]
-      });
-
-      if (sqlError) {
-        console.error('Direct SQL approach failed, trying absolute minimal insert:', sqlError);
-        
-        // Absolute last resort: insert with only required fields and no restrictions/arrays
-        const absoluteMinimal = {
-          patient_id: patientId,
-          document_id: documentId,
-          organization_id: organizationId,
-          examination_date: normalizedExamDate,
-          examination_type: validatedData.examinationType || 'pre-employment',
-          fitness_status: validatedData.fitnessStatus || 'unknown',
-          company_name: validatedData.companyName || 'N/A',
-          job_title: validatedData.occupation || 'N/A'
-        };
-
-        console.log('Absolute minimal insert attempt:', absoluteMinimal);
-
-        try {
-          // Try without .select() to avoid any additional queries
-          const { error: finalError } = await supabase
-            .from('medical_examinations')
-            .insert(absoluteMinimal);
-
-          if (finalError) {
-            throw new Error(`Final minimal insert failed: ${finalError.message} (${finalError.code})`);
-          }
-
-          // If insert succeeded, get the record ID
-          const { data: insertedRecord, error: selectError } = await supabase
-            .from('medical_examinations')
-            .select('id')
-            .eq('document_id', documentId)
-            .single();
-
-          if (selectError) {
-            // Even if we can't get the ID, the insert worked
-            examination = { id: 'unknown-but-created' };
-          } else {
-            examination = insertedRecord;
-          }
-
-          console.log('Absolute minimal insert succeeded');
-        } catch (finalError) {
-          console.error('All approaches exhausted:', finalError);
-          throw new Error(`Cannot create medical examination: ${finalError.message}. This may be a database configuration issue.`);
-        }
-      } else {
-        examination = { id: examId };
-        console.log('Direct SQL insert succeeded:', examination.id);
-      }
-    } else {
-      console.log('RPC function succeeded:', examination);
-    }
-
-    // Step 3: Create test results from document data (optional)
-    try {
-      const { data: document } = await supabase
-        .from('documents')
-        .select('extracted_data')
-        .eq('id', documentId)
+      const { data: newExam, error: createError } = await supabase
+        .from('medical_examinations')
+        .insert(examinationData)
+        .select('id')
         .single();
 
-      if (document?.extracted_data) {
-        const extractedData = document.extracted_data as any;
-        const structuredData = extractedData?.structured_data;
-        
-        if (structuredData?.certificate_info?.medical_tests) {
-          const medicalTests = structuredData.certificate_info.medical_tests;
-          const testResults = [];
-
-          for (const [testKey, testData] of Object.entries(medicalTests)) {
-            if (testKey.endsWith('_done') && testData === true) {
-              const testType = testKey.replace('_done', '');
-              const resultKey = `${testType}_results`;
-              const result = medicalTests[resultKey];
-
-              testResults.push({
-                examination_id: examination.id,
-                test_type: testType.replace(/_/g, ' '),
-                test_done: true,
-                test_result: result || 'N/A'
-              });
-            }
-          }
-
-          if (testResults.length > 0) {
-            const { error: testError } = await supabase
-              .from('medical_test_results')
-              .insert(testResults);
-
-            if (testError) {
-              console.error('Error creating test results:', testError);
-              // Don't fail the whole process for test results
-            } else {
-              console.log('Created test results:', testResults.length);
-            }
-          }
-        }
+      if (createError) {
+        console.error('Final fallback failed:', createError);
+        throw new Error(`Failed to create medical examination record: ${createError.message}`);
       }
-    } catch (testError) {
-      console.warn('Error processing test results (non-critical):', testError);
-      // Continue without test results
+
+      console.log('Created new examination via fallback:', newExam.id);
+      return { patientId, examinationId: newExam.id };
+    } else {
+      console.log('RPC function succeeded:', examination);
+      return { patientId, examinationId: examination[0]?.id };
     }
-
-    // Step 4: Update document status (optional)
-    try {
-      const { error: statusError } = await supabase
-        .from('documents')
-        .update({ 
-          validation_status: 'promoted_to_patient',
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', documentId);
-
-      if (statusError) {
-        console.error('Error updating document status:', statusError);
-        // Don't fail the process for status update
-      }
-    } catch (statusError) {
-      console.warn('Error updating document status (non-critical):', statusError);
-      // Continue without status update
-    }
-
-    console.log('Successfully promoted certificate to patient record');
-    return { patientId, examinationId: examination.id };
 
   } catch (error) {
     console.error('Error in promoteToPatientRecord:', error);
