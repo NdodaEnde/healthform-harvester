@@ -348,17 +348,18 @@ const CertificateTemplate = ({
                     <table className="w-full border border-gray-900">
                       <thead>
                         <tr>
-                          <th className="border-r border-gray-900 py-1 w-1/3 text-center bg-blue-50 text-xs font-bold">Done</th>
-                          <th className="py-1 w-2/3 text-center bg-blue-50 text-xs font-bold">Results</th>
+                          <th className="border-r border-b border-gray-900 py-1 w-1/2 text-center bg-blue-50 text-xs font-bold"></th>
+                          <th className="border-r border-b border-gray-900 py-1 w-1/4 text-center bg-blue-50 text-xs font-bold">Done</th>
+                          <th className="border-b border-gray-900 py-1 w-1/4 text-center bg-blue-50 text-xs font-bold">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium w-1/3">BLOODS</td>
-                          <td className="border-b border-gray-900 text-center py-1 w-1/3">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">BLOODS</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
                           </td>
-                          <td className="border-b border-gray-900 p-1 text-sm w-1/3">
+                          <td className="border-b border-gray-900 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.bloods.results}
@@ -369,8 +370,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium">FAR, NEAR VISION</td>
-                          <td className="border-b border-gray-900 text-center py-1">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">FAR, NEAR VISION</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
                           </td>
                           <td className="border-b border-gray-900 p-1 text-sm">
@@ -384,8 +385,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium">SIDE & DEPTH</td>
-                          <td className="border-b border-gray-900 text-center py-1">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">SIDE & DEPTH</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
                           </td>
                           <td className="border-b border-gray-900 p-1 text-sm">
@@ -399,8 +400,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 pl-2 text-sm font-medium">NIGHT VISION</td>
-                          <td className="text-center py-1">
+                          <td className="border-r pl-2 text-sm font-medium">NIGHT VISION</td>
+                          <td className="border-r text-center py-1">
                             {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
                           </td>
                           <td className="p-1 text-sm">
@@ -422,14 +423,15 @@ const CertificateTemplate = ({
                     <table className="w-full border border-gray-900">
                       <thead>
                         <tr>
-                          <th className="border-r border-gray-900 py-1 w-1/3 text-center bg-blue-50 text-xs font-bold">Done</th>
-                          <th className="py-1 w-2/3 text-center bg-blue-50 text-xs font-bold">Results</th>
+                          <th className="border-r border-b border-gray-900 py-1 w-1/2 text-center bg-blue-50 text-xs font-bold"></th>
+                          <th className="border-r border-b border-gray-900 py-1 w-1/4 text-center bg-blue-50 text-xs font-bold">Done</th>
+                          <th className="border-b border-gray-900 py-1 w-1/4 text-center bg-blue-50 text-xs font-bold">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium">Hearing</td>
-                          <td className="border-b border-gray-900 text-center py-1">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">Hearing</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
                           </td>
                           <td className="border-b border-gray-900 p-1 text-sm">
@@ -443,8 +445,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium">Working at Heights</td>
-                          <td className="border-b border-gray-900 text-center py-1">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">Working at Heights</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
                           </td>
                           <td className="border-b border-gray-900 p-1 text-sm">
@@ -458,8 +460,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium">Lung Function</td>
-                          <td className="border-b border-gray-900 text-center py-1">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">Lung Function</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
                           </td>
                           <td className="border-b border-gray-900 p-1 text-sm">
@@ -473,8 +475,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 border-b border-gray-900 pl-2 text-sm font-medium">X-Ray</td>
-                          <td className="border-b border-gray-900 text-center py-1">
+                          <td className="border-r border-b border-gray-900 pl-2 text-sm font-medium">X-Ray</td>
+                          <td className="border-r border-b border-gray-900 text-center py-1">
                             {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
                           </td>
                           <td className="border-b border-gray-900 p-1 text-sm">
@@ -488,8 +490,8 @@ const CertificateTemplate = ({
                           </td>
                         </tr>
                         <tr>
-                          <td className="border-r border-gray-900 pl-2 text-sm font-medium">Drug Screen</td>
-                          <td className="text-center py-1">
+                          <td className="border-r pl-2 text-sm font-medium">Drug Screen</td>
+                          <td className="border-r text-center py-1">
                             {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
                           </td>
                           <td className="p-1 text-sm">
