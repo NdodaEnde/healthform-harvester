@@ -855,24 +855,25 @@ console.log("Data to render in template:", dataToRender);
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
               </div>
               
-              <div className="px-4">
+                            <div className="px-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <div className="mb-2">
+                      <div className="bg-gray-800 text-white text-center py-1 text-sm font-bold">BLOODS</div>
+                    </div>
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border-t border-l border-r border-b border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
-                          <th className="border-t border-b border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border-t border-b border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                          <th className="border-t border-l border-b border-gray-400 py-1 w-1/2 text-center bg-blue-50 text-xs">Done</th>
+                          <th className="border-t border-r border-b border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">BLOODS</td>
-                          <td className="border-b border-gray-400 text-center">
+                          <td className="border-l border-b border-gray-400 text-center">
                             {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
                           </td>
-                          <td className="border-b border-gray-400 p-1 text-sm">
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
                                 value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
@@ -882,53 +883,60 @@ console.log("Data to render in template:", dataToRender);
                             ) : medicalTests.bloods.results}
                           </td>
                         </tr>
-                        <tr>
-                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
-                          <td className="border-b border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
-                          </td>
-                          <td className="border-b border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.farNearVision.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
-                          <td className="border-b border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
-                          </td>
-                          <td className="border-b border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.sideDepth.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm">NIGHT VISION</td>
-                          <td className="border-b border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
-                          </td>
-                          <td className="border-b border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.nightVision.results}
-                          </td>
-                        </tr>
                       </tbody>
                     </table>
+                    
+                    <div className="mt-4">
+                      <table className="w-full border border-gray-400">
+                        <tbody>
+                          <tr>
+                            <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">FAR, NEAR VISION</td>
+                            <td className="border-b border-gray-400 text-center w-1/6">
+                              {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
+                            </td>
+                            <td className="border-r border-b border-gray-400 p-1 text-sm">
+                              {editable ? (
+                                <Input
+                                  value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
+                                  onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
+                                  className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                                />
+                              ) : medicalTests.farNearVision.results}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">SIDE & DEPTH</td>
+                            <td className="border-b border-gray-400 text-center">
+                              {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
+                            </td>
+                            <td className="border-r border-b border-gray-400 p-1 text-sm">
+                              {editable ? (
+                                <Input
+                                  value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
+                                  onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
+                                  className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                                />
+                              ) : medicalTests.sideDepth.results}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">NIGHT VISION</td>
+                            <td className="border-b border-gray-400 text-center">
+                              {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
+                            </td>
+                            <td className="border-r border-b border-gray-400 p-1 text-sm">
+                              {editable ? (
+                                <Input
+                                  value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
+                                  onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
+                                  className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                                />
+                              ) : medicalTests.nightVision.results}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                   <div>
                     <table className="w-full border border-gray-400">
