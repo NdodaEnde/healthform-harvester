@@ -151,7 +151,7 @@ export type Database = {
           {
             foreignKeyName: "certificate_compliance_patient_id_fkey"
             columns: ["patient_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "patients"
             referencedColumns: ["id"]
           },
