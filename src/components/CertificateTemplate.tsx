@@ -442,165 +442,167 @@ const CertificateTemplate = ({
               <div className="px-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
-                          <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.bloods_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.bloods.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.farNearVision.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.sideDepth.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.nightVision.results}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    <div className="border border-gray-400">
+                      <div className="bg-blue-50 border-b border-gray-400 grid grid-cols-3">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm font-medium">BLOODS</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-xs text-center font-medium">Done</div>
+                        <div className="py-1 px-2 text-xs text-center font-medium">Results</div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">BLOODS</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.bloods_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.bloods.results}
+                        </div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">FAR, NEAR VISION</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.farNearVision.results}
+                        </div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">SIDE & DEPTH</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.sideDepth.results}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">NIGHT VISION</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.nightVision.results}
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                  
                   <div>
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
-                          <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.hearing_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.hearing.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.heights_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.heights.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.lung_function_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.lungFunction.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.x_ray_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.xRay.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
-                          <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {editable ? (
-                              <Input
-                                value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
-                                onChange={(e) => handleFieldChange('examination_results.test_results.drug_screen_results', e.target.value)}
-                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
-                              />
-                            ) : medicalTests.drugScreen.results}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    <div className="border border-gray-400">
+                      <div className="bg-blue-50 border-b border-gray-400 grid grid-cols-3">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm font-medium">Test</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-xs text-center font-medium">Done</div>
+                        <div className="py-1 px-2 text-xs text-center font-medium">Results</div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">Hearing</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.hearing_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.hearing.results}
+                        </div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">Working at Heights</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.heights_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.heights.results}
+                        </div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">Lung Function</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.lung_function_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.lungFunction.results}
+                        </div>
+                      </div>
+                      
+                      <div className="border-b border-gray-400 grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">X-Ray</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.x_ray_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.xRay.results}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 min-h-8">
+                        <div className="border-r border-gray-400 py-1 px-2 text-sm">Drug Screen</div>
+                        <div className="border-r border-gray-400 py-1 px-2 text-center">
+                          {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
+                        </div>
+                        <div className="py-1 px-2 text-sm">
+                          {editable ? (
+                            <Input
+                              value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
+                              onChange={(e) => handleFieldChange('examination_results.test_results.drug_screen_results', e.target.value)}
+                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                            />
+                          ) : medicalTests.drugScreen.results}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
