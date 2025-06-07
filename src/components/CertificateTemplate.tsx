@@ -852,7 +852,7 @@ const CertificateTemplate = ({
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
               </div>
               
-              <div className="px-4">
+                            <div className="px-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <table className="w-full border border-gray-400">
@@ -1017,7 +1017,6 @@ const CertificateTemplate = ({
                   </div>
                 </div>
               </div>
-            </div>
             
             <div className="px-4 mb-4">
               <div className="flex items-center">
