@@ -42,6 +42,435 @@ const CertificateTemplate = ({
     return current !== undefined && current !== null ? current : defaultValue;
   };
 
+  // Enhanced extraction function that handles your specific data structure
+  const extractCertificateData = (data: any): any => {
+    console.log("Starting certificate data extraction...");
+    
+    // Initialize the result structure
+    const result = {
+      patient: {
+        name: '',
+        id_number: '',
+        company: '',
+        occupation: ''
+      },
+      examination_results: {
+        date: '',
+        type: {
+          pre_employment: false,
+          periodical: false,
+          exit: false
+        },
+        test_results: {}
+      },
+      certification: {
+        valid_until: '',
+        examination_date: '',
+        fit: false,
+        fit_with_restrictions: false,
+        fit_with_condition: false,
+        temporarily_unfit: false,
+        unfit: false,
+        comments: '',
+        follow_up: '',
+        review_date: ''
+      },
+      restrictions: {}
+    };
+
+    // First, try to get data from the structured_data.certificate_info if it exists
+    const certificateInfo = getValue(data, 'structured_data.certificate_info') || 
+                           getValue(data, 'extracted_data.structured_data.certificate_info') ||
+                           getValue(data, 'certificate_info');
+
+    if (certificateInfo) {
+      console.log("Found certificate_info:", certificateInfo);
+      
+      // Map the certificate_info fields to our result structure
+      result.patient.name = getValue(certificateInfo, 'employee_name') || '';
+      result.patient.id_number = getValue(certificateInfo, 'id_number') || '';
+      result.patient.company = getValue(certificateInfo, 'company_name') || '';
+      result.patient.occupation = getValue(certificateInfo, 'job_title') || '';
+      
+      result.examination_results.date = getValue(certificateInfo, 'examination_date') || '';
+      result.certification.examination_date = getValue(certificateInfo, 'examination_date') || '';
+      result.certification.valid_until = getValue(certificateInfo, 'expiry_date') || '';
+      
+      // Map examination type
+      result.examination_results.type.pre_employment = getValue(certificateInfo, 'pre_employment_checked') === true;
+      result.examination_results.type.periodical = getValue(certificateInfo, 'periodical_checked') === true;
+      result.examination_results.type.exit = getValue(certificateInfo, 'exit_checked') === true;
+      
+      // Map medical tests if available
+      const medicalTests = getValue(certificateInfo, 'medical_tests');
+      if (medicalTests && typeof medicalTests === 'object') {
+        result.examination_results.test_results = medicalTests;
+      }
+    }
+
+    // Next, try to extract from raw_content if we have it
+    const rawContent = getValue(data, 'raw_content') || 
+                      getValue(data, 'structured_data.raw_content') ||
+                      getValue(data, 'extracted_data.raw_content') ||
+                      getValue(data, 'extracted_data.structured_data.raw_content');
+
+    if (rawContent && typeof rawContent === 'string') {
+      console.log("Found raw_content, extracting additional data...");
+      const enhancedData = extractDataFromMarkdown(rawContent);
+      
+      // Merge enhanced data, but don't overwrite existing good data
+      if (!result.patient.name && enhancedData.patient?.name) {
+        result.patient.name = enhancedData.patient.name;
+      }
+      if (!result.patient.id_number && enhancedData.patient?.id_number) {
+        result.patient.id_number = enhancedData.patient.id_number;
+      }
+      if (!result.patient.company && enhancedData.patient?.company) {
+        result.patient.company = enhancedData.patient.company;
+      }
+      if (!result.patient.occupation && enhancedData.patient?.occupation) {
+        result.patient.occupation = enhancedData.patient.occupation;
+      }
+      
+      // Merge examination data
+      if (enhancedData.examination_results) {
+        if (!result.examination_results.date && enhancedData.examination_results.date) {
+          result.examination_results.date = enhancedData.examination_results.date;
+          result.certification.examination_date = enhancedData.examination_results.date;
+        }
+        
+        if (enhancedData.examination_results.type) {
+          Object.keys(enhancedData.examination_results.type).forEach(key => {
+            if (enhancedData.examination_results.type[key] === true) {
+              result.examination_results.type[key] = true;
+            }
+          });
+        }
+        
+        if (enhancedData.examination_results.test_results) {
+          result.examination_results.test_results = {
+            ...result.examination_results.test_results,
+            ...enhancedData.examination_results.test_results
+          };
+        }
+      }
+      
+      // Merge certification data
+      if (enhancedData.certification) {
+        if (!result.certification.valid_until && enhancedData.certification.valid_until) {
+          result.certification.valid_until = enhancedData.certification.valid_until;
+        }
+        
+        // Merge fitness status
+        Object.keys(enhancedData.certification).forEach(key => {
+          if (enhancedData.certification[key] === true) {
+            result.certification[key] = true;
+          } else if (enhancedData.certification[key] && !result.certification[key]) {
+            result.certification[key] = enhancedData.certification[key];
+          }
+        });
+      }
+      
+      // Merge restrictions
+      if (enhancedData.restrictions) {
+        result.restrictions = {
+          ...result.restrictions,
+          ...enhancedData.restrictions
+        };
+      }
+    }
+
+    console.log("Final extracted certificate data:", result);
+    return result;
+  };
+
+  const extractDataFromMarkdown = (markdown: string): any => {
+    if (!markdown) return {};
+    console.log("Extracting data from markdown");
+    const extracted: any = {
+      patient: {},
+      examination_results: {
+        type: {},
+        test_results: {}
+      },
+      certification: {},
+      restrictions: {}
+    };
+
+    // Extract patient information with more flexible patterns
+    const namePatterns = [
+      /Initials\s*&?\s*Surname:\s*([^\n\r]+)/i,
+      /Employee[:\s]*([^\n\r]+)/i,
+      /Name[:\s]*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of namePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.name = match[1].trim();
+        break;
+      }
+    }
+
+    const idPatterns = [
+      /ID\s*No:?\s*([^\n\r]+)/i,
+      /ID\s*Number:?\s*([^\n\r]+)/i,
+      /Identity:?\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of idPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.id_number = match[1].trim();
+        break;
+      }
+    }
+
+    const companyPatterns = [
+      /Company\s*Name:\s*([^\n\r]+)/i,
+      /Employer:\s*([^\n\r]+)/i,
+      /Organization:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of companyPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.company = match[1].trim();
+        break;
+      }
+    }
+
+    const jobPatterns = [
+      /Job\s*Title:\s*([^\n\r]+)/i,
+      /Position:\s*([^\n\r]+)/i,
+      /Occupation:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of jobPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.occupation = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract dates
+    const examDatePatterns = [
+      /Date\s*of\s*Examination:\s*([^\n\r]+)/i,
+      /Examination\s*Date:\s*([^\n\r]+)/i,
+      /Date\s*Examined:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of examDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.examination_results.date = match[1].trim();
+        break;
+      }
+    }
+
+    const expiryPatterns = [
+      /Expiry\s*Date:\s*([^\n\r]+)/i,
+      /Valid\s*Until:\s*([^\n\r]+)/i,
+      /Expires:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of expiryPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.certification.valid_until = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract examination type with more flexible patterns
+    extracted.examination_results.type.pre_employment = 
+      /PRE-?EMPLOYMENT[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /PRE-?EMPLOYMENT[^[\]]*:\s*[xX✓]/i.test(markdown);
+      
+    extracted.examination_results.type.periodical = 
+      /PERIODICAL[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /PERIODICAL[^[\]]*:\s*[xX✓]/i.test(markdown);
+      
+    extracted.examination_results.type.exit = 
+      /EXIT[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /EXIT[^[\]]*:\s*[xX✓]/i.test(markdown);
+
+    // Extract medical test results with more flexible patterns
+    const testsMap = [
+      { names: ['BLOODS', 'BLOOD TEST', 'BLOOD WORK'], key: 'bloods' },
+      { names: ['FAR, NEAR VISION', 'VISION TEST', 'EYE TEST'], key: 'far_near_vision' },
+      { names: ['SIDE & DEPTH', 'PERIPHERAL VISION'], key: 'side_depth' },
+      { names: ['NIGHT VISION'], key: 'night_vision' },
+      { names: ['HEARING', 'AUDIOMETRY'], key: 'hearing' },
+      { names: ['WORKING AT HEIGHTS', 'HEIGHTS'], key: 'heights' },
+      { names: ['LUNG FUNCTION', 'SPIROMETRY'], key: 'lung_function' },
+      { names: ['X-RAY', 'CHEST X-RAY'], key: 'x_ray' },
+      { names: ['DRUG SCREEN', 'DRUG TEST'], key: 'drug_screen' }
+    ];
+    
+    testsMap.forEach(test => {
+      let isDone = false;
+      let results = '';
+      
+      for (const testName of test.names) {
+        // Try various patterns for each test name
+        const patterns = [
+          new RegExp(`${testName}[^|]*\\|[^|]*([xX✓])[^|]*\\|[^|]*([^|\\n\\r]+)`, 'i'),
+          new RegExp(`${testName}[^:]*:[^:]*([xX✓])[^:]*:[^:]*([^:\\n\\r]+)`, 'i'),
+          new RegExp(`<td[^>]*>${testName}[^<]*</td>[^<]*<td[^>]*>([xX✓])[^<]*</td>[^<]*<td[^>]*>([^<]+)</td>`, 'i')
+        ];
+        
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isDone = match[1] && /[xX✓]/.test(match[1]);
+            results = match[2] ? match[2].trim() : '';
+            break;
+          }
+        }
+        
+        if (isDone || results) break;
+      }
+      
+      if (isDone || results) {
+        extracted.examination_results.test_results[`${test.key}_done`] = isDone;
+        extracted.examination_results.test_results[`${test.key}_results`] = results;
+      }
+    });
+
+    // Extract fitness status
+    const fitnessOptions = [
+      { names: ['FIT'], key: 'fit' },
+      { names: ['FIT WITH RESTRICTION', 'FIT WITH RESTRICTIONS'], key: 'fit_with_restrictions' },
+      { names: ['FIT WITH CONDITION'], key: 'fit_with_condition' },
+      { names: ['TEMPORARY UNFIT', 'TEMPORARILY UNFIT'], key: 'temporarily_unfit' },
+      { names: ['UNFIT', 'PERMANENTLY UNFIT'], key: 'unfit' }
+    ];
+    
+    fitnessOptions.forEach(option => {
+      let isSelected = false;
+      
+      for (const optionName of option.names) {
+        const patterns = [
+          new RegExp(`${optionName}[^|\\[]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i'),
+          new RegExp(`<th[^>]*>${optionName}[^<]*</th>[\\s\\S]*?<td[^>]*>\\[[^\\]]*[xX✓][^\\]]*\\]</td>`, 'i'),
+          new RegExp(`\\|[^|]*${optionName}[^|]*\\|[^|]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i')
+        ];
+
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        if (isSelected) break;
+      }
+      
+      extracted.certification[option.key] = isSelected;
+    });
+
+    // Extract restrictions
+    const restrictions = [
+      { names: ['HEIGHTS'], key: 'heights' },
+      { names: ['DUST EXPOSURE'], key: 'dust_exposure' },
+      { names: ['MOTORIZED EQUIPMENT'], key: 'motorized_equipment' },
+      { names: ['WEAR HEARING PROTECTION', 'HEARING PROTECTION'], key: 'wear_hearing_protection' },
+      { names: ['CONFINED SPACES'], key: 'confined_spaces' },
+      { names: ['CHEMICAL EXPOSURE'], key: 'chemical_exposure' },
+      { names: ['WEAR SPECTACLES', 'SPECTACLES'], key: 'wear_spectacles' },
+      { names: ['REMAIN ON TREATMENT FOR CHRONIC CONDITIONS', 'CHRONIC CONDITIONS'], key: 'remain_on_treatment_for_chronic_conditions' }
+    ];
+    
+    restrictions.forEach(restriction => {
+      let isSelected = false;
+      
+      for (const restrictionName of restriction.names) {
+        const patterns = [
+          new RegExp(`${restrictionName}[^|\\[]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i'),
+          new RegExp(`<td[^>]*>${restrictionName}[^<]*</td>[^<]*<td[^>]*>\\[[^\\]]*[xX✓][^\\]]*\\]</td>`, 'i'),
+          new RegExp(`\\|[^|]*${restrictionName}[^|]*\\|[^|]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i')
+        ];
+
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        if (isSelected) break;
+      }
+      
+      extracted.restrictions[restriction.key] = isSelected;
+    });
+
+    // Extract additional information
+    const followUpPatterns = [
+      /Referred\s+or\s+follow\s+up\s+actions:?\s*([^<\n\r]+)/i,
+      /Follow\s+up\s+actions:?\s*([^<\n\r]+)/i,
+      /Referred:?\s*([^<\n\r]+)/i
+    ];
+    
+    for (const pattern of followUpPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        const cleanedText = match[1].trim().replace(/<\/td>.*$/, '');
+        extracted.certification.follow_up = cleanedText === "N/A" ? "N/A" : cleanedText;
+        break;
+      }
+    }
+
+    // Improved review date extraction
+    const reviewDatePatterns = [
+      /Review\s+Date:?\s*([^<\n\r]+)/i,
+      /Next\s+Review:?\s*([^<\n\r]+)/i,
+      /Follow\s+up\s+Date:?\s*([^<\n\r]+)/i
+    ];
+    
+    for (const pattern of reviewDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        const cleanedText = match[1].trim().replace(/<\/td>.*$/, '').replace(/<\/tr>.*$/, '');
+        extracted.certification.review_date = cleanedText;
+        break;
+      }
+    }
+
+    // As a fallback, try to find the review date in the raw text
+    if (!extracted.certification.review_date || extracted.certification.review_date.includes('<')) {
+      const rawReviewMatch = markdown.match(/Review\s+Date:?\s*([^\n<]+)/i);
+      if (rawReviewMatch && rawReviewMatch[1]) {
+        extracted.certification.review_date = rawReviewMatch[1].trim();
+      } else {
+        extracted.certification.review_date = '';
+      }
+    }
+
+    // Fallback for follow up if it contains HTML
+    if (!extracted.certification.follow_up || extracted.certification.follow_up.includes('<')) {
+      const rawFollowUpMatch = markdown.match(/follow\s+up\s+actions:?\s*([^\n<]+)/i);
+      if (rawFollowUpMatch && rawFollowUpMatch[1]) {
+        extracted.certification.follow_up = rawFollowUpMatch[1].trim();
+      } else {
+        extracted.certification.follow_up = '';
+      }
+    }
+
+    // Comments extraction
+    const commentsMatch = markdown.match(/Comments:\s*([^<\n\r]+)/i);
+    if (commentsMatch && commentsMatch[1]) {
+      let comments = commentsMatch[1].trim();
+      extracted.certification.comments = comments === "N/A" ? "N/A" : comments;
+    }
+
+    console.log("Extracted data from markdown:", extracted);
+    return extracted;
+  };
+
   const normalizeExtractedDataForTemplate = (extractedData: any): any => {
     console.log("Normalizing extracted data for template:", extractedData);
     
@@ -51,6 +480,56 @@ const CertificateTemplate = ({
     // If we have structured_data wrapper, use that
     if (extractedData?.structured_data) {
       sourceData = extractedData.structured_data;
+    }
+    
+    // If we have certificate_info from document processing, map it properly
+    if (sourceData?.certificate_info) {
+      const certInfo = sourceData.certificate_info;
+      
+      return {
+        patient: {
+          name: certInfo.employee_name || '',
+          id_number: certInfo.id_number || '',
+          company: certInfo.company_name || '',
+          occupation: certInfo.job_title || ''
+        },
+        examination_results: {
+          date: certInfo.examination_date || '',
+          type: {
+            pre_employment: certInfo.pre_employment_checked || false,
+            periodical: certInfo.periodical_checked || false,
+            exit: certInfo.exit_checked || false
+          },
+          test_results: certInfo.medical_tests || {}
+        },
+        certification: {
+          examination_date: certInfo.examination_date || '',
+          valid_until: certInfo.expiry_date || '',
+          fit: certInfo.fitness_status?.fit || false,
+          fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
+          fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
+          temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
+          unfit: certInfo.fitness_status?.unfit || false,
+          comments: certInfo.comments || '',
+          follow_up: certInfo.follow_up || '',
+          review_date: certInfo.review_date || ''
+        },
+        restrictions: certInfo.restrictions || {}
+      };
+    }
+    
+    // If data is already in the right structure, return as-is
+    if (sourceData?.patient || sourceData?.examination_results || sourceData?.certification) {
+      return sourceData;
+    }
+    
+    // Try to extract from raw_content if available
+    const rawContent = extractedData?.raw_content || 
+                      extractedData?.structured_data?.raw_content ||
+                      extractedData?.extracted_data?.raw_content;
+    
+    if (rawContent && typeof rawContent === 'string') {
+      return extractDataFromMarkdown(rawContent);
     }
     
     // Return empty structure if no valid data found
@@ -79,8 +558,12 @@ const CertificateTemplate = ({
 
   // Initialize editable data state
   useEffect(() => {
+    console.log("CertificateTemplate received data:", extractedData);
+    
     if (extractedData) {
       const normalizedData = normalizeExtractedDataForTemplate(extractedData);
+      console.log("Normalized data:", normalizedData);
+      
       if (editable) {
         setEditableData(normalizedData);
       }
@@ -104,6 +587,7 @@ const CertificateTemplate = ({
     setEditableData(newData);
     
     if (onDataChange) {
+      console.log('Calling onDataChange with:', newData);
       onDataChange(newData);
     }
   };
@@ -117,6 +601,8 @@ const CertificateTemplate = ({
   const dataToRender = editable && editableData ? 
     editableData : 
     normalizeExtractedDataForTemplate(extractedData);
+
+  console.log("Data to render in template:", dataToRender);
 
   const patient = dataToRender.patient || {};
   const examination = dataToRender.examination_results || {};
@@ -135,41 +621,43 @@ const CertificateTemplate = ({
   const medicalTests = {
     bloods: {
       done: isChecked(testResults.bloods_done),
-      results: getValue(testResults, 'bloods_results', '')
+      results: getValue(testResults, 'bloods_results', 'N/A')
     },
     farNearVision: {
       done: isChecked(testResults.far_near_vision_done),
-      results: getValue(testResults, 'far_near_vision_results', '')
+      results: getValue(testResults, 'far_near_vision_results', 'N/A')
     },
     sideDepth: {
       done: isChecked(testResults.side_depth_done),
-      results: getValue(testResults, 'side_depth_results', '')
+      results: getValue(testResults, 'side_depth_results', 'N/A')
     },
     nightVision: {
       done: isChecked(testResults.night_vision_done),
-      results: getValue(testResults, 'night_vision_results', '')
+      results: getValue(testResults, 'night_vision_results', 'N/A')
     },
     hearing: {
       done: isChecked(testResults.hearing_done),
-      results: getValue(testResults, 'hearing_results', '')
+      results: getValue(testResults, 'hearing_results', 'N/A')
     },
     heights: {
       done: isChecked(testResults.heights_done),
-      results: getValue(testResults, 'heights_results', '')
+      results: getValue(testResults, 'heights_results', 'N/A')
     },
     lungFunction: {
       done: isChecked(testResults.lung_function_done),
-      results: getValue(testResults, 'lung_function_results', '')
+      results: getValue(testResults, 'lung_function_results', 'N/A')
     },
     xRay: {
       done: isChecked(testResults.x_ray_done),
-      results: getValue(testResults, 'x_ray_results', '')
+      results: getValue(testResults, 'x_ray_results', 'N/A')
     },
     drugScreen: {
       done: isChecked(testResults.drug_screen_done),
-      results: getValue(testResults, 'drug_screen_results', '')
+      results: getValue(testResults, 'drug_screen_results', 'N/A')
     }
   };
+
+  console.log("Medical tests data:", medicalTests);
 
   const restrictionsData = {
     heights: isChecked(restrictions.heights),
@@ -188,6 +676,20 @@ const CertificateTemplate = ({
     exit: isChecked(examination.type?.exit)
   };
 
+  console.log("Certificate template using data:", {
+    name: patient.name,
+    id: patient.id_number,
+    company: patient.company,
+    occupation: patient.occupation,
+    examDate: examination.date,
+    expiryDate: certification.valid_until,
+    examinationType,
+    fitnessStatus,
+    medicalTests,
+    restrictionsData
+  });
+
+  // Extract organization information for signatures and stamps
   const organization = extractedData?.organization || {};
   const physician = 'MJ Mphuthi';
   const practiceNumber = '0404160';
@@ -205,7 +707,7 @@ const CertificateTemplate = ({
         />
       );
     }
-    return <span className={`${className}`}>{value || ''}</span>;
+    return <span className={`${className}`}>{value || 'Not Provided'}</span>;
   };
 
   // Helper function to render checkbox
@@ -227,7 +729,6 @@ const CertificateTemplate = ({
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
-          {/* Watermark */}
           <div className="absolute top-[47%] inset-x-0 flex items-center justify-center opacity-40 pointer-events-none" aria-hidden="true">
             <img 
               src="/lovable-uploads/ead30039-3558-4ae0-a3ec-c58d8755a311.png" 
@@ -237,7 +738,6 @@ const CertificateTemplate = ({
           </div>
           
           <div className="relative z-10">
-            {/* Header */}
             <div className="px-4 pt-4">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -247,87 +747,99 @@ const CertificateTemplate = ({
                     className="h-20 object-contain"
                   />
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold bg-gray-800 text-white px-3 py-1">BLUECOLLAR OCCUPATIONAL HEALTH</div>
-                  <div className="text-[0.65rem] mt-1 px-3 text-black">Tel: +27 11 892 0771/ 011 892 0627</div>
-                  <div className="text-[0.65rem] px-3 text-black">Email: admin@bluecollarocc.co.za</div>
-                  <div className="text-[0.65rem] px-3 text-black">office@bluecollarocc.co.za</div>
-                  <div className="text-[0.65rem] px-3 text-black">135 Leeuwpoort Street; Boksburg South; Boksburg</div>
+                <div className="bg-white text-right">
+                  <div className="text-sm font-bold bg-gray-800 text-white px-3 py-1 text-right">BLUECOLLAR OCCUPATIONAL HEALTH</div>
+                  <div className="text-[0.65rem] mt-1 px-3 text-black text-right">Tel: +27 11 892 0771/011 892 0627</div>
+                  <div className="text-[0.65rem] px-3 text-black text-right">Email: admin@bluecollarhealth.co.za</div>
+                  <div className="text-[0.65rem] px-3 text-black text-right">office@bluecollarhealth.co.za</div>
+                  <div className="text-[0.65rem] px-3 text-black text-right">135 Leeuwpoort Street, Boksburg South, Boksburg</div>
                 </div>
               </div>
             </div>
             
-            {/* Title */}
-            <div className="bg-gray-800 text-white text-center py-2 mb-3">
+            <div className="bg-gray-800 text-white text-center py-2 mb-2">
               <h2 className="text-lg font-bold">CERTIFICATE OF FITNESS</h2>
             </div>
             
-            {/* Doctor certification text */}
-            <div className="text-center text-xs px-4 mb-4">
+            <div className="text-center text-xs px-4 mb-3">
               <p>
-                <span className="font-semibold">Dr. {physician} / Practice No: {practiceNumber} / Sr. {nurse} / Practice No: {nurseNumber}</span>
+                Dr. {physician} / Practice No: {practiceNumber} / Sr. {nurse} / Practice No: {nurseNumber}
               </p>
               <p>certify that the following employee:</p>
             </div>
             
-            {/* Patient Info Form */}
-            <div className="px-4 space-y-3 mb-4">
-              <div className="flex items-center">
-                <span className="font-semibold text-sm mr-2">Initials & Surname:</span>
-                <div className="border-b border-gray-900 flex-1 mr-8">
-                  {renderField(patient.name, 'patient.name')}
+            <div className="px-4 space-y-4 mb-4">
+              <div className="flex justify-between space-x-4">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <span className="font-semibold mr-1">Initials & Surname:</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(patient.name, 'patient.name')}
+                    </div>
+                  </div>
                 </div>
-                <span className="font-semibold text-sm mr-2">ID NO:</span>
-                <div className="border-b border-gray-900 w-64">
-                  {renderField(patient.id_number, 'patient.id_number')}
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <span className="font-semibold mr-1">ID NO:</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(patient.id_number, 'patient.id_number')}
+                    </div>
+                  </div>
                 </div>
               </div>
               
               <div className="flex items-center">
-                <span className="font-semibold text-sm mr-2">Company Name:</span>
-                <div className="border-b border-gray-900 flex-1">
+                <span className="font-semibold mr-1">Company Name:</span>
+                <div className="border-b border-gray-400 flex-1">
                   {renderField(patient.company, 'patient.company')}
                 </div>
               </div>
               
-              <div className="flex items-center">
-                <span className="font-semibold text-sm mr-2">Date of Examination:</span>
-                <div className="border-b border-gray-900 flex-1 mr-8">
-                  {renderField(examination.date || certification.examination_date, 'examination_results.date')}
+              <div className="flex justify-between space-x-4">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <span className="font-semibold mr-1">Date of Examination:</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(examination.date || certification.examination_date, 'examination_results.date')}
+                    </div>
+                  </div>
                 </div>
-                <span className="font-semibold text-sm mr-2">Expiry Date:</span>
-                <div className="border-b border-gray-900 w-48">
-                  {renderField(certification.valid_until, 'certification.valid_until')}
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <span className="font-semibold mr-1">Expiry Date:</span>
+                    <div className="border-b border-gray-400 flex-1">
+                      {renderField(certification.valid_until, 'certification.valid_until')}
+                    </div>
+                  </div>
                 </div>
               </div>
               
               <div className="flex items-center">
-                <span className="font-semibold text-sm mr-2">Job Title:</span>
-                <div className="border-b border-gray-900 flex-1">
+                <span className="font-semibold mr-1">Job Title:</span>
+                <div className="border-b border-gray-400 flex-1">
                   {renderField(patient.occupation, 'patient.occupation')}
                 </div>
               </div>
             </div>
             
-            {/* Examination Type */}
             <div className="px-4 mb-4">
-              <table className="w-full border border-gray-900">
+              <table className="w-full border border-gray-400">
                 <thead>
                   <tr>
-                    <th className="border border-gray-900 py-2 w-1/3 text-center bg-gray-100 text-sm font-bold">PRE-EMPLOYMENT</th>
-                    <th className="border border-gray-900 py-2 w-1/3 text-center bg-gray-100 text-sm font-bold">PERIODICAL</th>
-                    <th className="border border-gray-900 py-2 w-1/3 text-center bg-gray-100 text-sm font-bold">EXIT</th>
+                    <th className="border border-gray-400 py-1 w-1/3 text-center bg-gray-100 text-sm">PRE-EMPLOYMENT</th>
+                    <th className="border border-gray-400 py-1 w-1/3 text-center bg-gray-100 text-sm">PERIODICAL</th>
+                    <th className="border border-gray-400 py-1 w-1/3 text-center bg-gray-100 text-sm">EXIT</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-900 h-8 text-center">
+                    <td className="border border-gray-400 h-8 text-center">
                       {renderCheckbox(examinationType.preEmployment, 'examination_results.type.pre_employment')}
                     </td>
-                    <td className="border border-gray-900 h-8 text-center">
+                    <td className="border border-gray-400 h-8 text-center">
                       {renderCheckbox(examinationType.periodical, 'examination_results.type.periodical')}
                     </td>
-                    <td className="border border-gray-900 h-8 text-center">
+                    <td className="border border-gray-400 h-8 text-center">
                       {renderCheckbox(examinationType.exit, 'examination_results.type.exit')}
                     </td>
                   </tr>
@@ -335,9 +847,8 @@ const CertificateTemplate = ({
               </table>
             </div>
             
-            {/* Medical Tests Section */}
             <div className="mb-4">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-bold mb-3">
+              <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
               </div>
               
@@ -347,46 +858,70 @@ const CertificateTemplate = ({
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
-                          <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                          <th className="border-t border-l border-b border-gray-400 py-1 w-1/2 text-left pl-2 bg-blue-50 text-sm"></th>
+                          <th className="border-t border-b border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
+                          <th className="border-t border-r border-b border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.bloods.done ? '✓' : ''}
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">BLOODS</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.bloods.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.farNearVision.done ? '✓' : ''}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.farNearVision.results}
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.bloods_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.bloods.results}
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.sideDepth.done ? '✓' : ''}
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">FAR, NEAR VISION</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.sideDepth.results}
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.farNearVision.results}
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.nightVision.done ? '✓' : ''}
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">SIDE & DEPTH</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.nightVision.results}
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.sideDepth.results}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border-l border-r border-b border-gray-400 pl-2 text-sm font-medium">NIGHT VISION</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
+                          </td>
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.nightVision.results}
                           </td>
                         </tr>
                       </tbody>
@@ -396,55 +931,85 @@ const CertificateTemplate = ({
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Hearing</th>
-                          <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
-                          <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
+                          <th className="border-t border-l border-b border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
+                          <th className="border-t border-b border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
+                          <th className="border-t border-r border-b border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.hearing.done ? '✓' : ''}
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Hearing</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.hearing.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.heights.done ? '✓' : ''}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.heights.results}
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.hearing_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.hearing.results}
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.lungFunction.done ? '✓' : ''}
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Working at Heights</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.lungFunction.results}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.xRay.done ? '✓' : ''}
-                          </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.xRay.results}
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.heights_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.heights.results}
                           </td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
-                          <td className="border border-gray-400 text-center">
-                            {medicalTests.drugScreen.done ? '✓' : ''}
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Lung Function</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
                           </td>
-                          <td className="border border-gray-400 p-1 text-sm">
-                            {medicalTests.drugScreen.results}
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.lung_function_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.lungFunction.results}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">X-Ray</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
+                          </td>
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.x_ray_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.xRay.results}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border-l border-b border-gray-400 pl-2 text-sm">Drug Screen</td>
+                          <td className="border-b border-gray-400 text-center">
+                            {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
+                          </td>
+                          <td className="border-r border-b border-gray-400 p-1 text-sm">
+                            {editable ? (
+                              <Input
+                                value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
+                                onChange={(e) => handleFieldChange('examination_results.test_results.drug_screen_results', e.target.value)}
+                                className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
+                              />
+                            ) : medicalTests.drugScreen.results}
                           </td>
                         </tr>
                       </tbody>
@@ -454,77 +1019,79 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Follow-up Actions */}
             <div className="px-4 mb-4">
               <div className="flex items-center">
-                <span className="font-semibold text-sm mr-2">Referred or follow up actions:</span>
-                <div className="border-b border-gray-900 flex-1 mr-8">
+                <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
+                <div className="border-b border-gray-400 flex-1">
                   {renderField(certification.follow_up || '', 'certification.follow_up')}
                 </div>
-                <span className="font-semibold text-sm mr-2 text-red-600">Review Date:</span>
-                <div className="border-b border-gray-900 w-48">
-                  {renderField(certification.review_date || '', 'certification.review_date')}
+                <div className="ml-2">
+                  <div className="text-sm">
+                    <span className="font-semibold mr-1">Review Date:</span>
+                    <span className="text-red-600">
+                      {renderField(certification.review_date || '', 'certification.review_date', 'text-red-600')}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
             
-            {/* Restrictions */}
             <div className="mb-4">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-bold mb-2">
+              <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-2">
                 Restrictions:
               </div>
               
               <div className="px-4">
-                <table className="w-full border border-gray-900 text-sm">
+                <table className="w-full border border-gray-400 text-sm">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Heights</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Heights</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.heights, 'restrictions.heights')}
                         </div>
                       </td>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Dust Exposure</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Dust Exposure</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.dustExposure, 'restrictions.dust_exposure')}
                         </div>
                       </td>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Motorized Equipment</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Motorized Equipment</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.motorizedEquipment, 'restrictions.motorized_equipment')}
                         </div>
                       </td>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Wear Hearing Protection</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Wear Hearing Protection</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.hearingProtection, 'restrictions.wear_hearing_protection')}
                         </div>
                       </td>
                     </tr>
                     <tr>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Confined Spaces</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Confined Spaces</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.confinedSpaces, 'restrictions.confined_spaces')}
                         </div>
                       </td>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Chemical Exposure</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Chemical Exposure</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.chemicalExposure, 'restrictions.chemical_exposure')}
                         </div>
                       </td>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Wear Spectacles</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Wear Spectacles</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.wearSpectacles, 'restrictions.wear_spectacles')}
                         </div>
                       </td>
-                      <td className={`border border-gray-900 p-2 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
-                        <div className="text-xs">Remain on Treatment for Chronic Conditions</div>
-                        <div className="mt-1">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs font-medium">Remain on Treatment</div>
+                        <div className="text-[0.6rem]">
                           {renderCheckbox(restrictionsData.chronicConditions, 'restrictions.remain_on_treatment_for_chronic_conditions')}
                         </div>
                       </td>
@@ -534,73 +1101,68 @@ const CertificateTemplate = ({
               </div>
             </div>
             
-            {/* Medical Fitness Declaration */}
-            <div className="mb-4">
-              <div className="bg-gray-800 text-white text-center py-1 text-sm font-bold mb-2">
-                Medical Fitness Declaration
+            <div className="mb-2">
+              <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-1">
+                FITNESS ASSESSMENT
               </div>
               
               <div className="px-4">
-                <table className="w-full border border-gray-900">
+                <table className="w-full border border-gray-400">
                   <tbody>
                     <tr>
-                      <td className={`border border-gray-900 p-3 text-center ${fitnessStatus.fit ? 'bg-green-200' : ''}`}>
-                        <div className="text-sm font-bold">FIT</div>
-                        <div className="mt-2">
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
+                        <div className="text-xs">FIT</div>
+                        <div className="text-green-600 text-sm">
                           {renderCheckbox(fitnessStatus.fit, 'certification.fit')}
                         </div>
-                      </td>
-                      <td className={`border border-gray-900 p-3 text-center ${fitnessStatus.fitWithRestriction ? 'bg-blue-200' : ''}`}>
-                        <div className="text-sm font-bold">Fit with Restriction</div>
-                        <div className="mt-2">
+                      </th>
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs">Fit with Restriction</div>
+                        <div className="text-yellow-600 text-sm">
                           {renderCheckbox(fitnessStatus.fitWithRestriction, 'certification.fit_with_restrictions')}
                         </div>
-                      </td>
-                      <td className={`border border-gray-900 p-3 text-center ${fitnessStatus.fitWithCondition ? 'bg-cyan-200' : ''}`}>
-                        <div className="text-sm font-bold">Fit with Condition</div>
-                        <div className="mt-2">
+                      </th>
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
+                        <div className="text-xs">Fit with Condition</div>
+                        <div className="text-yellow-600 text-sm">
                           {renderCheckbox(fitnessStatus.fitWithCondition, 'certification.fit_with_condition')}
                         </div>
-                      </td>
-                      <td className={`border border-gray-900 p-3 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-yellow-200' : ''}`}>
-                        <div className="text-sm font-bold">Temporary Unfit</div>
-                        <div className="mt-2">
+                      </th>
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
+                        <div className="text-xs">Temporary Unfit</div>
+                        <div className="text-red-600 text-sm">
                           {renderCheckbox(fitnessStatus.temporarilyUnfit, 'certification.temporarily_unfit')}
                         </div>
-                      </td>
-                      <td className={`border border-gray-900 p-3 text-center ${fitnessStatus.unfit ? 'bg-red-200' : ''}`}>
-                        <div className="text-sm font-bold">UNFIT</div>
-                        <div className="mt-2">
+                      </th>
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
+                        <div className="text-xs">UNFIT</div>
+                        <div className="text-red-600 text-sm">
                           {renderCheckbox(fitnessStatus.unfit, 'certification.unfit')}
                         </div>
-                      </td>
+                      </th>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
             
-            {/* Comments */}
-            <div className="px-4 mb-6">
-              <div className="flex items-start">
-                <span className="font-semibold text-sm mr-2 mt-1">Comments:</span>
-                <div className="border border-gray-900 flex-1 min-h-12 p-2">
-                  {editable ? (
-                    <Input
-                      value={certification.comments || ''}
-                      onChange={(e) => handleFieldChange('certification.comments', e.target.value)}
-                      className="border-0 bg-transparent px-0 py-0 h-auto text-sm w-full"
-                    />
-                  ) : (certification.comments || '')}
-                </div>
+            <div className="px-4 mb-1">
+              <div className="font-semibold text-xs mb-0.5">Comments:</div>
+              <div className="border border-gray-400 p-1 min-h-8 text-xs">
+                {editable ? (
+                  <Input
+                    value={certification.comments || ''}
+                    onChange={(e) => handleFieldChange('certification.comments', e.target.value)}
+                    className="border-0 bg-transparent px-1 py-0 h-auto text-xs w-full"
+                  />
+                ) : (certification.comments || 'N/A')}
               </div>
             </div>
             
-            {/* Signature Section */}
-            <div className="px-4 mb-4">
+            <div className="px-4 mb-3">
               <div className="flex justify-between items-end">
                 <div className="flex-1">
-                  <div className="border-t border-gray-900 pt-2 max-w-64">
+                  <div className="border-t border-gray-400 pt-1 mt-4 max-w-56">
                     <div className="min-h-16 flex items-center justify-center">
                       <OrganizationLogo
                         variant="signature"
@@ -609,22 +1171,22 @@ const CertificateTemplate = ({
                         className="max-h-12 w-auto object-contain"
                       />
                     </div>
-                    <div className="text-center font-bold text-sm mt-2">SIGNATURE</div>
+                    <div className="text-center font-semibold text-[0.6rem]">SIGNATURE</div>
                   </div>
                 </div>
                 
-                <div className="flex-1 px-4 text-center">
-                  <div className="text-xs leading-tight">
-                    <p className="font-bold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
-                    <p className="italic">Dr {physician} / Practice No. {practiceNumber}</p>
-                    <p>Sr. {nurse}</p>
-                    <p>SANC No: 14262133; SASOHN No: AR 2136 / MBCHB DOH</p>
-                    <p>Practice Number: {nurseNumber}</p>
+                <div className="flex-1 px-2 flex justify-center">
+                  <div className="w-fit max-w-md text-center">
+                    <p className="text-[0.6rem] leading-tight font-semibold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
+                    <p className="text-[0.6rem] leading-tight italic">Dr {physician} / Practice No. {practiceNumber}</p>
+                    <p className="text-[0.6rem] leading-tight">Sr. {nurse}</p>
+                    <p className="text-[0.6rem] leading-tight">SANC No: 14262133; SASOHN No: AR 2136</p>
+                    <p className="text-[0.6rem] leading-tight">Practice Number: {nurseNumber}</p>
                   </div>
                 </div>
                 
                 <div className="flex-1 text-right">
-                  <div className="border-t border-gray-900 pt-2 max-w-64 ml-auto">
+                  <div className="border-t border-gray-400 pt-1 mt-4 max-w-56 ml-auto">
                     <div className="min-h-16 flex items-center justify-center">
                       <OrganizationLogo
                         variant="stamp"
@@ -633,10 +1195,14 @@ const CertificateTemplate = ({
                         className="max-h-16 w-auto object-contain"
                       />
                     </div>
-                    <div className="text-center font-bold text-sm mt-2">STAMP</div>
+                    <div className="text-center font-semibold text-[0.6rem]">STAMP</div>
                   </div>
                 </div>
               </div>
+            </div>
+            
+            <div className="bg-gray-800 text-white text-center px-1 text-[0.55rem] leading-none py-1 mt-2">
+              © {new Date().getFullYear()} BlueCollar Health & Wellness
             </div>
           </div>
         </div>
