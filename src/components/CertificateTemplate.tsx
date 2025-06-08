@@ -855,13 +855,14 @@ console.log("Data to render in template:", dataToRender);
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
               </div>
               
-              <div className="px-4">
+                            <div className="px-4">
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Left Table */}
                   <div>
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
+                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
                           <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
                           <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
@@ -870,66 +871,68 @@ console.log("Data to render in template:", dataToRender);
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
+                            {renderCheckbox(testResults.bloods_done, 'examination_results.test_results.bloods_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
+                                value={testResults.bloods_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.bloods_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.bloods.results}
+                            ) : (testResults.bloods_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
+                            {renderCheckbox(testResults.far_near_vision_done, 'examination_results.test_results.far_near_vision_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
+                                value={testResults.far_near_vision_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.farNearVision.results}
+                            ) : (testResults.far_near_vision_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
+                            {renderCheckbox(testResults.side_depth_done, 'examination_results.test_results.side_depth_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
+                                value={testResults.side_depth_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.sideDepth.results}
+                            ) : (testResults.side_depth_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
+                            {renderCheckbox(testResults.night_vision_done, 'examination_results.test_results.night_vision_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
+                                value={testResults.night_vision_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.nightVision.results}
+                            ) : (testResults.night_vision_results || '')}
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
+                  
+                  {/* Right Table */}
                   <div>
                     <table className="w-full border border-gray-400">
                       <thead>
@@ -943,97 +946,80 @@ console.log("Data to render in template:", dataToRender);
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
+                            {renderCheckbox(testResults.hearing_done, 'examination_results.test_results.hearing_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
+                                value={testResults.hearing_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.hearing_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.hearing.results}
+                            ) : (testResults.hearing_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
+                            {renderCheckbox(testResults.heights_done, 'examination_results.test_results.heights_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
+                                value={testResults.heights_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.heights_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.heights.results}
+                            ) : (testResults.heights_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
+                            {renderCheckbox(testResults.lung_function_done, 'examination_results.test_results.lung_function_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
+                                value={testResults.lung_function_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.lung_function_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.lungFunction.results}
+                            ) : (testResults.lung_function_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
+                            {renderCheckbox(testResults.x_ray_done, 'examination_results.test_results.x_ray_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
+                                value={testResults.x_ray_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.x_ray_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.xRay.results}
+                            ) : (testResults.x_ray_results || '')}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
+                            {renderCheckbox(testResults.drug_screen_done, 'examination_results.test_results.drug_screen_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
+                                value={testResults.drug_screen_results || ''}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.drug_screen_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : medicalTests.drugScreen.results}
+                            ) : (testResults.drug_screen_results || '')}
                           </td>
                         </tr>
                       </tbody>
                     </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="px-4 mb-4">
-              <div className="flex items-center">
-                <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
-                <div className="border-b border-gray-400 flex-1">
-                  {renderField(certification.follow_up || '', 'certification.follow_up')}
-                </div>
-                <div className="ml-2">
-                  <div className="text-sm">
-                    <span className="font-semibold mr-1">Review Date:</span>
-                    <span className="text-red-600">
-                      {renderField(certification.review_date || '', 'certification.review_date', 'text-red-600')}
-                    </span>
                   </div>
                 </div>
               </div>
