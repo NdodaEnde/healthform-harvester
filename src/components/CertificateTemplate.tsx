@@ -2,124 +2,704 @@ import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
+import OrganizationLogo from "./OrganizationLogo";
 
-type HistoricalCertificateTemplateProps = {
+type CertificateTemplateProps = {
   extractedData: any;
+  documentId?: string;
   editable?: boolean;
   onDataChange?: (data: any) => void;
 };
 
-const HistoricalCertificateTemplate = ({
+const CertificateTemplate = ({
   extractedData,
+  documentId,
   editable = false,
   onDataChange
-}: HistoricalCertificateTemplateProps) => {
+}: CertificateTemplateProps) => {
   const [editableData, setEditableData] = useState<any>(null);
-  const [stampDate, setStampDate] = useState<string>('');
 
-  // Initialize editable data
   useEffect(() => {
-    if (extractedData) {
-      const normalizedData = normalizeExtractedData(extractedData);
-      if (editable) {
-        setEditableData(normalizedData);
-      }
-      // Auto-populate stamp date with examination date
-      if (normalizedData?.examination_results?.date) {
-        setStampDate(formatDateForStamp(normalizedData.examination_results.date));
-      }
-    }
-  }, [extractedData, editable]);
+    console.log("CertificateTemplate received data:", extractedData);
+  }, [extractedData]);
 
-  const normalizeExtractedData = (data: any) => {
-    // Same normalization logic as your current template
-    if (data?.structured_data?.certificate_info) {
-      const certInfo = data.structured_data.certificate_info;
-      return {
-        patient: {
-          name: certInfo.employee_name || '',
-          id_number: certInfo.id_number || '',
-          company: certInfo.company_name || '',
-          occupation: certInfo.job_title || ''
-        },
-        examination_results: {
-          date: certInfo.examination_date || '',
-          type: {
-            pre_employment: certInfo.pre_employment_checked || false,
-            periodical: certInfo.periodical_checked || false,
-            exit: certInfo.exit_checked || false
-          },
-          test_results: certInfo.medical_tests || {}
-        },
-        certification: {
-          valid_until: certInfo.expiry_date || '',
-          fit: certInfo.fitness_status?.fit || false,
-          fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
-          fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
-          temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
-          unfit: certInfo.fitness_status?.unfit || false,
-          comments: certInfo.comments || '',
-          follow_up: certInfo.follow_up || '',
-          review_date: certInfo.review_date || ''
-        },
-        restrictions: certInfo.restrictions || {}
-      };
-    }
-    return data || {};
+  const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
+    if (value === undefined || value === null) return false;
+    const stringValue = String(value).toLowerCase().trim();
+    return trueValues.includes(stringValue);
   };
 
-  const formatDateForStamp = (dateString: string): string => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      }).replace(/\//g, '-');
-    } catch {
-      return dateString;
-    }
-  };
-
-  const handleFieldChange = (path: string, value: any) => {
-    if (!editable || !editableData) return;
-    
+  const getValue = (obj: any, path: string, defaultValue: any = '') => {
+    if (!obj || !path) return defaultValue;
     const keys = path.split('.');
-    const newData = JSON.parse(JSON.stringify(editableData));
-    let current = newData;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) current[keys[i]] = {};
-      current = current[keys[i]];
+    let current = obj;
+    for (const key of keys) {
+      if (current === undefined || current === null || typeof current !== 'object') {
+        return defaultValue;
+      }
+      current = current[key];
     }
-    
-    current[keys[keys.length - 1]] = value;
-    setEditableData(newData);
-    
-    // Auto-update stamp date when examination date changes
-    if (path === 'examination_results.date') {
-      setStampDate(formatDateForStamp(value));
-    }
-    
-    if (onDataChange) {
-      onDataChange(newData);
-    }
+    return current !== undefined && current !== null ? current : defaultValue;
   };
 
-  const handleCheckboxChange = (path: string, checked: boolean) => {
-    handleFieldChange(path, checked);
+  // Enhanced extraction function that handles your specific data structure
+  const extractCertificateData = (data: any): any => {
+    console.log("Starting certificate data extraction...");
+    
+    // Initialize the result structure
+    const result = {
+      patient: {
+        name: '',
+        id_number: '',
+        company: '',
+        occupation: ''
+      },
+      examination_results: {
+        date: '',
+        type: {
+          pre_employment: false,
+          periodical: false,
+          exit: false
+        },
+        test_results: {}
+      },
+      certification: {
+        valid_until: '',
+        examination_date: '',
+        fit: false,
+        fit_with_restrictions: false,
+        fit_with_condition: false,
+        temporarily_unfit: false,
+        unfit: false,
+        comments: '',
+        follow_up: '',
+        review_date: ''
+      },
+      restrictions: {}
+    };
+
+    // First, try to get data from the structured_data.certificate_info if it exists
+    const certificateInfo = getValue(data, 'structured_data.certificate_info') || 
+                           getValue(data, 'extracted_data.structured_data.certificate_info') ||
+                           getValue(data, 'certificate_info');
+
+    if (certificateInfo) {
+      console.log("Found certificate_info:", certificateInfo);
+      
+      // Map the certificate_info fields to our result structure
+      result.patient.name = getValue(certificateInfo, 'employee_name') || '';
+      result.patient.id_number = getValue(certificateInfo, 'id_number') || '';
+      result.patient.company = getValue(certificateInfo, 'company_name') || '';
+      result.patient.occupation = getValue(certificateInfo, 'job_title') || '';
+      
+      result.examination_results.date = getValue(certificateInfo, 'examination_date') || '';
+      result.certification.examination_date = getValue(certificateInfo, 'examination_date') || '';
+      result.certification.valid_until = getValue(certificateInfo, 'expiry_date') || '';
+      
+      // Map examination type
+      result.examination_results.type.pre_employment = getValue(certificateInfo, 'pre_employment_checked') === true;
+      result.examination_results.type.periodical = getValue(certificateInfo, 'periodical_checked') === true;
+      result.examination_results.type.exit = getValue(certificateInfo, 'exit_checked') === true;
+      
+      // Map medical tests if available
+      const medicalTests = getValue(certificateInfo, 'medical_tests');
+      if (medicalTests && typeof medicalTests === 'object') {
+        result.examination_results.test_results = medicalTests;
+      }
+    }
+
+    // Next, try to extract from raw_content if we have it
+    const rawContent = getValue(data, 'raw_content') || 
+                      getValue(data, 'structured_data.raw_content') ||
+                      getValue(data, 'extracted_data.raw_content') ||
+                      getValue(data, 'extracted_data.structured_data.raw_content');
+
+    if (rawContent && typeof rawContent === 'string') {
+      console.log("Found raw_content, extracting additional data...");
+      const enhancedData = extractDataFromMarkdown(rawContent);
+      
+      // Merge enhanced data, but don't overwrite existing good data
+      if (!result.patient.name && enhancedData.patient?.name) {
+        result.patient.name = enhancedData.patient.name;
+      }
+      if (!result.patient.id_number && enhancedData.patient?.id_number) {
+        result.patient.id_number = enhancedData.patient.id_number;
+      }
+      if (!result.patient.company && enhancedData.patient?.company) {
+        result.patient.company = enhancedData.patient.company;
+      }
+      if (!result.patient.occupation && enhancedData.patient?.occupation) {
+        result.patient.occupation = enhancedData.patient.occupation;
+      }
+      
+      // Merge examination data
+      if (enhancedData.examination_results) {
+        if (!result.examination_results.date && enhancedData.examination_results.date) {
+          result.examination_results.date = enhancedData.examination_results.date;
+          result.certification.examination_date = enhancedData.examination_results.date;
+        }
+        
+        if (enhancedData.examination_results.type) {
+          Object.keys(enhancedData.examination_results.type).forEach(key => {
+            if (enhancedData.examination_results.type[key] === true) {
+              result.examination_results.type[key] = true;
+            }
+          });
+        }
+        
+        if (enhancedData.examination_results.test_results) {
+          result.examination_results.test_results = {
+            ...result.examination_results.test_results,
+            ...enhancedData.examination_results.test_results
+          };
+        }
+      }
+      
+      // Merge certification data
+      if (enhancedData.certification) {
+        if (!result.certification.valid_until && enhancedData.certification.valid_until) {
+          result.certification.valid_until = enhancedData.certification.valid_until;
+        }
+        
+        // Merge fitness status
+        Object.keys(enhancedData.certification).forEach(key => {
+          if (enhancedData.certification[key] === true) {
+            result.certification[key] = true;
+          } else if (enhancedData.certification[key] && !result.certification[key]) {
+            result.certification[key] = enhancedData.certification[key];
+          }
+        });
+      }
+      
+      // Merge restrictions
+      if (enhancedData.restrictions) {
+        result.restrictions = {
+          ...result.restrictions,
+          ...enhancedData.restrictions
+        };
+      }
+    }
+
+    console.log("Final extracted certificate data:", result);
+    return result;
   };
 
-  const dataToRender = editable && editableData ? editableData : normalizeExtractedData(extractedData);
+  const extractDataFromMarkdown = (markdown: string): any => {
+    if (!markdown) return {};
+    console.log("Extracting data from markdown");
+    const extracted: any = {
+      patient: {},
+      examination_results: {
+        type: {},
+        test_results: {}
+      },
+      certification: {},
+      restrictions: {}
+    };
+
+    // Extract patient information with more flexible patterns
+    const namePatterns = [
+      /Initials\s*&?\s*Surname:\s*([^\n\r]+)/i,
+      /Employee[:\s]*([^\n\r]+)/i,
+      /Name[:\s]*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of namePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.name = match[1].trim();
+        break;
+      }
+    }
+
+    const idPatterns = [
+      /ID\s*No:?\s*([^\n\r]+)/i,
+      /ID\s*Number:?\s*([^\n\r]+)/i,
+      /Identity:?\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of idPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.id_number = match[1].trim();
+        break;
+      }
+    }
+
+    const companyPatterns = [
+      /Company\s*Name:\s*([^\n\r]+)/i,
+      /Employer:\s*([^\n\r]+)/i,
+      /Organization:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of companyPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.company = match[1].trim();
+        break;
+      }
+    }
+
+    const jobPatterns = [
+      /Job\s*Title:\s*([^\n\r]+)/i,
+      /Position:\s*([^\n\r]+)/i,
+      /Occupation:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of jobPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.patient.occupation = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract dates
+    const examDatePatterns = [
+      /Date\s*of\s*Examination:\s*([^\n\r]+)/i,
+      /Examination\s*Date:\s*([^\n\r]+)/i,
+      /Date\s*Examined:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of examDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.examination_results.date = match[1].trim();
+        break;
+      }
+    }
+
+    const expiryPatterns = [
+      /Expiry\s*Date:\s*([^\n\r]+)/i,
+      /Valid\s*Until:\s*([^\n\r]+)/i,
+      /Expires:\s*([^\n\r]+)/i
+    ];
+    
+    for (const pattern of expiryPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        extracted.certification.valid_until = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract examination type with more flexible patterns
+    extracted.examination_results.type.pre_employment = 
+      /PRE-?EMPLOYMENT[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /PRE-?EMPLOYMENT[^[\]]*:\s*[xX✓]/i.test(markdown);
+      
+    extracted.examination_results.type.periodical = 
+      /PERIODICAL[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /PERIODICAL[^[\]]*:\s*[xX✓]/i.test(markdown);
+      
+    extracted.examination_results.type.exit = 
+      /EXIT[^[\]]*\[\s*[xX✓]\s*\]/i.test(markdown) ||
+      /EXIT[^[\]]*:\s*[xX✓]/i.test(markdown);
+
+    // Extract medical test results with more flexible patterns
+    const testsMap = [
+      { names: ['BLOODS', 'BLOOD TEST', 'BLOOD WORK'], key: 'bloods' },
+      { names: ['FAR, NEAR VISION', 'VISION TEST', 'EYE TEST'], key: 'far_near_vision' },
+      { names: ['SIDE & DEPTH', 'PERIPHERAL VISION'], key: 'side_depth' },
+      { names: ['NIGHT VISION'], key: 'night_vision' },
+      { names: ['HEARING', 'AUDIOMETRY'], key: 'hearing' },
+      { names: ['WORKING AT HEIGHTS', 'HEIGHTS'], key: 'heights' },
+      { names: ['LUNG FUNCTION', 'SPIROMETRY'], key: 'lung_function' },
+      { names: ['X-RAY', 'CHEST X-RAY'], key: 'x_ray' },
+      { names: ['DRUG SCREEN', 'DRUG TEST'], key: 'drug_screen' }
+    ];
+    
+    testsMap.forEach(test => {
+      let isDone = false;
+      let results = '';
+      
+      for (const testName of test.names) {
+        // Try various patterns for each test name
+        const patterns = [
+          new RegExp(`${testName}[^|]*\\|[^|]*([xX✓])[^|]*\\|[^|]*([^|\\n\\r]+)`, 'i'),
+          new RegExp(`${testName}[^:]*:[^:]*([xX✓])[^:]*:[^:]*([^:\\n\\r]+)`, 'i'),
+          new RegExp(`<td[^>]*>${testName}[^<]*</td>[^<]*<td[^>]*>([xX✓])[^<]*</td>[^<]*<td[^>]*>([^<]+)</td>`, 'i')
+        ];
+        
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isDone = match[1] && /[xX✓]/.test(match[1]);
+            results = match[2] ? match[2].trim() : '';
+            break;
+          }
+        }
+        
+        if (isDone || results) break;
+      }
+      
+      if (isDone || results) {
+        extracted.examination_results.test_results[`${test.key}_done`] = isDone;
+        extracted.examination_results.test_results[`${test.key}_results`] = results;
+      }
+    });
+
+    // Extract fitness status
+    const fitnessOptions = [
+      { names: ['FIT'], key: 'fit' },
+      { names: ['FIT WITH RESTRICTION', 'FIT WITH RESTRICTIONS'], key: 'fit_with_restrictions' },
+      { names: ['FIT WITH CONDITION'], key: 'fit_with_condition' },
+      { names: ['TEMPORARY UNFIT', 'TEMPORARILY UNFIT'], key: 'temporarily_unfit' },
+      { names: ['UNFIT', 'PERMANENTLY UNFIT'], key: 'unfit' }
+    ];
+    
+    fitnessOptions.forEach(option => {
+      let isSelected = false;
+      
+      for (const optionName of option.names) {
+        const patterns = [
+          new RegExp(`${optionName}[^|\\[]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i'),
+          new RegExp(`<th[^>]*>${optionName}[^<]*</th>[\\s\\S]*?<td[^>]*>\\[[^\\]]*[xX✓][^\\]]*\\]</td>`, 'i'),
+          new RegExp(`\\|[^|]*${optionName}[^|]*\\|[^|]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i')
+        ];
+
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        if (isSelected) break;
+      }
+      
+      extracted.certification[option.key] = isSelected;
+    });
+
+    // Extract restrictions
+    const restrictions = [
+      { names: ['HEIGHTS'], key: 'heights' },
+      { names: ['DUST EXPOSURE'], key: 'dust_exposure' },
+      { names: ['MOTORIZED EQUIPMENT'], key: 'motorized_equipment' },
+      { names: ['WEAR HEARING PROTECTION', 'HEARING PROTECTION'], key: 'wear_hearing_protection' },
+      { names: ['CONFINED SPACES'], key: 'confined_spaces' },
+      { names: ['CHEMICAL EXPOSURE'], key: 'chemical_exposure' },
+      { names: ['WEAR SPECTACLES', 'SPECTACLES'], key: 'wear_spectacles' },
+      { names: ['REMAIN ON TREATMENT FOR CHRONIC CONDITIONS', 'CHRONIC CONDITIONS'], key: 'remain_on_treatment_for_chronic_conditions' }
+    ];
+    
+    restrictions.forEach(restriction => {
+      let isSelected = false;
+      
+      for (const restrictionName of restriction.names) {
+        const patterns = [
+          new RegExp(`${restrictionName}[^|\\[]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i'),
+          new RegExp(`<td[^>]*>${restrictionName}[^<]*</td>[^<]*<td[^>]*>\\[[^\\]]*[xX✓][^\\]]*\\]</td>`, 'i'),
+          new RegExp(`\\|[^|]*${restrictionName}[^|]*\\|[^|]*\\[[^\\]]*[xX✓][^\\]]*\\]`, 'i')
+        ];
+
+        for (const pattern of patterns) {
+          const match = markdown.match(pattern);
+          if (match) {
+            isSelected = true;
+            break;
+          }
+        }
+        
+        if (isSelected) break;
+      }
+      
+      extracted.restrictions[restriction.key] = isSelected;
+    });
+
+    // Extract additional information - UPDATED SECTION
+    // Improved follow up action extraction
+    const followUpPatterns = [
+      /Referred\s+or\s+follow\s+up\s+actions:?\s*([^<\n\r]+)/i,
+      /Follow\s+up\s+actions:?\s*([^<\n\r]+)/i,
+      /Referred:?\s*([^<\n\r]+)/i
+    ];
+    
+    for (const pattern of followUpPatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        const cleanedText = match[1].trim().replace(/<\/td>.*$/, '');
+        extracted.certification.follow_up = cleanedText === "N/A" ? "N/A" : cleanedText;
+        break;
+      }
+    }
+
+    // Improved review date extraction
+    const reviewDatePatterns = [
+      /Review\s+Date:?\s*([^<\n\r]+)/i,
+      /Next\s+Review:?\s*([^<\n\r]+)/i,
+      /Follow\s+up\s+Date:?\s*([^<\n\r]+)/i
+    ];
+    
+    for (const pattern of reviewDatePatterns) {
+      const match = markdown.match(pattern);
+      if (match && match[1] && match[1].trim() !== '') {
+        const cleanedText = match[1].trim().replace(/<\/td>.*$/, '').replace(/<\/tr>.*$/, '');
+        extracted.certification.review_date = cleanedText;
+        break;
+      }
+    }
+
+    // As a fallback, try to find the review date in the raw text
+    if (!extracted.certification.review_date || extracted.certification.review_date.includes('<')) {
+      const rawReviewMatch = markdown.match(/Review\s+Date:?\s*([^\n<]+)/i);
+      if (rawReviewMatch && rawReviewMatch[1]) {
+        extracted.certification.review_date = rawReviewMatch[1].trim();
+      } else {
+        extracted.certification.review_date = '';
+      }
+    }
+
+    // Fallback for follow up if it contains HTML
+    if (!extracted.certification.follow_up || extracted.certification.follow_up.includes('<')) {
+      const rawFollowUpMatch = markdown.match(/follow\s+up\s+actions:?\s*([^\n<]+)/i);
+      if (rawFollowUpMatch && rawFollowUpMatch[1]) {
+        extracted.certification.follow_up = rawFollowUpMatch[1].trim();
+      } else {
+        extracted.certification.follow_up = '';
+      }
+    }
+
+    // Comments extraction - keeping this as is
+    const commentsMatch = markdown.match(/Comments:\s*([^<\n\r]+)/i);
+    if (commentsMatch && commentsMatch[1]) {
+      let comments = commentsMatch[1].trim();
+      extracted.certification.comments = comments === "N/A" ? "N/A" : comments;
+    }
+
+    console.log("Extracted data from markdown:", extracted);
+    return extracted;
+  };
+
+  const normalizeExtractedDataForTemplate = (extractedData: any): any => {
+  console.log("Normalizing extracted data for template:", extractedData);
   
+  // Handle the case where data comes from document processing
+  let sourceData = extractedData;
+  
+  // If we have structured_data wrapper, use that
+  if (extractedData?.structured_data) {
+    sourceData = extractedData.structured_data;
+  }
+  
+  // If we have certificate_info from document processing, map it properly
+  if (sourceData?.certificate_info) {
+    const certInfo = sourceData.certificate_info;
+    
+    return {
+      patient: {
+        name: certInfo.employee_name || '',
+        id_number: certInfo.id_number || '',
+        company: certInfo.company_name || '',
+        occupation: certInfo.job_title || ''
+      },
+      examination_results: {
+        date: certInfo.examination_date || '',
+        type: {
+          pre_employment: certInfo.pre_employment_checked || false,
+          periodical: certInfo.periodical_checked || false,
+          exit: certInfo.exit_checked || false
+        },
+        test_results: certInfo.medical_tests || {}
+      },
+      certification: {
+        examination_date: certInfo.examination_date || '',
+        valid_until: certInfo.expiry_date || '',
+        fit: certInfo.fitness_status?.fit || false,
+        fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
+        fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
+        temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
+        unfit: certInfo.fitness_status?.unfit || false,
+        comments: certInfo.comments || '',
+        follow_up: certInfo.follow_up || '',
+        review_date: certInfo.review_date || ''
+      },
+      restrictions: certInfo.restrictions || {}
+    };
+  }
+  
+  // If data is already in the right structure, return as-is
+  if (sourceData?.patient || sourceData?.examination_results || sourceData?.certification) {
+    return sourceData;
+  }
+  
+  // Try to extract from raw_content if available
+  const rawContent = extractedData?.raw_content || 
+                    extractedData?.structured_data?.raw_content ||
+                    extractedData?.extracted_data?.raw_content;
+  
+  if (rawContent && typeof rawContent === 'string') {
+    return extractDataFromMarkdown(rawContent);
+  }
+  
+  // Return empty structure if no valid data found
+  return {
+    patient: { name: '', id_number: '', company: '', occupation: '' },
+    examination_results: { 
+      date: '', 
+      type: { pre_employment: false, periodical: false, exit: false },
+      test_results: {}
+    },
+    certification: {
+      examination_date: '',
+      valid_until: '',
+      fit: false,
+      fit_with_restrictions: false,
+      fit_with_condition: false,
+      temporarily_unfit: false,
+      unfit: false,
+      comments: '',
+      follow_up: '',
+      review_date: ''
+    },
+    restrictions: {}
+  };
+};
+
+  // Initialize editable data state
+  useEffect(() => {
+  console.log("CertificateTemplate received data:", extractedData);
+  
+  if (extractedData) {
+    const normalizedData = normalizeExtractedDataForTemplate(extractedData);
+    console.log("Normalized data:", normalizedData);
+    
+    if (editable) {
+      setEditableData(normalizedData);
+    }
+  }
+}, [extractedData, editable]);
+
+  // Handle field changes in editable mode
+const handleFieldChange = (path: string, value: any) => {
+  if (!editable || !editableData) return;
+  
+  const keys = path.split('.');
+  const newData = JSON.parse(JSON.stringify(editableData));
+  let current = newData;
+  
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!current[keys[i]]) current[keys[i]] = {};
+    current = current[keys[i]];
+  }
+  
+  current[keys[keys.length - 1]] = value;
+  setEditableData(newData);
+  
+  if (onDataChange) {
+    console.log('Calling onDataChange with:', newData);
+    onDataChange(newData);
+  }
+};
+
+// Handle checkbox changes
+const handleCheckboxChange = (path: string, checked: boolean) => {
+  handleFieldChange(path, checked);
+};
+
+// Update the dataToRender logic (replace your existing line):
+
+// Use editable data if in edit mode, otherwise normalize and use extracted data
+const dataToRender = editable && editableData ? 
+  editableData : 
+  normalizeExtractedDataForTemplate(extractedData);
+
+console.log("Data to render in template:", dataToRender);
+
   const patient = dataToRender.patient || {};
   const examination = dataToRender.examination_results || {};
   const restrictions = dataToRender.restrictions || {};
   const certification = dataToRender.certification || {};
   const testResults = examination.test_results || {};
 
+  const fitnessStatus = {
+    fit: isChecked(certification.fit),
+    fitWithRestriction: isChecked(certification.fit_with_restrictions),
+    fitWithCondition: isChecked(certification.fit_with_condition),
+    temporarilyUnfit: isChecked(certification.temporarily_unfit),
+    unfit: isChecked(certification.unfit)
+  };
+
+  const medicalTests = {
+    bloods: {
+      done: isChecked(testResults.bloods_done),
+      results: getValue(testResults, 'bloods_results', 'N/A')
+    },
+    farNearVision: {
+      done: isChecked(testResults.far_near_vision_done),
+      results: getValue(testResults, 'far_near_vision_results', 'N/A')
+    },
+    sideDepth: {
+      done: isChecked(testResults.side_depth_done),
+      results: getValue(testResults, 'side_depth_results', 'N/A')
+    },
+    nightVision: {
+      done: isChecked(testResults.night_vision_done),
+      results: getValue(testResults, 'night_vision_results', 'N/A')
+    },
+    hearing: {
+      done: isChecked(testResults.hearing_done),
+      results: getValue(testResults, 'hearing_results', 'N/A')
+    },
+    heights: {
+      done: isChecked(testResults.heights_done),
+      results: getValue(testResults, 'heights_results', 'N/A')
+    },
+    lungFunction: {
+      done: isChecked(testResults.lung_function_done),
+      results: getValue(testResults, 'lung_function_results', 'N/A')
+    },
+    xRay: {
+      done: isChecked(testResults.x_ray_done),
+      results: getValue(testResults, 'x_ray_results', 'N/A')
+    },
+    drugScreen: {
+      done: isChecked(testResults.drug_screen_done),
+      results: getValue(testResults, 'drug_screen_results', 'N/A')
+    }
+  };
+
+  console.log("Medical tests data:", medicalTests);
+
+  const restrictionsData = {
+    heights: isChecked(restrictions.heights),
+    dustExposure: isChecked(restrictions.dust_exposure),
+    motorizedEquipment: isChecked(restrictions.motorized_equipment),
+    hearingProtection: isChecked(restrictions.wear_hearing_protection),
+    confinedSpaces: isChecked(restrictions.confined_spaces),
+    chemicalExposure: isChecked(restrictions.chemical_exposure),
+    wearSpectacles: isChecked(restrictions.wear_spectacles),
+    chronicConditions: isChecked(restrictions.remain_on_treatment_for_chronic_conditions)
+  };
+
+  const examinationType = {
+    preEmployment: isChecked(examination.type?.pre_employment),
+    periodical: isChecked(examination.type?.periodical),
+    exit: isChecked(examination.type?.exit)
+  };
+
+  console.log("Certificate template using data:", {
+    name: patient.name,
+    id: patient.id_number,
+    company: patient.company,
+    occupation: patient.occupation,
+    examDate: examination.date,
+    expiryDate: certification.valid_until,
+    examinationType,
+    fitnessStatus,
+    medicalTests,
+    restrictionsData
+  });
+
+  // Extract organization information for signatures and stamps
+  const organization = extractedData?.organization || {};
+  const physician = 'MJ Mphuthi';
+  const practiceNumber = '0404160';
+  const nurse = 'Sibongile Mahlangu';
+  const nurseNumber = '999 088 0000 8177 91';
+
+  // Helper function to render field (editable input or static text)
   const renderField = (value: string, path: string, className: string = "") => {
     if (editable) {
       return (
@@ -130,15 +710,16 @@ const HistoricalCertificateTemplate = ({
         />
       );
     }
-    return <span className={className}>{value || ''}</span>;
+    return <span className={`${className}`}>{value || 'Not Provided'}</span>;
   };
 
+  // Helper function to render checkbox
   const renderCheckbox = (checked: boolean, path: string) => {
     if (editable) {
       return (
         <input
           type="checkbox"
-          checked={checked || false}
+          checked={checked}
           onChange={(e) => handleCheckboxChange(path, e.target.checked)}
           className="w-4 h-4"
         />
@@ -151,7 +732,6 @@ const HistoricalCertificateTemplate = ({
     <ScrollArea className="h-full">
       <Card className="border-0 shadow-none bg-white w-full max-w-3xl mx-auto font-sans text-black">
         <div className="relative overflow-hidden">
-          {/* Watermark */}
           <div className="absolute top-[47%] inset-x-0 flex items-center justify-center opacity-40 pointer-events-none" aria-hidden="true">
             <img 
               src="/lovable-uploads/ead30039-3558-4ae0-a3ec-c58d8755a311.png" 
@@ -161,15 +741,6 @@ const HistoricalCertificateTemplate = ({
           </div>
           
           <div className="relative z-10">
-            {editable && (
-              <div className="px-4 pt-2">
-                <Badge variant="secondary" className="mb-2">
-                  Historical Template
-                </Badge>
-              </div>
-            )}
-
-            {/* Header */}
             <div className="px-4 pt-4">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -189,20 +760,17 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Title */}
             <div className="bg-gray-800 text-white text-center py-2 mb-2">
               <h2 className="text-lg font-bold">CERTIFICATE OF FITNESS</h2>
             </div>
             
-            {/* Certification text */}
             <div className="text-center text-xs px-4 mb-3">
               <p>
-                Dr. MJ Mphuthi / Practice No: 0404160 / Sr. Sibongile Mahlangu / Practice No: 999 088 0000 8177 91
+                Dr. {physician} / Practice No: {practiceNumber} / Sr. {nurse} / Practice No: {nurseNumber}
               </p>
               <p>certify that the following employee:</p>
             </div>
             
-            {/* Patient Information */}
             <div className="px-4 space-y-4 mb-4">
               <div className="flex justify-between space-x-4">
                 <div className="flex-1">
@@ -235,7 +803,7 @@ const HistoricalCertificateTemplate = ({
                   <div className="flex items-center">
                     <span className="font-semibold mr-1">Date of Examination:</span>
                     <div className="border-b border-gray-400 flex-1">
-                      {renderField(examination.date, 'examination_results.date')}
+                      {renderField(examination.date || certification.examination_date, 'examination_results.date')}
                     </div>
                   </div>
                 </div>
@@ -257,7 +825,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Examination Type Table */}
             <div className="px-4 mb-4">
               <table className="w-full border border-gray-400">
                 <thead>
@@ -270,26 +837,25 @@ const HistoricalCertificateTemplate = ({
                 <tbody>
                   <tr>
                     <td className="border border-gray-400 h-8 text-center">
-                      {renderCheckbox(examination.type?.pre_employment, 'examination_results.type.pre_employment')}
+                      {renderCheckbox(examinationType.preEmployment, 'examination_results.type.pre_employment')}
                     </td>
                     <td className="border border-gray-400 h-8 text-center">
-                      {renderCheckbox(examination.type?.periodical, 'examination_results.type.periodical')}
+                      {renderCheckbox(examinationType.periodical, 'examination_results.type.periodical')}
                     </td>
                     <td className="border border-gray-400 h-8 text-center">
-                      {renderCheckbox(examination.type?.exit, 'examination_results.type.exit')}
+                      {renderCheckbox(examinationType.exit, 'examination_results.type.exit')}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             
-            {/* Medical Tests Section */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
               </div>
               
-              <div className="px-4">
+                            <div className="px-4">
                 <div className="grid grid-cols-2 gap-4">
                   {/* Left Table */}
                   <div>
@@ -459,25 +1025,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Follow up actions */}
-            <div className="px-4 mb-4">
-              <div className="flex items-center">
-                <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
-                <div className="border-b border-gray-400 flex-1">
-                  {renderField(certification.follow_up, 'certification.follow_up')}
-                </div>
-                <div className="ml-2">
-                  <div className="text-sm">
-                    <span className="font-semibold mr-1">Review Date:</span>
-                    <span className="text-red-600">
-                      {renderField(certification.review_date, 'certification.review_date', 'text-red-600')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Restrictions */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-2">
                 Restrictions:
@@ -487,54 +1034,54 @@ const HistoricalCertificateTemplate = ({
                 <table className="w-full border border-gray-400 text-sm">
                   <tbody>
                     <tr>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.heights ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Heights</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.heights, 'restrictions.heights')}
+                          {renderCheckbox(restrictionsData.heights, 'restrictions.heights')}
                         </div>
                       </td>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.dustExposure ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Dust Exposure</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.dust_exposure, 'restrictions.dust_exposure')}
+                          {renderCheckbox(restrictionsData.dustExposure, 'restrictions.dust_exposure')}
                         </div>
                       </td>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.motorizedEquipment ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Motorized Equipment</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.motorized_equipment, 'restrictions.motorized_equipment')}
+                          {renderCheckbox(restrictionsData.motorizedEquipment, 'restrictions.motorized_equipment')}
                         </div>
                       </td>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.hearingProtection ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Wear Hearing Protection</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.wear_hearing_protection, 'restrictions.wear_hearing_protection')}
+                          {renderCheckbox(restrictionsData.hearingProtection, 'restrictions.wear_hearing_protection')}
                         </div>
                       </td>
                     </tr>
                     <tr>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.confinedSpaces ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Confined Spaces</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.confined_spaces, 'restrictions.confined_spaces')}
+                          {renderCheckbox(restrictionsData.confinedSpaces, 'restrictions.confined_spaces')}
                         </div>
                       </td>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chemicalExposure ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Chemical Exposure</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.chemical_exposure, 'restrictions.chemical_exposure')}
+                          {renderCheckbox(restrictionsData.chemicalExposure, 'restrictions.chemical_exposure')}
                         </div>
                       </td>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.wearSpectacles ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Wear Spectacles</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.wear_spectacles, 'restrictions.wear_spectacles')}
+                          {renderCheckbox(restrictionsData.wearSpectacles, 'restrictions.wear_spectacles')}
                         </div>
                       </td>
-                      <td className="border border-gray-400 p-1 text-center">
+                      <td className={`border border-gray-400 p-1 text-center ${restrictionsData.chronicConditions ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs font-medium">Remain on Treatment</div>
                         <div className="text-[0.6rem]">
-                          {renderCheckbox(restrictions.remain_on_treatment_for_chronic_conditions, 'restrictions.remain_on_treatment_for_chronic_conditions')}
+                          {renderCheckbox(restrictionsData.chronicConditions, 'restrictions.remain_on_treatment_for_chronic_conditions')}
                         </div>
                       </td>
                     </tr>
@@ -543,7 +1090,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* FITNESS ASSESSMENT */}
             <div className="mb-2">
               <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-1">
                 FITNESS ASSESSMENT
@@ -553,34 +1099,34 @@ const HistoricalCertificateTemplate = ({
                 <table className="w-full border border-gray-400">
                   <tbody>
                     <tr>
-                      <th className="border border-gray-400 p-1 text-center bg-green-100">
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fit ? 'bg-green-100' : ''}`}>
                         <div className="text-xs">FIT</div>
                         <div className="text-green-600 text-sm">
-                          {renderCheckbox(certification.fit, 'certification.fit')}
+                          {renderCheckbox(fitnessStatus.fit, 'certification.fit')}
                         </div>
                       </th>
-                      <th className="border border-gray-400 p-1 text-center">
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithRestriction ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs">Fit with Restriction</div>
                         <div className="text-yellow-600 text-sm">
-                          {renderCheckbox(certification.fit_with_restrictions, 'certification.fit_with_restrictions')}
+                          {renderCheckbox(fitnessStatus.fitWithRestriction, 'certification.fit_with_restrictions')}
                         </div>
                       </th>
-                      <th className="border border-gray-400 p-1 text-center">
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.fitWithCondition ? 'bg-yellow-100' : ''}`}>
                         <div className="text-xs">Fit with Condition</div>
                         <div className="text-yellow-600 text-sm">
-                          {renderCheckbox(certification.fit_with_condition, 'certification.fit_with_condition')}
+                          {renderCheckbox(fitnessStatus.fitWithCondition, 'certification.fit_with_condition')}
                         </div>
                       </th>
-                      <th className="border border-gray-400 p-1 text-center">
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.temporarilyUnfit ? 'bg-red-100' : ''}`}>
                         <div className="text-xs">Temporary Unfit</div>
                         <div className="text-red-600 text-sm">
-                          {renderCheckbox(certification.temporarily_unfit, 'certification.temporarily_unfit')}
+                          {renderCheckbox(fitnessStatus.temporarilyUnfit, 'certification.temporarily_unfit')}
                         </div>
                       </th>
-                      <th className="border border-gray-400 p-1 text-center">
+                      <th className={`border border-gray-400 p-1 text-center ${fitnessStatus.unfit ? 'bg-red-100' : ''}`}>
                         <div className="text-xs">UNFIT</div>
                         <div className="text-red-600 text-sm">
-                          {renderCheckbox(certification.unfit, 'certification.unfit')}
+                          {renderCheckbox(fitnessStatus.unfit, 'certification.unfit')}
                         </div>
                       </th>
                     </tr>
@@ -589,7 +1135,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Comments */}
             <div className="px-4 mb-1">
               <div className="font-semibold text-xs mb-0.5">Comments:</div>
               <div className="border border-gray-400 p-1 min-h-8 text-xs">
@@ -599,74 +1144,45 @@ const HistoricalCertificateTemplate = ({
                     onChange={(e) => handleFieldChange('certification.comments', e.target.value)}
                     className="border-0 bg-transparent px-1 py-0 h-auto text-xs w-full"
                   />
-                ) : (certification.comments || '')}
+                ) : (certification.comments || 'N/A')}
               </div>
             </div>
             
-            {/* SIGNATURE AND STAMP SECTION - HISTORICAL VERSION */}
             <div className="px-4 mb-3">
               <div className="flex justify-between items-end">
-                {/* Signature Section */}
                 <div className="flex-1">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56">
-                    <div className="min-h-16 flex items-center justify-center bg-gray-50 border rounded">
-                      {/* Pre-filled signature image from the sample certificate */}
-                      <div className="text-center p-2">
-                        <div style={{ fontFamily: 'cursive', fontSize: '24px', color: '#000' }}>
-                          MJ Mphuthi
-                        </div>
-                        <div className="border-b-2 border-black w-20 mx-auto mt-1"></div>
-                      </div>
+                    <div className="min-h-16 flex items-center justify-center">
+                      <OrganizationLogo
+                        variant="signature"
+                        organization={organization}
+                        size="lg"
+                        className="max-h-12 w-auto object-contain"
+                      />
                     </div>
                     <div className="text-center font-semibold text-[0.6rem]">SIGNATURE</div>
                   </div>
                 </div>
                 
-                {/* Middle Section - Practitioner Info */}
                 <div className="flex-1 px-2 flex justify-center">
                   <div className="w-fit max-w-md text-center">
                     <p className="text-[0.6rem] leading-tight font-semibold">Occupational Health Practitioner / Occupational Medical Practitioner</p>
-                    <p className="text-[0.6rem] leading-tight italic">Dr MJ Mphuthi / Practice No. 0404160</p>
-                    <p className="text-[0.6rem] leading-tight">Sr. Sibongile Mahlangu</p>
+                    <p className="text-[0.6rem] leading-tight italic">Dr {physician} / Practice No. {practiceNumber}</p>
+                    <p className="text-[0.6rem] leading-tight">Sr. {nurse}</p>
                     <p className="text-[0.6rem] leading-tight">SANC No: 14262133; SASOHN No: AR 2136</p>
-                    <p className="text-[0.6rem] leading-tight">Practice Number: 999 088 0000 8177 91</p>
+                    <p className="text-[0.6rem] leading-tight">Practice Number: {nurseNumber}</p>
                   </div>
                 </div>
                 
-                {/* Stamp Section */}
                 <div className="flex-1 text-right">
                   <div className="border-t border-gray-400 pt-1 mt-4 max-w-56 ml-auto">
-                    <div className="min-h-16 flex flex-col items-center justify-center bg-gray-50 border rounded relative">
-                      {/* Pre-filled stamp design from the sample certificate */}
-                      <div className="relative">
-                        {/* Circular stamp border */}
-                        <div className="w-16 h-16 border-4 border-black rounded-full flex flex-col items-center justify-center text-center">
-                          <div className="text-[0.45rem] font-bold leading-none">Dr MJ Mphuthi</div>
-                          <div className="text-[0.35rem] leading-none mt-0.5">Occupational Medicine Practitioner</div>
-                          <div className="text-[0.35rem] leading-none">BSc(Med), PDD, M.Phil (HIV/AIDS)</div>
-                          <div className="text-[0.35rem] leading-none">MBCHB, DOHM & OHME</div>
-                        </div>
-                        
-                        {/* Editable date inside stamp */}
-                        <div className="absolute bottom-[-8px] left-1/2 transform -translate-x-1/2 bg-white px-1">
-                          {editable ? (
-                            <Input
-                              value={stampDate}
-                              onChange={(e) => setStampDate(e.target.value)}
-                              placeholder="DD-MM-YYYY"
-                              className="border-0 border-b border-gray-400 rounded-none bg-transparent px-1 py-0 h-auto text-[0.5rem] text-center w-16"
-                            />
-                          ) : (
-                            <span className="text-[0.5rem] font-bold">{stampDate}</span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Practice number at bottom right */}
-                      <div className="absolute bottom-1 right-1">
-                        <div className="text-[0.4rem] font-bold">Practice NO: 1522469 MP No: 0404160</div>
-                        <div className="text-[0.35rem]">Email: mandlajockey@yahoo.com T: 1 083 209 1098</div>
-                      </div>
+                    <div className="min-h-16 flex items-center justify-center">
+                      <OrganizationLogo
+                        variant="stamp"
+                        organization={organization}
+                        size="lg"
+                        className="max-h-16 w-auto object-contain"
+                      />
                     </div>
                     <div className="text-center font-semibold text-[0.6rem]">STAMP</div>
                   </div>
@@ -674,7 +1190,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Footer */}
             <div className="bg-gray-800 text-white text-center px-1 text-[0.55rem] leading-none py-1 mt-2">
               © {new Date().getFullYear()} BlueCollar Health & Wellness
             </div>
@@ -685,4 +1200,4 @@ const HistoricalCertificateTemplate = ({
   );
 };
 
-export default HistoricalCertificateTemplate;
+export default CertificateTemplate;
