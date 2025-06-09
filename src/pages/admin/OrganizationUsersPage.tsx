@@ -38,41 +38,24 @@ const OrganizationUsersPage = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <UsersIcon className="h-8 w-8" />
-          Manage Users
+          User Management
         </h1>
         <p className="text-muted-foreground mt-1">
           Manage users and invitations for <span className="font-medium">{organizationName}</span>
         </p>
       </div>
       
-      <Tabs defaultValue="users" className="w-full">
+      <Tabs defaultValue="invitations" className="w-full">
         <TabsList className="mb-8">
+          <TabsTrigger value="invitations" className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
+            Send Invitations
+          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <UsersIcon className="h-4 w-4" />
             Current Users
           </TabsTrigger>
-          <TabsTrigger value="invitations" className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4" />
-            Pending Invitations
-          </TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UsersIcon className="h-5 w-5" />
-                Organization Users
-              </CardTitle>
-              <CardDescription>
-                Users who currently have access to {organizationName}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UserList organizationId={effectiveOrganizationId} />
-            </CardContent>
-          </Card>
-        </TabsContent>
         
         <TabsContent value="invitations" className="space-y-6">
           <Card>
@@ -87,6 +70,23 @@ const OrganizationUsersPage = () => {
             </CardHeader>
             <CardContent>
               <InvitationList organizationId={effectiveOrganizationId} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UsersIcon className="h-5 w-5" />
+                Organization Users
+              </CardTitle>
+              <CardDescription>
+                Users who currently have access to {organizationName}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <UserList organizationId={effectiveOrganizationId} />
             </CardContent>
           </Card>
         </TabsContent>
