@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,14 +22,18 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Plus, Edit, Copy, Trash } from "lucide-react";
+import { Loader2, Plus, Edit, Copy, Trash, FileText, Settings } from "lucide-react";
 import CertificateTemplateEditor from "./CertificateTemplateEditor";
 import CertificateTemplatePreview from "./CertificateTemplatePreview";
 import { getOrganizationBranding } from "@/types/organization";
+import { fixedTemplates } from "@/utils/templateRegistry";
+import type { ConfigurableTemplate, FixedTemplate } from "@/types/template";
 
 const templateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
@@ -51,10 +54,11 @@ interface CertificateTemplate {
 
 export default function CertificateTemplateManager() {
   const { currentOrganization } = useOrganization();
+  const [activeTab, setActiveTab] = useState("fixed");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [currentTemplate, setCurrentTemplate] = useState<CertificateTemplate | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<CertificateTemplate | null>(null);
+  const [currentTemplate, setCurrentTemplate] = useState<ConfigurableTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<FixedTemplate | ConfigurableTemplate | null>(null);
   const queryClient = useQueryClient();
   const organizationId = currentOrganization?.id;
 
@@ -88,8 +92,8 @@ export default function CertificateTemplateManager() {
     }
   }, [currentTemplate, isEditMode, form]);
 
-  // Fetch templates
-  const { data: templates, isLoading } = useQuery({
+  // Fetch configurable templates
+  const { data: configurableTemplates, isLoading } = useQuery({
     queryKey: ["certificateTemplates", organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
@@ -101,7 +105,7 @@ export default function CertificateTemplateManager() {
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return (data || []) as unknown as CertificateTemplate[];
+      return (data || []).map(template => ({ ...template, category: 'configurable' as const })) as ConfigurableTemplate[];
     },
     enabled: !!organizationId,
   });
@@ -290,7 +294,7 @@ export default function CertificateTemplateManager() {
     }
   };
 
-  const handleEditTemplate = (template: CertificateTemplate) => {
+  const handleEditTemplate = (template: ConfigurableTemplate) => {
     setCurrentTemplate(template);
     setIsEditMode(true);
     setIsDialogOpen(true);
@@ -300,7 +304,7 @@ export default function CertificateTemplateManager() {
     duplicateTemplateMutation.mutate(template);
   };
 
-  const handleSelectTemplate = (template: CertificateTemplate) => {
+  const handleSelectTemplate = (template: FixedTemplate | ConfigurableTemplate) => {
     setSelectedTemplate(template);
   };
 
@@ -347,93 +351,183 @@ export default function CertificateTemplateManager() {
         <h2 className="text-xl font-semibold">Certificate Templates</h2>
         <Button onClick={handleNewTemplate}>
           <Plus className="h-4 w-4 mr-2" />
-          New Template
+          New Custom Template
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center p-6">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {templates?.map((template) => (
-            <Card 
-              key={template.id} 
-              className={`cursor-pointer transition-all ${
-                selectedTemplate?.id === template.id 
-                  ? "ring-2 ring-primary" 
-                  : "hover:shadow-md"
-              }`}
-              onClick={() => handleSelectTemplate(template)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-medium">
-                    {template.name}
-                    {template.is_default && (
-                      <span className="ml-2 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                        Default
-                      </span>
-                    )}
-                  </CardTitle>
-                  <div className="flex space-x-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditTemplate(template);
-                      }}
-                      className="h-8 w-8"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDuplicateTemplate(template);
-                      }}
-                      className="h-8 w-8"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTemplate(template);
-                      }}
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="fixed" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Fixed Layout Templates
+          </TabsTrigger>
+          <TabsTrigger value="configurable" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Custom Templates
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="fixed" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Professional, pre-built templates ready to use immediately. Perfect for standardized documents.
+          </p>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {fixedTemplates.map((template) => (
+              <Card 
+                key={template.id}
+                className={`cursor-pointer transition-all ${
+                  selectedTemplate?.id === template.id 
+                    ? "ring-2 ring-primary" 
+                    : "hover:shadow-md"
+                }`}
+                onClick={() => handleSelectTemplate(template)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-medium">
+                      {template.name}
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        Fixed Layout
+                      </Badge>
+                    </CardTitle>
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {template.description}
+                  </p>
+                  <div className="h-32 bg-gray-50 dark:bg-gray-900 border rounded-md flex items-center justify-center">
+                    <div className="text-sm text-muted-foreground">{template.preview}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="configurable" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Custom templates with full control over sections, branding, and layout. Create your own designs.
+          </p>
+          
+          {isLoading ? (
+            <div className="flex justify-center p-6">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {configurableTemplates?.map((template) => (
+                <Card 
+                  key={template.id}
+                  className={`cursor-pointer transition-all ${
+                    selectedTemplate?.id === template.id 
+                      ? "ring-2 ring-primary" 
+                      : "hover:shadow-md"
+                  }`}
+                  onClick={() => handleSelectTemplate(template)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-medium">
+                        {template.name}
+                        {template.is_default && (
+                          <span className="ml-2 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            Default
+                          </span>
+                        )}
+                      </CardTitle>
+                      <div className="flex space-x-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditTemplate(template);
+                          }}
+                          className="h-8 w-8"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateTemplate(template);
+                          }}
+                          className="h-8 w-8"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTemplate(template);
+                          }}
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-32 bg-gray-50 dark:bg-gray-900 border rounded-md flex items-center justify-center">
+                      <div className="text-sm text-muted-foreground">Custom Template</div>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Updated {new Date(template.updated_at).toLocaleDateString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {(!configurableTemplates || configurableTemplates.length === 0) && (
+                <div className="col-span-full text-center py-12">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-muted-foreground mb-2">No custom templates yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create your first custom template to get started
+                  </p>
+                  <Button onClick={handleNewTemplate}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Custom Template
+                  </Button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-32 bg-gray-50 dark:bg-gray-900 border rounded-md flex items-center justify-center">
-                  <div className="text-sm text-muted-foreground">Preview</div>
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Updated {new Date(template.updated_at).toLocaleDateString()}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              )}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {selectedTemplate && (
         <div className="mt-8">
-          <h3 className="text-lg font-medium mb-4">Preview Template: {selectedTemplate.name}</h3>
-          <CertificateTemplatePreview 
-            template={selectedTemplate} 
-            organizationBranding={organizationBranding}
-          />
+          <h3 className="text-lg font-medium mb-4">
+            Preview: {selectedTemplate.name}
+            {selectedTemplate.category === 'fixed' && (
+              <Badge variant="outline" className="ml-2">Fixed Layout</Badge>
+            )}
+          </h3>
+          {selectedTemplate.category === 'configurable' ? (
+            <CertificateTemplatePreview 
+              template={selectedTemplate} 
+              organizationBranding={organizationBranding}
+            />
+          ) : (
+            <div className="p-6 border rounded-lg bg-gray-50 dark:bg-gray-900">
+              <p className="text-sm text-muted-foreground text-center">
+                {selectedTemplate.description}
+              </p>
+              <div className="mt-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Fixed layout templates are used directly in document validation
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

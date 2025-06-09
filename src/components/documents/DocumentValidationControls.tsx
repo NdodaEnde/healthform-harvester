@@ -123,8 +123,8 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             <SelectValue placeholder="Select template" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="historical">Historical Certificate</SelectItem>
-            <SelectItem value="modern">Modern Certificate</SelectItem>
+            <SelectItem value="historical">Historical Certificate (Fixed)</SelectItem>
+            <SelectItem value="modern">Modern Certificate (Fixed)</SelectItem>
           </SelectContent>
         </Select>
       </div>
