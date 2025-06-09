@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -24,7 +23,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   validatedData,
   onValidationModeChange,
   onValidationComplete,
-  selectedTemplate = 'historical', // Default to historical as discussed
+  selectedTemplate = 'modern', // Default to modern for new documents
   onTemplateChange
 }) => {
   const { currentOrganization } = useOrganization();
@@ -42,17 +41,57 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     onValidationComplete?.();
   };
 
-  // Auto-detect template based on document data
+  // CORRECTED: Auto-detect template based on document data
   const detectTemplate = (data: any): 'modern' | 'historical' => {
-    // Check if document has signature/stamp data in extracted content
-    const hasSignatureData = data?.signature || data?.stamp || 
-                             data?.structured_data?.signature || 
-                             data?.structured_data?.stamp ||
-                             data?.extracted_data?.signature ||
-                             data?.extracted_data?.stamp;
+    const getValue = (obj: any, path: string): any => {
+      if (!obj || !path) return null;
+      const keys = path.split('.');
+      let current = obj;
+      for (const key of keys) {
+        if (current === undefined || current === null || typeof current !== 'object') {
+          return null;
+        }
+        current = current[key];
+      }
+      return current;
+    };
+
+    // Check for signature data
+    const hasSignature = !!(
+      getValue(data, 'signature') ||
+      getValue(data, 'structured_data.signature') ||
+      getValue(data, 'extracted_data.signature') ||
+      getValue(data, 'certificate_info.signature') ||
+      getValue(data, 'structured_data.certificate_info.signature')
+    );
+
+    // Check for stamp data
+    const hasStamp = !!(
+      getValue(data, 'stamp') ||
+      getValue(data, 'structured_data.stamp') ||
+      getValue(data, 'extracted_data.stamp') ||
+      getValue(data, 'certificate_info.stamp') ||
+      getValue(data, 'structured_data.certificate_info.stamp')
+    );
+
+    const hasSignatureStampData = hasSignature || hasStamp;
     
-    // If no signature/stamp data found, assume historical document
-    return hasSignatureData ? 'modern' : 'historical';
+    // CORRECTED LOGIC:
+    // Historical documents (filed records) have physical signatures/stamps → Historical template
+    // Modern documents (current workflow) don't have signatures/stamps yet → Modern template
+    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
+    
+    console.log('Template detection:', {
+      hasSignature,
+      hasStamp,
+      hasSignatureStampData,
+      detectedTemplate,
+      reasoning: hasSignatureStampData 
+        ? 'Found signature/stamp data → Historical template (filed document)' 
+        : 'No signature/stamp data → Modern template (current workflow)'
+    });
+    
+    return detectedTemplate;
   };
 
   // Auto-detect template when document changes
@@ -62,6 +101,10 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
       onTemplateChange(detectedTemplate);
     }
   }, [document?.extracted_data, onTemplateChange]);
+
+  // Get auto-detected template for display
+  const autoDetectedTemplate = document?.extracted_data ? detectTemplate(document.extracted_data) : 'modern';
+  const isUsingAutoDetection = selectedTemplate === autoDetectedTemplate;
 
   // Transform the validated data to match what the promotion service expects
   const transformDataForPromotion = (data: any) => {
@@ -115,18 +158,56 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
       </div>
 
       {/* Template Selection */}
-      <div className="flex items-center gap-2">
-        <Settings className="h-4 w-4 text-gray-500" />
-        <span className="text-sm font-medium">Template:</span>
-        <Select value={selectedTemplate} onValueChange={onTemplateChange}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Select template" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="historical">Historical Certificate (Fixed)</SelectItem>
-            <SelectItem value="modern">Modern Certificate (Fixed)</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
+        <div className="flex items-center gap-2">
+          <Settings className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium">Certificate Template:</span>
+          <Select value={selectedTemplate} onValueChange={onTemplateChange}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="historical">
+                Historical Certificate
+                {autoDetectedTemplate === 'historical' && (
+                  <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
+                )}
+              </SelectItem>
+              <SelectItem value="modern">
+                Modern Certificate
+                {autoDetectedTemplate === 'modern' && (
+                  <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
+                )}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {isUsingAutoDetection ? (
+            <Badge variant="outline" className="text-green-600 border-green-200 text-xs">
+              Auto-detected
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-orange-600 border-orange-200 text-xs">
+              Manual override
+            </Badge>
+          )}
+        </div>
+
+        {/* Template Description */}
+        <div className="text-xs text-muted-foreground pl-6">
+          {selectedTemplate === 'historical' 
+            ? 'For filed documents with physical signatures and stamps (historical records)'
+            : 'For current workflow documents without physical signatures/stamps (digital workflow)'
+          }
+        </div>
+
+        {/* Auto-detection explanation */}
+        <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded border-l-2 border-blue-200">
+          <strong>Auto-detection:</strong> {autoDetectedTemplate === 'historical' 
+            ? 'Found signature/stamp data → Historical template recommended'
+            : 'No signature/stamp data found → Modern template recommended'
+          }
+        </div>
       </div>
 
       <div className="flex gap-2">
