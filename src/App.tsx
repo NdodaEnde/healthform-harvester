@@ -172,6 +172,26 @@ function App() {
                             </DashboardLayout>
                           </OrganizationProtectedRoute>
                         } />
+
+                        // Add this route in your App.tsx in the protected routes section
+                        // Add it after the existing OrganizationUsersPage route
+
+                        <Route path="/admin/users" element={
+                          <OrganizationProtectedRoute>
+                            <DashboardLayout>
+                              <OrganizationUsersPage />
+                            </DashboardLayout>
+                          </OrganizationProtectedRoute>
+                        } />
+
+                        // Also update the existing route parameter to match
+                        <Route path="/admin/organizations/:organizationId/users" element={
+                          <OrganizationProtectedRoute>
+                            <DashboardLayout>
+                              <OrganizationUsersPage />
+                            </DashboardLayout>
+                          </OrganizationProtectedRoute>
+                        } />
                         
                         <Route path="/admin/organizations/:id/clients" element={
                           <OrganizationProtectedRoute>
