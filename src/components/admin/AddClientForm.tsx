@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { Loader2 } from 'lucide-react';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Organization name is required'),
@@ -46,40 +46,48 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
         return;
       }
 
-      // First create the client organization
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: data.name,
-          organization_type: 'client',
-          contact_email: data.contact_email || null,
-          contact_phone: data.contact_phone || null,
-          is_active: true
-        } as any)
-        .select()
-        .single();
+      console.log('Creating client organization with data:', {
+        organization_name: data.name,
+        contact_email: data.contact_email || null,
+        service_provider_id: currentOrganization.id
+      });
 
-      if (orgError) throw orgError;
-      if (!newOrg || !('id' in newOrg)) throw new Error('Failed to create organization');
+      // Use the RPC function to create client organization
+      const { data: result, error } = await supabase.rpc('create_client_organization', {
+        organization_name: data.name,
+        contact_email: data.contact_email || null,
+        service_provider_id: currentOrganization.id
+      });
 
-      // Then create the relationship
-      const { error: relError } = await supabase
-        .from('organization_relationships')
-        .insert({
-          service_provider_id: currentOrganization.id,
-          client_id: newOrg.id,
-          relationship_start_date: new Date().toISOString().split('T')[0],
-          is_active: true
-        } as any);
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
 
-      if (relError) throw relError;
+      console.log('Client organization created successfully:', result);
 
       toast.success('Client organization created successfully');
       reset();
       if (onSuccess) onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating client:', error);
-      toast.error('Failed to create client organization');
+      
+      // Handle specific error messages from the RPC function
+      let errorMessage = 'Failed to create client organization';
+      
+      if (error.message) {
+        if (error.message.includes('already exists')) {
+          errorMessage = 'An organization with this name already exists';
+        } else if (error.message.includes('Organization name cannot be empty')) {
+          errorMessage = 'Organization name is required';
+        } else if (error.message.includes('Failed to create organization')) {
+          errorMessage = error.message.replace('Failed to create organization: ', '');
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -101,6 +109,7 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
               id="name"
               {...register('name')}
               placeholder="Enter organization name"
+              disabled={loading}
             />
             {errors.name && (
               <p className="text-sm text-red-600">{errors.name.message}</p>
@@ -114,6 +123,7 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
               type="email"
               {...register('contact_email')}
               placeholder="Enter contact email"
+              disabled={loading}
             />
             {errors.contact_email && (
               <p className="text-sm text-red-600">{errors.contact_email.message}</p>
@@ -126,15 +136,17 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
               id="contact_phone"
               {...register('contact_phone')}
               placeholder="Enter contact phone number"
+              disabled={loading}
             />
           </div>
 
           <div className="flex gap-4 pt-4">
             <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? 'Creating...' : 'Create Client'}
             </Button>
             {onCancel && (
-              <Button type="button" variant="outline" onClick={onCancel}>
+              <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
                 Cancel
               </Button>
             )}
