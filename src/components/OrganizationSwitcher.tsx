@@ -1,6 +1,5 @@
-// src/components/OrganizationSwitcher.tsx
 
-import React from "react";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,202 +8,147 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, Building2, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useOrganization } from "@/contexts/OrganizationContext";
+import { 
+  Building, 
+  ChevronDown, 
+  Users,
+  Building2
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
-const OrganizationSwitcher = () => {
+export default function OrganizationSwitcher() {
   const { 
-    currentOrganization, 
-    currentClient, 
-    userOrganizations, 
-    clientOrganizations, 
-    switchOrganization, 
-    switchClient, 
-    isServiceProvider 
+    currentOrganization,
+    currentClient,
+    userOrganizations,
+    clientOrganizations,
+    switchOrganization,
+    switchClient,
+    isServiceProvider
   } = useOrganization();
-
-  const isCurrentServiceProvider = isServiceProvider();
-
+  
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
+  const [location] = useState(window.location.pathname);
+  
+  // Debug logging to check component rendering and data
+  useEffect(() => {
+    console.log("OrganizationSwitcher rendered at:", location);
+    console.log("Current organization:", currentOrganization);
+    console.log("Current client:", currentClient);
+    console.log("Is service provider:", isServiceProvider());
+    console.log("Client organizations:", clientOrganizations);
+  }, [currentOrganization, currentClient, clientOrganizations, location]);
+  
   if (!currentOrganization) {
-    return (
-      <div className="flex items-center space-x-2">
-        <div className="w-8 h-8 bg-gray-200 rounded-md animate-pulse" />
-        <div className="space-y-1">
-          <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
-          <div className="h-2 w-16 bg-gray-200 rounded animate-pulse" />
-        </div>
-      </div>
-    );
+    return null;
   }
-
-  // Custom styles for the dropdown content to ensure proper z-index and positioning
-  const dropdownContentStyles = {
-    zIndex: 9999,
-    position: 'fixed' as const,
-    backgroundColor: 'white',
-    border: '1px solid hsl(var(--border))',
-    borderRadius: '6px',
-    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-  };
-
+  
   return (
-    <div className="flex flex-col space-y-2">
-      {/* Organization Selector */}
+    <div className="flex flex-col space-y-3 w-full min-w-[220px] max-w-[280px]" data-testid="organization-switcher">
+      {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="w-full justify-start px-2 py-1 h-auto text-left hover:bg-accent"
-          >
-            <div className="flex items-center space-x-2 min-w-0">
-              <Avatar className="h-6 w-6 shrink-0">
-                <AvatarImage src={currentOrganization.logo_url} />
-                <AvatarFallback className="text-xs">
-                  {currentOrganization.name?.charAt(0)?.toUpperCase() || 'O'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium leading-none truncate">
-                  {currentOrganization.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {currentOrganization.organization_type === 'service_provider' 
-                    ? 'Service Provider' 
-                    : 'Client'
-                  }
-                </p>
-              </div>
-              <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
+          <Button variant="outline" className="flex items-center gap-2 w-full border-gray-300 justify-between">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Building className="h-4 w-4 shrink-0" />
+              <span className="truncate">{currentOrganization.name}</span>
             </div>
+            {userOrganizations.length > 1 && (
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+            )}
           </Button>
         </DropdownMenuTrigger>
-        
-        {/* Use Portal to render outside the sidebar container and apply custom styles */}
-        <DropdownMenuPortal>
-          <DropdownMenuContent 
-            className="w-64"
-            style={dropdownContentStyles}
-            sideOffset={5}
-            align="start"
-            avoidCollisions={true}
-            collisionPadding={20}
-          >
+        {userOrganizations.length > 1 && (
+          <DropdownMenuContent align="start" className="w-56 z-[100] bg-white dark:bg-gray-800 shadow-lg">
             <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            
-            {userOrganizations.map((org) => (
-              <DropdownMenuItem
+            {userOrganizations.map(org => (
+              <DropdownMenuItem 
                 key={org.id}
+                className="flex justify-between items-center cursor-pointer"
                 onClick={() => switchOrganization(org.id)}
-                className="cursor-pointer"
               >
-                <div className="flex items-center space-x-2 w-full">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={org.logo_url} />
-                    <AvatarFallback className="text-xs">
-                      {org.name?.charAt(0)?.toUpperCase() || 'O'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium leading-none">
-                      {org.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {org.organization_type === 'service_provider' 
-                        ? 'Service Provider' 
-                        : 'Client'
-                      }
-                    </p>
-                  </div>
-                  {currentOrganization?.id === org.id && (
-                    <Check className="h-4 w-4" />
-                  )}
+                <div className="flex items-center truncate">
+                  <Building className="h-4 w-4 mr-2 opacity-70" />
+                  <span className="truncate">{org.name}</span>
                 </div>
+                {org.id === currentOrganization.id && (
+                  <Badge variant="secondary" className="ml-2">Current</Badge>
+                )}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
-        </DropdownMenuPortal>
+        )}
       </DropdownMenu>
-
-      {/* Client Selector - Only show for service providers */}
-      {isCurrentServiceProvider && clientOrganizations.length > 0 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="w-full justify-start px-2 py-1 h-auto text-left hover:bg-accent"
+      
+      {/* Client selector (only for service providers) - with enhanced visibility */}
+      {isServiceProvider() && (
+        <div className="w-full">
+          {clientOrganizations.length > 0 ? (
+            <Select
+              value={currentClient ? currentClient.id : "all_clients"}
+              onValueChange={(value) => {
+                console.log("Switching to client:", value);
+                switchClient(value);
+                toast.success(
+                  value === "all_clients"
+                    ? "Switched to all clients view"
+                    : `Switched to ${clientOrganizations.find(c => c.id === value)?.name}`
+                );
+              }}
+              open={isSelectOpen}
+              onOpenChange={setIsSelectOpen}
             >
-              <div className="flex items-center space-x-2 min-w-0">
-                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium leading-none truncate">
-                    {currentClient ? currentClient.name : 'All Clients'}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Client View
-                  </p>
-                </div>
-                <ChevronsUpDown className="ml-auto h-3 w-3 shrink-0 opacity-50" />
-              </div>
-            </Button>
-          </DropdownMenuTrigger>
-          
-          {/* Use Portal for client dropdown as well */}
-          <DropdownMenuPortal>
-            <DropdownMenuContent 
-              className="w-64"
-              style={dropdownContentStyles}
-              sideOffset={5}
-              align="start"
-              avoidCollisions={true}
-              collisionPadding={20}
-            >
-              <DropdownMenuLabel>Switch Client View</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem
-                onClick={() => switchClient("all_clients")}
-                className="cursor-pointer"
+              <SelectTrigger 
+                className="w-full flex items-center gap-2 bg-blue-100 border-blue-300 shadow-sm 
+                  dark:bg-blue-900/30 dark:border-blue-800"
               >
-                <div className="flex items-center space-x-2 w-full">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="flex-1 text-sm">All Clients</span>
-                  {!currentClient && <Check className="h-4 w-4" />}
+                <div className="flex items-center gap-2">
+                  {currentClient ? (
+                    <Building2 className="h-4 w-4" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
+                  <SelectValue placeholder="Select client" className="text-foreground font-medium">
+                    {currentClient ? currentClient.name : "All Clients"}
+                  </SelectValue>
                 </div>
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              {clientOrganizations.map((client) => (
-                <DropdownMenuItem
-                  key={client.id}
-                  onClick={() => switchClient(client.id)}
-                  className="cursor-pointer"
-                >
-                  <div className="flex items-center space-x-2 w-full">
-                    <Avatar className="h-4 w-4">
-                      <AvatarImage src={client.logo_url} />
-                      <AvatarFallback className="text-[10px]">
-                        {client.name?.charAt(0)?.toUpperCase() || 'C'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="flex-1 text-sm">{client.name}</span>
-                    {currentClient?.id === client.id && (
-                      <Check className="h-4 w-4" />
-                    )}
+              </SelectTrigger>
+              <SelectContent className="bg-popover border border-border shadow-md z-[100] w-[220px] min-w-full">
+                <SelectItem value="all_clients" className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 inline" />
+                    <span>All Clients</span>
                   </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenuPortal>
-        </DropdownMenu>
+                </SelectItem>
+                {clientOrganizations.map(client => (
+                  <SelectItem key={client.id} value={client.id} className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 inline" />
+                      <span className="truncate">{client.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Button variant="outline" disabled className="w-full flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="truncate">No Clients</span>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
-};
-
-export default OrganizationSwitcher;
+}

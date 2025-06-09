@@ -1,5 +1,3 @@
-// src/components/DashboardSidebar.tsx
-
 import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -28,78 +26,80 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
   
-  const navItems = [
+  // Update the navItems array in your DashboardSidebar.tsx
+// Replace the existing navItems array with this updated version:
+
+const navItems = [
+  { 
+    name: "Dashboard", 
+    href: "/dashboard", 
+    icon: LayoutDashboard 
+  },
+  { 
+    name: "Documents", 
+    href: "/documents", 
+    icon: FileText 
+  },
+  {
+    name: "Patients",
+    href: "/patients",
+    icon: UserRound
+  },
+  {
+    name: "Analytics",
+    href: "/analytics",
+    icon: BarChart
+  },
+  {
+    name: "Clinical Analytics",
+    href: "/clinical-analytics",
+    icon: ActivitySquare
+  },
+  {
+    name: "Occupational Health",
+    href: "/integrated-occupational-health",
+    icon: HardHat
+  },
+  {
+    name: "Reports",
+    href: "/reports",
+    icon: PieChart
+  },
+  {
+    name: "Certificate Templates",
+    href: "/certificates/templates",
+    icon: ScrollText
+  },
+  ...(isServiceProvider ? [
     { 
-      name: "Dashboard", 
-      href: "/dashboard", 
-      icon: LayoutDashboard 
+      name: "Organizations", 
+      href: "/admin/organizations", 
+      icon: Building
     },
     { 
-      name: "Documents", 
-      href: "/documents", 
-      icon: FileText 
+      name: "Clients", 
+      href: `/admin/organizations/${currentOrganization?.id}/clients`, 
+      icon: Building 
     },
-    {
-      name: "Patients",
-      href: "/patients",
-      icon: UserRound
-    },
-    {
-      name: "Analytics",
-      href: "/analytics",
-      icon: BarChart
-    },
-    {
-      name: "Clinical Analytics",
-      href: "/clinical-analytics",
-      icon: ActivitySquare
-    },
-    {
-      name: "Occupational Health",
-      href: "/integrated-occupational-health",
-      icon: HardHat
-    },
-    {
-      name: "Reports",
-      href: "/reports",
-      icon: PieChart
-    },
-    {
-      name: "Certificate Templates",
-      href: "/certificates/templates",
-      icon: ScrollText
-    },
-    ...(isServiceProvider ? [
-      { 
-        name: "Organizations", 
-        href: "/admin/organizations", 
-        icon: Building
-      },
-      { 
-        name: "Clients", 
-        href: `/admin/organizations/${currentOrganization?.id}/clients`, 
-        icon: Building 
-      },
-      { 
-        name: "Users", 
-        href: `/admin/organizations/${currentOrganization?.id}/users`, 
-        icon: Users 
-      }
-    ] : []),
     { 
-      name: "Settings", 
-      href: "/settings/organization", 
-      icon: Settings 
+      name: "Users", 
+      href: "/admin/users",  // Simplified route
+      icon: Users 
     }
-  ];
+  ] : []),
+  { 
+    name: "Settings", 
+    href: "/settings/organization", 
+    icon: Settings 
+  }
+];
 
   return (
     <div 
       className={cn(
-        "h-[calc(100vh-64px)] fixed top-16 left-0 bg-background border-r transition-all duration-300 sidebar-container",
+        "h-[calc(100vh-64px)] fixed top-16 left-0 bg-background border-r transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
-      style={{ zIndex: 40 }} // Ensure sidebar has lower z-index than dropdowns
     >
       <div className="flex flex-col h-full">
         <div className="flex-1 py-6">
@@ -138,13 +138,11 @@ export function DashboardSidebar() {
           </nav>
         </div>
         
-        {/* Keep organization switcher at the bottom of sidebar with proper container */}
+        {/* Keep organization switcher at the bottom of sidebar */}
         <div className={cn(
-          "p-4 border-t relative", // Add relative positioning
+          "p-4 border-t", 
           collapsed ? "items-center justify-center" : ""
-        )}
-        style={{ zIndex: 1 }} // Lower z-index for container
-        >
+        )}>
           {!collapsed && (
             <div className="mb-2 text-xs font-semibold text-muted-foreground">
               ORGANIZATION
