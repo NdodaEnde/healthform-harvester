@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
@@ -22,6 +21,7 @@ export default function DocumentViewer() {
   const [error, setError] = useState<string | null>(null);
   const [isValidationMode, setIsValidationMode] = useState(false);
   const [validatedData, setValidatedData] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'historical'>('historical');
 
   useEffect(() => {
     if (id) {
@@ -30,9 +30,7 @@ export default function DocumentViewer() {
   }, [id]);
 
   useEffect(() => {
-    // Initialize validated data when document loads - use the raw extracted_data
     if (document?.extracted_data) {
-      // Use the extracted_data directly, don't process it through utility functions yet
       setValidatedData(document.extracted_data);
     }
   }, [document]);
@@ -80,13 +78,11 @@ export default function DocumentViewer() {
       action: validatedData?.patient?.name ? {
         label: 'View Patient',
         onClick: () => {
-          // Optional: Navigate to patient profile if needed
           console.log('Navigate to patient:', validatedData.patient.name);
         }
       } : undefined
     });
     
-    // Refresh document data
     fetchDocument();
   };
 
@@ -94,6 +90,10 @@ export default function DocumentViewer() {
     if (document?.public_url) {
       window.open(document.public_url, '_blank');
     }
+  };
+
+  const handleTemplateChange = (template: 'modern' | 'historical') => {
+    setSelectedTemplate(template);
   };
 
   if (loading) {
@@ -186,7 +186,7 @@ export default function DocumentViewer() {
             </div>
           </div>
 
-          {/* Validation Controls - only for processed documents */}
+          {/* Validation Controls - now with template selection */}
           {isProcessed && validatedData && (
             <DocumentValidationControls
               document={document}
@@ -194,6 +194,8 @@ export default function DocumentViewer() {
               validatedData={validatedData}
               onValidationModeChange={handleValidationModeChange}
               onValidationComplete={handleValidationComplete}
+              selectedTemplate={selectedTemplate}
+              onTemplateChange={handleTemplateChange}
             />
           )}
         </CardContent>
@@ -248,6 +250,7 @@ export default function DocumentViewer() {
                 extractedData={validatedData}
                 editable={true}
                 onDataChange={handleDataChange}
+                templateType={selectedTemplate}
               />
 
               <div className="mt-4 pt-4 border-t">
@@ -269,13 +272,14 @@ export default function DocumentViewer() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Certificate Preview
+              Certificate Preview ({selectedTemplate === 'modern' ? 'Modern' : 'Historical'} Template)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <CertificateTemplate 
               extractedData={validatedData}
               editable={false}
+              templateType={selectedTemplate}
             />
           </CardContent>
         </Card>
@@ -303,7 +307,7 @@ export default function DocumentViewer() {
             This document is still being processed. Data extraction and validation features will be available once processing is complete.
           </AlertDescription>
         </Alert>
-        )}
+      )}
     </div>
   );
 }

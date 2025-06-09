@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { CheckCircle, Edit, User } from 'lucide-react';
+import { CheckCircle, Edit, User, Settings } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificatePromotionDialog from '../certificates/CertificatePromotionDialog';
 import type { DatabaseDocument } from '@/types/database';
@@ -13,6 +14,8 @@ interface DocumentValidationControlsProps {
   validatedData: any;
   onValidationModeChange: (enabled: boolean) => void;
   onValidationComplete?: () => void;
+  selectedTemplate?: 'modern' | 'historical';
+  onTemplateChange?: (template: 'modern' | 'historical') => void;
 }
 
 const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
@@ -20,7 +23,9 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   isValidated,
   validatedData,
   onValidationModeChange,
-  onValidationComplete
+  onValidationComplete,
+  selectedTemplate = 'historical', // Default to historical as discussed
+  onTemplateChange
 }) => {
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
@@ -36,6 +41,27 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     setIsPromotionDialogOpen(false);
     onValidationComplete?.();
   };
+
+  // Auto-detect template based on document data
+  const detectTemplate = (data: any): 'modern' | 'historical' => {
+    // Check if document has signature/stamp data in extracted content
+    const hasSignatureData = data?.signature || data?.stamp || 
+                             data?.structured_data?.signature || 
+                             data?.structured_data?.stamp ||
+                             data?.extracted_data?.signature ||
+                             data?.extracted_data?.stamp;
+    
+    // If no signature/stamp data found, assume historical document
+    return hasSignatureData ? 'modern' : 'historical';
+  };
+
+  // Auto-detect template when document changes
+  React.useEffect(() => {
+    if (document?.extracted_data && onTemplateChange) {
+      const detectedTemplate = detectTemplate(document.extracted_data);
+      onTemplateChange(detectedTemplate);
+    }
+  }, [document?.extracted_data, onTemplateChange]);
 
   // Transform the validated data to match what the promotion service expects
   const transformDataForPromotion = (data: any) => {
@@ -86,6 +112,21 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             Validated
           </Badge>
         )}
+      </div>
+
+      {/* Template Selection */}
+      <div className="flex items-center gap-2">
+        <Settings className="h-4 w-4 text-gray-500" />
+        <span className="text-sm font-medium">Template:</span>
+        <Select value={selectedTemplate} onValueChange={onTemplateChange}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select template" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="historical">Historical Certificate</SelectItem>
+            <SelectItem value="modern">Modern Certificate</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex gap-2">
