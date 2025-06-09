@@ -26,70 +26,73 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
   
-  const navItems = [
+  // Update the navItems array in your DashboardSidebar.tsx
+// Replace the existing navItems array with this updated version:
+
+const navItems = [
+  { 
+    name: "Dashboard", 
+    href: "/dashboard", 
+    icon: LayoutDashboard 
+  },
+  { 
+    name: "Documents", 
+    href: "/documents", 
+    icon: FileText 
+  },
+  {
+    name: "Patients",
+    href: "/patients",
+    icon: UserRound
+  },
+  {
+    name: "Analytics",
+    href: "/analytics",
+    icon: BarChart
+  },
+  {
+    name: "Clinical Analytics",
+    href: "/clinical-analytics",
+    icon: ActivitySquare
+  },
+  {
+    name: "Occupational Health",
+    href: "/integrated-occupational-health",
+    icon: HardHat
+  },
+  {
+    name: "Reports",
+    href: "/reports",
+    icon: PieChart
+  },
+  {
+    name: "Certificate Templates",
+    href: "/certificates/templates",
+    icon: ScrollText
+  },
+  ...(isServiceProvider ? [
     { 
-      name: "Dashboard", 
-      href: "/dashboard", 
-      icon: LayoutDashboard 
+      name: "Organizations", 
+      href: "/admin/organizations", 
+      icon: Building
     },
     { 
-      name: "Documents", 
-      href: "/documents", 
-      icon: FileText 
+      name: "Clients", 
+      href: `/admin/organizations/${currentOrganization?.id}/clients`, 
+      icon: Building 
     },
-    {
-      name: "Patients",
-      href: "/patients",
-      icon: UserRound
-    },
-    {
-      name: "Analytics",
-      href: "/analytics",
-      icon: BarChart
-    },
-    {
-      name: "Clinical Analytics",
-      href: "/clinical-analytics",
-      icon: ActivitySquare
-    },
-    {
-      name: "Occupational Health",
-      href: "/integrated-occupational-health",
-      icon: HardHat
-    },
-    {
-      name: "Reports",
-      href: "/reports",
-      icon: PieChart
-    },
-    {
-      name: "Certificate Templates",
-      href: "/certificates/templates",
-      icon: ScrollText
-    },
-    ...(isServiceProvider ? [
-      { 
-        name: "Organizations", 
-        href: "/admin/organizations", 
-        icon: Building
-      },
-      { 
-        name: "Clients", 
-        href: `/admin/organizations/${currentOrganization?.id}/clients`, 
-        icon: Building 
-      },
-      { 
-        name: "Users", 
-        href: `/admin/organizations/${currentOrganization?.id}/users`, 
-        icon: Users 
-      }
-    ] : []),
     { 
-      name: "Settings", 
-      href: "/settings/organization", 
-      icon: Settings 
+      name: "Users", 
+      href: "/admin/users",  // Simplified route
+      icon: Users 
     }
-  ];
+  ] : []),
+  { 
+    name: "Settings", 
+    href: "/settings/organization", 
+    icon: Settings 
+  }
+];
 
   return (
     <div 
