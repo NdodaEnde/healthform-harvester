@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw, Mail, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import InviteUserForm from '@/components/admin/InviteUserForm';
 
 interface Invitation {
   id: string;
@@ -38,7 +39,6 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
       if (error) throw error;
 
       if (data && Array.isArray(data)) {
-        // Safe type conversion with proper validation
         const typedInvitations: Invitation[] = data
           .filter((item: any): item is Record<string, any> => {
             return item !== null && 
@@ -79,6 +79,14 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
     }
   }, [organizationId]);
 
+  const handleInvitationSent = () => {
+    // Refresh the invitations list when a new invitation is sent
+    fetchInvitations();
+    if (onInvitationDeleted) {
+      onInvitationDeleted();
+    }
+  };
+
   const deleteInvitation = async (invitationId: string) => {
     try {
       const { error } = await supabase
@@ -112,57 +120,74 @@ const InvitationList: React.FC<InvitationListProps> = ({ organizationId, onInvit
     return <Badge variant="secondary">Pending</Badge>;
   };
 
-  if (loading) {
-    return (
+  return (
+    <div className="space-y-6">
+      {/* Use existing InviteUserForm component */}
       <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <RefreshCw className="h-6 w-6 animate-spin" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5" />
+            Send New Invitation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InviteUserForm 
+            organizationId={organizationId}
+            onInvite={handleInvitationSent}
+            onUserAdded={handleInvitationSent}
+          />
         </CardContent>
       </Card>
-    );
-  }
 
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle>Pending Invitations</CardTitle>
-        <Button variant="outline" size="sm" onClick={fetchInvitations}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {invitations.length === 0 ? (
-          <p className="text-muted-foreground text-center py-4">No pending invitations</p>
-        ) : (
-          <div className="space-y-4">
-            {invitations.map((invitation) => (
-              <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{invitation.email}</span>
-                    {getStatusBadge(invitation)}
+      {/* Pending Invitations List */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Pending Invitations
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={fetchInvitations} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+            </div>
+          ) : invitations.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">No pending invitations</p>
+          ) : (
+            <div className="space-y-4">
+              {invitations.map((invitation) => (
+                <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium">{invitation.email}</span>
+                      {getStatusBadge(invitation)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Role: {invitation.role} • 
+                      Sent: {format(new Date(invitation.created_at), 'MMM d, yyyy')} • 
+                      Expires: {format(new Date(invitation.expires_at), 'MMM d, yyyy')}
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Role: {invitation.role} • 
-                    Sent: {format(new Date(invitation.created_at), 'MMM d, yyyy')} • 
-                    Expires: {format(new Date(invitation.expires_at), 'MMM d, yyyy')}
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteInvitation(invitation.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteInvitation(invitation.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
