@@ -1,67 +1,108 @@
+import React from "react";
+import ModernCertificateTemplate from "./certificates/ModernCertificateTemplate";
+import HistoricalCertificateTemplate from "./certificates/HistoricalCertificateTemplate";
 
-import React, { useEffect, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-
-type HistoricalCertificateTemplateProps = {
+type CertificateTemplateProps = {
   extractedData: any;
   documentId?: string;
   editable?: boolean;
   onDataChange?: (data: any) => void;
+  templateType?: 'modern' | 'historical';
 };
 
-const HistoricalCertificateTemplate = ({
+const CertificateTemplate = ({
   extractedData,
   documentId,
   editable = false,
-  onDataChange
-}: HistoricalCertificateTemplateProps) => {
-  const [editableData, setEditableData] = useState<any>(null);
-
-  const getValue = (obj: any, path: string, defaultValue: any = '') => {
-    if (!obj || !path) return defaultValue;
-    const keys = path.split('.');
-    let current = obj;
-    for (const key of keys) {
-      if (current === undefined || current === null || typeof current !== 'object') {
-        return defaultValue;
+  onDataChange,
+  templateType = 'modern' // Default to modern for current workflow
+}: CertificateTemplateProps) => {
+  
+  // Helper function to detect signature/stamp data
+  const hasSignatureStampData = (data: any): boolean => {
+    const getValue = (obj: any, path: string): any => {
+      if (!obj || !path) return null;
+      const keys = path.split('.');
+      let current = obj;
+      for (const key of keys) {
+        if (current === undefined || current === null || typeof current !== 'object') {
+          return null;
+        }
+        current = current[key];
       }
-      current = current[key];
-    }
-    return current !== undefined && current !== null ? current : defaultValue;
-  };
-
-  const isChecked = (value: any, trueValues: string[] = ['yes', 'true', 'checked', '1', 'x']) => {
-    if (value === undefined || value === null) return false;
-    const stringValue = String(value).toLowerCase().trim();
-    return trueValues.includes(stringValue);
-  };
-
-  // Normalize extracted data for template use
-  const normalizeExtractedDataForTemplate = (extractedData: any): any => {
-    if (!extractedData) return {
-      patient: { name: '', id_number: '', company: '', occupation: '' },
-      examination_results: { 
-        date: '', 
-        type: { pre_employment: false, periodical: false, exit: false },
-        test_results: {}
-      },
-      certification: {
-        examination_date: '',
-        valid_until: '',
-        fit: false,
-        fit_with_restrictions: false,
-        fit_with_condition: false,
-        temporarily_unfit: false,
-        unfit: false,
-        comments: '',
-        follow_up: '',
-        review_date: ''
-      },
-      restrictions: {}
+      return current;
     };
 
+    // Check for signature data
+    const hasSignature = !!(
+      getValue(data, 'signature') ||
+      getValue(data, 'structured_data.signature') ||
+      getValue(data, 'extracted_data.signature') ||
+      getValue(data, 'certificate_info.signature') ||
+      getValue(data, 'structured_data.certificate_info.signature')
+    );
+
+    // Check for stamp data
+    const hasStamp = !!(
+      getValue(data, 'stamp') ||
+      getValue(data, 'structured_data.stamp') ||
+      getValue(data, 'extracted_data.stamp') ||
+      getValue(data, 'certificate_info.stamp') ||
+      getValue(data, 'structured_data.certificate_info.stamp')
+    );
+
+    return hasSignature || hasStamp;
+  };
+
+  // Determine which template to use
+  let finalTemplateType = templateType;
+  
+  // Auto-detect if not explicitly specified or if using default
+  if (extractedData) {
+    const hasSignatureStamp = hasSignatureStampData(extractedData);
+    
+    // CORRECTED LOGIC:
+    // Historical documents have signature/stamp data → Historical template
+    // Modern documents don't have signature/stamp data → Modern template
+    if (hasSignatureStamp) {
+      finalTemplateType = 'historical';
+      if (templateType === 'modern') {
+        console.log('Auto-switching to historical template due to signature/stamp data');
+      }
+    } else {
+      finalTemplateType = 'modern';
+      if (templateType === 'historical') {
+        console.log('Using modern template - no signature/stamp data found');
+      }
+    }
+  }
+  
+  if (finalTemplateType === 'historical') {
+    return (
+      <HistoricalCertificateTemplate
+        extractedData={extractedData}
+        documentId={documentId}
+        editable={editable}
+        onDataChange={onDataChange}
+      />
+    );
+  }
+
+  return (
+    <ModernCertificateTemplate
+      extractedData={extractedData}
+      documentId={documentId}
+      editable={editable}
+      onDataChange={onDataChange}
+    />
+  );
+};
+
+export default CertificateTemplate;
+
+  const normalizeExtractedDataForTemplate = (extractedData: any): any => {
+    console.log("Normalizing extracted data for template:", extractedData);
+    
     // Handle the case where data comes from document processing
     let sourceData = extractedData;
     
@@ -93,6 +134,7 @@ const HistoricalCertificateTemplate = ({
         certification: {
           examination_date: certInfo.examination_date || '',
           valid_until: certInfo.expiry_date || '',
+          stamp_date: certInfo.examination_date || '', // Initialize stamp date with examination date
           fit: certInfo.fitness_status?.fit || false,
           fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
           fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
@@ -108,16 +150,46 @@ const HistoricalCertificateTemplate = ({
     
     // If data is already in the right structure, return as-is
     if (sourceData?.patient || sourceData?.examination_results || sourceData?.certification) {
+      // Ensure stamp_date is set to examination_date if not present
+      if (sourceData.certification && !sourceData.certification.stamp_date) {
+        sourceData.certification.stamp_date = sourceData.certification.examination_date || sourceData.examination_results?.date || '';
+      }
       return sourceData;
     }
     
-    return sourceData;
+    // Return empty structure if no valid data found
+    return {
+      patient: { name: '', id_number: '', company: '', occupation: '' },
+      examination_results: { 
+        date: '', 
+        type: { pre_employment: false, periodical: false, exit: false },
+        test_results: {}
+      },
+      certification: {
+        examination_date: '',
+        valid_until: '',
+        stamp_date: '',
+        fit: false,
+        fit_with_restrictions: false,
+        fit_with_condition: false,
+        temporarily_unfit: false,
+        unfit: false,
+        comments: '',
+        follow_up: '',
+        review_date: ''
+      },
+      restrictions: {}
+    };
   };
 
   // Initialize editable data state
   useEffect(() => {
+    console.log("HistoricalCertificateTemplate received data:", extractedData);
+    
     if (extractedData) {
       const normalizedData = normalizeExtractedDataForTemplate(extractedData);
+      console.log("Normalized data:", normalizedData);
+      
       if (editable) {
         setEditableData(normalizedData);
       }
@@ -141,6 +213,7 @@ const HistoricalCertificateTemplate = ({
     setEditableData(newData);
     
     if (onDataChange) {
+      console.log('Calling onDataChange with:', newData);
       onDataChange(newData);
     }
   };
@@ -155,6 +228,8 @@ const HistoricalCertificateTemplate = ({
     editableData : 
     normalizeExtractedDataForTemplate(extractedData);
 
+  console.log("Data to render in historical template:", dataToRender);
+
   const patient = dataToRender.patient || {};
   const examination = dataToRender.examination_results || {};
   const restrictions = dataToRender.restrictions || {};
@@ -167,6 +242,45 @@ const HistoricalCertificateTemplate = ({
     fitWithCondition: isChecked(certification.fit_with_condition),
     temporarilyUnfit: isChecked(certification.temporarily_unfit),
     unfit: isChecked(certification.unfit)
+  };
+
+  const medicalTests = {
+    bloods: {
+      done: isChecked(testResults.bloods_done),
+      results: getValue(testResults, 'bloods_results', 'N/A')
+    },
+    farNearVision: {
+      done: isChecked(testResults.far_near_vision_done),
+      results: getValue(testResults, 'far_near_vision_results', 'N/A')
+    },
+    sideDepth: {
+      done: isChecked(testResults.side_depth_done),
+      results: getValue(testResults, 'side_depth_results', 'N/A')
+    },
+    nightVision: {
+      done: isChecked(testResults.night_vision_done),
+      results: getValue(testResults, 'night_vision_results', 'N/A')
+    },
+    hearing: {
+      done: isChecked(testResults.hearing_done),
+      results: getValue(testResults, 'hearing_results', 'N/A')
+    },
+    heights: {
+      done: isChecked(testResults.heights_done),
+      results: getValue(testResults, 'heights_results', 'N/A')
+    },
+    lungFunction: {
+      done: isChecked(testResults.lung_function_done),
+      results: getValue(testResults, 'lung_function_results', 'N/A')
+    },
+    xRay: {
+      done: isChecked(testResults.x_ray_done),
+      results: getValue(testResults, 'x_ray_results', 'N/A')
+    },
+    drugScreen: {
+      done: isChecked(testResults.drug_screen_done),
+      results: getValue(testResults, 'drug_screen_results', 'N/A')
+    }
   };
 
   const restrictionsData = {
@@ -344,7 +458,6 @@ const HistoricalCertificateTemplate = ({
               </table>
             </div>
             
-            {/* Medical Tests Section - Same structure as modern template */}
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-sm font-semibold mb-2">
                 MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS
@@ -352,12 +465,11 @@ const HistoricalCertificateTemplate = ({
               
               <div className="px-4">
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Left Table */}
                   <div>
                     <table className="w-full border border-gray-400">
                       <thead>
                         <tr>
-                          <th className="border border-gray-400 py-1 text-left pl-2 bg-blue-50 text-sm">Test</th>
+                          <th className="border border-gray-400 py-1 w-1/3 text-left pl-2 bg-blue-50 text-sm">BLOODS</th>
                           <th className="border border-gray-400 py-1 w-1/6 text-center bg-blue-50 text-xs">Done</th>
                           <th className="border border-gray-400 py-1 text-center bg-blue-50 text-xs">Results</th>
                         </tr>
@@ -366,68 +478,66 @@ const HistoricalCertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">BLOODS</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.bloods_done, 'examination_results.test_results.bloods_done')}
+                            {renderCheckbox(medicalTests.bloods.done, 'examination_results.test_results.bloods_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.bloods_results || ''}
+                                value={medicalTests.bloods.results === 'N/A' ? '' : medicalTests.bloods.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.bloods_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.bloods_results || '')}
+                            ) : medicalTests.bloods.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">FAR, NEAR VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.far_near_vision_done, 'examination_results.test_results.far_near_vision_done')}
+                            {renderCheckbox(medicalTests.farNearVision.done, 'examination_results.test_results.far_near_vision_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.far_near_vision_results || ''}
+                                value={medicalTests.farNearVision.results === 'N/A' ? '' : medicalTests.farNearVision.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.far_near_vision_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.far_near_vision_results || '')}
+                            ) : medicalTests.farNearVision.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">SIDE & DEPTH</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.side_depth_done, 'examination_results.test_results.side_depth_done')}
+                            {renderCheckbox(medicalTests.sideDepth.done, 'examination_results.test_results.side_depth_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.side_depth_results || ''}
+                                value={medicalTests.sideDepth.results === 'N/A' ? '' : medicalTests.sideDepth.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.side_depth_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.side_depth_results || '')}
+                            ) : medicalTests.sideDepth.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">NIGHT VISION</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.night_vision_done, 'examination_results.test_results.night_vision_done')}
+                            {renderCheckbox(medicalTests.nightVision.done, 'examination_results.test_results.night_vision_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.night_vision_results || ''}
+                                value={medicalTests.nightVision.results === 'N/A' ? '' : medicalTests.nightVision.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.night_vision_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.night_vision_results || '')}
+                            ) : medicalTests.nightVision.results}
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-                  
-                  {/* Right Table */}
                   <div>
                     <table className="w-full border border-gray-400">
                       <thead>
@@ -441,76 +551,76 @@ const HistoricalCertificateTemplate = ({
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Hearing</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.hearing_done, 'examination_results.test_results.hearing_done')}
+                            {renderCheckbox(medicalTests.hearing.done, 'examination_results.test_results.hearing_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.hearing_results || ''}
+                                value={medicalTests.hearing.results === 'N/A' ? '' : medicalTests.hearing.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.hearing_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.hearing_results || '')}
+                            ) : medicalTests.hearing.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Working at Heights</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.heights_done, 'examination_results.test_results.heights_done')}
+                            {renderCheckbox(medicalTests.heights.done, 'examination_results.test_results.heights_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.heights_results || ''}
+                                value={medicalTests.heights.results === 'N/A' ? '' : medicalTests.heights.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.heights_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.heights_results || '')}
+                            ) : medicalTests.heights.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Lung Function</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.lung_function_done, 'examination_results.test_results.lung_function_done')}
+                            {renderCheckbox(medicalTests.lungFunction.done, 'examination_results.test_results.lung_function_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.lung_function_results || ''}
+                                value={medicalTests.lungFunction.results === 'N/A' ? '' : medicalTests.lungFunction.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.lung_function_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.lung_function_results || '')}
+                            ) : medicalTests.lungFunction.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">X-Ray</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.x_ray_done, 'examination_results.test_results.x_ray_done')}
+                            {renderCheckbox(medicalTests.xRay.done, 'examination_results.test_results.x_ray_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.x_ray_results || ''}
+                                value={medicalTests.xRay.results === 'N/A' ? '' : medicalTests.xRay.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.x_ray_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.x_ray_results || '')}
+                            ) : medicalTests.xRay.results}
                           </td>
                         </tr>
                         <tr>
                           <td className="border border-gray-400 pl-2 text-sm">Drug Screen</td>
                           <td className="border border-gray-400 text-center">
-                            {renderCheckbox(testResults.drug_screen_done, 'examination_results.test_results.drug_screen_done')}
+                            {renderCheckbox(medicalTests.drugScreen.done, 'examination_results.test_results.drug_screen_done')}
                           </td>
                           <td className="border border-gray-400 p-1 text-sm">
                             {editable ? (
                               <Input
-                                value={testResults.drug_screen_results || ''}
+                                value={medicalTests.drugScreen.results === 'N/A' ? '' : medicalTests.drugScreen.results}
                                 onChange={(e) => handleFieldChange('examination_results.test_results.drug_screen_results', e.target.value)}
                                 className="border-0 bg-transparent px-1 py-0 h-auto text-xs"
                               />
-                            ) : (testResults.drug_screen_results || '')}
+                            ) : medicalTests.drugScreen.results}
                           </td>
                         </tr>
                       </tbody>
@@ -520,7 +630,23 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Restrictions Section */}
+            <div className="px-4 mb-4">
+              <div className="flex items-center">
+                <div className="font-semibold text-sm mr-1">Referred or follow up actions:</div>
+                <div className="border-b border-gray-400 flex-1">
+                  {renderField(certification.follow_up || '', 'certification.follow_up')}
+                </div>
+                <div className="ml-2">
+                  <div className="text-sm">
+                    <span className="font-semibold mr-1">Review Date:</span>
+                    <span className="text-red-600">
+                      {renderField(certification.review_date || '', 'certification.review_date', 'text-red-600')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div className="mb-4">
               <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-2">
                 Restrictions:
@@ -586,7 +712,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Fitness Assessment Section */}
             <div className="mb-2">
               <div className="bg-gray-800 text-white text-center py-1 text-xs font-semibold mb-1">
                 FITNESS ASSESSMENT
@@ -632,7 +757,6 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Comments Section */}
             <div className="px-4 mb-1">
               <div className="font-semibold text-xs mb-0.5">Comments:</div>
               <div className="border border-gray-400 p-1 min-h-8 text-xs">
@@ -646,15 +770,14 @@ const HistoricalCertificateTemplate = ({
               </div>
             </div>
             
-            {/* Historical Signature and Stamp Section */}
             <div className="px-4 mb-3">
               <div className="flex justify-between items-end">
                 <div className="flex-1">
-                  <div className="max-w-56">
+                  <div className="border-t border-gray-400 pt-1 mt-4 max-w-56">
                     <div className="min-h-16 flex items-center justify-center">
                       <img 
                         src="/lovable-uploads/signature-image.png" 
-                        alt="Historical Signature" 
+                        alt="Signature" 
                         className="max-h-12 w-auto object-contain"
                       />
                     </div>
@@ -672,26 +795,26 @@ const HistoricalCertificateTemplate = ({
                 </div>
                 
                 <div className="flex-1 text-right">
-                  <div className="max-w-56 ml-auto">
+                  <div className="border-t border-gray-400 pt-1 mt-4 max-w-56 ml-auto">
                     <div className="min-h-16 flex items-center justify-center relative">
                       <img 
                         src="/lovable-uploads/stamp-image.png" 
-                        alt="Historical Stamp" 
+                        alt="Stamp" 
                         className="max-h-16 w-auto object-contain"
                       />
-                      {/* Overlay date on stamp */}
+                      {/* Editable date overlay on stamp */}
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center mt-2">
+                        <div className="text-center">
                           {editable ? (
                             <Input
-                              value={examination.date || certification.examination_date || ''}
-                              onChange={(e) => handleFieldChange('examination_results.date', e.target.value)}
-                              className="border-0 bg-transparent px-1 py-0 h-auto text-xs font-bold text-center w-20 focus:bg-white focus:bg-opacity-70"
+                              value={certification.stamp_date || certification.examination_date || ''}
+                              onChange={(e) => handleFieldChange('certification.stamp_date', e.target.value)}
+                              className="w-20 h-6 text-xs text-center border-0 bg-transparent font-bold text-black focus:ring-1 focus:ring-blue-500 rounded"
                               placeholder="DD-MM-YYYY"
                             />
                           ) : (
                             <span className="text-xs font-bold text-black">
-                              {examination.date || certification.examination_date || ''}
+                              {certification.stamp_date || certification.examination_date || ''}
                             </span>
                           )}
                         </div>
