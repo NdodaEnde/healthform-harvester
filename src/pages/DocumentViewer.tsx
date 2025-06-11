@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +27,7 @@ export default function DocumentViewer() {
   const isManualSelection = useRef(false);
   const hasAutoDetected = useRef(false);
   const documentId = useRef<string | null>(null);
+  const autoDetectionRan = useRef(false); // Additional safeguard
 
   useEffect(() => {
     if (id) {
@@ -47,121 +48,131 @@ export default function DocumentViewer() {
       documentId.current = document.id;
       isManualSelection.current = false;
       hasAutoDetected.current = false;
+      autoDetectionRan.current = false;
     }
   }, [document?.id]);
 
-  // Auto-detection useEffect - now works with proper Edge Function boolean flags
+  // FIXED: Auto-detection useEffect with better guards
   useEffect(() => {
-    if (document?.extracted_data && !isManualSelection.current && !hasAutoDetected.current) {
-      console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
-      console.log('Full extracted_data:', document.extracted_data);
-    
-      // Get the structured data from Edge Function
-      const structuredData = document.extracted_data.structured_data;
-      const certificateInfo = structuredData?.certificate_info;
-      const rawContent = document.extracted_data.raw_content || '';
-    
-      console.log('Certificate info:', certificateInfo);
-      console.log('Raw content sample:', rawContent.substring(0, 200));
-    
-      // Check explicit boolean flags from enhanced Edge Function
-      let hasSignature = false;
-      let hasStamp = false;
+    // Strong guards to prevent multiple runs
+    if (!document?.extracted_data || 
+        isManualSelection.current || 
+        hasAutoDetected.current || 
+        autoDetectionRan.current) {
       
-      // PRIORITY 1: Check explicit boolean flags from Edge Function
-      if (certificateInfo?.signature === true) {
-        hasSignature = true;
-        console.log('✅ Signature detected from Edge Function boolean flag');
+      if (isManualSelection.current) {
+        console.log('⚡ Skipping auto-detection - user has manually selected template');
+      } else if (hasAutoDetected.current || autoDetectionRan.current) {
+        console.log('⚡ Skipping auto-detection - already completed for this document');
       }
-      
-      if (certificateInfo?.stamp === true) {
-        hasStamp = true;
-        console.log('✅ Stamp detected from Edge Function boolean flag');
-      }
-      
-      // PRIORITY 2: Fallback to enhanced content analysis if flags not set
-      if (!hasSignature || !hasStamp) {
-        console.log('Using fallback content analysis...');
-        
-        const contentLower = rawContent.toLowerCase();
-        
-        // Look for signature indicators - comprehensive list
-        if (!hasSignature) {
-          const signatureKeywords = [
-            'signature:',
-            'handwritten signature',
-            'stylized flourish',
-            'placed above the printed word "signature"',
-            'overlapping strokes',
-            'signature consists of',
-            'tall, looping, and angular strokes',
-            'handwriting & style',
-            'multiple overlapping lines',
-            'horizontal flourish'
-          ];
-          
-          hasSignature = signatureKeywords.some(keyword => contentLower.includes(keyword));
-          if (hasSignature) {
-            console.log('✅ Signature detected from enhanced raw content analysis');
-          }
-        }
-        
-        // Look for stamp indicators - comprehensive list
-        if (!hasStamp) {
-          const stampKeywords = [
-            'stamp:',
-            'rectangular black stamp',
-            'practice no',
-            'practice number',
-            'practice no.',
-            'practice no:',
-            'sanc no',
-            'sanc number',
-            'sasohn no',
-            'mp no',
-            'mp number',
-            'black stamp',
-            'official stamp',
-            'hpcsa',
-            'with partial text and date'
-          ];
-          
-          hasStamp = stampKeywords.some(keyword => contentLower.includes(keyword));
-          if (hasStamp) {
-            console.log('✅ Stamp detected from enhanced raw content analysis');
-          }
-        }
-      }
-      
-      const hasSignatureStampData = hasSignature || hasStamp;
-    
-      const detectionResult = {
-        hasSignature,
-        hasStamp,
-        hasSignatureStampData,
-        detectedTemplate: hasSignatureStampData ? 'historical' : 'modern',
-        reasoning: hasSignatureStampData 
-          ? `Found ${hasSignature ? 'signature' : ''}${hasSignature && hasStamp ? ' and ' : ''}${hasStamp ? 'stamp' : ''} → Historical template (filed record)` 
-          : 'No signature/stamp data → Modern template (current workflow)'
-      };
-    
-      console.log('Enhanced template detection:', detectionResult);
-    
-      // Apply auto-detection
-      const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
-      setSelectedTemplate(detectedTemplate);
-      
-      console.log(`✅ Auto-detected: ${detectedTemplate} template (${detectionResult.reasoning})`);
-      
-      // Mark that auto-detection has run
-      hasAutoDetected.current = true;
-      console.log('=== END AUTO-DETECTION ===');
-    } else if (isManualSelection.current) {
-      console.log('⚡ Skipping auto-detection - user has manually selected template');
-    } else if (hasAutoDetected.current) {
-      console.log('⚡ Skipping auto-detection - already completed for this document');
+      return;
     }
-  }, [document?.extracted_data]);
+
+    console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
+    console.log('Full extracted_data:', document.extracted_data);
+
+    // Get the structured data from Edge Function
+    const structuredData = document.extracted_data.structured_data;
+    const certificateInfo = structuredData?.certificate_info;
+    const rawContent = document.extracted_data.raw_content || '';
+
+    console.log('Certificate info:', certificateInfo);
+    console.log('Raw content sample:', rawContent.substring(0, 200));
+
+    // Check explicit boolean flags from enhanced Edge Function
+    let hasSignature = false;
+    let hasStamp = false;
+    
+    // PRIORITY 1: Check explicit boolean flags from Edge Function
+    if (certificateInfo?.signature === true) {
+      hasSignature = true;
+      console.log('✅ Signature detected from Edge Function boolean flag');
+    }
+    
+    if (certificateInfo?.stamp === true) {
+      hasStamp = true;
+      console.log('✅ Stamp detected from Edge Function boolean flag');
+    }
+    
+    // PRIORITY 2: Fallback to enhanced content analysis if flags not set
+    if (!hasSignature || !hasStamp) {
+      console.log('Using fallback content analysis...');
+      
+      const contentLower = rawContent.toLowerCase();
+      
+      // Look for signature indicators - comprehensive list
+      if (!hasSignature) {
+        const signatureKeywords = [
+          'signature:',
+          'handwritten signature',
+          'stylized flourish',
+          'placed above the printed word "signature"',
+          'overlapping strokes',
+          'signature consists of',
+          'tall, looping, and angular strokes',
+          'handwriting & style',
+          'multiple overlapping lines',
+          'horizontal flourish'
+        ];
+        
+        hasSignature = signatureKeywords.some(keyword => contentLower.includes(keyword));
+        if (hasSignature) {
+          console.log('✅ Signature detected from enhanced raw content analysis');
+        }
+      }
+      
+      // Look for stamp indicators - comprehensive list
+      if (!hasStamp) {
+        const stampKeywords = [
+          'stamp:',
+          'rectangular black stamp',
+          'practice no',
+          'practice number',
+          'practice no.',
+          'practice no:',
+          'sanc no',
+          'sanc number',
+          'sasohn no',
+          'mp no',
+          'mp number',
+          'black stamp',
+          'official stamp',
+          'hpcsa',
+          'with partial text and date'
+        ];
+        
+        hasStamp = stampKeywords.some(keyword => contentLower.includes(keyword));
+        if (hasStamp) {
+          console.log('✅ Stamp detected from enhanced raw content analysis');
+        }
+      }
+    }
+    
+    const hasSignatureStampData = hasSignature || hasStamp;
+
+    const detectionResult = {
+      hasSignature,
+      hasStamp,
+      hasSignatureStampData,
+      detectedTemplate: hasSignatureStampData ? 'historical' : 'modern',
+      reasoning: hasSignatureStampData 
+        ? `Found ${hasSignature ? 'signature' : ''}${hasSignature && hasStamp ? ' and ' : ''}${hasStamp ? 'stamp' : ''} → Historical template (filed record)` 
+        : 'No signature/stamp data → Modern template (current workflow)'
+    };
+
+    console.log('Enhanced template detection:', detectionResult);
+
+    // Apply auto-detection
+    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
+    setSelectedTemplate(detectedTemplate);
+    
+    console.log(`✅ Auto-detected: ${detectedTemplate} template (${detectionResult.reasoning})`);
+    
+    // Mark that auto-detection has run - multiple safeguards
+    hasAutoDetected.current = true;
+    autoDetectionRan.current = true;
+    console.log('=== END AUTO-DETECTION ===');
+  }, [document?.extracted_data]); // Only depend on extracted_data
 
   const fetchDocument = async () => {
     try {
@@ -220,20 +231,21 @@ export default function DocumentViewer() {
     }
   };
 
-  const handleTemplateChange = (template: 'modern' | 'historical') => {
+  // FIXED: More robust manual template change handler
+  const handleTemplateChange = useCallback((template: 'modern' | 'historical') => {
     console.log(`🎯 Template manually changed to: ${template}`);
     console.log('Previous template:', selectedTemplate);
     console.log('Manual selection flag before:', isManualSelection.current);
     
-    // Set the template first
-    setSelectedTemplate(template);
-    
-    // Mark as manual selection to prevent auto-detection override
+    // Set manual selection flag FIRST to prevent any auto-detection interference
     isManualSelection.current = true;
     
-    console.log('Manual selection flag set to true - auto-detection will be skipped');
+    // Then set the template
+    setSelectedTemplate(template);
+    
+    console.log('Manual selection flag set to true - auto-detection will be permanently disabled');
     console.log('Template should now be:', template);
-  };
+  }, [selectedTemplate]);
 
   if (loading) {
     return (
@@ -325,12 +337,13 @@ export default function DocumentViewer() {
             </div>
           </div>
 
-          {/* Debug info - remove this in production */}
+          {/* Debug info - shows current state */}
           {process.env.NODE_ENV === 'development' && isProcessed && validatedData && (
             <div className="p-3 bg-gray-100 rounded text-xs">
               <p><strong>Debug:</strong></p>
               <p>Manual selection: {isManualSelection.current ? 'Yes' : 'No'}</p>
               <p>Auto-detected: {hasAutoDetected.current ? 'Yes' : 'No'}</p>
+              <p>Auto-detection ran: {autoDetectionRan.current ? 'Yes' : 'No'}</p>
               <p>Selected template: {selectedTemplate}</p>
             </div>
           )}
