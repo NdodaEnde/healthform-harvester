@@ -50,7 +50,7 @@ export default function DocumentViewer() {
     }
   }, [document?.id]);
 
-  // Auto-detection useEffect - improved logic with better signature/stamp detection
+  // Auto-detection useEffect - now works with proper Edge Function boolean flags
   useEffect(() => {
     if (document?.extracted_data && !isManualSelection.current && !hasAutoDetected.current) {
       console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
@@ -64,26 +64,28 @@ export default function DocumentViewer() {
       console.log('Certificate info:', certificateInfo);
       console.log('Raw content sample:', rawContent.substring(0, 200));
     
-      // Enhanced signature/stamp detection
+      // Check explicit boolean flags from enhanced Edge Function
       let hasSignature = false;
       let hasStamp = false;
       
-      // Check Edge Function results first
+      // PRIORITY 1: Check explicit boolean flags from Edge Function
       if (certificateInfo?.signature === true) {
         hasSignature = true;
-        console.log('✅ Signature detected from Edge Function certificate_info');
+        console.log('✅ Signature detected from Edge Function boolean flag');
       }
       
       if (certificateInfo?.stamp === true) {
         hasStamp = true;
-        console.log('✅ Stamp detected from Edge Function certificate_info');
+        console.log('✅ Stamp detected from Edge Function boolean flag');
       }
       
-      // Enhanced fallback: Check raw content for signature/stamp indicators
+      // PRIORITY 2: Fallback to enhanced content analysis if flags not set
       if (!hasSignature || !hasStamp) {
+        console.log('Using fallback content analysis...');
+        
         const contentLower = rawContent.toLowerCase();
         
-        // Look for signature indicators - more comprehensive
+        // Look for signature indicators - comprehensive list
         if (!hasSignature) {
           const signatureKeywords = [
             'signature:',
@@ -93,9 +95,9 @@ export default function DocumentViewer() {
             'overlapping strokes',
             'signature consists of',
             'tall, looping, and angular strokes',
-            'dr mj mphuthi',
-            'occupational medicine practitioner',
-            'practitioner signature'
+            'handwriting & style',
+            'multiple overlapping lines',
+            'horizontal flourish'
           ];
           
           hasSignature = signatureKeywords.some(keyword => contentLower.includes(keyword));
@@ -104,7 +106,7 @@ export default function DocumentViewer() {
           }
         }
         
-        // Look for stamp indicators - more comprehensive
+        // Look for stamp indicators - comprehensive list
         if (!hasStamp) {
           const stampKeywords = [
             'stamp:',
