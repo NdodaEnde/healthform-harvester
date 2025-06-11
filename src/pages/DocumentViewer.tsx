@@ -50,7 +50,88 @@ export default function DocumentViewer() {
     }
   }, [document?.id]);
 
-
+  // Auto-detection useEffect - improved logic with better signature/stamp detection
+  useEffect(() => {
+    if (document?.extracted_data && !isManualSelection.current && !hasAutoDetected.current) {
+      console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
+      console.log('Full extracted_data:', document.extracted_data);
+    
+      // Get the structured data from Edge Function
+      const structuredData = document.extracted_data.structured_data;
+      const certificateInfo = structuredData?.certificate_info;
+      const rawContent = document.extracted_data.raw_content || '';
+    
+      console.log('Certificate info:', certificateInfo);
+      console.log('Raw content sample:', rawContent.substring(0, 200));
+    
+      // Enhanced signature/stamp detection
+      let hasSignature = false;
+      let hasStamp = false;
+      
+      // Check Edge Function results first
+      if (certificateInfo?.signature === true) {
+        hasSignature = true;
+        console.log('✅ Signature detected from Edge Function certificate_info');
+      }
+      
+      if (certificateInfo?.stamp === true) {
+        hasStamp = true;
+        console.log('✅ Stamp detected from Edge Function certificate_info');
+      }
+      
+      // Enhanced fallback: Check raw content for signature/stamp indicators
+      if (!hasSignature || !hasStamp) {
+        const contentLower = rawContent.toLowerCase();
+        
+        // Look for signature indicators - more comprehensive
+        if (!hasSignature) {
+          const signatureKeywords = [
+            'signature:',
+            'handwritten signature',
+            'stylized flourish',
+            'placed above the printed word "signature"',
+            'overlapping strokes',
+            'signature consists of',
+            'tall, looping, and angular strokes',
+            'dr mj mphuthi',
+            'occupational medicine practitioner',
+            'practitioner signature'
+          ];
+          
+          hasSignature = signatureKeywords.some(keyword => contentLower.includes(keyword));
+          if (hasSignature) {
+            console.log('✅ Signature detected from enhanced raw content analysis');
+          }
+        }
+        
+        // Look for stamp indicators - more comprehensive
+        if (!hasStamp) {
+          const stampKeywords = [
+            'stamp:',
+            'rectangular black stamp',
+            'practice no',
+            'practice number',
+            'practice no.',
+            'practice no:',
+            'sanc no',
+            'sanc number',
+            'sasohn no',
+            'mp no',
+            'mp number',
+            'black stamp',
+            'official stamp',
+            'hpcsa',
+            'with partial text and date'
+          ];
+          
+          hasStamp = stampKeywords.some(keyword => contentLower.includes(keyword));
+          if (hasStamp) {
+            console.log('✅ Stamp detected from enhanced raw content analysis');
+          }
+        }
+      }
+      
+      const hasSignatureStampData = hasSignature || hasStamp;
     
       const detectionResult = {
         hasSignature,
@@ -139,9 +220,17 @@ export default function DocumentViewer() {
 
   const handleTemplateChange = (template: 'modern' | 'historical') => {
     console.log(`🎯 Template manually changed to: ${template}`);
+    console.log('Previous template:', selectedTemplate);
+    console.log('Manual selection flag before:', isManualSelection.current);
+    
+    // Set the template first
     setSelectedTemplate(template);
-    isManualSelection.current = true; // Mark as manual selection
-    console.log('Manual selection flag set to true');
+    
+    // Mark as manual selection to prevent auto-detection override
+    isManualSelection.current = true;
+    
+    console.log('Manual selection flag set to true - auto-detection will be skipped');
+    console.log('Template should now be:', template);
   };
 
   if (loading) {
