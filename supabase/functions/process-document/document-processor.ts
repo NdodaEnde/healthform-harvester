@@ -5,6 +5,91 @@ import { processCertificateOfFitnessData } from "./processors/certificate-of-fit
 import type { ParsedSAID } from "./sa-id-parser.ts";
 import { parseSouthAfricanIDNumber, normalizeIDNumber } from "./sa-id-parser.ts";
 
+/**
+ * Analyzes LandingAI chunks to detect signature and stamp presence
+ */
+function detectSignatureAndStamp(result: any): { signature: boolean; stamp: boolean } {
+  console.log('=== SIGNATURE/STAMP DETECTION FROM LANDINGAI ===');
+  
+  const signatureDetection = {
+    signature: false,
+    stamp: false
+  };
+
+  try {
+    // Check if we have chunks array
+    const chunks = result?.chunks || result?.data?.chunks || [];
+    console.log('Analyzing chunks for signature/stamp detection:', chunks.length);
+
+    if (Array.isArray(chunks)) {
+      chunks.forEach((chunk: any, index: number) => {
+        const chunkText = (chunk.text || '').toLowerCase();
+        const chunkType = chunk.chunk_type || '';
+        
+        console.log(`Chunk ${index}:`, {
+          type: chunkType,
+          textSample: chunkText.substring(0, 100),
+          hasSignatureKeywords: chunkText.includes('signature'),
+          hasStampKeywords: chunkText.includes('stamp')
+        });
+
+        // Detect signature
+        if (chunkType === 'figure' && (
+          chunkText.includes('signature') ||
+          chunkText.includes('scanned') ||
+          chunkText.includes('digital signature') ||
+          chunkText.includes('handwriting') ||
+          chunkText.includes('pen strokes')
+        )) {
+          signatureDetection.signature = true;
+          console.log('✅ SIGNATURE detected in figure chunk:', chunk.chunk_id);
+        }
+
+        // Detect stamp
+        if ((chunkType === 'text' || chunkType === 'figure') && (
+          chunkText.includes('stamp') ||
+          chunkText.includes('practice no') ||
+          chunkText.includes('practice number')
+        )) {
+          signatureDetection.stamp = true;
+          console.log('✅ STAMP detected in chunk:', chunk.chunk_id);
+        }
+      });
+    }
+
+    // Also check markdown content as fallback
+    const markdown = result?.markdown || result?.data?.markdown || '';
+    if (typeof markdown === 'string') {
+      const markdownLower = markdown.toLowerCase();
+      
+      if (!signatureDetection.signature && (
+        markdownLower.includes('signature') ||
+        markdownLower.includes('scanned or digital signature') ||
+        markdownLower.includes('handwriting features')
+      )) {
+        signatureDetection.signature = true;
+        console.log('✅ SIGNATURE detected in markdown content');
+      }
+
+      if (!signatureDetection.stamp && (
+        markdownLower.includes('stamp') ||
+        markdownLower.includes('practice no')
+      )) {
+        signatureDetection.stamp = true;
+        console.log('✅ STAMP detected in markdown content');
+      }
+    }
+
+  } catch (error) {
+    console.error('Error in signature/stamp detection:', error);
+  }
+
+  console.log('Final detection results:', signatureDetection);
+  console.log('=== END SIGNATURE/STAMP DETECTION ===');
+  
+  return signatureDetection;
+}
+
 // Process document with Landing AI API
 export async function processDocumentWithLandingAI(file: File, documentType: string, documentId: string, supabase: any) {
   try {
@@ -71,7 +156,20 @@ export async function processDocumentWithLandingAI(file: File, documentType: str
     if (documentType === 'medical-questionnaire') {
       initialData = processMedicalQuestionnaireData(result);
     } else {
+      // Detect signature and stamp before processing
+      const { signature, stamp } = detectSignatureAndStamp(result);
       initialData = processCertificateOfFitnessData(result);
+  
+      // Add signature/stamp to the structured data
+      if (initialData) {
+        initialData.signature = signature;
+        initialData.stamp = stamp;
+        // Also add to certificate_info if it exists
+        if (initialData.certificate_info) {
+          initialData.certificate_info.signature = signature;
+          initialData.certificate_info.stamp = stamp;
+        }
+      }
     }
     
     console.log('Initial structured data:', JSON.stringify(initialData));
