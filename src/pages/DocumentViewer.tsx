@@ -177,7 +177,7 @@ export default function DocumentViewer() {
     } else if (isManualSelection) {
       console.log('⚡ Skipping auto-detection - user has manually selected template');
     }
-  }
+  }, [document, isManualSelection]);
 
   const fetchDocument = async () => {
     try {
