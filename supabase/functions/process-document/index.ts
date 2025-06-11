@@ -14,6 +14,91 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Use environment variable for API endpoint with the correct name
 const microserviceUrl = Deno.env.get('SDK_MICROSERVICE_URL') || 'https://document-processing-service.onrender.com';
 
+/**
+ * Analyzes LandingAI chunks to detect signature and stamp presence
+ */
+function detectSignatureAndStamp(result: any): { signature: boolean; stamp: boolean } {
+  console.log('=== SIGNATURE/STAMP DETECTION FROM LANDINGAI ===');
+  
+  const signatureDetection = {
+    signature: false,
+    stamp: false
+  };
+
+  try {
+    // Check if we have chunks array
+    const chunks = result?.chunks || result?.data?.chunks || [];
+    console.log('Analyzing chunks for signature/stamp detection:', chunks.length);
+
+    if (Array.isArray(chunks)) {
+      chunks.forEach((chunk: any, index: number) => {
+        const chunkText = (chunk.text || '').toLowerCase();
+        const chunkType = chunk.chunk_type || '';
+        
+        console.log(`Chunk ${index}:`, {
+          type: chunkType,
+          textSample: chunkText.substring(0, 100),
+          hasSignatureKeywords: chunkText.includes('signature'),
+          hasStampKeywords: chunkText.includes('stamp')
+        });
+
+        // Detect signature
+        if (chunkType === 'figure' && (
+          chunkText.includes('signature') ||
+          chunkText.includes('scanned') ||
+          chunkText.includes('digital signature') ||
+          chunkText.includes('handwriting') ||
+          chunkText.includes('pen strokes')
+        )) {
+          signatureDetection.signature = true;
+          console.log('✅ SIGNATURE detected in figure chunk:', chunk.chunk_id);
+        }
+
+        // Detect stamp
+        if ((chunkType === 'text' || chunkType === 'figure') && (
+          chunkText.includes('stamp') ||
+          chunkText.includes('practice no') ||
+          chunkText.includes('practice number')
+        )) {
+          signatureDetection.stamp = true;
+          console.log('✅ STAMP detected in chunk:', chunk.chunk_id);
+        }
+      });
+    }
+
+    // Also check markdown content as fallback
+    const markdown = result?.markdown || result?.data?.markdown || '';
+    if (typeof markdown === 'string') {
+      const markdownLower = markdown.toLowerCase();
+      
+      if (!signatureDetection.signature && (
+        markdownLower.includes('signature') ||
+        markdownLower.includes('scanned or digital signature') ||
+        markdownLower.includes('handwriting features')
+      )) {
+        signatureDetection.signature = true;
+        console.log('✅ SIGNATURE detected in markdown content');
+      }
+
+      if (!signatureDetection.stamp && (
+        markdownLower.includes('stamp') ||
+        markdownLower.includes('practice no')
+      )) {
+        signatureDetection.stamp = true;
+        console.log('✅ STAMP detected in markdown content');
+      }
+    }
+
+  } catch (error) {
+    console.error('Error in signature/stamp detection:', error);
+  }
+
+  console.log('Final detection results:', signatureDetection);
+  console.log('=== END SIGNATURE/STAMP DETECTION ===');
+  
+  return signatureDetection;
+}
+
 // Enhanced certificate extraction function
 function extractCertificateInfo(rawContent: string): any {
   if (!rawContent) return {};
@@ -21,6 +106,10 @@ function extractCertificateInfo(rawContent: string): any {
   console.log("=== ENHANCED CERTIFICATE EXTRACTION ===");
   console.log("Raw content preview (first 500 chars):");
   console.log(rawContent.substring(0, 500));
+
+  //Detect signature and stamp from raw content
+  const { signature, stamp } = detectSignatureAndStamp({ markdown: rawContent });
+  console.log('Signature/stamp detection results:', { signature, stamp });
   
   const certificateInfo: any = {};
   
@@ -356,6 +445,10 @@ function extractCertificateInfo(rawContent: string): any {
   console.log("=== FINAL CERTIFICATE INFO ===");
   console.log("Certificate info keys:", Object.keys(certificateInfo));
   console.log("Certificate info:", JSON.stringify(certificateInfo, null, 2));
+
+  // ADD THESE FIELDS BEFORE THE RETURN
+  certificateInfo.signature = signature;
+  certificateInfo.stamp = stamp;
   
   return certificateInfo;
 }
