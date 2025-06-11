@@ -38,142 +38,41 @@ export default function DocumentViewer() {
     }
   }, [document]);
 
-  // ENHANCED Auto-detection useEffect with debugging and manual selection protection
+  // SIMPLIFIED Auto-detection useEffect - looks for signature/stamp fields from Edge Function
   useEffect(() => {
-    if (document?.extracted_data && !isManualSelection) { // Only auto-detect if not manually selected
-      console.log('=== SIGNATURE/STAMP DETECTION DEBUG ===');
+    if (document?.extracted_data && !isManualSelection) {
+      console.log('=== SIGNATURE/STAMP DETECTION ===');
       console.log('Full extracted_data:', document.extracted_data);
-      
-      // Enhanced detection function
-      const hasSignatureStampData = (data: any): boolean => {
-        const getValue = (obj: any, path: string): any => {
-          if (!obj || !path) return null;
-          const keys = path.split('.');
-          let current = obj;
-          for (const key of keys) {
-            if (current === undefined || current === null || typeof current !== 'object') {
-              return null;
-            }
-            current = current[key];
-          }
-          return current;
-        };
-
-        // More comprehensive search paths
-        const signaturePaths = [
-          'signature',
-          'structured_data.signature', 
-          'extracted_data.signature',
-          'certificate_info.signature',
-          'structured_data.certificate_info.signature',
-          'signature_present',
-          'has_signature',
-          'signed',
-          'doctor_signature',
-          'physician_signature'
-        ];
-
-        const stampPaths = [
-          'stamp',
-          'structured_data.stamp',
-          'extracted_data.stamp', 
-          'certificate_info.stamp',
-          'structured_data.certificate_info.stamp',
-          'stamp_present',
-          'has_stamp',
-          'stamped',
-          'official_stamp',
-          'practice_stamp',
-          'date_stamp'
-        ];
-
-        console.log('Checking signature paths...');
-        let hasSignature = false;
-        for (const path of signaturePaths) {
-          const value = getValue(data, path);
-          console.log(`  ${path}:`, value);
-          if (value) {
-            hasSignature = true;
-            console.log(`  ✓ Found signature data at: ${path}`);
-          }
-        }
-
-        console.log('Checking stamp paths...');
-        let hasStamp = false;
-        for (const path of stampPaths) {
-          const value = getValue(data, path);
-          console.log(`  ${path}:`, value);
-          if (value) {
-            hasStamp = true;
-            console.log(`  ✓ Found stamp data at: ${path}`);
-          }
-        }
-
-        // Keyword-based detection as fallback
-        console.log('Checking for signature/stamp keywords...');
-        const dataString = JSON.stringify(data).toLowerCase();
-        const signatureKeywords = ['signature', 'dr ', 'doctor', 'physician', 'signed'];
-        const stampKeywords = ['stamp', 'practice no', 'practice number', 'sanc no'];
-        
-        let hasSignatureKeywords = false;
-        let hasStampKeywords = false;
-        
-        for (const keyword of signatureKeywords) {
-          if (dataString.includes(keyword)) {
-            hasSignatureKeywords = true;
-            console.log(`  ✓ Found signature keyword: "${keyword}"`);
-            break;
-          }
-        }
-        
-        for (const keyword of stampKeywords) {
-          if (dataString.includes(keyword)) {
-            hasStampKeywords = true;
-            console.log(`  ✓ Found stamp keyword: "${keyword}"`);
-            break;
-          }
-        }
-
-        // Medical certificate heuristic - if it has medical certificate structure, likely historical
-        const hasMedicalStructure = !!(
-          getValue(data, 'structured_data.certificate_info.examination_date') ||
-          getValue(data, 'certificate_info.examination_date') ||
-          getValue(data, 'structured_data.certificate_info.employee_name') ||
-          getValue(data, 'certificate_info.employee_name') ||
-          dataString.includes('examination_date') ||
-          dataString.includes('practice no') ||
-          dataString.includes('sanc no')
-        );
-
-        console.log('Detection results:', {
-          hasSignature,
-          hasStamp, 
-          hasSignatureKeywords,
-          hasStampKeywords,
-          hasMedicalStructure
-        });
-
-        // Return true if ANY indicator suggests historical document
-        return hasSignature || hasStamp || hasSignatureKeywords || hasStampKeywords || hasMedicalStructure;
-      };
-
-      const hasSignatureStamp = hasSignatureStampData(document.extracted_data);
-      
-      console.log('=== FINAL DETECTION RESULT ===');
-      console.log('Has signature/stamp indicators:', hasSignatureStamp);
-      
+    
+      // Get the structured data from Edge Function
+      const structuredData = document.extracted_data.structured_data;
+      const certificateInfo = structuredData?.certificate_info;
+    
+      console.log('Certificate info:', certificateInfo);
+    
+      // Check for the signature/stamp fields you just added in Edge Function
+      const hasSignature = certificateInfo?.signature === true;
+      const hasStamp = certificateInfo?.stamp === true;
+    
+      console.log('Detection check:', {
+        hasSignature,
+        hasStamp,
+        signatureField: certificateInfo?.signature,
+        stampField: certificateInfo?.stamp
+      });
+    
       // CORRECTED LOGIC:
       // Documents with signature/stamp data = Historical documents (filed records)
       // Documents without signature/stamp data = Modern documents (current workflow)
-      if (hasSignatureStamp) {
+      if (hasSignature || hasStamp) {
         setSelectedTemplate('historical');
-        console.log('✅ Auto-detected: Historical template (found signature/stamp indicators)');
+        console.log('✅ Auto-detected: Historical template (found signature/stamp from Edge Function)');
       } else {
         setSelectedTemplate('modern');
-        console.log('✅ Auto-detected: Modern template (no signature/stamp indicators)');
+        console.log('✅ Auto-detected: Modern template (no signature/stamp from Edge Function)');
       }
-      
-      console.log('=== END DETECTION DEBUG ===');
+    
+      console.log('=== END DETECTION ===');
     } else if (isManualSelection) {
       console.log('⚡ Skipping auto-detection - user has manually selected template');
     }
