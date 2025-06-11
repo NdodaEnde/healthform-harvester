@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,8 +23,9 @@ export default function DocumentViewer() {
   const [validatedData, setValidatedData] = useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'historical'>('modern');
   
-  // ADD THIS LINE - Critical for preventing auto-detection override
-  const [isManualSelection, setIsManualSelection] = useState(false);
+  // Use refs to track manual selection and prevent auto-detection override
+  const isManualSelection = useRef(false);
+  const hasAutoDetected = useRef(false);
 
   useEffect(() => {
     if (id) {
@@ -38,10 +39,10 @@ export default function DocumentViewer() {
     }
   }, [document]);
 
-  // SIMPLIFIED Auto-detection useEffect - looks for signature/stamp fields from Edge Function
+  // Auto-detection useEffect - only runs once per document and only if no manual selection
   useEffect(() => {
-    if (document?.extracted_data && !isManualSelection) {
-      console.log('=== SIGNATURE/STAMP DETECTION ===');
+    if (document?.extracted_data && !isManualSelection.current && !hasAutoDetected.current) {
+      console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
       console.log('Full extracted_data:', document.extracted_data);
     
       // Get the structured data from Edge Function
@@ -50,33 +51,41 @@ export default function DocumentViewer() {
     
       console.log('Certificate info:', certificateInfo);
     
-      // Check for the signature/stamp fields you just added in Edge Function
+      // Check for the signature/stamp fields from Edge Function
       const hasSignature = certificateInfo?.signature === true;
       const hasStamp = certificateInfo?.stamp === true;
+      const hasSignatureStampData = hasSignature || hasStamp;
     
-      console.log('Detection check:', {
+      const detectionResult = {
         hasSignature,
         hasStamp,
-        signatureField: certificateInfo?.signature,
-        stampField: certificateInfo?.stamp
-      });
+        hasSignatureStampData,
+        detectedTemplate: hasSignatureStampData ? 'historical' : 'modern',
+        reasoning: hasSignatureStampData 
+          ? 'Found signature/stamp data → Historical template (filed record)' 
+          : 'No signature/stamp data → Modern template (current workflow)'
+      };
     
-      // CORRECTED LOGIC:
-      // Documents with signature/stamp data = Historical documents (filed records)
-      // Documents without signature/stamp data = Modern documents (current workflow)
-      if (hasSignature || hasStamp) {
+      console.log('Template detection:', detectionResult);
+    
+      // Apply auto-detection
+      if (hasSignatureStampData) {
         setSelectedTemplate('historical');
         console.log('✅ Auto-detected: Historical template (found signature/stamp from Edge Function)');
       } else {
         setSelectedTemplate('modern');
         console.log('✅ Auto-detected: Modern template (no signature/stamp from Edge Function)');
       }
-    
-      console.log('=== END DETECTION ===');
-    } else if (isManualSelection) {
+      
+      // Mark that auto-detection has run
+      hasAutoDetected.current = true;
+      console.log('=== END AUTO-DETECTION ===');
+    } else if (isManualSelection.current) {
       console.log('⚡ Skipping auto-detection - user has manually selected template');
+    } else if (hasAutoDetected.current) {
+      console.log('⚡ Skipping auto-detection - already completed for this document');
     }
-  }, [document, isManualSelection]);
+  }, [document?.extracted_data]); // Only depend on extracted_data, not the entire document
 
   const fetchDocument = async () => {
     try {
@@ -137,9 +146,17 @@ export default function DocumentViewer() {
 
   const handleTemplateChange = (template: 'modern' | 'historical') => {
     setSelectedTemplate(template);
-    setIsManualSelection(true); // Mark as manual selection
+    isManualSelection.current = true; // Mark as manual selection using ref
     console.log(`🎯 Template manually changed to: ${template}`);
   };
+
+  // Reset manual selection flag when document changes
+  useEffect(() => {
+    if (document) {
+      isManualSelection.current = false;
+      hasAutoDetected.current = false;
+    }
+  }, [document?.id]);
 
   if (loading) {
     return (
