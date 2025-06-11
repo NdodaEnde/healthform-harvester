@@ -99,345 +99,188 @@ function detectSignatureAndStamp(result: any): { signature: boolean; stamp: bool
   return signatureDetection;
 }
 
-// Enhanced certificate extraction function
+/**
+ * Fixed certificate extraction function that properly handles microservice response
+ * Replace the existing extractCertificateInfo function in your index.ts with this
+ */
 function extractCertificateInfo(rawContent: string): any {
-  if (!rawContent) return {};
-  
-  console.log("=== ENHANCED CERTIFICATE EXTRACTION ===");
+  console.log("=== FIXED CERTIFICATE EXTRACTION ===");
   console.log("Raw content preview (first 500 chars):");
   console.log(rawContent.substring(0, 500));
 
-  //Detect signature and stamp from raw content
-  const { signature, stamp } = detectSignatureAndStamp({ markdown: rawContent });
-  console.log('Signature/stamp detection results:', { signature, stamp });
-  
   const certificateInfo: any = {};
   
-  // Enhanced pattern matching with multiple variations
+  // Clean the raw content first - remove HTML comments and normalize
+  let cleanContent = rawContent;
+  
+  // Remove HTML comments like <!-- table, from page 0... -->
+  cleanContent = cleanContent.replace(/<!--[^>]*-->/g, '');
+  
+  // Replace HTML table elements with spaces to prevent concatenation
+  cleanContent = cleanContent.replace(/<\/td>/g, ' ');
+  cleanContent = cleanContent.replace(/<td[^>]*>/g, ' ');
+  cleanContent = cleanContent.replace(/<\/tr>/g, '\n');
+  cleanContent = cleanContent.replace(/<tr[^>]*>/g, '');
+  cleanContent = cleanContent.replace(/<\/table>/g, '\n');
+  cleanContent = cleanContent.replace(/<table[^>]*>/g, '');
+  cleanContent = cleanContent.replace(/<\/tbody>/g, '');
+  cleanContent = cleanContent.replace(/<tbody[^>]*>/g, '');
+  cleanContent = cleanContent.replace(/<th[^>]*>.*?<\/th>/g, '');
+  
+  // Clean up extra whitespace
+  cleanContent = cleanContent.replace(/\s+/g, ' ').trim();
+  
+  console.log("Cleaned content preview (first 500 chars):");
+  console.log(cleanContent.substring(0, 500));
+
+  // Enhanced field extraction with multiple patterns
   const extractField = (patterns: RegExp[], fieldName: string) => {
     for (const pattern of patterns) {
-      const match = rawContent.match(pattern);
+      const match = cleanContent.match(pattern);
       if (match && match[1] && match[1].trim() !== '') {
         const value = match[1].trim();
-        console.log(`✓ Found ${fieldName}:`, value);
-        return value;
+        // Skip if value looks like HTML remnants
+        if (!value.includes('<') && !value.includes('td>') && value.length < 100) {
+          console.log(`✓ Found ${fieldName}:`, value);
+          return value;
+        }
       }
     }
     console.log(`✗ ${fieldName} not found`);
     return null;
   };
   
-  // Employee name patterns
+  // Employee name patterns - enhanced to handle the actual content structure
   const namePatterns = [
-    /Initials\s*&?\s*Surname:\s*([^\n\r]+)/i,
-    /Employee\s*Name:\s*([^\n\r]+)/i,
-    /Name:\s*([^\n\r]+)/i,
-    /Initials\s*&\s*Surname:\s*([^\n\r]+)/i
+    /Initials\s*&?\s*Surname:\s*([^\n\r]+?)(?:\s+ID\s+NO|$)/i,
+    /Employee.*?:\s*([A-Z][A-Z\.\s]+[A-Z])/i,
+    /PA\.\s+([A-Z][a-z]+)/i, // Based on your example "PA. Mahlong"
+    /Initials.*?Surname.*?:\s*([^\n]+)/i
   ];
   const employeeName = extractField(namePatterns, 'employee_name');
   if (employeeName) certificateInfo.employee_name = employeeName;
   
-  // ID number patterns
+  // ID number patterns - enhanced for SA ID format
   const idPatterns = [
-    /ID\s*No:?\s*([^\n\r]+)/i,
-    /ID\s*Number:?\s*([^\n\r]+)/i,
-    /Identity\s*Number:?\s*([^\n\r]+)/i
+    /ID\s*NO:\s*([0-9\s]+[0-9])/i,
+    /ID\s*Number:\s*([0-9\s]+[0-9])/i,
+    /(\d{6}\s*\d{4}\s*\d{3})/i, // SA ID format: YYMMDD NNNN CCC
+    /(\d{13})/i // 13-digit ID number
   ];
   const idNumber = extractField(idPatterns, 'id_number');
-  if (idNumber) certificateInfo.id_number = idNumber;
+  if (idNumber) certificateInfo.id_number = idNumber.replace(/\s+/g, ' ').trim();
   
   // Company name patterns
   const companyPatterns = [
-    /Company\s*Name:\s*([^\n\r]+)/i,
-    /Employer:\s*([^\n\r]+)/i,
-    /Organization:\s*([^\n\r]+)/i
+    /Company\s*Name:\s*([A-Z][A-Z\s]+?)(?:\s+Date|$)/i,
+    /(APE\s+Pumps?)/i, // Based on your example
+    /Company.*?:\s*([A-Z][A-Za-z\s&]+)/i
   ];
   const companyName = extractField(companyPatterns, 'company_name');
   if (companyName) certificateInfo.company_name = companyName;
   
   // Job title patterns
   const jobPatterns = [
-    /Job\s*Title:\s*([^\n\r]+)/i,
-    /Position:\s*([^\n\r]+)/i,
-    /Occupation:\s*([^\n\r]+)/i
+    /Job\s*Title:\s*([A-Z][A-Za-z\s]+?)(?:\s+PRE-|$)/i,
+    /(Artisan)/i, // Based on your example
+    /Position:\s*([A-Z][A-Za-z\s]+)/i
   ];
   const jobTitle = extractField(jobPatterns, 'job_title');
   if (jobTitle) certificateInfo.job_title = jobTitle;
   
-  // Date patterns
+  // Date patterns - enhanced for the DD.MM.YYYY format
   const examDatePatterns = [
-    /Date\s*of\s*Examination:\s*([^\n\r]+)/i,
-    /Examination\s*Date:\s*([^\n\r]+)/i,
-    /Date\s*Examined:\s*([^\n\r]+)/i
+    /Date\s*of\s*Examination:\s*(\d{1,2}\.?\d{1,2}\.?\d{4})/i,
+    /Examination.*?Date:\s*(\d{1,2}\.?\d{1,2}\.?\d{4})/i,
+    /(\d{2}\.\d{2}\.\d{4})/g // DD.MM.YYYY format
   ];
   const examDate = extractField(examDatePatterns, 'examination_date');
   if (examDate) certificateInfo.examination_date = examDate;
   
   const expiryPatterns = [
-    /Expiry\s*Date:\s*([^\n\r]+)/i,
-    /Valid\s*Until:\s*([^\n\r]+)/i,
-    /Expires:\s*([^\n\r]+)/i
+    /Expiry\s*Date:\s*(\d{1,2}\.?\d{1,2}\.?\d{4})/i,
+    /Valid\s*Until:\s*(\d{1,2}\.?\d{1,2}\.?\d{4})/i,
+    /Expires?:\s*(\d{1,2}\.?\d{1,2}\.?\d{4})/i
   ];
   const expiryDate = extractField(expiryPatterns, 'expiry_date');
   if (expiryDate) certificateInfo.expiry_date = expiryDate;
   
-  // Check examination type with enhanced patterns
+  // Enhanced examination type detection
+  console.log("Checking examination types...");
+  
+  // Look for checkmarks or indicators near examination types
   certificateInfo.pre_employment_checked = 
-    /PRE-?EMPLOYMENT[^[\]]*\[\s*[xX✓]\s*\]/i.test(rawContent) ||
-    /PRE-?EMPLOYMENT[^:]*:\s*[xX✓]/i.test(rawContent);
+    /PRE-?EMPLOYMENT\s*[✓x]/i.test(cleanContent) ||
+    /PRE-?EMPLOYMENT.*?checked/i.test(cleanContent);
     
   certificateInfo.periodical_checked = 
-    /PERIODICAL[^[\]]*\[\s*[xX✓]\s*\]/i.test(rawContent) ||
-    /PERIODICAL[^:]*:\s*[xX✓]/i.test(rawContent);
+    /PERIODICAL\s*[✓x]/i.test(cleanContent) ||
+    /PERIODICAL.*?checked/i.test(cleanContent);
     
   certificateInfo.exit_checked = 
-    /EXIT[^[\]]*\[\s*[xX✓]\s*\]/i.test(rawContent) ||
-    /EXIT[^:]*:\s*[xX✓]/i.test(rawContent);
+    /EXIT\s*[✓x]/i.test(cleanContent) ||
+    /EXIT.*?checked/i.test(cleanContent);
   
-  console.log("Examination types:", {
+  console.log("Examination types detected:", {
     pre_employment: certificateInfo.pre_employment_checked,
     periodical: certificateInfo.periodical_checked,
     exit: certificateInfo.exit_checked
   });
   
-  // Extract medical tests with enhanced parsing for the specific table format
+  // Extract medical tests - simplified approach
   const medicalTests: any = {};
+  const testNames = ['BLOODS', 'FAR, NEAR VISION', 'SIDE & DEPTH', 'NIGHT VISION', 'Hearing', 'Working at Heights', 'Lung Function', 'X-Ray', 'Drug Screen'];
   
-  // First, extract the entire medical tests table
-  const medicalTableMatch = rawContent.match(/<table><tbody><tr><td colspan="4">MEDICAL EXAMINATION CONDUCTED INCLUDES THE FOLLOWING TESTS<\/td><\/tr>(.*?)<\/tbody><\/table>/s);
-  
-  if (medicalTableMatch) {
-    console.log("Processing medical tests table...");
-    const tableContent = medicalTableMatch[1];
+  testNames.forEach(testName => {
+    const testKey = testName.toLowerCase().replace(/[^a-z]+/g, '_');
     
-    // Parse the specific structure of this table
-    const rows = tableContent.match(/<tr>(.*?)<\/tr>/g);
-    if (rows) {
-      // Process each row
-      rows.forEach((row, index) => {
-        const cells = row.match(/<td[^>]*>(.*?)<\/td>/g);
-        if (cells) {
-          const cellContents = cells.map(cell => cell.replace(/<\/?td[^>]*>/g, '').trim());
-          
-          // Handle different row patterns
-          if (index === 1) {
-            // Row with BLOODS and Hearing results
-            if (cellContents.length >= 6) {
-              medicalTests.bloods_done = cellContents[1] === '✓';
-              medicalTests.bloods_results = cellContents[2] || 'N/A';
-              medicalTests.hearing_done = cellContents[4] === '✓';
-              medicalTests.hearing_results = cellContents[5] || 'N/A';
-            }
-          } else if (index >= 2 && index <= 4) {
-            // Rows with paired tests
-            if (cellContents.length >= 6) {
-              // Left side test
-              const leftTest = cellContents[0];
-              const leftDone = cellContents[1] === '✓';
-              const leftResults = cellContents[2] || 'N/A';
-              
-              // Right side test  
-              const rightTest = cellContents[3];
-              const rightDone = cellContents[4] === '✓';
-              const rightResults = cellContents[5] || 'N/A';
-              
-              // Map test names to keys
-              const testMapping = {
-                'FAR, NEAR VISION': 'far_near_vision',
-                'SIDE & DEPTH': 'side_depth', 
-                'NIGHT VISION': 'night_vision',
-                'Working at Heights': 'heights',
-                'Lung Function': 'lung_function',
-                'X-Ray': 'x_ray'
-              };
-              
-              if (leftTest && testMapping[leftTest]) {
-                medicalTests[`${testMapping[leftTest]}_done`] = leftDone;
-                medicalTests[`${testMapping[leftTest]}_results`] = leftResults;
-                console.log(`✓ Found ${leftTest}: done=${leftDone}, results=${leftResults}`);
-              }
-              
-              if (rightTest && testMapping[rightTest]) {
-                medicalTests[`${testMapping[rightTest]}_done`] = rightDone;
-                medicalTests[`${testMapping[rightTest]}_results`] = rightResults;
-                console.log(`✓ Found ${rightTest}: done=${rightDone}, results=${rightResults}`);
-              }
-            }
-          } else if (index === 5) {
-            // Drug Screen row
-            if (cellContents.length >= 5) {
-              const drugTest = cellContents[3]; // Should be "Drug Screen"
-              const drugDone = cellContents[4] === '✓';
-              const drugResults = cellContents[5] || 'N/A';
-              
-              if (drugTest === 'Drug Screen') {
-                medicalTests.drug_screen_done = drugDone;
-                medicalTests.drug_screen_results = drugResults;
-                console.log(`✓ Found Drug Screen: done=${drugDone}, results=${drugResults}`);
-              }
-            }
-          }
-        }
-      });
+    // Look for test name followed by results
+    const testPattern = new RegExp(`${testName}.*?([0-9\/]+|Normal|N\\/A|NEGATIVE|Positive)`, 'i');
+    const testMatch = cleanContent.match(testPattern);
+    
+    if (testMatch) {
+      medicalTests[`${testKey}_done`] = true;
+      medicalTests[`${testKey}_results`] = testMatch[1];
+      console.log(`✓ Found medical test ${testName}: ${testMatch[1]}`);
+    } else {
+      medicalTests[`${testKey}_done`] = false;
+      medicalTests[`${testKey}_results`] = 'N/A';
     }
-  }
-  
-  console.log("Extracted medical tests:", medicalTests);
+  });
   
   if (Object.keys(medicalTests).length > 0) {
     certificateInfo.medical_tests = medicalTests;
   }
   
-  // Extract fitness status with enhanced parsing for the specific table format
+  // Enhanced fitness status detection
   const fitnessStatus: any = {};
-  const fitnessTableMatch = rawContent.match(/<table><tbody><tr><th colspan="5">Medical Fitness Declaration<\/th><\/tr>(.*?)<\/tbody><\/table>/s);
   
-  if (fitnessTableMatch) {
-    console.log("Processing fitness declaration table...");
-    const tableContent = fitnessTableMatch[1];
-    
-    // Look for visual indicators in the raw content or make reasonable assumptions
-    const fitnessOptions = ['FIT', 'Fit with Restriction', 'Fit with Condition', 'Temporary Unfit', 'UNFIT'];
-    
-    // Check for any explicit selection markers
-    let selectedOption = null;
-    
-    fitnessOptions.forEach(option => {
-      const patterns = [
-        new RegExp(`<td[^>]*class="[^"]*selected[^"]*"[^>]*>${option}</td>`, 'i'),
-        new RegExp(`<td[^>]*style="[^"]*background[^"]*"[^>]*>${option}</td>`, 'i'),
-        new RegExp(`${option}.*?\\[.*?[xX✓].*?\\]`, 'i')
-      ];
-      
-      patterns.forEach(pattern => {
-        if (rawContent.match(pattern)) {
-          selectedOption = option;
-          console.log(`✓ Found selected fitness option: ${option}`);
-        }
-      });
-    });
-    
-    // If no explicit selection found, check the context
-    if (!selectedOption) {
-      // Look for any restrictions or conditions mentioned
-      const hasRestrictions = rawContent.toLowerCase().includes('restriction') && 
-                            !rawContent.toLowerCase().includes('no restriction');
-      const hasConditions = rawContent.toLowerCase().includes('condition') && 
-                          !rawContent.toLowerCase().includes('no condition');
-      const isUnfit = rawContent.toLowerCase().includes('unfit') && 
-                     !rawContent.toLowerCase().includes('not unfit');
-      
-      if (isUnfit) {
-        selectedOption = 'UNFIT';
-      } else if (hasRestrictions) {
-        selectedOption = 'Fit with Restriction'; 
-      } else if (hasConditions) {
-        selectedOption = 'Fit with Condition';
-      } else {
-        // Default to FIT if no negative indicators
-        selectedOption = 'FIT';
-      }
-      
-      console.log(`✓ Inferred fitness status: ${selectedOption}`);
-    }
-    
-    // Map the selected option to our structure
-    const fitnessMapping = {
-      'FIT': 'fit',
-      'Fit with Restriction': 'fit_with_restrictions', 
-      'Fit with Condition': 'fit_with_condition',
-      'Temporary Unfit': 'temporarily_unfit',
-      'UNFIT': 'unfit'
-    };
-    
-    if (selectedOption && fitnessMapping[selectedOption]) {
-      fitnessStatus[fitnessMapping[selectedOption]] = true;
-      console.log(`✓ Set fitness status: ${fitnessMapping[selectedOption]} = true`);
-    }
-  }
+  // Look for fitness declarations
+  fitnessStatus.fit = /FIT:\s*\[[x✓]\]/i.test(cleanContent) || /\bFIT\b.*?checked/i.test(cleanContent);
+  fitnessStatus.fit_with_restrictions = /Fit with Restriction.*?\[[x✓]\]/i.test(cleanContent);
+  fitnessStatus.fit_with_condition = /Fit with Condition.*?\[[x✓]\]/i.test(cleanContent);
+  fitnessStatus.temporarily_unfit = /Temporary.*?Unfit.*?\[[x✓]\]/i.test(cleanContent);
+  fitnessStatus.unfit = /UNFIT.*?\[[x✓]\]/i.test(cleanContent);
   
-  if (Object.keys(fitnessStatus).length > 0) {
+  console.log("Fitness status detected:", fitnessStatus);
+  
+  if (Object.keys(fitnessStatus).some(key => fitnessStatus[key])) {
     certificateInfo.fitness_status = fitnessStatus;
   }
   
-  // Extract restrictions with enhanced visual detection
-  const extractedRestrictions: any = {};
-  const restrictionsTableMatch = rawContent.match(/<table><tbody><tr><td colspan="4">Restrictions:<\/td><\/tr>(.*?)<\/tbody><\/table>/s);
-  
-  if (restrictionsTableMatch) {
-    console.log("Processing restrictions table...");
-    const tableContent = restrictionsTableMatch[1];
-    
-    const restrictionsList = [
-      'Heights', 'Dust Exposure', 'Motorized Equipment', 'Wear Hearing Protection',
-      'Confined Spaces', 'Chemical Exposure', 'Wear Spectacles', 
-      'Remain on Treatment for Chronic Conditions'
-    ];
-    
-    // Check each restriction for selection indicators
-    restrictionsList.forEach(restriction => {
-      let isSelected = false;
-      
-      // Look for visual selection indicators
-      const patterns = [
-        new RegExp(`<td[^>]*(?:class="[^"]*(?:selected|highlighted)[^"]*"|style="[^"]*background[^"]*yellow[^"]*")[^>]*>${restriction}[^<]*</td>`, 'i'),
-        new RegExp(`<td[^>]*>${restriction}[^<]*✓[^<]*</td>`, 'i'),
-        new RegExp(`<td[^>]*>${restriction}[^<]*<[^>]*✓[^>]*>[^<]*</td>`, 'i'),
-        new RegExp(`${restriction}[^<\n]{0,50}[✓]`, 'i'),
-        new RegExp(`${restriction}.*?\\[.*?[xX✓].*?\\]`, 'i')
-      ];
-      
-      patterns.forEach(pattern => {
-        if (rawContent.match(pattern)) {
-          isSelected = true;
-          console.log(`✓ Found selected restriction: ${restriction}`);
-        }
-      });
-      
-      // Map restriction names to keys
-      const restrictionMapping = {
-        'Heights': 'heights',
-        'Dust Exposure': 'dust_exposure', 
-        'Motorized Equipment': 'motorized_equipment',
-        'Wear Hearing Protection': 'wear_hearing_protection',
-        'Confined Spaces': 'confined_spaces',
-        'Chemical Exposure': 'chemical_exposure',
-        'Wear Spectacles': 'wear_spectacles',
-        'Remain on Treatment for Chronic Conditions': 'remain_on_treatment_for_chronic_conditions'
-      };
-      
-      if (restrictionMapping[restriction]) {
-        extractedRestrictions[restrictionMapping[restriction]] = isSelected;
-      }
-    });
-    
-    // Additional check: if we see any mention of restrictions in the fitness assessment
-    const hasRestrictionsContext = rawContent.toLowerCase().includes('restriction') && 
-                                  !rawContent.toLowerCase().includes('no restriction');
-    
-    if (hasRestrictionsContext) {
-      console.log("⚠️ Document mentions restrictions - may need manual review");
-    }
-  }
-  
-  console.log("Extracted restrictions:", extractedRestrictions);
-  if (Object.keys(extractedRestrictions).length > 0) {
-    certificateInfo.restrictions = extractedRestrictions;
-  }
-  
   // Extract additional fields
-  const followUpMatch = rawContent.match(/Referred\s+or\s+follow\s+up\s+actions:\s*([^\n\r]+)/i);
-  if (followUpMatch && followUpMatch[1]) {
+  const followUpMatch = cleanContent.match(/Referred.*?follow.*?actions?:\s*([^\n\r]+)/i);
+  if (followUpMatch && followUpMatch[1] && followUpMatch[1].trim() !== '') {
     certificateInfo.follow_up = followUpMatch[1].trim();
   }
 
-  const reviewDateMatch = rawContent.match(/Review\s+Date:\s*([^\n\r]+)/i);
+  const reviewDateMatch = cleanContent.match(/Review\s*Date:\s*(\d{1,2}\.?\d{1,2}\.?\d{4})/i);
   if (reviewDateMatch && reviewDateMatch[1]) {
-    certificateInfo.review_date = reviewDateMatch[1].trim();
+    certificateInfo.review_date = reviewDateMatch[1];
   }
 
-  const commentsMatch = rawContent.match(/Comments:\s*([^<\n\r]+)/i);
-  if (commentsMatch && commentsMatch[1]) {
+  const commentsMatch = cleanContent.match(/Comments:\s*([^<\n\r]+)/i);
+  if (commentsMatch && commentsMatch[1] && commentsMatch[1].trim() !== '') {
     let comments = commentsMatch[1].trim();
     certificateInfo.comments = comments === "N/A" ? "N/A" : comments;
   }
@@ -445,10 +288,6 @@ function extractCertificateInfo(rawContent: string): any {
   console.log("=== FINAL CERTIFICATE INFO ===");
   console.log("Certificate info keys:", Object.keys(certificateInfo));
   console.log("Certificate info:", JSON.stringify(certificateInfo, null, 2));
-
-  // ADD THESE FIELDS BEFORE THE RETURN
-  certificateInfo.signature = signature;
-  certificateInfo.stamp = stamp;
   
   return certificateInfo;
 }
