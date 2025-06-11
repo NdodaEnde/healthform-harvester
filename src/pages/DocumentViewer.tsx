@@ -23,9 +23,10 @@ export default function DocumentViewer() {
   const [validatedData, setValidatedData] = useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'historical'>('modern');
   
-  // Use refs to track manual selection and prevent auto-detection override
+  // Use refs to track state and prevent conflicts
   const isManualSelection = useRef(false);
   const hasAutoDetected = useRef(false);
+  const documentId = useRef<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -39,22 +40,17 @@ export default function DocumentViewer() {
     }
   }, [document]);
 
-  // Auto-detection useEffect - only runs once per document and only if no manual selection
+  // Reset refs when document changes
   useEffect(() => {
-    if (document?.extracted_data && !isManualSelection.current && !hasAutoDetected.current) {
-      console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
-      console.log('Full extracted_data:', document.extracted_data);
-    
-      // Get the structured data from Edge Function
-      const structuredData = document.extracted_data.structured_data;
-      const certificateInfo = structuredData?.certificate_info;
-    
-      console.log('Certificate info:', certificateInfo);
-    
-      // Check for the signature/stamp fields from Edge Function
-      const hasSignature = certificateInfo?.signature === true;
-      const hasStamp = certificateInfo?.stamp === true;
-      const hasSignatureStampData = hasSignature || hasStamp;
+    if (document && document.id !== documentId.current) {
+      console.log('🔄 Document changed, resetting template selection state');
+      documentId.current = document.id;
+      isManualSelection.current = false;
+      hasAutoDetected.current = false;
+    }
+  }, [document?.id]);
+
+
     
       const detectionResult = {
         hasSignature,
@@ -62,20 +58,17 @@ export default function DocumentViewer() {
         hasSignatureStampData,
         detectedTemplate: hasSignatureStampData ? 'historical' : 'modern',
         reasoning: hasSignatureStampData 
-          ? 'Found signature/stamp data → Historical template (filed record)' 
+          ? `Found ${hasSignature ? 'signature' : ''}${hasSignature && hasStamp ? ' and ' : ''}${hasStamp ? 'stamp' : ''} → Historical template (filed record)` 
           : 'No signature/stamp data → Modern template (current workflow)'
       };
     
-      console.log('Template detection:', detectionResult);
+      console.log('Enhanced template detection:', detectionResult);
     
       // Apply auto-detection
-      if (hasSignatureStampData) {
-        setSelectedTemplate('historical');
-        console.log('✅ Auto-detected: Historical template (found signature/stamp from Edge Function)');
-      } else {
-        setSelectedTemplate('modern');
-        console.log('✅ Auto-detected: Modern template (no signature/stamp from Edge Function)');
-      }
+      const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
+      setSelectedTemplate(detectedTemplate);
+      
+      console.log(`✅ Auto-detected: ${detectedTemplate} template (${detectionResult.reasoning})`);
       
       // Mark that auto-detection has run
       hasAutoDetected.current = true;
@@ -85,7 +78,7 @@ export default function DocumentViewer() {
     } else if (hasAutoDetected.current) {
       console.log('⚡ Skipping auto-detection - already completed for this document');
     }
-  }, [document?.extracted_data]); // Only depend on extracted_data, not the entire document
+  }, [document?.extracted_data]);
 
   const fetchDocument = async () => {
     try {
@@ -145,18 +138,11 @@ export default function DocumentViewer() {
   };
 
   const handleTemplateChange = (template: 'modern' | 'historical') => {
-    setSelectedTemplate(template);
-    isManualSelection.current = true; // Mark as manual selection using ref
     console.log(`🎯 Template manually changed to: ${template}`);
+    setSelectedTemplate(template);
+    isManualSelection.current = true; // Mark as manual selection
+    console.log('Manual selection flag set to true');
   };
-
-  // Reset manual selection flag when document changes
-  useEffect(() => {
-    if (document) {
-      isManualSelection.current = false;
-      hasAutoDetected.current = false;
-    }
-  }, [document?.id]);
 
   if (loading) {
     return (
@@ -248,7 +234,17 @@ export default function DocumentViewer() {
             </div>
           </div>
 
-          {/* Validation Controls - now with template selection */}
+          {/* Debug info - remove this in production */}
+          {process.env.NODE_ENV === 'development' && isProcessed && validatedData && (
+            <div className="p-3 bg-gray-100 rounded text-xs">
+              <p><strong>Debug:</strong></p>
+              <p>Manual selection: {isManualSelection.current ? 'Yes' : 'No'}</p>
+              <p>Auto-detected: {hasAutoDetected.current ? 'Yes' : 'No'}</p>
+              <p>Selected template: {selectedTemplate}</p>
+            </div>
+          )}
+
+          {/* Validation Controls - with improved template selection */}
           {isProcessed && validatedData && (
             <DocumentValidationControls
               document={document}
