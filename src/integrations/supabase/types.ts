@@ -1158,12 +1158,22 @@ export type Database = {
         Returns: string
       }
       create_client_organization: {
-        Args: { org_name: string; org_email?: string }
+        Args:
+          | { org_name: string; org_email?: string }
+          | {
+              organization_name: string
+              contact_email?: string
+              service_provider_id?: string
+            }
         Returns: string
       }
       create_first_organization: {
         Args: { org_name: string; org_type: string; org_email?: string }
         Returns: string
+      }
+      create_organization_relationship: {
+        Args: { provider_id: string; client_id: string }
+        Returns: Json
       }
       create_user_profile: {
         Args: { user_id: string; email: string; full_name?: string }
@@ -1176,6 +1186,14 @@ export type Database = {
       force_insert_profile: {
         Args: { p_user_id: string; p_email: string; p_full_name?: string }
         Returns: boolean
+      }
+      get_client_organizations: {
+        Args: { provider_id: string }
+        Returns: Json
+      }
+      get_service_provider_organizations: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_user_organizations: {
         Args: Record<PropertyKey, never>

@@ -97,12 +97,17 @@ const navItems = [
   return (
     <div 
       className={cn(
-        "h-[calc(100vh-64px)] fixed top-16 left-0 bg-background border-r transition-all duration-300",
+        "min-h-screen fixed top-16 left-0 bg-background border-r transition-all duration-300 z-40",
+        "flex flex-col",
         collapsed ? "w-16" : "w-64"
       )}
+      style={{
+        height: 'calc(100vh - 4rem)', // More explicit height calculation
+        maxHeight: 'calc(100vh - 4rem)'
+      }}
     >
-      <div className="flex flex-col h-full">
-        <div className="flex-1 py-6">
+      <div className="flex flex-col h-full overflow-hidden">
+        <div className="flex-1 py-6 overflow-y-auto">
           <div className="px-3 mb-6 flex justify-end">
             <Button 
               variant="ghost" 
@@ -138,11 +143,18 @@ const navItems = [
           </nav>
         </div>
         
-        {/* Keep organization switcher at the bottom of sidebar */}
-        <div className={cn(
-          "p-4 border-t", 
-          collapsed ? "items-center justify-center" : ""
-        )}>
+        {/* Keep organization switcher at the bottom of sidebar with improved positioning */}
+        <div 
+          className={cn(
+            "p-4 border-t bg-background shrink-0", 
+            collapsed ? "items-center justify-center px-2" : ""
+          )}
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 50
+          }}
+        >
           {!collapsed && (
             <div className="mb-2 text-xs font-semibold text-muted-foreground">
               ORGANIZATION
