@@ -62,7 +62,7 @@ export default function OrganizationSwitcher() {
         <DropdownMenuTrigger asChild>
           <Button 
             variant="outline" 
-            className="flex items-center justify-between w-full h-10 px-3 bg-background border hover:bg-accent"
+            className="flex items-center justify-between w-full h-10 px-3 bg-background border border-border hover:bg-accent hover:text-accent-foreground text-foreground"
           >
             <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
               <Building className="h-4 w-4 flex-shrink-0" />
@@ -76,7 +76,7 @@ export default function OrganizationSwitcher() {
         {userOrganizations.length > 1 && (
           <DropdownMenuContent 
             align="start" 
-            className="w-56 z-50 bg-popover border shadow-md"
+            className="w-56 z-50 bg-popover text-popover-foreground border border-border shadow-md"
             sideOffset={4}
           >
             <DropdownMenuLabel className="text-sm font-medium">Switch Organization</DropdownMenuLabel>
@@ -116,20 +116,20 @@ export default function OrganizationSwitcher() {
                 );
               }}
             >
-              <SelectTrigger className="w-full h-10 px-3 bg-blue-50 border-blue-200 hover:bg-blue-100">
+              <SelectTrigger className="w-full h-10 px-3 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-foreground">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   {currentClient ? (
-                    <Building2 className="h-4 w-4 flex-shrink-0" />
+                    <Building2 className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
                   ) : (
-                    <Users className="h-4 w-4 flex-shrink-0" />
+                    <Users className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
                   )}
-                  <SelectValue className="text-sm font-medium">
+                  <SelectValue className="text-sm font-medium text-blue-900 dark:text-blue-100">
                     {currentClient ? currentClient.name : "All Clients"}
                   </SelectValue>
                 </div>
               </SelectTrigger>
               <SelectContent 
-                className="z-50 bg-popover border shadow-md min-w-[200px]"
+                className="z-50 bg-popover text-popover-foreground border border-border shadow-md min-w-[200px]"
                 position="popper"
                 sideOffset={4}
               >
@@ -153,7 +153,7 @@ export default function OrganizationSwitcher() {
             <Button 
               variant="outline" 
               disabled 
-              className="w-full h-10 px-3 text-sm bg-gray-50"
+              className="w-full h-10 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-muted-foreground border border-border"
             >
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 flex-shrink-0" />
