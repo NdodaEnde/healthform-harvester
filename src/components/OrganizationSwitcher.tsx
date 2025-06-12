@@ -37,7 +37,6 @@ export default function OrganizationSwitcher() {
     isServiceProvider
   } = useOrganization();
   
-  const [isSelectOpen, setIsSelectOpen] = useState(false);
   const [location] = useState(window.location.pathname);
   
   // Debug logging to check component rendering and data
@@ -54,16 +53,13 @@ export default function OrganizationSwitcher() {
   }
   
   return (
-    <div 
-      className="flex flex-col space-y-3 w-full min-w-[220px] max-w-[280px] relative" 
-      data-testid="organization-switcher"
-    >
+    <div className="flex flex-col space-y-3 w-full" data-testid="organization-switcher">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
             variant="outline" 
-            className="flex items-center gap-2 w-full border-gray-300 justify-between h-10"
+            className="flex items-center gap-2 w-full justify-between h-10 bg-background border-input hover:bg-accent hover:text-accent-foreground"
           >
             <div className="flex items-center gap-2 overflow-hidden flex-1">
               <Building className="h-4 w-4 shrink-0" />
@@ -77,7 +73,7 @@ export default function OrganizationSwitcher() {
         {userOrganizations.length > 1 && (
           <DropdownMenuContent 
             align="start" 
-            className="w-[280px] z-[9999] bg-white dark:bg-gray-800 shadow-lg border"
+            className="w-[240px] bg-popover border shadow-md"
             sideOffset={4}
           >
             <DropdownMenuLabel className="text-sm">Switch Organization</DropdownMenuLabel>
@@ -101,9 +97,9 @@ export default function OrganizationSwitcher() {
         )}
       </DropdownMenu>
       
-      {/* Client selector (only for service providers) - with enhanced visibility */}
+      {/* Client selector (only for service providers) */}
       {isServiceProvider() && (
-        <div className="w-full relative">
+        <div className="w-full">
           {clientOrganizations.length > 0 ? (
             <Select
               value={currentClient ? currentClient.id : "all_clients"}
@@ -116,13 +112,8 @@ export default function OrganizationSwitcher() {
                     : `Switched to ${clientOrganizations.find(c => c.id === value)?.name}`
                 );
               }}
-              open={isSelectOpen}
-              onOpenChange={setIsSelectOpen}
             >
-              <SelectTrigger 
-                className="w-full flex items-center gap-2 bg-blue-50 border-blue-200 shadow-sm 
-                  dark:bg-blue-900/30 dark:border-blue-800 h-10"
-              >
+              <SelectTrigger className="w-full flex items-center gap-2 bg-blue-50 border-blue-200 h-10">
                 <div className="flex items-center gap-2 flex-1">
                   {currentClient ? (
                     <Building2 className="h-4 w-4 shrink-0" />
@@ -134,12 +125,7 @@ export default function OrganizationSwitcher() {
                   </SelectValue>
                 </div>
               </SelectTrigger>
-              <SelectContent 
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
-                  shadow-lg z-[9999] w-[280px] max-h-[300px]"
-                position="popper"
-                sideOffset={4}
-              >
+              <SelectContent className="bg-popover border shadow-md w-[240px]">
                 <SelectItem value="all_clients" className="text-sm py-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4" />

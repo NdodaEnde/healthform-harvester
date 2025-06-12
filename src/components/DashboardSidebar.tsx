@@ -1,3 +1,4 @@
+
 import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -26,9 +27,6 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
   
-  // Update the navItems array in your DashboardSidebar.tsx
-// Replace the existing navItems array with this updated version:
-
 const navItems = [
   { 
     name: "Dashboard", 
@@ -83,7 +81,7 @@ const navItems = [
     },
     { 
       name: "Users", 
-      href: "/admin/users",  // Simplified route
+      href: "/admin/users",
       icon: Users 
     }
   ] : []),
@@ -102,7 +100,7 @@ const navItems = [
         collapsed ? "w-16" : "w-64"
       )}
       style={{
-        height: 'calc(100vh - 4rem)', // More explicit height calculation
+        height: 'calc(100vh - 4rem)',
         maxHeight: 'calc(100vh - 4rem)'
       }}
     >
@@ -143,24 +141,21 @@ const navItems = [
           </nav>
         </div>
         
-        {/* Keep organization switcher at the bottom of sidebar with improved positioning */}
+        {/* Organization switcher at bottom - simplified positioning */}
         <div 
           className={cn(
             "p-4 border-t bg-background shrink-0", 
-            collapsed ? "items-center justify-center px-2" : ""
+            collapsed && "items-center justify-center px-2"
           )}
-          style={{
-            position: 'sticky',
-            bottom: 0,
-            zIndex: 50
-          }}
         >
           {!collapsed && (
-            <div className="mb-2 text-xs font-semibold text-muted-foreground">
-              ORGANIZATION
-            </div>
+            <>
+              <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                ORGANIZATION
+              </div>
+              <OrganizationSwitcher />
+            </>
           )}
-          {!collapsed && <OrganizationSwitcher />}
         </div>
       </div>
     </div>
