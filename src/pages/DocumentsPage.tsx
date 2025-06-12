@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,22 +54,42 @@ const DocumentsPage = () => {
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
 
+  // Debug logging to understand the filtering context
+  React.useEffect(() => {
+    console.log('📊 DocumentsPage Debug Info:');
+    console.log('Current Organization:', currentOrganization);
+    console.log('Current Client:', currentClient);
+    console.log('Effective Organization ID:', organizationId);
+    console.log('Is Service Provider:', isServiceProvider());
+    console.log('Context Label:', contextLabel);
+    console.log('Environment:', window.location.hostname);
+  }, [currentOrganization, currentClient, organizationId, isServiceProvider, contextLabel]);
+
   // Fetch all documents to get unique document types for filter dropdown
   const { data: allDocuments } = useQuery({
     queryKey: ['all-documents', organizationId],
     queryFn: async () => {
+      console.log('🔍 Fetching all documents for organization:', organizationId);
+      
       let query = supabase
         .from('documents')
         .select('document_type');
       
       if (currentClient && isServiceProvider()) {
+        console.log('📋 Filtering by client organization:', currentClient.id);
         query = query.eq('client_organization_id', currentClient.id);
       } else if (organizationId) {
+        console.log('🏢 Filtering by organization:', organizationId);
         query = query.eq('organization_id', organizationId);
       }
       
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching all documents:', error);
+        throw error;
+      }
+      
+      console.log('📄 All documents count:', data?.length || 0);
       return data || [];
     },
     enabled: !!organizationId
@@ -91,15 +110,26 @@ const DocumentsPage = () => {
   const { data: documents, isLoading, error, refetch } = useQuery({
     queryKey: ['documents', organizationId, statusFilter, documentTypeFilter, searchTerm, currentPage],
     queryFn: async () => {
+      console.log('🔍 Fetching documents with filters:');
+      console.log('Organization ID:', organizationId);
+      console.log('Status Filter:', statusFilter);
+      console.log('Document Type Filter:', documentTypeFilter);
+      console.log('Search Term:', searchTerm);
+      console.log('Current Page:', currentPage);
+      
       let query = supabase
         .from('documents')
         .select('*', { count: 'exact' });
       
       // Apply organization/client filter
       if (currentClient && isServiceProvider()) {
+        console.log('🎯 Applying client filter:', currentClient.id);
         query = query.eq('client_organization_id', currentClient.id);
       } else if (organizationId) {
+        console.log('🎯 Applying organization filter:', organizationId);
         query = query.eq('organization_id', organizationId);
+      } else {
+        console.log('⚠️ No organization context - this might cause issues');
       }
       
       // Apply status filter
@@ -128,6 +158,7 @@ const DocumentsPage = () => {
       const { data, error, count } = await query;
 
       if (error) {
+        console.error('❌ Error fetching documents:', error);
         toast({
           title: "Error fetching documents",
           description: error.message,
@@ -135,6 +166,11 @@ const DocumentsPage = () => {
         });
         throw new Error(error.message);
       }
+
+      console.log('📊 Query Results:');
+      console.log('Documents found:', data?.length || 0);
+      console.log('Total count:', count);
+      console.log('Sample documents:', data?.slice(0, 3));
 
       return {
         documents: data?.map(doc => ({
