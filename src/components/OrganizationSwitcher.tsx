@@ -1,4 +1,3 @@
-
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,43 +52,43 @@ export default function OrganizationSwitcher() {
   }
   
   return (
-    <div className="flex flex-col space-y-3 w-full" data-testid="organization-switcher">
+    <div className="space-y-3 w-full">
       {/* Organization selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
             variant="outline" 
-            className="flex items-center gap-2 w-full justify-between h-10 bg-background border-input hover:bg-accent hover:text-accent-foreground"
+            className="flex items-center justify-between w-full h-10 px-3 bg-background border hover:bg-accent"
           >
-            <div className="flex items-center gap-2 overflow-hidden flex-1">
-              <Building className="h-4 w-4 shrink-0" />
-              <span className="truncate text-sm">{currentOrganization.name}</span>
+            <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+              <Building className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate text-sm font-medium">{currentOrganization.name}</span>
             </div>
             {userOrganizations.length > 1 && (
-              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+              <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 ml-2" />
             )}
           </Button>
         </DropdownMenuTrigger>
         {userOrganizations.length > 1 && (
           <DropdownMenuContent 
             align="start" 
-            className="w-[240px] bg-popover border shadow-md"
+            className="w-56 z-50 bg-popover border shadow-md"
             sideOffset={4}
           >
-            <DropdownMenuLabel className="text-sm">Switch Organization</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-sm font-medium">Switch Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {userOrganizations.map(org => (
               <DropdownMenuItem 
                 key={org.id}
-                className="flex justify-between items-center cursor-pointer text-sm py-2"
+                className="flex justify-between items-center cursor-pointer text-sm py-2 px-2"
                 onClick={() => switchOrganization(org.id)}
               >
-                <div className="flex items-center truncate flex-1">
-                  <Building className="h-4 w-4 mr-2 opacity-70" />
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Building className="h-4 w-4 opacity-70 flex-shrink-0" />
                   <span className="truncate">{org.name}</span>
                 </div>
                 {org.id === currentOrganization.id && (
-                  <Badge variant="secondary" className="ml-2 text-xs">Current</Badge>
+                  <Badge variant="secondary" className="ml-2 text-xs flex-shrink-0">Current</Badge>
                 )}
               </DropdownMenuItem>
             ))}
@@ -113,27 +112,31 @@ export default function OrganizationSwitcher() {
                 );
               }}
             >
-              <SelectTrigger className="w-full flex items-center gap-2 bg-blue-50 border-blue-200 h-10">
-                <div className="flex items-center gap-2 flex-1">
+              <SelectTrigger className="w-full h-10 px-3 bg-blue-50 border-blue-200 hover:bg-blue-100">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   {currentClient ? (
-                    <Building2 className="h-4 w-4 shrink-0" />
+                    <Building2 className="h-4 w-4 flex-shrink-0" />
                   ) : (
-                    <Users className="h-4 w-4 shrink-0" />
+                    <Users className="h-4 w-4 flex-shrink-0" />
                   )}
-                  <SelectValue placeholder="Select client" className="text-foreground font-medium text-sm">
+                  <SelectValue className="text-sm font-medium">
                     {currentClient ? currentClient.name : "All Clients"}
                   </SelectValue>
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-popover border shadow-md w-[240px]">
-                <SelectItem value="all_clients" className="text-sm py-2">
+              <SelectContent 
+                className="z-50 bg-popover border shadow-md min-w-[200px]"
+                position="popper"
+                sideOffset={4}
+              >
+                <SelectItem value="all_clients" className="text-sm py-2 cursor-pointer">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     <span>All Clients</span>
                   </div>
                 </SelectItem>
                 {clientOrganizations.map(client => (
-                  <SelectItem key={client.id} value={client.id} className="text-sm py-2">
+                  <SelectItem key={client.id} value={client.id} className="text-sm py-2 cursor-pointer">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
                       <span className="truncate">{client.name}</span>
@@ -146,10 +149,12 @@ export default function OrganizationSwitcher() {
             <Button 
               variant="outline" 
               disabled 
-              className="w-full flex items-center gap-2 h-10 text-sm"
+              className="w-full h-10 px-3 text-sm bg-gray-50"
             >
-              <Users className="h-4 w-4 shrink-0" />
-              <span className="truncate">No Clients</span>
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">No Clients</span>
+              </div>
             </Button>
           )}
         </div>
