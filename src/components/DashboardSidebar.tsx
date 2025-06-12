@@ -1,4 +1,3 @@
-
 import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -27,70 +26,70 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentOrganization, isServiceProvider } = useOrganization();
   
-const navItems = [
-  { 
-    name: "Dashboard", 
-    href: "/dashboard", 
-    icon: LayoutDashboard 
-  },
-  { 
-    name: "Documents", 
-    href: "/documents", 
-    icon: FileText 
-  },
-  {
-    name: "Patients",
-    href: "/patients",
-    icon: UserRound
-  },
-  {
-    name: "Analytics",
-    href: "/analytics",
-    icon: BarChart
-  },
-  {
-    name: "Clinical Analytics",
-    href: "/clinical-analytics",
-    icon: ActivitySquare
-  },
-  {
-    name: "Occupational Health",
-    href: "/integrated-occupational-health",
-    icon: HardHat
-  },
-  {
-    name: "Reports",
-    href: "/reports",
-    icon: PieChart
-  },
-  {
-    name: "Certificate Templates",
-    href: "/certificates/templates",
-    icon: ScrollText
-  },
-  ...(isServiceProvider ? [
+  const navItems = [
     { 
-      name: "Organizations", 
-      href: "/admin/organizations", 
-      icon: Building
+      name: "Dashboard", 
+      href: "/dashboard", 
+      icon: LayoutDashboard 
     },
     { 
-      name: "Clients", 
-      href: `/admin/organizations/${currentOrganization?.id}/clients`, 
-      icon: Building 
+      name: "Documents", 
+      href: "/documents", 
+      icon: FileText 
     },
+    {
+      name: "Patients",
+      href: "/patients",
+      icon: UserRound
+    },
+    {
+      name: "Analytics",
+      href: "/analytics",
+      icon: BarChart
+    },
+    {
+      name: "Clinical Analytics",
+      href: "/clinical-analytics",
+      icon: ActivitySquare
+    },
+    {
+      name: "Occupational Health",
+      href: "/integrated-occupational-health",
+      icon: HardHat
+    },
+    {
+      name: "Reports",
+      href: "/reports",
+      icon: PieChart
+    },
+    {
+      name: "Certificate Templates",
+      href: "/certificates/templates",
+      icon: ScrollText
+    },
+    ...(isServiceProvider ? [
+      { 
+        name: "Organizations", 
+        href: "/admin/organizations", 
+        icon: Building
+      },
+      { 
+        name: "Clients", 
+        href: `/admin/organizations/${currentOrganization?.id}/clients`, 
+        icon: Building 
+      },
+      { 
+        name: "Users", 
+        href: "/admin/users",
+        icon: Users 
+      }
+    ] : []),
     { 
-      name: "Users", 
-      href: "/admin/users",
-      icon: Users 
+      name: "Settings", 
+      href: "/settings/organization", 
+      icon: Settings 
     }
-  ] : []),
-  { 
-    name: "Settings", 
-    href: "/settings/organization", 
-    icon: Settings 
-  }
-];
+  ];
 
   return (
     <div 
@@ -104,20 +103,24 @@ const navItems = [
         maxHeight: 'calc(100vh - 4rem)'
       }}
     >
-      <div className="flex flex-col h-full overflow-hidden">
-        <div className="flex-1 py-6 overflow-y-auto">
-          <div className="px-3 mb-6 flex justify-end">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setCollapsed(!collapsed)}
-              className="ml-auto"
-            >
-              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            </Button>
-          </div>
-          
-          <nav className="space-y-1 px-2">
+      {/* Main Content Area - Fixed height with proper flex layout */}
+      <div className="flex flex-col h-full">
+        
+        {/* Collapse Toggle - Fixed height */}
+        <div className="flex-shrink-0 px-3 py-4 flex justify-end">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setCollapsed(!collapsed)}
+            className="ml-auto"
+          >
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </Button>
+        </div>
+        
+        {/* Navigation - Scrollable middle section */}
+        <div className="flex-1 px-2 overflow-y-auto min-h-0">
+          <nav className="space-y-1">
             {navItems.map((item) => (
               <NavLink
                 key={item.name}
@@ -141,11 +144,11 @@ const navItems = [
           </nav>
         </div>
         
-        {/* Organization switcher at bottom - simplified positioning */}
+        {/* Organization Switcher - Fixed at bottom */}
         <div 
           className={cn(
-            "p-4 border-t bg-background shrink-0", 
-            collapsed && "items-center justify-center px-2"
+            "flex-shrink-0 p-4 border-t bg-background",
+            collapsed && "px-2"
           )}
         >
           {!collapsed && (
@@ -157,6 +160,7 @@ const navItems = [
             </>
           )}
         </div>
+        
       </div>
     </div>
   );
