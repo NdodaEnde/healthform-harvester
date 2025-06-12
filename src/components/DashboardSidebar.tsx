@@ -94,20 +94,20 @@ export function DashboardSidebar() {
   return (
     <div 
       className={cn(
-        "min-h-screen fixed top-16 left-0 bg-background border-r transition-all duration-300 z-40",
+        "fixed top-16 left-0 bg-background border-r transition-all duration-300 z-40",
         "flex flex-col",
         collapsed ? "w-16" : "w-64"
       )}
       style={{
         height: 'calc(100vh - 4rem)',
-        maxHeight: 'calc(100vh - 4rem)'
+        minHeight: 'calc(100vh - 4rem)'
       }}
     >
-      {/* Main Content Area - Fixed height with proper flex layout */}
-      <div className="flex flex-col h-full">
+      {/* FIXED: Changed to use grid layout for better space distribution */}
+      <div className="h-full grid grid-rows-[auto_1fr_auto] overflow-hidden">
         
         {/* Collapse Toggle - Fixed height */}
-        <div className="flex-shrink-0 px-3 py-4 flex justify-end">
+        <div className="px-3 py-4 flex justify-end">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -118,9 +118,9 @@ export function DashboardSidebar() {
           </Button>
         </div>
         
-        {/* Navigation - Scrollable middle section */}
-        <div className="flex-1 px-2 overflow-y-auto min-h-0">
-          <nav className="space-y-1">
+        {/* Navigation - Flexible middle section that can scroll */}
+        <div className="px-2 overflow-y-auto">
+          <nav className="space-y-1 pb-4">
             {navItems.map((item) => (
               <NavLink
                 key={item.name}
@@ -144,12 +144,15 @@ export function DashboardSidebar() {
           </nav>
         </div>
         
-        {/* Organization Switcher - Fixed at bottom */}
+        {/* Organization Switcher - Fixed at bottom with guaranteed space */}
         <div 
           className={cn(
-            "flex-shrink-0 p-4 border-t bg-background",
+            "p-4 border-t bg-background",
             collapsed && "px-2"
           )}
+          style={{
+            minHeight: "140px" // ✅ GUARANTEED minimum space for the switcher
+          }}
         >
           {!collapsed && (
             <>
