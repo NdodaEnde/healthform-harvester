@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrphanedDocumentFixer } from '@/components/OrphanedDocumentFixer';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList } from 'lucide-react';
+import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList, Shield, Lock, Database, FileShield } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,7 @@ const DocumentsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(9);
   const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const [deletingDocuments, setDeletingDocuments] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   
   const { 
@@ -186,6 +187,95 @@ const DocumentsPage = () => {
 
   const totalPages = Math.ceil((documents?.totalCount || 0) / itemsPerPage);
 
+  // Enhanced delete handler function
+  const handleDeleteDocument = async (documentId: string, fileName: string) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`);
+    
+    if (!confirmed) return;
+
+    // Add document to deleting set to show loading state
+    setDeletingDocuments(prev => new Set(prev).add(documentId));
+
+    try {
+      // First, get the document to access its file path for storage cleanup
+      const { data: document, error: fetchError } = await supabase
+        .from('documents')
+        .select('file_path')
+        .eq('id', documentId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching document for deletion:', fetchError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch document details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Delete from storage if file exists
+      if (document?.file_path) {
+        console.log('Deleting file from storage:', document.file_path);
+        const { error: storageError } = await supabase.storage
+          .from('medical-documents')
+          .remove([document.file_path]);
+        
+        if (storageError) {
+          console.warn('Warning: Could not delete file from storage:', storageError);
+          // Continue with database deletion even if storage fails
+        } else {
+          console.log('File deleted from storage successfully');
+        }
+      }
+
+      // Delete from database
+      const { error: deleteError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId);
+
+      if (deleteError) {
+        console.error('Error deleting document:', deleteError);
+        toast({
+          title: "Error deleting document",
+          description: deleteError.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Clean up local storage review data
+      localStorage.removeItem(`doc-review-${documentId}`);
+      localStorage.removeItem(`doc-review-note-${documentId}`);
+
+      // Refresh the documents list
+      refetch();
+
+      toast({
+        title: "Document deleted",
+        description: `"${fileName}" has been successfully deleted`,
+      });
+
+      console.log('Document deleted successfully:', documentId);
+
+    } catch (error) {
+      console.error('Unexpected error during deletion:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the document",
+        variant: "destructive"
+      });
+    } finally {
+      // Remove document from deleting set
+      setDeletingDocuments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(documentId);
+        return newSet;
+      });
+    }
+  };
+
   const handleUploadComplete = () => {
     refetch();
     setShowUploadDialog(false);
@@ -304,25 +394,146 @@ const DocumentsPage = () => {
     return items;
   };
   
-  // Render document card
-  const renderDocumentCard = (document: any) => (
-    <Card key={document.id}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">{document.file_name}</CardTitle>
+  // Render document card with delete functionality
+  const renderDocumentCard = (document: any) => {
+    const isDeleting = deletingDocuments.has(document.id);
+    
+    return (
+      <Card key={document.id} className={isDeleting ? 'opacity-50' : ''}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-lg">{document.file_name}</CardTitle>
+            </div>
+            <div>
+              {getReviewStatusBadge(document.reviewStatus)}
+            </div>
           </div>
-          <div>
-            {getReviewStatusBadge(document.reviewStatus)}
+          <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Status:</span>
+              <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                document.status === 'processed' 
+                  ? 'bg-green-100 text-green-800' 
+                  : document.status === 'processing' 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Type:</span>
+              <span className="text-sm">{document.document_type || 'Unknown'}</span>
+            </div>
+            {document.client_organization_id && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Client:</span>
+                <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                  For client
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => handleViewDocument(document.id)} 
+              variant="default"
+              disabled={isDeleting}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              View
+            </Button>
+          </div>
+          <div className="flex gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
+                    disabled={isDeleting}
+                  >
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Mark as reviewed</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
+                    disabled={isDeleting}
+                  >
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Mark as needs correction</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* DELETE BUTTON */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-9 w-9 hover:bg-destructive/10"
+                    onClick={() => handleDeleteDocument(document.id, document.file_name)}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className={`h-5 w-5 text-destructive ${isDeleting ? 'animate-pulse' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isDeleting ? 'Deleting...' : 'Delete document'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  // Render document list item with delete functionality
+  const renderDocumentListItem = (document: any) => {
+    const isDeleting = deletingDocuments.has(document.id);
+    
+    return (
+      <div key={document.id} className={`flex items-center justify-between p-4 border rounded-lg mb-2 hover:bg-accent/10 transition-colors ${isDeleting ? 'opacity-50' : ''}`}>
+        <div className="flex items-center gap-4 flex-1">
+          <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <h3 className="font-medium truncate">{document.file_name}</h3>
           </div>
         </div>
-        <CardDescription>Uploaded on {new Date(document.created_at).toLocaleDateString()}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Status:</span>
+        
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden md:flex items-center gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap mr-2">
+              {new Date(document.created_at).toLocaleString()}
+            </span>
+            
             <span className={`text-sm font-medium px-2 py-1 rounded-full ${
               document.status === 'processed' 
                 ? 'bg-green-100 text-green-800' 
@@ -332,153 +543,89 @@ const DocumentsPage = () => {
             }`}>
               {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
             </span>
+            
+            {document.document_type && (
+              <Badge variant="secondary" className="capitalize">
+                {document.document_type.replace(/_/g, ' ')}
+              </Badge>
+            )}
+            
+            {getReviewStatusBadge(document.reviewStatus)}
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Type:</span>
-            <span className="text-sm">{document.document_type || 'Unknown'}</span>
-          </div>
-          {document.client_organization_id && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Client:</span>
-              <span className="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                For client
-              </span>
-            </div>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <div className="flex gap-2">
-          <Button onClick={() => handleViewDocument(document.id)} variant="default">
-            <Eye className="mr-2 h-4 w-4" />
-            View
-          </Button>
-        </div>
-        <div className="flex gap-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
-                >
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Mark as reviewed</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
-                >
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Mark as needs correction</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </CardFooter>
-    </Card>
-  );
+          <div className="flex items-center gap-1">
+            <Button 
+              onClick={() => handleViewDocument(document.id)} 
+              variant="outline" 
+              size="sm"
+              disabled={isDeleting}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View
+            </Button>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
+                    disabled={isDeleting}
+                  >
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Mark as reviewed</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
+                    disabled={isDeleting}
+                  >
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Mark as needs correction</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-  // Render document list item
-  const renderDocumentListItem = (document: any) => (
-    <div key={document.id} className="flex items-center justify-between p-4 border rounded-lg mb-2 hover:bg-accent/10 transition-colors">
-      <div className="flex items-center gap-4 flex-1">
-        <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-        <div className="min-w-0">
-          <h3 className="font-medium truncate">{document.file_name}</h3>
+            {/* DELETE BUTTON */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8 hover:bg-destructive/10"
+                    onClick={() => handleDeleteDocument(document.id, document.file_name)}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className={`h-4 w-4 text-destructive ${isDeleting ? 'animate-pulse' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isDeleting ? 'Deleting...' : 'Delete document'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </div>
-      
-      <div className="flex items-center gap-3 shrink-0">
-        <div className="hidden md:flex items-center gap-2">
-          <span className="text-sm text-muted-foreground whitespace-nowrap mr-2">
-            {new Date(document.created_at).toLocaleString()}
-          </span>
-          
-          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-            document.status === 'processed' 
-              ? 'bg-green-100 text-green-800' 
-              : document.status === 'processing' 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'bg-red-100 text-red-800'
-          }`}>
-            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-          </span>
-          
-          {document.document_type && (
-            <Badge variant="secondary" className="capitalize">
-              {document.document_type.replace(/_/g, ' ')}
-            </Badge>
-          )}
-          
-          {getReviewStatusBadge(document.reviewStatus)}
-        </div>
-        
-        <div className="flex items-center gap-1">
-          <Button 
-            onClick={() => handleViewDocument(document.id)} 
-            variant="outline" 
-            size="sm"
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            View
-          </Button>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => updateDocumentReviewStatus(document.id, 'reviewed')}
-                >
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Mark as reviewed</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => updateDocumentReviewStatus(document.id, 'needs-correction')}
-                >
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Mark as needs correction</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
   
   return (
     <div className="mt-4">
@@ -742,7 +889,125 @@ const DocumentsPage = () => {
             transition={{ duration: 0.3 }}
             className="grid gap-6 md:grid-cols-2"
           >
-            {/* Security content kept the same */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-600" />
+                  Document Security
+                </CardTitle>
+                <CardDescription>
+                  Your documents are protected with enterprise-grade security
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">End-to-end encryption</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">HIPAA compliant storage</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">Access logging and monitoring</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">Regular security audits</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="h-5 w-5 text-blue-600" />
+                  Access Controls
+                </CardTitle>
+                <CardDescription>
+                  Granular permissions and role-based access
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Role-based permissions</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Multi-factor authentication</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Session management</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Audit trail logging</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-purple-600" />
+                  Data Protection
+                </CardTitle>
+                <CardDescription>
+                  Comprehensive backup and recovery systems
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm">Automated daily backups</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm">Geographic redundancy</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm">Point-in-time recovery</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm">Disaster recovery plan</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileShield className="h-5 w-5 text-orange-600" />
+                  Compliance
+                </CardTitle>
+                <CardDescription>
+                  Meeting healthcare and regulatory standards
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">HIPAA compliance</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">SOC 2 Type II certified</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">GDPR compliant</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">Regular compliance audits</span>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
         </TabsContent>
       </Tabs>
