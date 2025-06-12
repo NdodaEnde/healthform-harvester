@@ -1,24 +1,168 @@
-// TEMPORARY DEBUG VERSION - Replace OrganizationSwitcher temporarily
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
+  Building, 
+  ChevronDown, 
+  Users,
+  Building2
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export default function OrganizationSwitcher() {
-  return (
-    <div 
-      className="w-full bg-red-500 border-4 border-yellow-400 p-4"
-      style={{ 
-        minHeight: "100px",
-        backgroundColor: "red !important",
-        border: "4px solid yellow !important"
-      }}
-    >
-      <div className="text-white text-lg font-bold">
-        DEBUG: Can you see this red box?
+  const { 
+    currentOrganization,
+    currentClient,
+    userOrganizations,
+    clientOrganizations,
+    switchOrganization,
+    switchClient,
+    isServiceProvider
+  } = useOrganization();
+  
+  const [location] = useState(window.location.pathname);
+  
+  // Debug logging to check component rendering and data
+  useEffect(() => {
+    console.log("OrganizationSwitcher rendered at:", location);
+    console.log("Current organization:", currentOrganization);
+    console.log("Current client:", currentClient);
+    console.log("Is service provider:", isServiceProvider());
+    console.log("Client organizations:", clientOrganizations);
+  }, [currentOrganization, currentClient, clientOrganizations, location]);
+  
+  if (!currentOrganization) {
+    return (
+      <div className="w-full p-3 text-center text-sm text-muted-foreground bg-gray-50 rounded-md">
+        Loading organization...
       </div>
-      <button 
-        className="bg-blue-500 text-white p-2 mt-2 w-full"
-        onClick={() => alert("Button clicked!")}
-      >
-        Test Button - Click Me
-      </button>
+    );
+  }
+  
+  return (
+    <div className="space-y-3 w-full" data-testid="organization-switcher">
+      {/* Organization selector */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            variant="outline" 
+            className="flex items-center justify-between w-full h-10 px-3 bg-background border hover:bg-accent"
+          >
+            <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+              <Building className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate text-sm font-medium">{currentOrganization.name}</span>
+            </div>
+            {userOrganizations.length > 1 && (
+              <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 ml-2" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        {userOrganizations.length > 1 && (
+          <DropdownMenuContent 
+            align="start" 
+            className="w-56 z-50 bg-popover border shadow-md"
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="text-sm font-medium">Switch Organization</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {userOrganizations.map(org => (
+              <DropdownMenuItem 
+                key={org.id}
+                className="flex justify-between items-center cursor-pointer text-sm py-2 px-2"
+                onClick={() => switchOrganization(org.id)}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Building className="h-4 w-4 opacity-70 flex-shrink-0" />
+                  <span className="truncate">{org.name}</span>
+                </div>
+                {org.id === currentOrganization.id && (
+                  <Badge variant="secondary" className="ml-2 text-xs flex-shrink-0">Current</Badge>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        )}
+      </DropdownMenu>
+      
+      {/* Client selector (only for service providers) */}
+      {isServiceProvider() && (
+        <div className="w-full">
+          {clientOrganizations.length > 0 ? (
+            <Select
+              value={currentClient ? currentClient.id : "all_clients"}
+              onValueChange={(value) => {
+                console.log("Switching to client:", value);
+                switchClient(value);
+                toast.success(
+                  value === "all_clients"
+                    ? "Switched to all clients view"
+                    : `Switched to ${clientOrganizations.find(c => c.id === value)?.name}`
+                );
+              }}
+            >
+              <SelectTrigger className="w-full h-10 px-3 bg-blue-50 border-blue-200 hover:bg-blue-100">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {currentClient ? (
+                    <Building2 className="h-4 w-4 flex-shrink-0" />
+                  ) : (
+                    <Users className="h-4 w-4 flex-shrink-0" />
+                  )}
+                  <SelectValue className="text-sm font-medium">
+                    {currentClient ? currentClient.name : "All Clients"}
+                  </SelectValue>
+                </div>
+              </SelectTrigger>
+              <SelectContent 
+                className="z-50 bg-popover border shadow-md min-w-[200px]"
+                position="popper"
+                sideOffset={4}
+              >
+                <SelectItem value="all_clients" className="text-sm py-2 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>All Clients</span>
+                  </div>
+                </SelectItem>
+                {clientOrganizations.map(client => (
+                  <SelectItem key={client.id} value={client.id} className="text-sm py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      <span className="truncate">{client.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Button 
+              variant="outline" 
+              disabled 
+              className="w-full h-10 px-3 text-sm bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">No Clients</span>
+              </div>
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
