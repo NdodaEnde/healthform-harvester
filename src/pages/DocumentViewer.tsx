@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, FileText, Calendar, User, Building, Download, Edit } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, User, Building, Download, Edit, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
 import CertificateTemplate from '@/components/CertificateTemplate';
@@ -27,7 +27,7 @@ export default function DocumentViewer() {
   const isManualSelection = useRef(false);
   const hasAutoDetected = useRef(false);
   const documentId = useRef<string | null>(null);
-  const autoDetectionRan = useRef(false); // Additional safeguard
+  const autoDetectionRan = useRef(false);
 
   useEffect(() => {
     if (id) {
@@ -52,9 +52,8 @@ export default function DocumentViewer() {
     }
   }, [document?.id]);
 
-  // FIXED: Auto-detection useEffect with better guards
+  // Auto-detection useEffect with better guards
   useEffect(() => {
-    // Strong guards to prevent multiple runs
     if (!document?.extracted_data || 
         isManualSelection.current || 
         hasAutoDetected.current || 
@@ -71,7 +70,6 @@ export default function DocumentViewer() {
     console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
     console.log('Full extracted_data:', document.extracted_data);
 
-    // Get the structured data from Edge Function
     const structuredData = document.extracted_data.structured_data;
     const certificateInfo = structuredData?.certificate_info;
     const rawContent = document.extracted_data.raw_content || '';
@@ -79,11 +77,10 @@ export default function DocumentViewer() {
     console.log('Certificate info:', certificateInfo);
     console.log('Raw content sample:', rawContent.substring(0, 200));
 
-    // Check explicit boolean flags from enhanced Edge Function
     let hasSignature = false;
     let hasStamp = false;
     
-    // PRIORITY 1: Check explicit boolean flags from Edge Function
+    // Check explicit boolean flags from Edge Function
     if (certificateInfo?.signature === true) {
       hasSignature = true;
       console.log('✅ Signature detected from Edge Function boolean flag');
@@ -94,13 +91,12 @@ export default function DocumentViewer() {
       console.log('✅ Stamp detected from Edge Function boolean flag');
     }
     
-    // PRIORITY 2: Fallback to enhanced content analysis if flags not set
+    // Fallback to enhanced content analysis if flags not set
     if (!hasSignature || !hasStamp) {
       console.log('Using fallback content analysis...');
       
       const contentLower = rawContent.toLowerCase();
       
-      // Look for signature indicators - comprehensive list
       if (!hasSignature) {
         const signatureKeywords = [
           'signature:',
@@ -121,7 +117,6 @@ export default function DocumentViewer() {
         }
       }
       
-      // Look for stamp indicators - comprehensive list
       if (!hasStamp) {
         const stampKeywords = [
           'stamp:',
@@ -162,17 +157,15 @@ export default function DocumentViewer() {
 
     console.log('Enhanced template detection:', detectionResult);
 
-    // Apply auto-detection
     const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
     setSelectedTemplate(detectedTemplate);
     
     console.log(`✅ Auto-detected: ${detectedTemplate} template (${detectionResult.reasoning})`);
     
-    // Mark that auto-detection has run - multiple safeguards
     hasAutoDetected.current = true;
     autoDetectionRan.current = true;
     console.log('=== END AUTO-DETECTION ===');
-  }, [document?.extracted_data]); // Only depend on extracted_data
+  }, [document?.extracted_data]);
 
   const fetchDocument = async () => {
     try {
@@ -231,21 +224,129 @@ export default function DocumentViewer() {
     }
   };
 
-  // FIXED: More robust manual template change handler
   const handleTemplateChange = useCallback((template: 'modern' | 'historical') => {
     console.log(`🎯 Template manually changed to: ${template}`);
     console.log('Previous template:', selectedTemplate);
     console.log('Manual selection flag before:', isManualSelection.current);
     
-    // Set manual selection flag FIRST to prevent any auto-detection interference
     isManualSelection.current = true;
-    
-    // Then set the template
     setSelectedTemplate(template);
     
     console.log('Manual selection flag set to true - auto-detection will be permanently disabled');
     console.log('Template should now be:', template);
   }, [selectedTemplate]);
+
+  // Helper function to determine if document is a PDF
+  const isPDF = (document: DatabaseDocument) => {
+    return document.mime_type === 'application/pdf' || 
+           document.file_name?.toLowerCase().endsWith('.pdf');
+  };
+
+  // Helper function to determine if document is an image
+  const isImage = (document: DatabaseDocument) => {
+    return document.mime_type?.startsWith('image/') || 
+           /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(document.file_name || '');
+  };
+
+  // Render original document viewer
+  const renderOriginalDocument = () => {
+    if (!document?.public_url) {
+      return (
+        <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
+          <p className="text-muted-foreground">Original document not available</p>
+        </div>
+      );
+    }
+
+    if (isPDF(document)) {
+      return (
+        <div className="w-full space-y-4">
+          {/* PDF Embed */}
+          <div className="w-full border rounded-lg overflow-hidden shadow-sm">
+            <iframe
+              src={`${document.public_url}#view=FitH`}
+              className="w-full h-96 border-0"
+              title={`PDF: ${document.file_name}`}
+              loading="lazy"
+            />
+          </div>
+          
+          {/* Fallback options */}
+          <div className="flex gap-2 justify-center">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.open(document.public_url, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open in New Tab
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleDownload}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+          </div>
+          
+          {/* Additional note for users */}
+          <div className="text-xs text-muted-foreground text-center p-2 bg-blue-50 rounded">
+            💡 If the PDF doesn't display properly, try opening it in a new tab or downloading it
+          </div>
+        </div>
+      );
+    } else if (isImage(document)) {
+      return (
+        <div className="w-full">
+          <img 
+            src={document.public_url} 
+            alt={document.file_name}
+            className="w-full h-auto border rounded-lg shadow-sm max-h-96 object-contain"
+            onError={(e) => {
+              console.error('Image failed to load:', document.public_url);
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="hidden flex items-center justify-center h-40 bg-gray-50 rounded-lg">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-2">Failed to load image</p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(document.public_url, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Original
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      // Unknown file type
+      return (
+        <div className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-lg space-y-3">
+          <FileText className="h-8 w-8 text-muted-foreground" />
+          <p className="text-muted-foreground text-center">
+            Document preview not available for this file type
+            <br />
+            <span className="text-xs">({document.mime_type || 'Unknown type'})</span>
+          </p>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => window.open(document.public_url, '_blank')}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open Original
+          </Button>
+        </div>
+      );
+    }
+  };
 
   if (loading) {
     return (
@@ -295,7 +396,7 @@ export default function DocumentViewer() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">{document.file_name}</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mt-1">
             Uploaded {new Date(document.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -337,7 +438,7 @@ export default function DocumentViewer() {
             </div>
           </div>
 
-          {/* Debug info - shows current state */}
+          {/* Debug info */}
           {process.env.NODE_ENV === 'development' && isProcessed && validatedData && (
             <div className="p-3 bg-gray-100 rounded text-xs">
               <p><strong>Debug:</strong></p>
@@ -345,10 +446,13 @@ export default function DocumentViewer() {
               <p>Auto-detected: {hasAutoDetected.current ? 'Yes' : 'No'}</p>
               <p>Auto-detection ran: {autoDetectionRan.current ? 'Yes' : 'No'}</p>
               <p>Selected template: {selectedTemplate}</p>
+              <p>File type: {document.mime_type}</p>
+              <p>Is PDF: {isPDF(document) ? 'Yes' : 'No'}</p>
+              <p>Is Image: {isImage(document) ? 'Yes' : 'No'}</p>
             </div>
           )}
 
-          {/* Validation Controls - with improved template selection */}
+          {/* Validation Controls */}
           {isProcessed && validatedData && (
             <DocumentValidationControls
               document={document}
@@ -372,23 +476,16 @@ export default function DocumentViewer() {
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Original Document
+                {isPDF(document) && (
+                  <Badge variant="outline" className="ml-2">PDF</Badge>
+                )}
+                {isImage(document) && (
+                  <Badge variant="outline" className="ml-2">Image</Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {document.public_url ? (
-                <div className="w-full">
-                  <img 
-                    src={document.public_url} 
-                    alt={document.file_name}
-                    className="w-full h-auto border rounded-lg shadow-sm"
-                    style={{ maxHeight: '600px', objectFit: 'contain' }}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
-                  <p className="text-muted-foreground">Original document not available</p>
-                </div>
-              )}
+              {renderOriginalDocument()}
             </CardContent>
           </Card>
 
