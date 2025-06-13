@@ -30,6 +30,8 @@ export interface DatabaseDocument {
   mime_type: string;
   file_size?: number;
   public_url?: string;
+  validation_status?: string;
+  validated_by?: string;
 }
 
 export interface DatabaseOrganization {
