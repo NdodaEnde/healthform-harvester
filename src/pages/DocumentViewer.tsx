@@ -6,56 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, User, Building, Download, Edit, Save, CheckCircle, AlertTriangle, X, History } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, User, Building, Download, Edit, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import DocumentValidationControls from '@/components/documents/DocumentValidationControls';
 import type { DatabaseDocument } from '@/types/database';
-import { useAuth } from '@/contexts/AuthContext';
-
-interface ValidationHistoryEntry {
-  timestamp: string;
-  changes: any;
-  validated_by: string;
-  validation_type: 'auto' | 'manual' | 'correction';
-  notes?: string;
-}
-
-interface EnhancedExtractedData {
-  raw_content: string;
-  structured_data: any;
-  processing_info: any;
-  validation_history?: ValidationHistoryEntry[];
-  last_validated_at?: string;
-  last_validated_by?: string;
-  validation_status: 'pending' | 'in_progress' | 'validated' | 'needs_review';
-}
 
 export default function DocumentViewer() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  // Document state
   const [document, setDocument] = useState<DatabaseDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Validation state
   const [isValidationMode, setIsValidationMode] = useState(false);
   const [validatedData, setValidatedData] = useState<any>(null);
-  const [originalData, setOriginalData] = useState<any>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
-  const [showValidationHistory, setShowValidationHistory] = useState(false);
-  
-  // Template state
   const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'historical'>('modern');
   
-  // Refs for auto-detection
+  // Use refs to track state and prevent conflicts
   const isManualSelection = useRef(false);
   const hasAutoDetected = useRef(false);
   const documentId = useRef<string | null>(null);
@@ -69,9 +37,7 @@ export default function DocumentViewer() {
 
   useEffect(() => {
     if (document?.extracted_data) {
-      const extractedData = document.extracted_data as EnhancedExtractedData;
-      setValidatedData(extractedData);
-      setOriginalData(JSON.parse(JSON.stringify(extractedData))); // Deep copy
+      setValidatedData(document.extracted_data);
     }
   }, [document]);
 
@@ -83,24 +49,33 @@ export default function DocumentViewer() {
       isManualSelection.current = false;
       hasAutoDetected.current = false;
       autoDetectionRan.current = false;
-      setHasUnsavedChanges(false);
     }
   }, [document?.id]);
 
-  // Auto-detection for template selection
+  // Auto-detection useEffect with better guards
   useEffect(() => {
     if (!document?.extracted_data || 
         isManualSelection.current || 
         hasAutoDetected.current || 
         autoDetectionRan.current) {
+      
+      if (isManualSelection.current) {
+        console.log('⚡ Skipping auto-detection - user has manually selected template');
+      } else if (hasAutoDetected.current || autoDetectionRan.current) {
+        console.log('⚡ Skipping auto-detection - already completed for this document');
+      }
       return;
     }
 
     console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
-    
+    console.log('Full extracted_data:', document.extracted_data);
+
     const structuredData = document.extracted_data.structured_data;
     const certificateInfo = structuredData?.certificate_info;
     const rawContent = document.extracted_data.raw_content || '';
+
+    console.log('Certificate info:', certificateInfo);
+    console.log('Raw content sample:', rawContent.substring(0, 200));
 
     let hasSignature = false;
     let hasStamp = false;
@@ -116,56 +91,81 @@ export default function DocumentViewer() {
       console.log('✅ Stamp detected from Edge Function boolean flag');
     }
     
-    // Fallback to enhanced content analysis
+    // Fallback to enhanced content analysis if flags not set
     if (!hasSignature || !hasStamp) {
+      console.log('Using fallback content analysis...');
+      
       const contentLower = rawContent.toLowerCase();
       
       if (!hasSignature) {
         const signatureKeywords = [
-          'signature:', 'handwritten signature', 'stylized flourish',
-          'placed above the printed word "signature"', 'overlapping strokes',
-          'signature consists of', 'tall, looping, and angular strokes',
-          'handwriting & style', 'multiple overlapping lines', 'horizontal flourish'
+          'signature:',
+          'handwritten signature',
+          'stylized flourish',
+          'placed above the printed word "signature"',
+          'overlapping strokes',
+          'signature consists of',
+          'tall, looping, and angular strokes',
+          'handwriting & style',
+          'multiple overlapping lines',
+          'horizontal flourish'
         ];
         
         hasSignature = signatureKeywords.some(keyword => contentLower.includes(keyword));
+        if (hasSignature) {
+          console.log('✅ Signature detected from enhanced raw content analysis');
+        }
       }
       
       if (!hasStamp) {
         const stampKeywords = [
-          'stamp:', 'rectangular black stamp', 'practice no', 'practice number',
-          'practice no.', 'practice no:', 'sanc no', 'sanc number', 'sasohn no',
-          'mp no', 'mp number', 'black stamp', 'official stamp', 'hpcsa',
+          'stamp:',
+          'rectangular black stamp',
+          'practice no',
+          'practice number',
+          'practice no.',
+          'practice no:',
+          'sanc no',
+          'sanc number',
+          'sasohn no',
+          'mp no',
+          'mp number',
+          'black stamp',
+          'official stamp',
+          'hpcsa',
           'with partial text and date'
         ];
         
         hasStamp = stampKeywords.some(keyword => contentLower.includes(keyword));
+        if (hasStamp) {
+          console.log('✅ Stamp detected from enhanced raw content analysis');
+        }
       }
     }
     
     const hasSignatureStampData = hasSignature || hasStamp;
-    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
-    
-    setSelectedTemplate(detectedTemplate);
-    hasAutoDetected.current = true;
-    autoDetectionRan.current = true;
-    
-    console.log(`✅ Auto-detected: ${detectedTemplate} template`);
-    console.log('=== END AUTO-DETECTION ===');
-  }, [document?.extracted_data]);
 
-  // Prevent data loss on navigation
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-      }
+    const detectionResult = {
+      hasSignature,
+      hasStamp,
+      hasSignatureStampData,
+      detectedTemplate: hasSignatureStampData ? 'historical' : 'modern',
+      reasoning: hasSignatureStampData 
+        ? `Found ${hasSignature ? 'signature' : ''}${hasSignature && hasStamp ? ' and ' : ''}${hasStamp ? 'stamp' : ''} → Historical template (filed record)` 
+        : 'No signature/stamp data → Modern template (current workflow)'
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+    console.log('Enhanced template detection:', detectionResult);
+
+    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
+    setSelectedTemplate(detectedTemplate);
+    
+    console.log(`✅ Auto-detected: ${detectedTemplate} template (${detectionResult.reasoning})`);
+    
+    hasAutoDetected.current = true;
+    autoDetectionRan.current = true;
+    console.log('=== END AUTO-DETECTION ===');
+  }, [document?.extracted_data]);
 
   const fetchDocument = async () => {
     try {
@@ -198,143 +198,25 @@ export default function DocumentViewer() {
   };
 
   const handleValidationModeChange = (enabled: boolean) => {
-    if (enabled) {
-      setIsValidationMode(true);
-      // Set validation status to in_progress when entering validation mode
-      if (document?.extracted_data) {
-        const updatedData = {
-          ...document.extracted_data,
-          validation_status: 'in_progress' as const
-        };
-        setValidatedData(updatedData);
-      }
-    } else {
-      if (hasUnsavedChanges) {
-        setShowExitConfirmation(true);
-      } else {
-        exitValidationMode();
-      }
-    }
+    setIsValidationMode(enabled);
   };
 
-  const exitValidationMode = () => {
-    setIsValidationMode(false);
-    setHasUnsavedChanges(false);
-    setShowExitConfirmation(false);
-    
-    // Reset to original data
-    if (originalData) {
-      setValidatedData(JSON.parse(JSON.stringify(originalData)));
-    }
-  };
-
-  const handleDataChange = useCallback((updatedData: any) => {
+  const handleDataChange = (updatedData: any) => {
     setValidatedData(updatedData);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  const createValidationHistoryEntry = (type: 'auto' | 'manual' | 'correction', notes?: string): ValidationHistoryEntry => {
-    return {
-      timestamp: new Date().toISOString(),
-      changes: validatedData,
-      validated_by: user?.id || 'unknown',
-      validation_type: type,
-      notes
-    };
   };
 
-  const handleSaveChanges = async (isCompletingValidation = false) => {
-    if (!document || !validatedData) return false;
+  const handleValidationComplete = () => {
+    toast.success('Patient record created successfully!', {
+      action: validatedData?.patient?.name ? {
+        label: 'View Patient',
+        onClick: () => {
+          console.log('Navigate to patient:', validatedData.patient.name);
+        }
+      } : undefined
+    });
     
-    try {
-      setIsSaving(true);
-      
-      const currentExtractedData = document.extracted_data as EnhancedExtractedData;
-      
-      // Create new validation history entry
-      const newHistoryEntry = createValidationHistoryEntry(
-        isCompletingValidation ? 'manual' : 'correction',
-        isCompletingValidation ? 'Validation completed' : 'Data updated during validation'
-      );
-      
-      // Create updated extracted data structure
-      const updatedExtractedData: EnhancedExtractedData = {
-        ...currentExtractedData,
-        structured_data: validatedData.structured_data || validatedData,
-        validation_history: [
-          ...(currentExtractedData.validation_history || []),
-          newHistoryEntry
-        ],
-        last_validated_at: new Date().toISOString(),
-        last_validated_by: user?.id || 'unknown',
-        validation_status: isCompletingValidation ? 'validated' : 'in_progress'
-      };
-
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          extracted_data: updatedExtractedData,
-          status: isCompletingValidation ? 'validated' : document.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', document.id);
-
-      if (error) {
-        console.error('Error saving validated data:', error);
-        toast.error('Failed to save changes: ' + error.message);
-        return false;
-      }
-
-      const successMessage = isCompletingValidation 
-        ? 'Validation completed successfully!' 
-        : 'Changes saved successfully!';
-      
-      toast.success(successMessage);
-      setHasUnsavedChanges(false);
-      
-      // Update original data reference
-      setOriginalData(JSON.parse(JSON.stringify(updatedExtractedData)));
-      
-      // Refresh document data
-      await fetchDocument();
-      
-      return true;
-      
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast.error('Failed to save changes');
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
+    fetchDocument();
   };
-
-  const handleValidationComplete = async () => {
-    const saveSuccess = await handleSaveChanges(true);
-    
-    if (saveSuccess) {
-      // Exit validation mode
-      setIsValidationMode(false);
-      setHasUnsavedChanges(false);
-      
-      // Show success message with optional patient navigation
-      toast.success('Document validation completed!', {
-        action: validatedData?.patient?.name ? {
-          label: 'View Patient',
-          onClick: () => {
-            // Navigate to patient record if applicable
-            console.log('Navigate to patient:', validatedData.patient.name);
-          }
-        } : undefined
-      });
-    }
-  };
-
-  const handleTemplateChange = useCallback((template: 'modern' | 'historical') => {
-    console.log(`🎯 Template manually changed to: ${template}`);
-    isManualSelection.current = true;
-    setSelectedTemplate(template);
-  }, []);
 
   const handleDownload = () => {
     if (document?.public_url) {
@@ -342,24 +224,128 @@ export default function DocumentViewer() {
     }
   };
 
-  const getValidationStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="outline">Pending Validation</Badge>;
-      case 'in_progress':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
-      case 'validated':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Validated</Badge>;
-      case 'needs_review':
-        return <Badge variant="destructive">Needs Review</Badge>;
-      default:
-        return <Badge variant="outline">Unknown Status</Badge>;
-    }
+  const handleTemplateChange = useCallback((template: 'modern' | 'historical') => {
+    console.log(`🎯 Template manually changed to: ${template}`);
+    console.log('Previous template:', selectedTemplate);
+    console.log('Manual selection flag before:', isManualSelection.current);
+    
+    isManualSelection.current = true;
+    setSelectedTemplate(template);
+    
+    console.log('Manual selection flag set to true - auto-detection will be permanently disabled');
+    console.log('Template should now be:', template);
+  }, [selectedTemplate]);
+
+  // Helper function to determine if document is a PDF
+  const isPDF = (document: DatabaseDocument) => {
+    return document.mime_type === 'application/pdf' || 
+           document.file_name?.toLowerCase().endsWith('.pdf');
   };
 
-  const getValidationHistory = (): ValidationHistoryEntry[] => {
-    const extractedData = document?.extracted_data as EnhancedExtractedData;
-    return extractedData?.validation_history || [];
+  // Helper function to determine if document is an image
+  const isImage = (document: DatabaseDocument) => {
+    return document.mime_type?.startsWith('image/') || 
+           /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(document.file_name || '');
+  };
+
+  // Render original document viewer
+  const renderOriginalDocument = () => {
+    if (!document?.public_url) {
+      return (
+        <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
+          <p className="text-muted-foreground">Original document not available</p>
+        </div>
+      );
+    }
+
+    if (isPDF(document)) {
+      return (
+        <div className="w-full space-y-4">
+          {/* PDF Embed */}
+          <div className="w-full border rounded-lg overflow-hidden shadow-sm">
+            <iframe
+              src={`${document.public_url}#view=FitH`}
+              className="w-full h-96 border-0"
+              title={`PDF: ${document.file_name}`}
+              loading="lazy"
+            />
+          </div>
+          
+          {/* Fallback options */}
+          <div className="flex gap-2 justify-center">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.open(document.public_url, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open in New Tab
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleDownload}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+          </div>
+          
+          {/* Additional note for users */}
+          <div className="text-xs text-muted-foreground text-center p-2 bg-blue-50 rounded">
+            💡 If the PDF doesn't display properly, try opening it in a new tab or downloading it
+          </div>
+        </div>
+      );
+    } else if (isImage(document)) {
+      return (
+        <div className="w-full">
+          <img 
+            src={document.public_url} 
+            alt={document.file_name}
+            className="w-full h-auto border rounded-lg shadow-sm max-h-96 object-contain"
+            onError={(e) => {
+              console.error('Image failed to load:', document.public_url);
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="hidden flex items-center justify-center h-40 bg-gray-50 rounded-lg">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-2">Failed to load image</p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(document.public_url, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Original
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      // Unknown file type
+      return (
+        <div className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-lg space-y-3">
+          <FileText className="h-8 w-8 text-muted-foreground" />
+          <p className="text-muted-foreground text-center">
+            Document preview not available for this file type
+            <br />
+            <span className="text-xs">({document.mime_type || 'Unknown type'})</span>
+          </p>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => window.open(document.public_url, '_blank')}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open Original
+          </Button>
+        </div>
+      );
+    }
   };
 
   if (loading) {
@@ -392,83 +378,15 @@ export default function DocumentViewer() {
     );
   }
 
-  const isProcessed = document.status === 'processed' || document.status === 'completed' || document.status === 'validated';
+  const isProcessed = document.status === 'processed' || document.status === 'completed';
   const isCertificate = document.document_type?.includes('certificate') || 
                         document.file_name?.toLowerCase().includes('certificate');
-  
-  const extractedData = document.extracted_data as EnhancedExtractedData;
-  const validationHistory = getValidationHistory();
 
   return (
     <div className="space-y-6">
       <Helmet>
         <title>{document.file_name} | Document Viewer</title>
       </Helmet>
-
-      {/* Exit Confirmation Dialog */}
-      <Dialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Unsaved Changes
-            </DialogTitle>
-            <DialogDescription>
-              You have unsaved changes. If you exit validation mode now, your changes will be lost.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowExitConfirmation(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={() => handleSaveChanges(false)}
-              disabled={isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-            <Button variant="destructive" onClick={exitValidationMode}>
-              Exit Without Saving
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Validation History Dialog */}
-      <Dialog open={showValidationHistory} onOpenChange={setShowValidationHistory}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Validation History
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-96 overflow-y-auto space-y-4">
-            {validationHistory.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No validation history available</p>
-            ) : (
-              validationHistory.map((entry, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={entry.validation_type === 'manual' ? 'default' : 'secondary'}>
-                        {entry.validation_type}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  {entry.notes && (
-                    <p className="text-sm">{entry.notes}</p>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Header */}
       <div className="flex items-center gap-4">
@@ -482,71 +400,13 @@ export default function DocumentViewer() {
             Uploaded {new Date(document.created_at).toLocaleDateString()}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {validationHistory.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setShowValidationHistory(true)}>
-              <History className="h-4 w-4 mr-2" />
-              History ({validationHistory.length})
-            </Button>
-          )}
-          {document.public_url && (
-            <Button variant="outline" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </Button>
-          )}
-        </div>
+        {document.public_url && (
+          <Button variant="outline" onClick={handleDownload}>
+            <Download className="h-4 w-4 mr-2" />
+            Download
+          </Button>
+        )}
       </div>
-
-      {/* Validation Status Bar */}
-      {isValidationMode && (
-        <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Edit className="h-5 w-5 text-blue-600" />
-              <span className="font-medium text-blue-900">Validation Mode</span>
-            </div>
-            {hasUnsavedChanges && (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-orange-600 font-medium">Unsaved changes</span>
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => handleSaveChanges(false)}
-              disabled={!hasUnsavedChanges || isSaving}
-              variant="outline"
-              size="sm"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-            
-            <Button 
-              onClick={handleValidationComplete}
-              disabled={isSaving}
-              variant="default"
-              size="sm"
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Complete Validation
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => handleValidationModeChange(false)}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Exit
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Document Info */}
       <Card>
@@ -557,7 +417,7 @@ export default function DocumentViewer() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">Status</p>
               <Badge variant={isProcessed ? 'default' : 'secondary'}>
@@ -576,18 +436,19 @@ export default function DocumentViewer() {
                 {document.file_size ? `${(document.file_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown'}
               </p>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Validation Status</p>
-              {getValidationStatusBadge(extractedData?.validation_status || 'pending')}
-            </div>
           </div>
 
-          {/* Last validation info */}
-          {extractedData?.last_validated_at && (
-            <div className="pt-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                Last validated: {new Date(extractedData.last_validated_at).toLocaleString()}
-              </p>
+          {/* Debug info */}
+          {process.env.NODE_ENV === 'development' && isProcessed && validatedData && (
+            <div className="p-3 bg-gray-100 rounded text-xs">
+              <p><strong>Debug:</strong></p>
+              <p>Manual selection: {isManualSelection.current ? 'Yes' : 'No'}</p>
+              <p>Auto-detected: {hasAutoDetected.current ? 'Yes' : 'No'}</p>
+              <p>Auto-detection ran: {autoDetectionRan.current ? 'Yes' : 'No'}</p>
+              <p>Selected template: {selectedTemplate}</p>
+              <p>File type: {document.mime_type}</p>
+              <p>Is PDF: {isPDF(document) ? 'Yes' : 'No'}</p>
+              <p>Is Image: {isImage(document) ? 'Yes' : 'No'}</p>
             </div>
           )}
 
@@ -595,7 +456,7 @@ export default function DocumentViewer() {
           {isProcessed && validatedData && (
             <DocumentValidationControls
               document={document}
-              isValidated={extractedData?.validation_status === 'validated'}
+              isValidated={!!validatedData}
               validatedData={validatedData}
               onValidationModeChange={handleValidationModeChange}
               onValidationComplete={handleValidationComplete}
@@ -615,23 +476,16 @@ export default function DocumentViewer() {
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Original Document
+                {isPDF(document) && (
+                  <Badge variant="outline" className="ml-2">PDF</Badge>
+                )}
+                {isImage(document) && (
+                  <Badge variant="outline" className="ml-2">Image</Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {document.public_url ? (
-                <div className="w-full">
-                  <img 
-                    src={document.public_url} 
-                    alt={document.file_name}
-                    className="w-full h-auto border rounded-lg shadow-sm"
-                    style={{ maxHeight: '600px', objectFit: 'contain' }}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
-                  <p className="text-muted-foreground">Original document not available</p>
-                </div>
-              )}
+              {renderOriginalDocument()}
             </CardContent>
           </Card>
 
@@ -657,6 +511,15 @@ export default function DocumentViewer() {
                 onDataChange={handleDataChange}
                 templateType={selectedTemplate}
               />
+
+              <div className="mt-4 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsValidationMode(false)}
+                >
+                  Exit Validation Mode
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -688,7 +551,7 @@ export default function DocumentViewer() {
             <CardTitle>Extracted Data</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-sm bg-gray-50 p-4 rounded-lg overflow-auto max-h-96">
+            <pre className="text-sm bg-gray-50 p-4 rounded-lg overflow-auto">
               {JSON.stringify(document.extracted_data, null, 2)}
             </pre>
           </CardContent>

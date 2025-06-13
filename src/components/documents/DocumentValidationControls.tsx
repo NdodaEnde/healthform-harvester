@@ -1,20 +1,10 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  CheckCircle, 
-  Edit, 
-  Eye, 
-  AlertTriangle, 
-  FileText, 
-  Settings,
-  Info,
-  Sparkles,
-  FileImage
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { CheckCircle, Edit, User, Settings } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import CertificatePromotionDialog from '../certificates/CertificatePromotionDialog';
 import type { DatabaseDocument } from '@/types/database';
 
 interface DocumentValidationControlsProps {
@@ -22,294 +12,239 @@ interface DocumentValidationControlsProps {
   isValidated: boolean;
   validatedData: any;
   onValidationModeChange: (enabled: boolean) => void;
-  onValidationComplete: () => void;
-  selectedTemplate: 'modern' | 'historical';
-  onTemplateChange: (template: 'modern' | 'historical') => void;
+  onValidationComplete?: () => void;
+  selectedTemplate?: 'modern' | 'historical';
+  onTemplateChange?: (template: 'modern' | 'historical') => void;
 }
 
-export default function DocumentValidationControls({
+const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   document,
   isValidated,
   validatedData,
   onValidationModeChange,
   onValidationComplete,
-  selectedTemplate,
+  selectedTemplate = 'modern', // Default to modern for new documents
   onTemplateChange
-}: DocumentValidationControlsProps) {
-  
-  // Check if document is a certificate type
-  const isCertificate = document.document_type?.includes('certificate') || 
-                        document.file_name?.toLowerCase().includes('certificate');
+}) => {
+  const { currentOrganization } = useOrganization();
+  const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
 
-  // Get validation status from extracted data
-  const extractedData = document.extracted_data as any;
-  const validationStatus = extractedData?.validation_status || 'pending';
-  const lastValidatedAt = extractedData?.last_validated_at;
-  const validationHistory = extractedData?.validation_history || [];
-
-  // Check if document has structured data
-  const hasStructuredData = validatedData?.structured_data || 
-                            Object.keys(validatedData || {}).length > 0;
-
-  // Check for signature/stamp data for template recommendation
-  const hasSignatureStampData = () => {
-    const certificateInfo = validatedData?.structured_data?.certificate_info;
-    const rawContent = validatedData?.raw_content || '';
-    
-    return certificateInfo?.signature || 
-           certificateInfo?.stamp || 
-           rawContent.toLowerCase().includes('signature') ||
-           rawContent.toLowerCase().includes('stamp');
-  };
-
-  const getValidationStatusInfo = () => {
-    switch (validationStatus) {
-      case 'pending':
-        return {
-          icon: <AlertTriangle className="h-4 w-4 text-orange-500" />,
-          text: 'Pending validation',
-          description: 'This document has not been validated yet.',
-          color: 'text-orange-600'
-        };
-      case 'in_progress':
-        return {
-          icon: <Edit className="h-4 w-4 text-blue-500" />,
-          text: 'Validation in progress',
-          description: 'This document is currently being validated.',
-          color: 'text-blue-600'
-        };
-      case 'validated':
-        return {
-          icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-          text: 'Validated',
-          description: lastValidatedAt 
-            ? `Last validated on ${new Date(lastValidatedAt).toLocaleDateString()}`
-            : 'This document has been validated.',
-          color: 'text-green-600'
-        };
-      case 'needs_review':
-        return {
-          icon: <AlertTriangle className="h-4 w-4 text-red-500" />,
-          text: 'Needs review',
-          description: 'This document requires additional review.',
-          color: 'text-red-600'
-        };
-      default:
-        return {
-          icon: <FileText className="h-4 w-4 text-gray-500" />,
-          text: 'Unknown status',
-          description: 'Validation status is unknown.',
-          color: 'text-gray-600'
-        };
+  const handleCreatePatientRecord = () => {
+    if (validatedData && currentOrganization) {
+      console.log('Opening promotion dialog with validated data:', validatedData);
+      setIsPromotionDialogOpen(true);
     }
   };
 
-  const getTemplateRecommendation = () => {
-    if (!isCertificate) return null;
+  const handlePromotionComplete = () => {
+    setIsPromotionDialogOpen(false);
+    onValidationComplete?.();
+  };
+
+  // CORRECTED: Auto-detect template based on document data
+  const detectTemplate = (data: any): 'modern' | 'historical' => {
+    const getValue = (obj: any, path: string): any => {
+      if (!obj || !path) return null;
+      const keys = path.split('.');
+      let current = obj;
+      for (const key of keys) {
+        if (current === undefined || current === null || typeof current !== 'object') {
+          return null;
+        }
+        current = current[key];
+      }
+      return current;
+    };
+
+    // Check for signature data
+    const hasSignature = !!(
+      getValue(data, 'signature') ||
+      getValue(data, 'structured_data.signature') ||
+      getValue(data, 'extracted_data.signature') ||
+      getValue(data, 'certificate_info.signature') ||
+      getValue(data, 'structured_data.certificate_info.signature')
+    );
+
+    // Check for stamp data
+    const hasStamp = !!(
+      getValue(data, 'stamp') ||
+      getValue(data, 'structured_data.stamp') ||
+      getValue(data, 'extracted_data.stamp') ||
+      getValue(data, 'certificate_info.stamp') ||
+      getValue(data, 'structured_data.certificate_info.stamp')
+    );
+
+    const hasSignatureStampData = hasSignature || hasStamp;
     
-    const hasSignatureStamp = hasSignatureStampData();
-    const recommendedTemplate = hasSignatureStamp ? 'historical' : 'modern';
-    const isUsingRecommended = selectedTemplate === recommendedTemplate;
+    // CORRECTED LOGIC:
+    // Historical documents (filed records) have physical signatures/stamps → Historical template
+    // Modern documents (current workflow) don't have signatures/stamps yet → Modern template
+    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
+    
+    console.log('Template detection:', {
+      hasSignature,
+      hasStamp,
+      hasSignatureStampData,
+      detectedTemplate,
+      reasoning: hasSignatureStampData 
+        ? 'Found signature/stamp data → Historical template (filed document)' 
+        : 'No signature/stamp data → Modern template (current workflow)'
+    });
+    
+    return detectedTemplate;
+  };
+
+  // Auto-detect template when document changes
+  React.useEffect(() => {
+    if (document?.extracted_data && onTemplateChange) {
+      const detectedTemplate = detectTemplate(document.extracted_data);
+      onTemplateChange(detectedTemplate);
+    }
+  }, [document?.extracted_data, onTemplateChange]);
+
+  // Get auto-detected template for display
+  const autoDetectedTemplate = document?.extracted_data ? detectTemplate(document.extracted_data) : 'modern';
+  const isUsingAutoDetection = selectedTemplate === autoDetectedTemplate;
+
+  // Transform the validated data to match what the promotion service expects
+  const transformDataForPromotion = (data: any) => {
+    if (!data) return null;
+    
+    // Handle both old and new data structures
+    const patient = data.patient || {};
+    const certification = data.certification || {};
+    const examination_results = data.examination_results || {};
     
     return {
-      recommended: recommendedTemplate,
-      isUsingRecommended,
-      reason: hasSignatureStamp 
-        ? 'Document contains signatures/stamps → Historical template recommended'
-        : 'No signatures/stamps detected → Modern template recommended'
+      patientName: patient.name || data.patientName || 'Unknown',
+      patientId: patient.id_number || data.patientId || 'Unknown',
+      companyName: patient.company || data.companyName || 'Unknown',
+      occupation: patient.occupation || data.occupation || 'Unknown',
+      fitnessStatus: certification.fit ? 'fit' : 
+                    certification.fit_with_restrictions ? 'fit_with_restrictions' : 
+                    certification.temporarily_unfit ? 'temporarily_unfit' : 
+                    certification.unfit ? 'unfit' : 
+                    data.fitnessStatus || 'unknown',
+      restrictionsText: data.restrictionsText || 'None',
+      examinationDate: certification.examination_date || examination_results.date || data.examinationDate || new Date().toISOString().split('T')[0],
+      expiryDate: certification.valid_until || data.expiryDate,
+      examinationType: examination_results.type?.pre_employment ? 'pre-employment' :
+                      examination_results.type?.periodical ? 'periodical' :
+                      examination_results.type?.exit ? 'exit' : 
+                      data.examinationType || 'pre-employment',
+      comments: certification.comments || data.comments,
+      followUpActions: certification.follow_up || data.followUpActions
     };
   };
 
-  const statusInfo = getValidationStatusInfo();
-  const templateRec = getTemplateRecommendation();
-
-  if (!hasStructuredData) {
-    return (
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          No structured data available for validation. The document may still be processing.
-        </AlertDescription>
-      </Alert>
-    );
+  // Only show for processed documents
+  if (document.status !== 'processed' && document.status !== 'completed') {
+    return null;
   }
 
   return (
     <div className="space-y-4">
-      {/* Validation Status Card */}
-      <Card className="border-l-4 border-l-blue-500">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Document Validation
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Current Status */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-3">
-              {statusInfo.icon}
-              <div>
-                <p className={`font-medium ${statusInfo.color}`}>
-                  {statusInfo.text}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {statusInfo.description}
-                </p>
-              </div>
-            </div>
-            
-            {validationHistory.length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                {validationHistory.length} validation{validationHistory.length > 1 ? 's' : ''}
-              </Badge>
-            )}
-          </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="bg-green-100 text-green-800">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Processed
+        </Badge>
+        {isValidated && (
+          <Badge variant="outline" className="bg-blue-100 text-blue-800">
+            <Edit className="h-3 w-3 mr-1" />
+            Validated
+          </Badge>
+        )}
+      </div>
 
-          {/* Template Selection for Certificates */}
-          {isCertificate && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <FileImage className="h-4 w-4" />
-                  Display Template
-                </label>
-                
-                <Select
-                  value={selectedTemplate}
-                  onValueChange={(value: 'modern' | 'historical') => onTemplateChange(value)}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="modern">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        Modern Template
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="historical">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        Historical Template
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Template Recommendation */}
-              {templateRec && (
-                <div className={`p-3 rounded-lg border ${
-                  templateRec.isUsingRecommended 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-orange-50 border-orange-200'
-                }`}>
-                  <div className="flex items-start gap-2">
-                    {templateRec.isUsingRecommended ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                    )}
-                    <div>
-                      <p className={`text-sm font-medium ${
-                        templateRec.isUsingRecommended ? 'text-green-800' : 'text-orange-800'
-                      }`}>
-                        {templateRec.isUsingRecommended 
-                          ? 'Using recommended template' 
-                          : `Consider switching to ${templateRec.recommended} template`
-                        }
-                      </p>
-                      <p className={`text-xs ${
-                        templateRec.isUsingRecommended ? 'text-green-600' : 'text-orange-600'
-                      }`}>
-                        {templateRec.reason}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 pt-2">
-            <Button
-              onClick={() => onValidationModeChange(true)}
-              variant="default"
-              className="flex items-center gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              {validationStatus === 'validated' ? 'Edit Validation' : 'Start Validation'}
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => onValidationModeChange(false)}
-              className="flex items-center gap-2"
-            >
-              <Eye className="h-4 w-4" />
-              Preview Only
-            </Button>
-          </div>
-
-          {/* Validation Instructions */}
-          {validationStatus === 'pending' && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Validation Process:</strong> Review the extracted data against the original document, 
-                make any necessary corrections, and complete the validation to create accurate patient records.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Re-validation Notice */}
-          {validationStatus === 'validated' && (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                This document has been validated. You can still edit the data if corrections are needed. 
-                Changes will be tracked in the validation history.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Stats */}
-      {isCertificate && validatedData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">
-              {validatedData.structured_data?.certificate_info?.employee_name ? '✓' : '○'}
-            </div>
-            <div className="text-xs text-blue-800">Patient Name</div>
-          </div>
+      {/* Template Selection */}
+      <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
+        <div className="flex items-center gap-2">
+          <Settings className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium">Certificate Template:</span>
+          <Select value={selectedTemplate} onValueChange={onTemplateChange}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="historical">
+                Historical Certificate
+                {autoDetectedTemplate === 'historical' && (
+                  <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
+                )}
+              </SelectItem>
+              <SelectItem value="modern">
+                Modern Certificate
+                {autoDetectedTemplate === 'modern' && (
+                  <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
+                )}
+              </SelectItem>
+            </SelectContent>
+          </Select>
           
-          <div className="text-center p-3 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">
-              {validatedData.structured_data?.certificate_info?.examination_date ? '✓' : '○'}
-            </div>
-            <div className="text-xs text-green-800">Exam Date</div>
-          </div>
-          
-          <div className="text-center p-3 bg-purple-50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">
-              {validatedData.structured_data?.certificate_info?.fitness_status ? '✓' : '○'}
-            </div>
-            <div className="text-xs text-purple-800">Fitness Status</div>
-          </div>
-          
-          <div className="text-center p-3 bg-orange-50 rounded-lg">
-            <div className="text-2xl font-bold text-orange-600">
-              {validatedData.structured_data?.certificate_info?.company_name ? '✓' : '○'}
-            </div>
-            <div className="text-xs text-orange-800">Company</div>
-          </div>
+          {isUsingAutoDetection ? (
+            <Badge variant="outline" className="text-green-600 border-green-200 text-xs">
+              Auto-detected
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-orange-600 border-orange-200 text-xs">
+              Manual override
+            </Badge>
+          )}
         </div>
+
+        {/* Template Description */}
+        <div className="text-xs text-muted-foreground pl-6">
+          {selectedTemplate === 'historical' 
+            ? 'For filed documents with physical signatures and stamps (historical records)'
+            : 'For current workflow documents without physical signatures/stamps (digital workflow)'
+          }
+        </div>
+
+        {/* Auto-detection explanation */}
+        <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded border-l-2 border-blue-200">
+          <strong>Auto-detection:</strong> {autoDetectedTemplate === 'historical' 
+            ? 'Found signature/stamp data → Historical template recommended'
+            : 'No signature/stamp data found → Modern template recommended'
+          }
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Button 
+          onClick={() => onValidationModeChange(true)}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <Edit className="h-4 w-4" />
+          Validate Data
+        </Button>
+
+        {isValidated && validatedData && (
+          <Button 
+            onClick={handleCreatePatientRecord}
+            className="flex items-center gap-2"
+            disabled={!currentOrganization}
+          >
+            <User className="h-4 w-4" />
+            Create Patient Record
+          </Button>
+        )}
+      </div>
+
+      {isPromotionDialogOpen && validatedData && currentOrganization && (
+        <CertificatePromotionDialog
+          isOpen={isPromotionDialogOpen}
+          onClose={() => setIsPromotionDialogOpen(false)}
+          documentId={document.id}
+          validatedData={transformDataForPromotion(validatedData)}
+          organizationId={currentOrganization.id}
+          clientOrganizationId={document.client_organization_id}
+          onPromotionComplete={handlePromotionComplete}
+        />
       )}
     </div>
   );
-}
+};
+
+export default DocumentValidationControls;
