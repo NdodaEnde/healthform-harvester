@@ -31,7 +31,7 @@ export interface DatabaseDocument {
   file_size?: number;
   public_url?: string;
   validation_status?: string;
-  validated_by?: string;
+  validated_by?: string; // UUID of the user who validated the document
 }
 
 export interface DatabaseOrganization {
