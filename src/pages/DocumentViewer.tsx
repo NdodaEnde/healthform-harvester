@@ -206,7 +206,7 @@ export default function DocumentViewer() {
   };
 
   const handleValidationComplete = () => {
-    toast.success('Patient record created successfully!', {
+    toast.success('Validation completed successfully!', {
       action: validatedData?.patient?.name ? {
         label: 'View Patient',
         onClick: () => {
@@ -215,6 +215,7 @@ export default function DocumentViewer() {
       } : undefined
     });
     
+    // Refresh the document to show updated data
     fetchDocument();
   };
 

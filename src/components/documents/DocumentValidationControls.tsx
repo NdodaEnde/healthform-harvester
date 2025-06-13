@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { CheckCircle, Edit, User, Settings } from 'lucide-react';
+import { CheckCircle, Edit, User, Settings, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificatePromotionDialog from '../certificates/CertificatePromotionDialog';
+import { saveValidatedData } from '@/services/documentValidationService';
+import { toast } from 'sonner';
 import type { DatabaseDocument } from '@/types/database';
 
 interface DocumentValidationControlsProps {
@@ -23,11 +25,36 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   validatedData,
   onValidationModeChange,
   onValidationComplete,
-  selectedTemplate = 'modern', // Default to modern for new documents
+  selectedTemplate = 'modern',
   onTemplateChange
 }) => {
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveValidatedData = async () => {
+    if (!validatedData) {
+      toast.error('No validated data to save');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await saveValidatedData(document.id, validatedData);
+      
+      if (error) {
+        toast.error('Failed to save validated data: ' + error.message);
+      } else {
+        toast.success('Validated data saved successfully');
+        onValidationComplete?.();
+      }
+    } catch (err) {
+      console.error('Error saving validated data:', err);
+      toast.error('Unexpected error saving validated data');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleCreatePatientRecord = () => {
     if (validatedData && currentOrganization) {
@@ -36,9 +63,11 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     }
   };
 
-  const handlePromotionComplete = () => {
+  const handlePromotionComplete = async () => {
     setIsPromotionDialogOpen(false);
-    onValidationComplete?.();
+    
+    // Save the validated data to the document after successful patient record creation
+    await handleSaveValidatedData();
   };
 
   // CORRECTED: Auto-detect template based on document data
@@ -155,6 +184,12 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             Validated
           </Badge>
         )}
+        {document.validation_status === 'validated' && (
+          <Badge variant="outline" className="bg-green-100 text-green-800">
+            <Save className="h-3 w-3 mr-1" />
+            Saved
+          </Badge>
+        )}
       </div>
 
       {/* Template Selection */}
@@ -221,14 +256,26 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
         </Button>
 
         {isValidated && validatedData && (
-          <Button 
-            onClick={handleCreatePatientRecord}
-            className="flex items-center gap-2"
-            disabled={!currentOrganization}
-          >
-            <User className="h-4 w-4" />
-            Create Patient Record
-          </Button>
+          <>
+            <Button 
+              onClick={handleSaveValidatedData}
+              variant="outline"
+              className="flex items-center gap-2"
+              disabled={isSaving}
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+
+            <Button 
+              onClick={handleCreatePatientRecord}
+              className="flex items-center gap-2"
+              disabled={!currentOrganization}
+            >
+              <User className="h-4 w-4" />
+              Create Patient Record
+            </Button>
+          </>
         )}
       </div>
 
