@@ -26,8 +26,8 @@ export const saveValidatedData = async (
       return { error: fetchError };
     }
 
-    // Preserve the original extracted_data structure and merge with validated data
-    const originalExtractedData = currentDoc.extracted_data || {};
+    // Safely extract and type the original data
+    const originalExtractedData = currentDoc.extracted_data as any || {};
     
     // Create a merged structure that preserves signature/stamp detection data
     const mergedExtractedData = {
