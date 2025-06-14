@@ -65,17 +65,6 @@ const BatchDocumentUploader = ({
     e.target.value = '';
   };
 
-  // 🔧 FIX: Add a manual file input trigger function
-  const handleFileInputClick = () => {
-    console.log('🔧 Manual file input trigger');
-    if (fileInputRef.current) {
-      // Clear any previous value
-      fileInputRef.current.value = '';
-      // Force trigger the click
-      fileInputRef.current.click();
-    }
-  };
-
   const handleRemoveFile = (index: number) => {
     setQueuedFiles(prev => prev.filter((_, i) => i !== index));
   };
@@ -372,60 +361,21 @@ const BatchDocumentUploader = ({
           </p>
         </div>
         
-        // REPLACE THE FILE INPUT JSX SECTION WITH THIS:
-<div className="space-y-2">
-  <Label htmlFor="files">Select Documents</Label>
-  
-  {/* 🔧 FIX: Hidden file input with proper event handling */}
-  <input
-    ref={fileInputRef}
-    id="files"
-    type="file"
-    onChange={handleFilesChange}
-    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
-    disabled={uploading}
-    multiple
-    style={{ display: 'none' }} // Hide the native input
-  />
-  
-  {/* 🔧 FIX: Custom button that triggers file input */}
-  <div
-    onClick={handleFileInputClick}
-    className={`
-      flex items-center justify-center w-full h-32 px-6 
-      border-2 border-gray-300 border-dashed rounded-lg 
-      cursor-pointer bg-gray-50 hover:bg-gray-100 
-      transition-colors duration-200
-      ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-    `}
-  >
-    <div className="text-center">
-      <svg
-        className="w-10 h-10 mx-auto mb-4 text-gray-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-        />
-      </svg>
-      <p className="text-sm text-gray-600 font-medium">
-        {uploading ? 'Uploading...' : 'Click to select documents'}
-      </p>
-      <p className="text-xs text-gray-500 mt-1">
-        PDF, PNG, JPG, JPEG, DOC, DOCX, TXT
-      </p>
-    </div>
-  </div>
-  
-  <p className="text-xs text-muted-foreground">
-    Supported formats: PDF, PNG, JPG, JPEG, DOC, DOCX, TXT
-  </p>
-</div>
+        <div className="space-y-2">
+          <Label htmlFor="files">Select Documents</Label>
+          <Input 
+            id="files" 
+            type="file" 
+            onChange={handleFilesChange}
+            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+            disabled={uploading}
+            multiple
+            ref={fileInputRef}
+          />
+          <p className="text-xs text-muted-foreground">
+            Supported formats: PDF, PNG, JPG, JPEG, DOC, DOCX, TXT
+          </p>
+        </div>
 
         {organizationId && (
           <div className="text-xs text-muted-foreground">
