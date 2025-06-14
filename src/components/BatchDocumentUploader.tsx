@@ -65,7 +65,7 @@ const BatchDocumentUploader = ({
     e.target.value = '';
   };
 
-  / 🔧 FIX: Add a manual file input trigger function
+  // 🔧 FIX: Add a manual file input trigger function
   const handleFileInputClick = () => {
     console.log('🔧 Manual file input trigger');
     if (fileInputRef.current) {
