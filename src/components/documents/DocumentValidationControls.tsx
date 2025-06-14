@@ -41,14 +41,17 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 
     setIsSaving(true);
     try {
-      // 🎯 CRITICAL: Pass the selected template to preserve it
+      console.log('💾 Saving validated data with template:', selectedTemplate);
+      console.log('💾 Data being saved:', validatedData);
+      
       const { error } = await saveValidatedData(document.id, validatedData, selectedTemplate);
       
       if (error) {
         toast.error('Failed to save validated data: ' + error.message);
       } else {
         toast.success('Validated data saved successfully');
-        onValidationComplete?.();
+        // Don't call onValidationComplete here to avoid data refresh that might cause issues
+        console.log('💾 Save completed successfully');
       }
     } catch (err) {
       console.error('Error saving validated data:', err);
@@ -60,16 +63,28 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 
   const handleCreatePatientRecord = () => {
     if (validatedData && currentOrganization) {
-      console.log('Opening promotion dialog with validated data:', validatedData);
+      console.log('🏥 Opening promotion dialog with validated data:', validatedData);
       setIsPromotionDialogOpen(true);
     }
   };
 
+  // 🔧 FIXED: Simplified promotion complete handler
   const handlePromotionComplete = async () => {
     setIsPromotionDialogOpen(false);
     
-    // Save the validated data to the document after successful patient record creation
-    await handleSaveValidatedData();
+    console.log('🎉 Patient record creation completed');
+    
+    // Just show success message - don't save again as this might overwrite data
+    toast.success('Patient record created successfully!');
+    
+    // Optionally refresh the document to show any status updates
+    // but don't trigger a save operation that might clear the template data
+    if (onValidationComplete) {
+      // Add a small delay to ensure patient creation is fully complete
+      setTimeout(() => {
+        onValidationComplete();
+      }, 1000);
+    }
   };
 
   // 🔧 ENHANCED: Check for saved template selection
@@ -123,7 +138,10 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 
   // 🔧 FIXED: Enhanced transform function with better data extraction
   const transformDataForPromotion = (data: any) => {
-    if (!data) return null;
+    if (!data) {
+      console.warn('⚠️ No data provided to transformDataForPromotion');
+      return null;
+    }
     
     console.log('🔍 Transforming data for promotion:', data);
     
