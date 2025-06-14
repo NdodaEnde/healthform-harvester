@@ -43,7 +43,11 @@ const BatchDocumentUploader = ({
     setHasSavedBatch(BatchStorageService.hasSavedBatch(organizationId, clientOrganizationId));
   }, [organizationId, clientOrganizationId]);
 
+  // UPDATE THE handleFilesChange FUNCTION:
   const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📁 File input change event triggered');
+    console.log('📁 Files selected:', e.target.files?.length);
+  
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files).map(file => ({
         file,
@@ -52,9 +56,13 @@ const BatchDocumentUploader = ({
         progress: 0,
         reviewStatus: 'not-reviewed' as ReviewStatus
       }));
-      
+    
+      console.log('📁 Adding files to queue:', newFiles.length);
       setQueuedFiles(prev => [...prev, ...newFiles]);
     }
+  
+    // 🔧 CRITICAL: Clear the input value to allow same file selection again
+    e.target.value = '';
   };
 
   const handleRemoveFile = (index: number) => {
