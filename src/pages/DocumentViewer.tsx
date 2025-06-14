@@ -28,6 +28,7 @@ export default function DocumentViewer() {
   const hasAutoDetected = useRef(false);
   const documentId = useRef<string | null>(null);
   const autoDetectionRan = useRef(false);
+  const initialTemplateSet = useRef(false); // NEW: Track if initial template has been set
 
   useEffect(() => {
     if (id) {
@@ -49,20 +50,25 @@ export default function DocumentViewer() {
       isManualSelection.current = false;
       hasAutoDetected.current = false;
       autoDetectionRan.current = false;
+      initialTemplateSet.current = false; // NEW: Reset initial template flag
     }
   }, [document?.id]);
 
   // Auto-detection useEffect with better guards
   useEffect(() => {
+    // MODIFIED: Don't run auto-detection if initial template has already been set
     if (!document?.extracted_data || 
         isManualSelection.current || 
         hasAutoDetected.current || 
-        autoDetectionRan.current) {
+        autoDetectionRan.current ||
+        initialTemplateSet.current) {
       
       if (isManualSelection.current) {
         console.log('⚡ Skipping auto-detection - user has manually selected template');
       } else if (hasAutoDetected.current || autoDetectionRan.current) {
         console.log('⚡ Skipping auto-detection - already completed for this document');
+      } else if (initialTemplateSet.current) {
+        console.log('⚡ Skipping auto-detection - initial template already set');
       }
       return;
     }
@@ -164,6 +170,7 @@ export default function DocumentViewer() {
     
     hasAutoDetected.current = true;
     autoDetectionRan.current = true;
+    initialTemplateSet.current = true; // NEW: Mark that initial template has been set
     console.log('=== END AUTO-DETECTION ===');
   }, [document?.extracted_data]);
 
@@ -231,6 +238,7 @@ export default function DocumentViewer() {
     console.log('Manual selection flag before:', isManualSelection.current);
     
     isManualSelection.current = true;
+    initialTemplateSet.current = true; // NEW: Prevent auto-detection from overriding
     setSelectedTemplate(template);
     
     console.log('Manual selection flag set to true - auto-detection will be permanently disabled');
@@ -446,6 +454,7 @@ export default function DocumentViewer() {
               <p>Manual selection: {isManualSelection.current ? 'Yes' : 'No'}</p>
               <p>Auto-detected: {hasAutoDetected.current ? 'Yes' : 'No'}</p>
               <p>Auto-detection ran: {autoDetectionRan.current ? 'Yes' : 'No'}</p>
+              <p>Initial template set: {initialTemplateSet.current ? 'Yes' : 'No'}</p>
               <p>Selected template: {selectedTemplate}</p>
               <p>File type: {document.mime_type}</p>
               <p>Is PDF: {isPDF(document) ? 'Yes' : 'No'}</p>
