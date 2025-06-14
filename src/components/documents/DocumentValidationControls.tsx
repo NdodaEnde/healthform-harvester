@@ -121,35 +121,97 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   const autoDetectedTemplate = detectTemplateFromData();
   const isUsingAutoDetection = effectiveTemplate === autoDetectedTemplate && !document.extracted_data?.template_selection;
 
-  // Transform the validated data to match what the promotion service expects
+  // 🔧 FIXED: Enhanced transform function with better data extraction
   const transformDataForPromotion = (data: any) => {
     if (!data) return null;
     
-    // Handle both old and new data structures
-    const patient = data.patient || {};
-    const certification = data.certification || {};
-    const examination_results = data.examination_results || {};
+    console.log('🔍 Transforming data for promotion:', data);
     
-    return {
-      patientName: patient.name || data.patientName || 'Unknown',
-      patientId: patient.id_number || data.patientId || 'Unknown',
-      companyName: patient.company || data.companyName || 'Unknown',
-      occupation: patient.occupation || data.occupation || 'Unknown',
-      fitnessStatus: certification.fit ? 'fit' : 
-                    certification.fit_with_restrictions ? 'fit_with_restrictions' : 
-                    certification.temporarily_unfit ? 'temporarily_unfit' : 
-                    certification.unfit ? 'unfit' : 
-                    data.fitnessStatus || 'unknown',
+    // Handle multiple possible data structures
+    let patient, certification, examination_results;
+    
+    // Check if data has structured_data wrapper
+    if (data.structured_data) {
+      patient = data.structured_data.patient || {};
+      certification = data.structured_data.certification || {};
+      examination_results = data.structured_data.examination_results || {};
+    } else {
+      // Direct access to patient data
+      patient = data.patient || {};
+      certification = data.certification || {};
+      examination_results = data.examination_results || {};
+    }
+    
+    // Also check for certificate_info structure (from AI extraction)
+    const certificateInfo = data.structured_data?.certificate_info || data.certificate_info;
+    if (certificateInfo) {
+      console.log('📋 Found certificate_info structure:', certificateInfo);
+      
+      // Map certificate_info to patient data if patient data is empty
+      if (!patient.name && certificateInfo.employee_name) {
+        patient.name = certificateInfo.employee_name;
+      }
+      if (!patient.id_number && certificateInfo.id_number) {
+        patient.id_number = certificateInfo.id_number;
+      }
+      if (!patient.company && certificateInfo.company_name) {
+        patient.company = certificateInfo.company_name;
+      }
+      if (!patient.occupation && certificateInfo.job_title) {
+        patient.occupation = certificateInfo.job_title;
+      }
+    }
+    
+    console.log('📊 Extracted patient data:', patient);
+    console.log('📊 Extracted certification data:', certification);
+    console.log('📊 Extracted examination_results data:', examination_results);
+    
+    // Determine fitness status
+    let fitnessStatus = 'unknown';
+    if (certification.fit) fitnessStatus = 'fit';
+    else if (certification.fit_with_restrictions) fitnessStatus = 'fit_with_restrictions';
+    else if (certification.fit_with_condition) fitnessStatus = 'fit_with_condition';
+    else if (certification.temporarily_unfit) fitnessStatus = 'temporarily_unfit';
+    else if (certification.unfit) fitnessStatus = 'unfit';
+    else if (data.fitnessStatus) fitnessStatus = data.fitnessStatus;
+    
+    // Extract examination date
+    const examinationDate = certification.examination_date || 
+                           examination_results.date || 
+                           certificateInfo?.examination_date ||
+                           data.examinationDate || 
+                           new Date().toISOString().split('T')[0];
+    
+    // Extract expiry date
+    const expiryDate = certification.valid_until || 
+                      certificateInfo?.expiry_date ||
+                      certificateInfo?.valid_until ||
+                      data.expiryDate;
+    
+    // Extract examination type
+    let examinationType = 'pre-employment';
+    if (examination_results.type?.pre_employment) examinationType = 'pre-employment';
+    else if (examination_results.type?.periodical) examinationType = 'periodical';
+    else if (examination_results.type?.exit) examinationType = 'exit';
+    else if (data.examinationType) examinationType = data.examinationType;
+    
+    const transformedData = {
+      patientName: patient.name || certificateInfo?.employee_name || data.patientName || 'Unknown',
+      patientId: patient.id_number || patient.employee_id || certificateInfo?.id_number || data.patientId || 'Unknown',
+      companyName: patient.company || certificateInfo?.company_name || data.companyName || 'Unknown',
+      occupation: patient.occupation || certificateInfo?.job_title || data.occupation || 'Unknown',
+      fitnessStatus,
       restrictionsText: data.restrictionsText || 'None',
-      examinationDate: certification.examination_date || examination_results.date || data.examinationDate || new Date().toISOString().split('T')[0],
-      expiryDate: certification.valid_until || data.expiryDate,
-      examinationType: examination_results.type?.pre_employment ? 'pre-employment' :
-                      examination_results.type?.periodical ? 'periodical' :
-                      examination_results.type?.exit ? 'exit' : 
-                      data.examinationType || 'pre-employment',
-      comments: certification.comments || data.comments,
-      followUpActions: certification.follow_up || data.followUpActions
+      examinationDate,
+      expiryDate,
+      examinationType,
+      comments: certification.comments || certificateInfo?.comments || data.comments || '',
+      followUpActions: certification.follow_up || certificateInfo?.follow_up || data.followUpActions || ''
     };
+    
+    console.log('✅ Final transformed data:', transformedData);
+    
+    return transformedData;
   };
 
   // Only show for processed documents
