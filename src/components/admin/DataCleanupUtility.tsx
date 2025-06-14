@@ -153,7 +153,7 @@ export const DataCleanupUtility = () => {
         return 0;
       }
       
-      return data?.length || 0;
+      return Array.isArray(data) ? data.length : 0;
     } catch (error) {
       console.error("Audit logs cleanup error:", error);
       return 0;
@@ -172,7 +172,7 @@ export const DataCleanupUtility = () => {
         return 0;
       }
       
-      return data?.length || 0;
+      return Array.isArray(data) ? data.length : 0;
     } catch (error) {
       console.error("Certificates cleanup error:", error);
       return 0;
@@ -191,7 +191,7 @@ export const DataCleanupUtility = () => {
         return 0;
       }
       
-      return data?.length || 0;
+      return Array.isArray(data) ? data.length : 0;
     } catch (error) {
       console.error("Medical examinations cleanup error:", error);
       return 0;
@@ -210,7 +210,7 @@ export const DataCleanupUtility = () => {
         return 0;
       }
       
-      return data?.length || 0;
+      return Array.isArray(data) ? data.length : 0;
     } catch (error) {
       console.error("Documents cleanup error:", error);
       return 0;
@@ -229,7 +229,7 @@ export const DataCleanupUtility = () => {
         return 0;
       }
       
-      return data?.length || 0;
+      return Array.isArray(data) ? data.length : 0;
     } catch (error) {
       console.error("Patients cleanup error:", error);
       return 0;
