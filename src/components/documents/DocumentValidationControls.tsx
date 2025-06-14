@@ -1,64 +1,3 @@
-// 1. UPDATE services/documentValidationService.ts
-
-export const saveValidatedData = async (documentId: string, validatedData: any) => {
-  try {
-    console.log('Saving validated data for document:', documentId);
-    console.log('Validated data:', validatedData);
-    
-    // Get current document to preserve template selection and original data
-    const { data: currentDoc, error: fetchError } = await supabase
-      .from('documents')
-      .select('extracted_data')
-      .eq('id', documentId)
-      .single();
-
-    if (fetchError || !currentDoc) {
-      throw new Error('Failed to fetch current document data');
-    }
-
-    const currentExtractedData = currentDoc.extracted_data as any;
-    
-    // 🔧 FIX: Preserve template selection and original detection data
-    const updatedExtractedData = {
-      ...currentExtractedData,
-      structured_data: validatedData,
-      // Preserve the original raw_content that contains signature/stamp info
-      raw_content: currentExtractedData.raw_content,
-      // 🎯 CRITICAL: Save the current template selection
-      template_selection: {
-        selected_template: 'historical', // You can pass this as a parameter
-        manually_selected: true,
-        saved_at: new Date().toISOString()
-      },
-      // Mark as validated
-      validation_status: 'validated',
-      validated_at: new Date().toISOString()
-    };
-
-    const { error } = await supabase
-      .from('documents')
-      .update({
-        extracted_data: updatedExtractedData,
-        validated_by: (await supabase.auth.getUser()).data.user?.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', documentId);
-
-    if (error) {
-      throw error;
-    }
-
-    console.log('Successfully saved validated data');
-    return { error: null };
-
-  } catch (error) {
-    console.error('Error saving validated data:', error);
-    return { error };
-  }
-};
-
-// 2. UPDATE DocumentValidationControls.tsx - Add template selection parameter
-
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -69,6 +8,7 @@ import CertificatePromotionDialog from '../certificates/CertificatePromotionDial
 import { saveValidatedData } from '@/services/documentValidationService';
 import { toast } from 'sonner';
 import type { DatabaseDocument } from '@/types/database';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DocumentValidationControlsProps {
   document: DatabaseDocument;
@@ -102,45 +42,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 
     setIsSaving(true);
     try {
-      // Get current document to preserve original data
-      const { data: currentDoc, error: fetchError } = await supabase
-        .from('documents')
-        .select('extracted_data')
-        .eq('id', document.id)
-        .single();
-
-      if (fetchError || !currentDoc) {
-        throw new Error('Failed to fetch current document');
-      }
-
-      const currentExtractedData = currentDoc.extracted_data as any;
-      
-      // Create updated data that preserves template selection and signature/stamp info
-      const updatedExtractedData = {
-        ...currentExtractedData,
-        structured_data: validatedData,
-        // 🎯 PRESERVE: Keep original raw content with signature/stamp data
-        raw_content: currentExtractedData.raw_content,
-        // 🎯 SAVE: Current template selection
-        template_selection: {
-          selected_template: selectedTemplate,
-          manually_selected: true,
-          saved_at: new Date().toISOString(),
-          preserved_signature_data: !!(currentExtractedData.structured_data?.certificate_info?.signature),
-          preserved_stamp_data: !!(currentExtractedData.structured_data?.certificate_info?.stamp)
-        },
-        validation_status: 'validated',
-        validated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          extracted_data: updatedExtractedData,
-          validated_by: (await supabase.auth.getUser()).data.user?.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', document.id);
+      const { error } = await saveValidatedData(document.id, validatedData, selectedTemplate);
       
       if (error) {
         toast.error('Failed to save validated data: ' + error.message);
@@ -171,7 +73,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   };
 
   // 🔧 FIX: Check for saved template selection instead of auto-detecting
-  const getTemplateSelection = () => {
+  const getEffectiveTemplate = () => {
     const extractedData = document.extracted_data as any;
     
     // Check if template was previously saved
@@ -180,46 +82,12 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
       return extractedData.template_selection.selected_template;
     }
     
-    // Only auto-detect if no saved selection exists
-    const getValue = (obj: any, path: string): any => {
-      if (!obj || !path) return null;
-      const keys = path.split('.');
-      let current = obj;
-      for (const key of keys) {
-        if (current === undefined || current === null || typeof current !== 'object') {
-          return null;
-        }
-        current = current[key];
-      }
-      return current;
-    };
-
-    const hasSignature = !!(
-      getValue(extractedData, 'signature') ||
-      getValue(extractedData, 'structured_data.signature') ||
-      getValue(extractedData, 'structured_data.certificate_info.signature')
-    );
-
-    const hasStamp = !!(
-      getValue(extractedData, 'stamp') ||
-      getValue(extractedData, 'structured_data.stamp') ||
-      getValue(extractedData, 'structured_data.certificate_info.stamp')
-    );
-
-    const hasSignatureStampData = hasSignature || hasStamp;
-    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
-    
-    console.log('Auto-detecting template:', {
-      hasSignature,
-      hasStamp,
-      detectedTemplate
-    });
-    
-    return detectedTemplate;
+    // Return the current selection if no saved template
+    return selectedTemplate;
   };
 
-  // 🔧 FIX: Use saved template selection or current selection
-  const effectiveTemplate = document.extracted_data?.template_selection?.selected_template || selectedTemplate;
+  // Use saved template selection or current selection
+  const effectiveTemplate = getEffectiveTemplate();
 
   // Transform the validated data to match what the promotion service expects
   const transformDataForPromotion = (data: any) => {
