@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,19 +42,47 @@ const Dashboard = () => {
   };
 
   const { data: summaryData, isLoading: loadingSummary } = useQuery({
-    queryKey: ['dashboard-summary', organizationId],
+    queryKey: ['dashboard-summary', organizationId, currentClient?.id],
     queryFn: async () => {
-      const { data: documents, error: docError } = await supabase
+      // Build the query for documents based on context
+      let documentsQuery = supabase
         .from('documents')
-        .select('id, status, created_at')
-        .eq('organization_id', organizationId as any);
+        .select('id, status, created_at');
+
+      // Filter by organization context
+      if (currentClient) {
+        // When specific client is selected, show only that client's documents
+        documentsQuery = documentsQuery.eq('client_organization_id', currentClient.id);
+      } else if (currentOrganization?.organization_type === 'service_provider') {
+        // When "All Clients" is selected for service provider, show all client documents
+        documentsQuery = documentsQuery.eq('organization_id', currentOrganization.id);
+      } else {
+        // For regular organizations, show their documents
+        documentsQuery = documentsQuery.eq('organization_id', organizationId as any);
+      }
+
+      const { data: documents, error: docError } = await documentsQuery;
       
       if (docError) throw docError;
       
-      const { count: patientCount, error: patientError } = await supabase
+      // Build the query for patients based on context
+      let patientsQuery = supabase
         .from('patients')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId as any);
+        .select('*', { count: 'exact', head: true });
+
+      // Filter by organization context
+      if (currentClient) {
+        // When specific client is selected, show only that client's patients
+        patientsQuery = patientsQuery.eq('client_organization_id', currentClient.id);
+      } else if (currentOrganization?.organization_type === 'service_provider') {
+        // When "All Clients" is selected for service provider, show all client patients
+        patientsQuery = patientsQuery.eq('organization_id', currentOrganization.id);
+      } else {
+        // For regular organizations, show their patients
+        patientsQuery = patientsQuery.eq('organization_id', organizationId as any);
+      }
+
+      const { count: patientCount, error: patientError } = await patientsQuery;
       
       if (patientError) throw patientError;
       
@@ -131,14 +160,28 @@ const Dashboard = () => {
   });
 
   const { data: recentDocuments } = useQuery({
-    queryKey: ['recent-documents', organizationId],
+    queryKey: ['recent-documents', organizationId, currentClient?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Build the query for recent documents based on context
+      let documentsQuery = supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId as any)
         .order('created_at', { ascending: false })
         .limit(5);
+
+      // Filter by organization context
+      if (currentClient) {
+        // When specific client is selected, show only that client's documents
+        documentsQuery = documentsQuery.eq('client_organization_id', currentClient.id);
+      } else if (currentOrganization?.organization_type === 'service_provider') {
+        // When "All Clients" is selected for service provider, show all client documents
+        documentsQuery = documentsQuery.eq('organization_id', currentOrganization.id);
+      } else {
+        // For regular organizations, show their documents
+        documentsQuery = documentsQuery.eq('organization_id', organizationId as any);
+      }
+
+      const { data, error } = await documentsQuery;
       
       if (error) throw error;
       return data || [];
@@ -164,6 +207,9 @@ const Dashboard = () => {
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
             {contextLabel ? `Overview for ${contextLabel}` : "Organization overview"}
+            {currentClient && (
+              <span className="text-sm text-blue-600 ml-2">(Client View)</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-4">
