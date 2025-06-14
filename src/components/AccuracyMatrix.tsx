@@ -16,24 +16,39 @@ interface DocumentData {
 }
 
 const AccuracyMatrix = () => {
-  const { currentOrganization } = useOrganization();
+  const { currentOrganization, currentClient, getEffectiveOrganizationId } = useOrganization();
   const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const organizationId = getEffectiveOrganizationId();
 
   const fetchDocuments = async () => {
-    if (!currentOrganization?.id) return;
+    if (!organizationId && !currentOrganization?.id) return;
     
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase
+      // Build the query for documents based on context
+      let documentsQuery = supabase
         .from('documents')
         .select('id, document_type, created_at, extracted_data, status')
-        .eq('organization_id', currentOrganization.id as any)
         .not('status', 'eq', 'pending')
         .order('created_at', { ascending: false })
         .limit(50);
+
+      // Filter by organization context
+      if (currentClient) {
+        // When specific client is selected, show only that client's documents
+        documentsQuery = documentsQuery.eq('client_organization_id', currentClient.id);
+      } else if (currentOrganization?.organization_type === 'service_provider') {
+        // When "All Clients" is selected for service provider, show all client documents
+        documentsQuery = documentsQuery.eq('organization_id', currentOrganization.id);
+      } else {
+        // For regular organizations, show their documents
+        documentsQuery = documentsQuery.eq('organization_id', organizationId as any);
+      }
+
+      const { data, error } = await documentsQuery;
 
       if (error) {
         console.error('Error fetching documents:', error);
@@ -70,7 +85,7 @@ const AccuracyMatrix = () => {
 
   useEffect(() => {
     fetchDocuments();
-  }, [currentOrganization?.id]);
+  }, [organizationId, currentClient?.id, currentOrganization?.id]);
 
   const getAccuracyStats = () => {
     if (documents.length === 0) return { total: 0, processed: 0, failed: 0, accuracy: 0 };
@@ -170,6 +185,9 @@ const AccuracyMatrix = () => {
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5" />
             Processing Accuracy Matrix
+            {currentClient && (
+              <span className="text-sm text-blue-600 ml-2">({currentClient.name})</span>
+            )}
           </CardTitle>
           <Button 
             variant="outline" 
