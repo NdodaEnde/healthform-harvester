@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -31,6 +32,8 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // NEW: Track if auto-detection has already run to prevent overriding user's choice
+  const [autoDetectionCompleted, setAutoDetectionCompleted] = useState(false);
 
   const handleSaveValidatedData = async () => {
     if (!validatedData) {
@@ -70,7 +73,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     await handleSaveValidatedData();
   };
 
-  // CORRECTED: Auto-detect template based on document data
+  // MODIFIED: Auto-detect template based on document data, but only run once
   const detectTemplate = (data: any): 'modern' | 'historical' => {
     const getValue = (obj: any, path: string): any => {
       if (!obj || !path) return null;
@@ -123,17 +126,19 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     return detectedTemplate;
   };
 
-  // Auto-detect template when document changes
+  // MODIFIED: Auto-detect template when document changes, but only once and don't override existing selection
   React.useEffect(() => {
-    if (document?.extracted_data && onTemplateChange) {
+    if (document?.extracted_data && onTemplateChange && !autoDetectionCompleted) {
       const detectedTemplate = detectTemplate(document.extracted_data);
       onTemplateChange(detectedTemplate);
+      setAutoDetectionCompleted(true);
+      console.log('🔄 Initial auto-detection completed, will not run again');
     }
-  }, [document?.extracted_data, onTemplateChange]);
+  }, [document?.extracted_data, onTemplateChange, autoDetectionCompleted]);
 
   // Get auto-detected template for display
   const autoDetectedTemplate = document?.extracted_data ? detectTemplate(document.extracted_data) : 'modern';
-  const isUsingAutoDetection = selectedTemplate === autoDetectedTemplate;
+  const isUsingAutoDetection = selectedTemplate === autoDetectedTemplate && !autoDetectionCompleted;
 
   // Transform the validated data to match what the promotion service expects
   const transformDataForPromotion = (data: any) => {
@@ -204,13 +209,13 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             <SelectContent>
               <SelectItem value="historical">
                 Historical Certificate
-                {autoDetectedTemplate === 'historical' && (
+                {autoDetectedTemplate === 'historical' && !autoDetectionCompleted && (
                   <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
                 )}
               </SelectItem>
               <SelectItem value="modern">
                 Modern Certificate
-                {autoDetectedTemplate === 'modern' && (
+                {autoDetectedTemplate === 'modern' && !autoDetectionCompleted && (
                   <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
                 )}
               </SelectItem>
