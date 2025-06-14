@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -43,7 +42,7 @@ const BatchDocumentUploader = ({
     setHasSavedBatch(BatchStorageService.hasSavedBatch(organizationId, clientOrganizationId));
   }, [organizationId, clientOrganizationId]);
 
-  // UPDATE THE handleFilesChange FUNCTION:
+  // UPDATED: More robust file handling for better cross-browser compatibility
   const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('📁 File input change event triggered');
     console.log('📁 Files selected:', e.target.files?.length);
@@ -59,10 +58,15 @@ const BatchDocumentUploader = ({
     
       console.log('📁 Adding files to queue:', newFiles.length);
       setQueuedFiles(prev => [...prev, ...newFiles]);
+      
+      // 🔧 IMPROVED: Use setTimeout to clear input value after React has processed the change
+      // This prevents Chrome from becoming non-responsive on macOS
+      setTimeout(() => {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }, 100);
     }
-  
-    // 🔧 CRITICAL: Clear the input value to allow same file selection again
-    e.target.value = '';
   };
 
   const handleRemoveFile = (index: number) => {
@@ -221,9 +225,12 @@ const BatchDocumentUploader = ({
       setUploading(false);
       setProcessing(false);
       
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      // 🔧 IMPROVED: Clear file input more safely after upload completion
+      setTimeout(() => {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }, 200);
     }
   };
 
@@ -371,6 +378,7 @@ const BatchDocumentUploader = ({
             disabled={uploading}
             multiple
             ref={fileInputRef}
+            key={queuedFiles.length} // Force re-render to ensure clean state
           />
           <p className="text-xs text-muted-foreground">
             Supported formats: PDF, PNG, JPG, JPEG, DOC, DOCX, TXT
