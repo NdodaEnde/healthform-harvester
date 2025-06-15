@@ -28,7 +28,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
     try {
       setLoading(true);
       
-      // Fetch patient data
+      // Fetch patient data first
       try {
         const { data: patientData, error: patientError } = await supabase
           .from('patients')
@@ -39,72 +39,129 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         if (patientError) {
           console.error('Error fetching patient:', patientError);
           toast.error('Failed to load patient information');
+          return;
         } else {
           setPatient(patientData);
           console.log('Patient data loaded:', patientData);
         }
-      } catch (error) {
-        console.error('Error fetching patient:', error);
-        toast.error('Failed to load patient information');
-      }
 
-      // Fetch client organization data if available
-      if (clientOrganizationId) {
-        try {
-          const { data: clientOrgData, error: orgError } = await supabase
-            .from('organizations')
-            .select('*')
-            .eq('id', clientOrganizationId)
-            .single();
+        // Fetch client organization data if available
+        if (clientOrganizationId) {
+          try {
+            const { data: clientOrgData, error: orgError } = await supabase
+              .from('organizations')
+              .select('*')
+              .eq('id', clientOrganizationId)
+              .single();
 
-          if (orgError) {
-            console.error('Error fetching client organization:', orgError);
-          } else {
-            setClientOrganization(clientOrgData);
-            console.log('Client organization data loaded:', clientOrgData);
+            if (orgError) {
+              console.error('Error fetching client organization:', orgError);
+            } else {
+              setClientOrganization(clientOrgData);
+              console.log('Client organization data loaded:', clientOrgData);
+            }
+          } catch (error) {
+            console.error('Error fetching client organization:', error);
           }
-        } catch (error) {
-          console.error('Error fetching client organization:', error);
         }
-      }
 
-      // Fetch all certificates/documents for this patient
-      try {
-        console.log('=== FETCHING PATIENT CERTIFICATES ===');
+        // Now fetch documents using multiple strategies
+        console.log('=== COMPREHENSIVE DOCUMENT SEARCH ===');
         console.log('Patient ID:', patientId);
+        console.log('Patient ID Number:', patientData.id_number);
         console.log('Organization ID:', organizationId);
         console.log('Client Organization ID:', clientOrganizationId);
         
-        // Build the main query for patient documents
-        let query = supabase
+        const allDocuments: DatabaseDocument[] = [];
+
+        // Strategy 1: Documents directly linked to patient (owner_id)
+        console.log('Strategy 1: Looking for documents with owner_id =', patientId);
+        const { data: linkedDocs, error: linkedError } = await supabase
           .from('documents')
           .select('*')
-          .eq('owner_id', patientId);
+          .eq('owner_id', patientId)
+          .order('created_at', { ascending: false });
 
-        // Add organization filter - look in both organization_id and client_organization_id
-        if (clientOrganizationId) {
-          query = query.or(`organization_id.eq.${organizationId},client_organization_id.eq.${clientOrganizationId}`);
+        if (linkedError) {
+          console.error('Error fetching linked documents:', linkedError);
         } else {
-          query = query.eq('organization_id', organizationId);
+          console.log('Found linked documents:', linkedDocs?.length || 0);
+          if (linkedDocs) allDocuments.push(...linkedDocs);
         }
 
-        // Order by creation date (most recent first)
-        const { data, error } = await query.order('created_at', { ascending: false });
+        // Strategy 2: Documents with client_organization_id match (even if not linked to patient)
+        if (clientOrganizationId) {
+          console.log('Strategy 2: Looking for documents with client_organization_id =', clientOrganizationId);
+          const { data: clientDocs, error: clientError } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('client_organization_id', clientOrganizationId)
+            .in('status', ['processed', 'completed'])
+            .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching patient certificates:', error);
-          throw error;
+          if (clientError) {
+            console.error('Error fetching client documents:', clientError);
+          } else {
+            console.log('Found client organization documents:', clientDocs?.length || 0);
+            if (clientDocs) {
+              // Filter for documents that might belong to this patient by ID number
+              const patientIdNumber = patientData.id_number;
+              if (patientIdNumber) {
+                const matchingDocs = clientDocs.filter(doc => {
+                  if (!doc.extracted_data) return false;
+                  
+                  const extractedDataStr = JSON.stringify(doc.extracted_data).toLowerCase();
+                  return extractedDataStr.includes(patientIdNumber);
+                });
+                
+                console.log('Documents matching patient ID number:', matchingDocs.length);
+                allDocuments.push(...matchingDocs);
+              }
+            }
+          }
         }
 
-        console.log('Raw documents found:', data?.length || 0);
-        console.log('Documents data:', data);
+        // Strategy 3: All processed documents from organization
+        console.log('Strategy 3: Looking for all processed documents from organization:', organizationId);
+        const { data: orgDocs, error: orgError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .in('status', ['processed', 'completed'])
+          .order('created_at', { ascending: false });
+
+        if (orgError) {
+          console.error('Error fetching organization documents:', orgError);
+        } else {
+          console.log('Found organization documents:', orgDocs?.length || 0);
+          if (orgDocs && patientData.id_number) {
+            // Filter for documents that might belong to this patient by ID number
+            const matchingDocs = orgDocs.filter(doc => {
+              if (!doc.extracted_data) return false;
+              
+              const extractedDataStr = JSON.stringify(doc.extracted_data).toLowerCase();
+              return extractedDataStr.includes(patientData.id_number);
+            });
+            
+            console.log('Org documents matching patient ID number:', matchingDocs.length);
+            allDocuments.push(...matchingDocs);
+          }
+        }
+
+        // Remove duplicates based on document ID
+        const uniqueDocuments = allDocuments.filter((doc, index, self) => 
+          index === self.findIndex(d => d.id === doc.id)
+        );
+
+        console.log('Total unique documents found:', uniqueDocuments.length);
         
         // Filter for certificate-type documents and clean data
         const certificateTypes = ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'];
-        const certificateDocuments = (data || []).filter(doc => 
-          certificateTypes.includes(doc.document_type || '') ||
-          (doc.status === 'completed' || doc.status === 'processed')
-        );
+        const certificateDocuments = uniqueDocuments.filter(doc => {
+          const isCertificateType = certificateTypes.includes(doc.document_type || '');
+          const isProcessed = (doc.status === 'completed' || doc.status === 'processed');
+          return isCertificateType || isProcessed;
+        });
         
         console.log('Certificate documents found:', certificateDocuments.length);
         
@@ -116,8 +173,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         setDocuments(cleanedDocuments);
 
       } catch (error) {
-        console.error('Error fetching documents:', error);
-        toast.error('Failed to load certificates');
+        console.error('Error in patient data fetch:', error);
+        toast.error('Failed to load patient data');
       }
 
     } catch (error) {
@@ -201,10 +258,13 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Certificates Found</h3>
               <p className="text-muted-foreground">
-                No medical certificates have been processed for this patient yet.
+                No medical certificates have been found for this patient.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Patient ID: {patientId} | Organization: {organizationId}
+                Patient: {patient?.first_name} {patient?.last_name} (ID: {patient?.id_number})
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Searched in: {clientOrganization?.name || 'Unknown Organization'}
               </p>
             </div>
           ) : (
