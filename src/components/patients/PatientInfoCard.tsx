@@ -14,6 +14,9 @@ const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
   patient, 
   organizationName 
 }) => {
+  // Use birthdate_from_id if available, otherwise fall back to date_of_birth
+  const displayBirthdate = patient.birthdate_from_id || patient.date_of_birth;
+
   return (
     <Card>
       <CardHeader>
@@ -39,10 +42,10 @@ const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
                   <span>{patient.id_number}</span>
                 </div>
               )}
-              {patient.date_of_birth && (
+              {displayBirthdate && (
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Date of Birth:</span>
-                  <span>{new Date(patient.date_of_birth).toLocaleDateString()}</span>
+                  <span>{new Date(displayBirthdate).toLocaleDateString()}</span>
                 </div>
               )}
               {patient.gender && (

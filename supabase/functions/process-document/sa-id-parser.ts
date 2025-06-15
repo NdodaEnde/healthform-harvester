@@ -1,3 +1,4 @@
+
 /**
  * South African ID Number Parser
  * 
@@ -89,13 +90,19 @@ function extractBirthdate(idNumber: string): string | null {
     return null;
   }
 
-  // Basic validation for days in month
-  const lastDayOfMonth = new Date(parseInt(fullYear, 10), monthInt, 0).getDate();
-  if (dayInt > lastDayOfMonth) {
+  // Create the date object using the correct constructor
+  // Month in Date constructor is 0-based (0 = January, 11 = December)
+  const dateObj = new Date(parseInt(fullYear, 10), monthInt - 1, dayInt);
+  
+  // Verify the date is valid and matches what we expect
+  if (dateObj.getFullYear() !== parseInt(fullYear, 10) || 
+      dateObj.getMonth() !== monthInt - 1 || 
+      dateObj.getDate() !== dayInt) {
     return null;
   }
 
-  return `${fullYear}-${month}-${day}`;
+  // Format as ISO date string (YYYY-MM-DD)
+  return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 /**

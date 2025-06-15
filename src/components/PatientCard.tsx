@@ -34,6 +34,9 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient }) => {
 
   const contactInfo = patient.contact_info as ContactInfo || {};
 
+  // Use birthdate_from_id if available, otherwise fall back to date_of_birth
+  const displayBirthdate = patient.birthdate_from_id || patient.date_of_birth;
+
   return (
     <Card>
       <CardHeader>
@@ -50,7 +53,7 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient }) => {
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              Born: {format(new Date(patient.date_of_birth), 'MMM d, yyyy')}
+              Born: {format(new Date(displayBirthdate), 'MMM d, yyyy')}
             </span>
           </div>
           

@@ -60,7 +60,7 @@ const ClinicalAnalyticsPage = () => {
     }));
   }, [patientsData]);
 
-  // Calculate age distribution
+  // Calculate age distribution using the correct birthdate field
   const ageDistribution = React.useMemo(() => {
     if (!patientsData) return [];
     
@@ -74,12 +74,15 @@ const ClinicalAnalyticsPage = () => {
     };
     
     patientsData.forEach(patient => {
-      if (!patient.date_of_birth) {
+      // Use birthdate_from_id if available, otherwise fall back to date_of_birth
+      const birthdate = patient.birthdate_from_id || patient.date_of_birth;
+      
+      if (!birthdate) {
         ageGroups['Unknown']++;
         return;
       }
       
-      const birthDate = new Date(patient.date_of_birth);
+      const birthDate = new Date(birthdate);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();

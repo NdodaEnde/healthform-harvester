@@ -5,8 +5,12 @@ export interface DatabasePatient {
   first_name: string;
   last_name: string;
   date_of_birth: string;
+  birthdate_from_id?: string; // Added this field
   gender?: string;
+  gender_from_id?: string; // Added this field
   id_number?: string;
+  id_number_valid?: boolean; // Added this field
+  citizenship_status?: string; // Added this field
   created_at: string;
   updated_at: string;
   organization_id?: string;

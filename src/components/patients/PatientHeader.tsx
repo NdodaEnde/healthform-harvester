@@ -15,6 +15,9 @@ const PatientHeader: React.FC<PatientHeaderProps> = ({ patient }) => {
   const contactNumber = contactInfo?.phone || contactInfo?.contact_number;
   const email = contactInfo?.email;
 
+  // Use birthdate_from_id if available, otherwise fall back to date_of_birth
+  const displayBirthdate = patient.birthdate_from_id || patient.date_of_birth;
+
   return (
     <Card>
       <CardHeader>
@@ -30,11 +33,11 @@ const PatientHeader: React.FC<PatientHeaderProps> = ({ patient }) => {
             <Badge variant="outline">Patient</Badge>
           </div>
           
-          {patient.date_of_birth && (
+          {displayBirthdate && (
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
-                Born: {new Date(patient.date_of_birth).toLocaleDateString()}
+                Born: {new Date(displayBirthdate).toLocaleDateString()}
               </span>
             </div>
           )}
