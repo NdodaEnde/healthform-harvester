@@ -49,8 +49,41 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         }
       }
 
-      // Fetch patient-specific documents/certificates
+      // First, let's see ALL documents for this patient to debug
       try {
+        console.log('=== DEBUGGING: Checking all documents for patient ===');
+        const { data: allDocs, error: allDocsError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('owner_id', patientId);
+
+        if (allDocsError) {
+          console.error('Error fetching all patient documents:', allDocsError);
+        } else {
+          console.log('ALL documents for patient:', allDocs);
+          console.log('Total documents found:', allDocs?.length || 0);
+          
+          if (allDocs && allDocs.length > 0) {
+            allDocs.forEach((doc, index) => {
+              console.log(`Document ${index + 1}:`, {
+                id: doc.id,
+                file_name: doc.file_name,
+                document_type: doc.document_type,
+                status: doc.status,
+                organization_id: doc.organization_id,
+                client_organization_id: doc.client_organization_id,
+                owner_id: doc.owner_id
+              });
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error in debug query:', error);
+      }
+
+      // Now fetch patient-specific documents/certificates with the original query
+      try {
+        console.log('=== MAIN QUERY ===');
         console.log('Fetching certificates for patient:', patientId);
         console.log('Service provider organization:', organizationId);
         console.log('Client organization:', clientOrganizationId);
@@ -77,8 +110,30 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
           throw error;
         }
 
-        console.log('Patient certificates found:', data?.length || 0);
+        console.log('Patient certificates found with main query:', data?.length || 0);
         console.log('Certificates data:', data);
+        
+        // If no results, let's try a more relaxed query to see what we can find
+        if (!data || data.length === 0) {
+          console.log('=== RELAXED QUERY (no status/type filter) ===');
+          let relaxedQuery = supabase
+            .from('documents')
+            .select('*')
+            .eq('owner_id', patientId);
+
+          if (clientOrganizationId) {
+            relaxedQuery = relaxedQuery.or(`organization_id.eq.${organizationId},client_organization_id.eq.${clientOrganizationId}`);
+          } else {
+            relaxedQuery = relaxedQuery.eq('organization_id', organizationId);
+          }
+
+          const { data: relaxedData, error: relaxedError } = await relaxedQuery.order('created_at', { ascending: false });
+
+          if (!relaxedError) {
+            console.log('Relaxed query results:', relaxedData?.length || 0);
+            console.log('Relaxed query data:', relaxedData);
+          }
+        }
         
         const cleanedDocuments = (data || []).map(doc => ({
           ...doc,
@@ -172,6 +227,9 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
               <h3 className="text-lg font-semibold mb-2">No Certificates Found</h3>
               <p className="text-muted-foreground">
                 No medical certificates have been uploaded for this patient yet.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Check the browser console for debugging information about available documents.
               </p>
             </div>
           ) : (
