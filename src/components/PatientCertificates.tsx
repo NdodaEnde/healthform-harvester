@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,6 @@ import { cleanCertificateData } from '@/utils/certificate-data-cleaner';
 import { patientDataService } from '@/services/patientDataService';
 import type { DatabasePatient, DatabaseDocument, DatabaseOrganization } from '@/types/database';
 import PatientHeader from '@/components/patients/PatientHeader';
-import OrganizationHeader from '@/components/organizations/OrganizationHeader';
 import DocumentItem from '@/components/documents/DocumentItem';
 
 interface PatientCertificatesProps {
@@ -159,8 +157,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
   return (
     <div className="space-y-6">
       {patient && <PatientHeader patient={patient} />}
-      {/* Show the client organization that the patient belongs to, not the service provider */}
-      {clientOrganization && <OrganizationHeader organization={clientOrganization} />}
 
       <Card>
         <CardHeader>
