@@ -412,6 +412,72 @@ export type Database = {
           },
         ]
       }
+      documents_backup: {
+        Row: {
+          client_organization_id: string | null
+          created_at: string | null
+          document_type: string | null
+          extracted_data: Json | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string | null
+          mime_type: string | null
+          organization_id: string | null
+          owner_id: string | null
+          processed_at: string | null
+          processing_error: string | null
+          public_url: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          validated_by: string | null
+          validation_status: string | null
+        }
+        Insert: {
+          client_organization_id?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          extracted_data?: Json | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string | null
+          mime_type?: string | null
+          organization_id?: string | null
+          owner_id?: string | null
+          processed_at?: string | null
+          processing_error?: string | null
+          public_url?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          validated_by?: string | null
+          validation_status?: string | null
+        }
+        Update: {
+          client_organization_id?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          extracted_data?: Json | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string | null
+          mime_type?: string | null
+          organization_id?: string | null
+          owner_id?: string | null
+          processed_at?: string | null
+          processing_error?: string | null
+          public_url?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          validated_by?: string | null
+          validation_status?: string | null
+        }
+        Relationships: []
+      }
       form_templates: {
         Row: {
           category: string | null

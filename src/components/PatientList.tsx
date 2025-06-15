@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,9 +40,12 @@ const PatientList: React.FC<PatientListProps> = ({
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { getEffectiveOrganizationId } = useOrganization();
   const navigate = useNavigate();
+
+  // Get current page from URL search params, default to 1
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
   const fetchPatients = async () => {
     try {
@@ -145,8 +148,14 @@ const PatientList: React.FC<PatientListProps> = ({
 
   // Reset to first page when search term changes
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+    if (searchTerm) {
+      setSearchParams(prev => {
+        const newParams = new URLSearchParams(prev);
+        newParams.set('page', '1');
+        return newParams;
+      });
+    }
+  }, [searchTerm, setSearchParams]);
 
   const handlePatientClick = (patient: Patient) => {
     if (allowSelection && onSelectPatient) {
@@ -156,7 +165,8 @@ const PatientList: React.FC<PatientListProps> = ({
 
   const handleViewClick = (e: React.MouseEvent, patient: Patient) => {
     e.stopPropagation();
-    navigate(`/patients/${patient.id}`);
+    // Preserve current page in URL when navigating to patient details
+    navigate(`/patients/${patient.id}?returnPage=${currentPage}`);
   };
 
   const handleEditClick = (e: React.MouseEvent, patient: Patient) => {
@@ -164,7 +174,8 @@ const PatientList: React.FC<PatientListProps> = ({
     if (onEditPatient) {
       onEditPatient(patient);
     } else {
-      navigate(`/patients/${patient.id}/edit`);
+      // Preserve current page when navigating to edit
+      navigate(`/patients/${patient.id}/edit?returnPage=${currentPage}`);
     }
   };
 
@@ -173,7 +184,11 @@ const PatientList: React.FC<PatientListProps> = ({
   };
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('page', page.toString());
+      return newParams;
+    });
   };
 
   // Helper function to get the correct birthdate for display
