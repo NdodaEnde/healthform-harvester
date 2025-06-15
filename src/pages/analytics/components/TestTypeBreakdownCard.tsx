@@ -1,4 +1,4 @@
-
+import React from 'react';
 import {
   Card,
   CardContent,
@@ -114,7 +114,7 @@ export default function TestTypeBreakdownCard({
       name: name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
       count: data.total,
       completion: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,
-      status: data.completion >= 90 ? 'high' : data.completion >= 75 ? 'medium' : 'low',
+      status: data.total > 0 ? (Math.round((data.completed / data.total) * 100) >= 90 ? 'high' : Math.round((data.completed / data.total) * 100) >= 75 ? 'medium' : 'low') : 'low',
       description: getTestDescription(name)
     })).sort((a, b) => b.count - a.count);
 
