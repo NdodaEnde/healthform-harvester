@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -83,6 +84,8 @@ export default function FitnessCertificateStats({
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     const today = new Date();
+    // Set today to start of day for accurate comparison
+    today.setHours(0, 0, 0, 0);
 
     console.log('Processing examinations:', examinationsData.length);
     console.log('Today:', today.toISOString());
@@ -106,9 +109,12 @@ export default function FitnessCertificateStats({
       // Check for expiring certificates using the expiry_date column
       if (exam.expiry_date) {
         const expiryDate = new Date(exam.expiry_date);
+        expiryDate.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+        
         console.log('Checking expiry for exam:', exam.id, 'expiry_date:', exam.expiry_date, 'parsed:', expiryDate.toISOString());
         
-        if (expiryDate <= thirtyDaysFromNow && expiryDate >= today) {
+        // Include certificates that expire within the next 30 days (including today and past dates)
+        if (expiryDate <= thirtyDaysFromNow) {
           console.log('Certificate expiring soon:', exam.id, 'expires:', expiryDate.toISOString());
           expiringCertificates++;
         }
