@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +22,51 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
   const [patient, setPatient] = useState<DatabasePatient | null>(null);
   const [clientOrganization, setClientOrganization] = useState<DatabaseOrganization | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Enhanced function to search for patient ID in extracted data
+  const searchForPatientInDocument = (doc: DatabaseDocument, patientIdNumber: string): boolean => {
+    if (!doc.extracted_data || !patientIdNumber) return false;
+    
+    try {
+      // Convert the entire extracted_data to a string for comprehensive searching
+      const extractedDataStr = JSON.stringify(doc.extracted_data).toLowerCase();
+      const searchId = patientIdNumber.toLowerCase();
+      
+      console.log(`🔍 Searching document ${doc.id} (${doc.file_name})`);
+      console.log(`📄 Document type: ${doc.document_type}`);
+      console.log(`🆔 Looking for ID: ${searchId}`);
+      
+      // Direct match
+      if (extractedDataStr.includes(searchId)) {
+        console.log(`✅ FOUND direct match for ${searchId} in document ${doc.file_name}`);
+        return true;
+      }
+      
+      // Try variations of the ID number (with spaces, dashes, etc.)
+      const idVariations = [
+        searchId,
+        searchId.replace(/(\d{2})(\d{2})(\d{2})(\d{7})/, '$1 $2 $3 $4'),
+        searchId.replace(/(\d{6})(\d{7})/, '$1 $2'),
+        searchId.replace(/(\d{2})(\d{2})(\d{2})(\d{1})(\d{6})/, '$1/$2/$3 $4 $5'),
+      ];
+      
+      for (const variation of idVariations) {
+        if (extractedDataStr.includes(variation)) {
+          console.log(`✅ FOUND variation match "${variation}" for ${searchId} in document ${doc.file_name}`);
+          return true;
+        }
+      }
+      
+      // Log a sample of the extracted data for debugging
+      const sampleData = extractedDataStr.substring(0, 200) + (extractedDataStr.length > 200 ? '...' : '');
+      console.log(`❌ No match found. Sample data: ${sampleData}`);
+      
+      return false;
+    } catch (error) {
+      console.error('Error searching document:', error);
+      return false;
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -66,7 +110,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         }
 
         // Now fetch documents using multiple strategies
-        console.log('=== COMPREHENSIVE DOCUMENT SEARCH ===');
+        console.log('=== ENHANCED DOCUMENT SEARCH ===');
         console.log('Patient ID:', patientId);
         console.log('Patient ID Number:', patientData.id_number);
         console.log('Organization ID:', organizationId);
@@ -89,9 +133,11 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
           if (linkedDocs) allDocuments.push(...linkedDocs);
         }
 
-        // Strategy 2: Documents with client_organization_id match (even if not linked to patient)
+        // Strategy 2: Search ALL documents from both organizations
+        console.log('Strategy 2: Searching all documents from both organizations');
+        
+        // Get all documents from client organization
         if (clientOrganizationId) {
-          console.log('Strategy 2: Looking for documents with client_organization_id =', clientOrganizationId);
           const { data: clientDocs, error: clientError } = await supabase
             .from('documents')
             .select('*')
@@ -103,26 +149,18 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
             console.error('Error fetching client documents:', clientError);
           } else {
             console.log('Found client organization documents:', clientDocs?.length || 0);
-            if (clientDocs) {
-              // Filter for documents that might belong to this patient by ID number
-              const patientIdNumber = patientData.id_number;
-              if (patientIdNumber) {
-                const matchingDocs = clientDocs.filter(doc => {
-                  if (!doc.extracted_data) return false;
-                  
-                  const extractedDataStr = JSON.stringify(doc.extracted_data).toLowerCase();
-                  return extractedDataStr.includes(patientIdNumber);
-                });
-                
-                console.log('Documents matching patient ID number:', matchingDocs.length);
-                allDocuments.push(...matchingDocs);
-              }
+            if (clientDocs && patientData.id_number) {
+              console.log('🔍 Starting detailed search through client documents...');
+              const matchingClientDocs = clientDocs.filter(doc => 
+                searchForPatientInDocument(doc, patientData.id_number)
+              );
+              console.log(`Found ${matchingClientDocs.length} matching client documents`);
+              allDocuments.push(...matchingClientDocs);
             }
           }
         }
 
-        // Strategy 3: All processed documents from organization
-        console.log('Strategy 3: Looking for all processed documents from organization:', organizationId);
+        // Get all documents from service provider organization
         const { data: orgDocs, error: orgError } = await supabase
           .from('documents')
           .select('*')
@@ -135,16 +173,12 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         } else {
           console.log('Found organization documents:', orgDocs?.length || 0);
           if (orgDocs && patientData.id_number) {
-            // Filter for documents that might belong to this patient by ID number
-            const matchingDocs = orgDocs.filter(doc => {
-              if (!doc.extracted_data) return false;
-              
-              const extractedDataStr = JSON.stringify(doc.extracted_data).toLowerCase();
-              return extractedDataStr.includes(patientData.id_number);
-            });
-            
-            console.log('Org documents matching patient ID number:', matchingDocs.length);
-            allDocuments.push(...matchingDocs);
+            console.log('🔍 Starting detailed search through organization documents...');
+            const matchingOrgDocs = orgDocs.filter(doc => 
+              searchForPatientInDocument(doc, patientData.id_number)
+            );
+            console.log(`Found ${matchingOrgDocs.length} matching organization documents`);
+            allDocuments.push(...matchingOrgDocs);
           }
         }
 
@@ -270,7 +304,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
           ) : (
             <div className="space-y-4">
               <div className="text-sm text-muted-foreground mb-4">
-                Found {documents.length} certificate{documents.length !== 1 ? 's' : ''}
+                Found {documents.length} certificate{documents.length !== 1 ? 's' : ''} for ID number: {patient?.id_number}
               </div>
               {documents.map((doc) => (
                 <DocumentItem
