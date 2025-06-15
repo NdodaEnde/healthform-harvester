@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,10 +77,10 @@ const PatientList: React.FC<PatientListProps> = ({
         console.log('Total documents found:', docCount);
       }
 
-      // Fetch actual patients data - include birthdate_from_id
+      // Fetch actual patients data - include both gender fields
       const { data: patientsData, error: patientsError } = await supabase
         .from('patients')
-        .select('id, first_name, last_name, date_of_birth, birthdate_from_id, gender, id_number, client_organization_id')
+        .select('id, first_name, last_name, date_of_birth, birthdate_from_id, gender, gender_from_id, id_number, client_organization_id')
         .eq('client_organization_id', effectiveOrgId as any)
         .order('last_name', { ascending: true })
         .order('first_name', { ascending: true });
@@ -102,6 +101,7 @@ const PatientList: React.FC<PatientListProps> = ({
           date_of_birth: patient.date_of_birth || '',
           birthdate_from_id: patient.birthdate_from_id || undefined,
           gender: patient.gender || undefined,
+          gender_from_id: patient.gender_from_id || undefined,
           id_number: patient.id_number || undefined,
           client_organization_id: patient.client_organization_id || ''
         }));
