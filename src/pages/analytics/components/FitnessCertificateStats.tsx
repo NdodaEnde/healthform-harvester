@@ -81,6 +81,7 @@ export default function FitnessCertificateStats({
 
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const today = new Date();
 
     examinationsData.forEach(exam => {
       const status = exam.fitness_status?.toLowerCase() || '';
@@ -97,10 +98,10 @@ export default function FitnessCertificateStats({
         unfit++;
       }
 
-      // Check for expiring certificates
+      // Check for expiring certificates using the expiry_date column
       if (exam.expiry_date) {
         const expiryDate = new Date(exam.expiry_date);
-        if (expiryDate <= thirtyDaysFromNow && expiryDate > new Date()) {
+        if (expiryDate <= thirtyDaysFromNow && expiryDate >= today) {
           expiringCertificates++;
         }
       }
