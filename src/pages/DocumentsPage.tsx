@@ -58,7 +58,8 @@ const DocumentsPage = () => {
     console.log('Is Service Provider:', isServiceProvider());
     console.log('Context Label:', contextLabel);
     console.log('Environment:', window.location.hostname);
-  }, [currentOrganization, currentClient, organizationId, isServiceProvider, contextLabel]);
+    console.log('Current Page from URL:', currentPage);
+  }, [currentOrganization, currentClient, organizationId, isServiceProvider, contextLabel, currentPage]);
 
   // Fetch all documents to get unique document types for filter dropdown
   const { data: allDocuments } = useQuery({
@@ -181,14 +182,37 @@ const DocumentsPage = () => {
 
   const totalPages = Math.ceil((documents?.totalCount || 0) / itemsPerPage);
 
-  // Reset to first page when filters change
-  React.useEffect(() => {
+  // Function to handle page changes with URL updates
+  const handlePageChange = (page: number) => {
+    console.log('📄 Changing page to:', page);
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
-      newParams.set('page', '1');
+      newParams.set('page', page.toString());
       return newParams;
     });
-  }, [searchTerm, statusFilter, documentTypeFilter, setSearchParams]);
+  };
+
+  // Handle filter changes and reset to page 1
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    if (currentPage !== 1) {
+      handlePageChange(1);
+    }
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    if (currentPage !== 1) {
+      handlePageChange(1);
+    }
+  };
+
+  const handleDocumentTypeFilterChange = (value: string) => {
+    setDocumentTypeFilter(value);
+    if (currentPage !== 1) {
+      handlePageChange(1);
+    }
+  };
 
   // Enhanced delete handler function
   const handleDeleteDocument = async (documentId: string, fileName: string) => {
@@ -333,16 +357,7 @@ const DocumentsPage = () => {
   // Only show upload button if we have an organization context
   const canUpload = !!organizationId;
 
-  // Function to handle page changes with URL updates
-  const handlePageChange = (page: number) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      newParams.set('page', page.toString());
-      return newParams;
-    });
-  };
-
-  // Custom pagination component
+  // Custom pagination component that works with our URL-based pagination
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
@@ -762,12 +777,12 @@ const DocumentsPage = () => {
                       placeholder="Search documents by name..."
                       className="pl-8"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => handleSearchChange(e.target.value)}
                     />
                   </div>
                 </div>
                 <div>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                     <SelectTrigger>
                       <span className="flex items-center gap-2">
                         <Filter className="h-4 w-4" />
@@ -784,7 +799,7 @@ const DocumentsPage = () => {
                   </Select>
                 </div>
                 <div>
-                  <Select value={documentTypeFilter} onValueChange={setDocumentTypeFilter}>
+                  <Select value={documentTypeFilter} onValueChange={handleDocumentTypeFilterChange}>
                     <SelectTrigger>
                       <span className="flex items-center gap-2">
                         <Filter className="h-4 w-4" />
