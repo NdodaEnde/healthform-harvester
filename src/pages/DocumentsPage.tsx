@@ -11,21 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrphanedDocumentFixer } from '@/components/OrphanedDocumentFixer';
 import { motion } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList, Shield, Lock, Database, FileCheck } from 'lucide-react';
+import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList, Shield, Lock, Database, FileCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
 import { StorageCleanupUtility } from '@/components/StorageCleanupUtility';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
@@ -351,69 +342,98 @@ const DocumentsPage = () => {
     });
   }, [searchTerm, statusFilter, documentTypeFilter, setSearchParams]);
 
-  // Function to generate pagination links
-  const generatePaginationItems = () => {
-    const items = [];
+  // Custom pagination component that works with our URL-based pagination
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const pages = [];
+    const maxVisiblePages = 5;
     
-    // Always show first page
-    items.push(
-      <PaginationItem key="first">
-        <PaginationLink 
-          isActive={currentPage === 1} 
-          onClick={() => handlePageChange(1)}
-        >
-          1
-        </PaginationLink>
-      </PaginationItem>
+    // Calculate start and end page numbers
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Adjust start page if we're near the end
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    return (
+      <div className="mt-8">
+        <div className="flex items-center justify-center space-x-2">
+          {/* Previous button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+
+          {/* First page */}
+          {startPage > 1 && (
+            <>
+              <Button
+                variant={currentPage === 1 ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePageChange(1)}
+              >
+                1
+              </Button>
+              {startPage > 2 && <span className="px-2">...</span>}
+            </>
+          )}
+
+          {/* Page numbers */}
+          {Array.from({ length: endPage - startPage + 1 }, (_, i) => {
+            const page = startPage + i;
+            return (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePageChange(page)}
+              >
+                {page}
+              </Button>
+            );
+          })}
+
+          {/* Last page */}
+          {endPage < totalPages && (
+            <>
+              {endPage < totalPages - 1 && <span className="px-2">...</span>}
+              <Button
+                variant={currentPage === totalPages ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePageChange(totalPages)}
+              >
+                {totalPages}
+              </Button>
+            </>
+          )}
+
+          {/* Next button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="flex items-center gap-1"
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <p className="text-center text-sm text-muted-foreground mt-2">
+          Page {currentPage} of {totalPages} ({documents?.totalCount || 0} total documents)
+        </p>
+      </div>
     );
-    
-    // If there are many pages, add ellipsis after first page
-    if (currentPage > 3) {
-      items.push(
-        <PaginationItem key="ellipsis1">
-          <PaginationEllipsis />
-        </PaginationItem>
-      );
-    }
-    
-    // Add pages around current page
-    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-      items.push(
-        <PaginationItem key={i}>
-          <PaginationLink 
-            isActive={currentPage === i} 
-            onClick={() => handlePageChange(i)}
-          >
-            {i}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-    
-    // If there are many pages, add ellipsis before last page
-    if (currentPage < totalPages - 2) {
-      items.push(
-        <PaginationItem key="ellipsis2">
-          <PaginationEllipsis />
-        </PaginationItem>
-      );
-    }
-    
-    // Always show last page if it's not the first page
-    if (totalPages > 1) {
-      items.push(
-        <PaginationItem key="last">
-          <PaginationLink 
-            isActive={currentPage === totalPages} 
-            onClick={() => handlePageChange(totalPages)}
-          >
-            {totalPages}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-    
-    return items;
   };
   
   // Render document card with delete functionality
@@ -856,29 +876,7 @@ const DocumentsPage = () => {
               </motion.div>
               
               {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-8">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} 
-                        />
-                      </PaginationItem>
-                      
-                      {generatePaginationItems()}
-                      
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
+              {renderPagination()}
             </>
           ) : (
             <div className="text-center py-10 border rounded-lg bg-background">
