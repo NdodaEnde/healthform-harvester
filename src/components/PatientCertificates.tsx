@@ -24,7 +24,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
 }) => {
   const [documents, setDocuments] = useState<DatabaseDocument[]>([]);
   const [patient, setPatient] = useState<DatabasePatient | null>(null);
-  const [organization, setOrganization] = useState<DatabaseOrganization | null>(null);
+  const [clientOrganization, setClientOrganization] = useState<DatabaseOrganization | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -35,22 +35,28 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       try {
         const patientData = await patientDataService.fetchPatient(patientId);
         setPatient(patientData);
+        console.log('Patient data loaded:', patientData);
       } catch (error) {
         console.error('Error fetching patient:', error);
         toast.error('Failed to load patient information');
       }
 
-      // Fetch organization data
-      try {
-        const orgData = await patientDataService.fetchOrganization(organizationId);
-        setOrganization(orgData);
-      } catch (error) {
-        console.error('Error fetching organization:', error);
+      // Fetch client organization data (the organization the patient belongs to)
+      if (clientOrganizationId) {
+        try {
+          const clientOrgData = await patientDataService.fetchOrganization(clientOrganizationId);
+          setClientOrganization(clientOrgData);
+          console.log('Client organization data loaded:', clientOrgData);
+        } catch (error) {
+          console.error('Error fetching client organization:', error);
+        }
       }
 
       // Fetch patient-specific documents/certificates
       try {
-        console.log('Fetching certificates for patient:', patientId, 'organization:', organizationId, 'client org:', clientOrganizationId);
+        console.log('Fetching certificates for patient:', patientId);
+        console.log('Service provider organization:', organizationId);
+        console.log('Client organization:', clientOrganizationId);
         
         // Build query to check for documents in either organization_id or client_organization_id
         let query = supabase
@@ -153,7 +159,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
   return (
     <div className="space-y-6">
       {patient && <PatientHeader patient={patient} />}
-      {organization && <OrganizationHeader organization={organization} />}
+      {/* Show the client organization that the patient belongs to, not the service provider */}
+      {clientOrganization && <OrganizationHeader organization={clientOrganization} />}
 
       <Card>
         <CardHeader>
