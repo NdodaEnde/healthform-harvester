@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,59 +61,95 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       }
 
       // Now fetch documents for debugging
-      console.log('=== DOCUMENT STRUCTURE ANALYSIS ===');
+      console.log('=== ENHANCED DOCUMENT SEARCH ===');
       console.log('Patient ID:', patientId);
       console.log('Patient ID Number:', patientData.id_number);
       console.log('Organization ID:', organizationId);
       console.log('Client Organization ID:', clientOrganizationId);
 
-      // Get a few sample documents to analyze their structure
-      const { data: sampleDocs, error: sampleError } = await supabase
+      // Strategy 1: Look for documents already linked to this patient
+      console.log('Strategy 1: Looking for documents with owner_id =', patientId);
+      const { data: linkedDocs, error: linkedError } = await supabase
         .from('documents')
         .select('*')
-        .eq('client_organization_id', clientOrganizationId)
+        .eq('owner_id', patientId)
         .in('status', ['processed', 'completed'])
-        .limit(3)
         .order('created_at', { ascending: false });
 
-      if (sampleError) {
-        console.error('Error fetching sample documents:', sampleError);
-      } else if (sampleDocs && sampleDocs.length > 0) {
-        console.log(`📋 Analyzing structure of ${sampleDocs.length} sample documents:`);
+      if (linkedError) {
+        console.error('Error fetching linked documents:', linkedError);
+      } else {
+        console.log('Found linked documents:', linkedDocs?.length || 0);
+        if (linkedDocs && linkedDocs.length > 0) {
+          setDocuments(linkedDocs);
+          return;
+        }
+      }
+
+      // Strategy 2: Search through all documents from both organizations
+      console.log('Strategy 2: Searching all documents from both organizations');
+      
+      let allDocs: DatabaseDocument[] = [];
+      
+      // Get documents from client organization
+      if (clientOrganizationId) {
+        const { data: clientDocs, error: clientError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('client_organization_id', clientOrganizationId)
+          .in('status', ['processed', 'completed'])
+          .order('created_at', { ascending: false });
+
+        if (clientError) {
+          console.error('Error fetching client documents:', clientError);
+        } else {
+          console.log('Found client organization documents:', clientDocs?.length || 0);
+          allDocs = [...allDocs, ...(clientDocs || [])];
+        }
+      }
+
+      // Search through documents for patient ID
+      if (patientData.id_number && allDocs.length > 0) {
+        console.log('🔍 Starting detailed search through client documents...');
         
-        sampleDocs.forEach((doc, index) => {
-          console.log(`\n🔍 Document ${index + 1}: ${doc.file_name}`);
+        const matchingDocs: DatabaseDocument[] = [];
+        const searchId = patientData.id_number.replace(/\s/g, ''); // Remove spaces for comparison
+        
+        // Take a sample for detailed logging
+        const sampleDocs = allDocs.slice(0, 5);
+        
+        for (const doc of sampleDocs) {
+          console.log(`🔍 Searching document ${doc.id} (${doc.file_name})`);
           console.log(`📄 Document type: ${doc.document_type}`);
-          console.log(`📊 Status: ${doc.status}`);
+          console.log(`🆔 Looking for ID: ${searchId}`);
           
           if (doc.extracted_data) {
-            console.log('📦 Full extracted_data structure:');
-            console.log(JSON.stringify(doc.extracted_data, null, 2));
+            const extractedData = doc.extracted_data as any;
             
-            // Check for different possible locations of structured data
-            console.log('\n🔍 Checking for structured data locations:');
-            console.log('- extracted_data.structured_data exists:', !!doc.extracted_data.structured_data);
-            console.log('- extracted_data.certificate_info exists:', !!doc.extracted_data.certificate_info);
-            console.log('- extracted_data.patient exists:', !!doc.extracted_data.patient);
-            console.log('- extracted_data.chunks exists:', !!doc.extracted_data.chunks);
-            console.log('- extracted_data.raw_content exists:', !!doc.extracted_data.raw_content);
+            // Show the structure analysis
+            console.log('🔍 Checking for structured data locations:');
+            console.log('- extracted_data.structured_data exists:', !!extractedData.structured_data);
+            console.log('- extracted_data.certificate_info exists:', !!extractedData.certificate_info);
+            console.log('- extracted_data.patient exists:', !!extractedData.patient);
+            console.log('- extracted_data.chunks exists:', !!extractedData.chunks);
+            console.log('- extracted_data.raw_content exists:', !!extractedData.raw_content);
             
-            // If structured_data exists, show its structure
-            if (doc.extracted_data.structured_data) {
+            // Show structured_data content if it exists
+            if (extractedData.structured_data) {
               console.log('📋 structured_data content:');
-              console.log(JSON.stringify(doc.extracted_data.structured_data, null, 2));
+              console.log(JSON.stringify(extractedData.structured_data, null, 2));
             }
             
-            // If certificate_info exists, show its structure
-            if (doc.extracted_data.certificate_info) {
+            // Show certificate_info content if it exists
+            if (extractedData.certificate_info) {
               console.log('📋 certificate_info content:');
-              console.log(JSON.stringify(doc.extracted_data.certificate_info, null, 2));
+              console.log(JSON.stringify(extractedData.certificate_info, null, 2));
             }
             
-            // Check chunks for content
-            if (doc.extracted_data.chunks && Array.isArray(doc.extracted_data.chunks)) {
-              console.log(`📄 Found ${doc.extracted_data.chunks.length} chunks`);
-              const chunksWithContent = doc.extracted_data.chunks.filter(chunk => chunk.content && chunk.content.trim() !== '');
+            // Check chunks
+            if (extractedData.chunks && Array.isArray(extractedData.chunks)) {
+              console.log(`📄 Found ${extractedData.chunks.length} chunks`);
+              const chunksWithContent = extractedData.chunks.filter((chunk: any) => chunk.content && chunk.content.trim() !== '');
               console.log(`📄 Chunks with actual content: ${chunksWithContent.length}`);
               
               if (chunksWithContent.length > 0) {
@@ -120,14 +157,39 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
                 console.log(chunksWithContent[0].content.substring(0, 200) + '...');
               }
             }
+            
+            // Now check if we can find the ID anywhere
+            const extractedDataStr = JSON.stringify(extractedData).toLowerCase();
+            const idVariations = [
+              searchId,
+              searchId.replace(/(\d{6})(\d{7})/, '$1 $2'), // Add space in middle
+              searchId.replace(/(\d{2})(\d{2})(\d{2})(\d{7})/, '$1 $2 $3 $4'), // Full formatting
+            ];
+            
+            let foundMatch = false;
+            for (const idVariation of idVariations) {
+              if (extractedDataStr.includes(idVariation.toLowerCase())) {
+                console.log(`✅ Found match for ID variation: ${idVariation}`);
+                matchingDocs.push(doc);
+                foundMatch = true;
+                break;
+              }
+            }
+            
+            if (!foundMatch) {
+              console.log(`❌ No match found. Sample data: ${extractedDataStr.substring(0, 200)}...`);
+            }
           } else {
             console.log('❌ No extracted_data found for this document');
           }
-        });
+        }
+        
+        console.log(`🎯 Total matching documents found: ${matchingDocs.length}`);
+        setDocuments(matchingDocs);
+      } else {
+        console.log('⚠️ No patient ID number or no documents to search');
+        setDocuments([]);
       }
-
-      // For now, just show empty results while we analyze
-      setDocuments([]);
 
     } catch (error) {
       console.error('Error in fetchData:', error);
@@ -207,19 +269,33 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Debug Mode Active</h3>
-            <p className="text-muted-foreground">
-              Please check the browser console to see the detailed analysis of document structures.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Patient: {patient?.first_name} {patient?.last_name} (ID: {patient?.id_number})
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Looking for documents in: {clientOrganization?.name || 'Unknown Organization'}
-            </p>
-          </div>
+          {documents.length > 0 ? (
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <DocumentItem
+                  key={doc.id}
+                  document={doc}
+                  onView={handleView}
+                  onDownload={handleDownload}
+                  showCertificateInfo={true}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Debug Mode Active</h3>
+              <p className="text-muted-foreground">
+                Please check the browser console to see the detailed analysis of document structures.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Patient: {patient?.first_name} {patient?.last_name} (ID: {patient?.id_number})
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Looking for documents in: {clientOrganization?.name || 'Unknown Organization'}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
