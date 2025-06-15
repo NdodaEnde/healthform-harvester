@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,7 @@ interface Patient {
   date_of_birth: string;
   birthdate_from_id?: string;
   gender?: string;
+  gender_from_id?: string;
   id_number?: string;
   client_organization_id: string;
 }
