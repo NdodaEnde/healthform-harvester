@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { CheckCircle, Edit, User, Settings, Save } from 'lucide-react';
+import { CheckCircle, Edit, User, Settings, Save, Link } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificatePromotionDialog from '../certificates/CertificatePromotionDialog';
+import LinkToPatientDialog from './LinkToPatientDialog';
 import { saveValidatedData } from '@/services/documentValidationService';
 import { toast } from 'sonner';
 import type { DatabaseDocument } from '@/types/database';
@@ -30,6 +31,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 }) => {
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // 🔧 ENHANCED: Save function that preserves template selection
@@ -50,7 +52,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
         toast.error('Failed to save validated data: ' + error.message);
       } else {
         toast.success('Validated data saved successfully');
-        // Don't call onValidationComplete here to avoid data refresh that might cause issues
         console.log('💾 Save completed successfully');
       }
     } catch (err) {
@@ -68,19 +69,30 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     }
   };
 
+  const handleLinkToPatient = () => {
+    setIsLinkDialogOpen(true);
+  };
+
+  const handleLinkComplete = () => {
+    setIsLinkDialogOpen(false);
+    toast.success('Document linked to patient successfully!');
+    
+    if (onValidationComplete) {
+      setTimeout(() => {
+        onValidationComplete();
+      }, 1000);
+    }
+  };
+
   // 🔧 FIXED: Simplified promotion complete handler
   const handlePromotionComplete = async () => {
     setIsPromotionDialogOpen(false);
     
     console.log('🎉 Patient record creation completed');
     
-    // Just show success message - don't save again as this might overwrite data
     toast.success('Patient record created successfully!');
     
-    // Optionally refresh the document to show any status updates
-    // but don't trigger a save operation that might clear the template data
     if (onValidationComplete) {
-      // Add a small delay to ensure patient creation is fully complete
       setTimeout(() => {
         onValidationComplete();
       }, 1000);
@@ -237,6 +249,9 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     return null;
   }
 
+  // Check if document is already linked to a patient
+  const isLinkedToPatient = !!document.owner_id;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -254,6 +269,12 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
           <Badge variant="outline" className="bg-green-100 text-green-800">
             <Save className="h-3 w-3 mr-1" />
             Saved
+          </Badge>
+        )}
+        {isLinkedToPatient && (
+          <Badge variant="outline" className="bg-purple-100 text-purple-800">
+            <Link className="h-3 w-3 mr-1" />
+            Linked to Patient
           </Badge>
         )}
       </div>
@@ -322,7 +343,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button 
           onClick={() => onValidationModeChange(true)}
           variant="outline"
@@ -354,6 +375,18 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             </Button>
           </>
         )}
+
+        {/* Link to Existing Patient Button */}
+        {!isLinkedToPatient && (
+          <Button 
+            onClick={handleLinkToPatient}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Link className="h-4 w-4" />
+            Link to Patient
+          </Button>
+        )}
       </div>
 
       {isPromotionDialogOpen && validatedData && currentOrganization && (
@@ -367,6 +400,13 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
           onPromotionComplete={handlePromotionComplete}
         />
       )}
+
+      <LinkToPatientDialog
+        isOpen={isLinkDialogOpen}
+        onClose={() => setIsLinkDialogOpen(false)}
+        document={document}
+        onLinked={handleLinkComplete}
+      />
     </div>
   );
 };
