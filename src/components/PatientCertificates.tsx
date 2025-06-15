@@ -23,193 +23,111 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
   const [clientOrganization, setClientOrganization] = useState<DatabaseOrganization | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Enhanced function to search for patient ID in extracted data
-  const searchForPatientInDocument = (doc: DatabaseDocument, patientIdNumber: string): boolean => {
-    if (!doc.extracted_data || !patientIdNumber) return false;
-    
-    try {
-      // Convert the entire extracted_data to a string for comprehensive searching
-      const extractedDataStr = JSON.stringify(doc.extracted_data).toLowerCase();
-      const searchId = patientIdNumber.toLowerCase();
-      
-      console.log(`🔍 Searching document ${doc.id} (${doc.file_name})`);
-      console.log(`📄 Document type: ${doc.document_type}`);
-      console.log(`🆔 Looking for ID: ${searchId}`);
-      
-      // Direct match
-      if (extractedDataStr.includes(searchId)) {
-        console.log(`✅ FOUND direct match for ${searchId} in document ${doc.file_name}`);
-        return true;
-      }
-      
-      // Try variations of the ID number (with spaces, dashes, etc.)
-      const idVariations = [
-        searchId,
-        searchId.replace(/(\d{2})(\d{2})(\d{2})(\d{7})/, '$1 $2 $3 $4'),
-        searchId.replace(/(\d{6})(\d{7})/, '$1 $2'),
-        searchId.replace(/(\d{2})(\d{2})(\d{2})(\d{1})(\d{6})/, '$1/$2/$3 $4 $5'),
-      ];
-      
-      for (const variation of idVariations) {
-        if (extractedDataStr.includes(variation)) {
-          console.log(`✅ FOUND variation match "${variation}" for ${searchId} in document ${doc.file_name}`);
-          return true;
-        }
-      }
-      
-      // Log a sample of the extracted data for debugging
-      const sampleData = extractedDataStr.substring(0, 200) + (extractedDataStr.length > 200 ? '...' : '');
-      console.log(`❌ No match found. Sample data: ${sampleData}`);
-      
-      return false;
-    } catch (error) {
-      console.error('Error searching document:', error);
-      return false;
-    }
-  };
-
   const fetchData = async () => {
     try {
       setLoading(true);
       
       // Fetch patient data first
-      try {
-        const { data: patientData, error: patientError } = await supabase
-          .from('patients')
+      const { data: patientData, error: patientError } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', patientId)
+        .single();
+
+      if (patientError) {
+        console.error('Error fetching patient:', patientError);
+        toast.error('Failed to load patient information');
+        return;
+      }
+
+      setPatient(patientData);
+      console.log('Patient data loaded:', patientData);
+
+      // Fetch client organization data if available
+      if (clientOrganizationId) {
+        const { data: clientOrgData, error: orgError } = await supabase
+          .from('organizations')
           .select('*')
-          .eq('id', patientId)
+          .eq('id', clientOrganizationId)
           .single();
 
-        if (patientError) {
-          console.error('Error fetching patient:', patientError);
-          toast.error('Failed to load patient information');
-          return;
-        } else {
-          setPatient(patientData);
-          console.log('Patient data loaded:', patientData);
-        }
-
-        // Fetch client organization data if available
-        if (clientOrganizationId) {
-          try {
-            const { data: clientOrgData, error: orgError } = await supabase
-              .from('organizations')
-              .select('*')
-              .eq('id', clientOrganizationId)
-              .single();
-
-            if (orgError) {
-              console.error('Error fetching client organization:', orgError);
-            } else {
-              setClientOrganization(clientOrgData);
-              console.log('Client organization data loaded:', clientOrgData);
-            }
-          } catch (error) {
-            console.error('Error fetching client organization:', error);
-          }
-        }
-
-        // Now fetch documents using multiple strategies
-        console.log('=== ENHANCED DOCUMENT SEARCH ===');
-        console.log('Patient ID:', patientId);
-        console.log('Patient ID Number:', patientData.id_number);
-        console.log('Organization ID:', organizationId);
-        console.log('Client Organization ID:', clientOrganizationId);
-        
-        const allDocuments: DatabaseDocument[] = [];
-
-        // Strategy 1: Documents directly linked to patient (owner_id)
-        console.log('Strategy 1: Looking for documents with owner_id =', patientId);
-        const { data: linkedDocs, error: linkedError } = await supabase
-          .from('documents')
-          .select('*')
-          .eq('owner_id', patientId)
-          .order('created_at', { ascending: false });
-
-        if (linkedError) {
-          console.error('Error fetching linked documents:', linkedError);
-        } else {
-          console.log('Found linked documents:', linkedDocs?.length || 0);
-          if (linkedDocs) allDocuments.push(...linkedDocs);
-        }
-
-        // Strategy 2: Search ALL documents from both organizations
-        console.log('Strategy 2: Searching all documents from both organizations');
-        
-        // Get all documents from client organization
-        if (clientOrganizationId) {
-          const { data: clientDocs, error: clientError } = await supabase
-            .from('documents')
-            .select('*')
-            .eq('client_organization_id', clientOrganizationId)
-            .in('status', ['processed', 'completed'])
-            .order('created_at', { ascending: false });
-
-          if (clientError) {
-            console.error('Error fetching client documents:', clientError);
-          } else {
-            console.log('Found client organization documents:', clientDocs?.length || 0);
-            if (clientDocs && patientData.id_number) {
-              console.log('🔍 Starting detailed search through client documents...');
-              const matchingClientDocs = clientDocs.filter(doc => 
-                searchForPatientInDocument(doc, patientData.id_number)
-              );
-              console.log(`Found ${matchingClientDocs.length} matching client documents`);
-              allDocuments.push(...matchingClientDocs);
-            }
-          }
-        }
-
-        // Get all documents from service provider organization
-        const { data: orgDocs, error: orgError } = await supabase
-          .from('documents')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .in('status', ['processed', 'completed'])
-          .order('created_at', { ascending: false });
-
         if (orgError) {
-          console.error('Error fetching organization documents:', orgError);
+          console.error('Error fetching client organization:', orgError);
         } else {
-          console.log('Found organization documents:', orgDocs?.length || 0);
-          if (orgDocs && patientData.id_number) {
-            console.log('🔍 Starting detailed search through organization documents...');
-            const matchingOrgDocs = orgDocs.filter(doc => 
-              searchForPatientInDocument(doc, patientData.id_number)
-            );
-            console.log(`Found ${matchingOrgDocs.length} matching organization documents`);
-            allDocuments.push(...matchingOrgDocs);
-          }
+          setClientOrganization(clientOrgData);
+          console.log('Client organization data loaded:', clientOrgData);
         }
-
-        // Remove duplicates based on document ID
-        const uniqueDocuments = allDocuments.filter((doc, index, self) => 
-          index === self.findIndex(d => d.id === doc.id)
-        );
-
-        console.log('Total unique documents found:', uniqueDocuments.length);
-        
-        // Filter for certificate-type documents and clean data
-        const certificateTypes = ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'];
-        const certificateDocuments = uniqueDocuments.filter(doc => {
-          const isCertificateType = certificateTypes.includes(doc.document_type || '');
-          const isProcessed = (doc.status === 'completed' || doc.status === 'processed');
-          return isCertificateType || isProcessed;
-        });
-        
-        console.log('Certificate documents found:', certificateDocuments.length);
-        
-        const cleanedDocuments = certificateDocuments.map(doc => ({
-          ...doc,
-          extracted_data: doc.extracted_data ? cleanCertificateData(doc.extracted_data) : null
-        }));
-        
-        setDocuments(cleanedDocuments);
-
-      } catch (error) {
-        console.error('Error in patient data fetch:', error);
-        toast.error('Failed to load patient data');
       }
+
+      // Now fetch documents for debugging
+      console.log('=== DOCUMENT STRUCTURE ANALYSIS ===');
+      console.log('Patient ID:', patientId);
+      console.log('Patient ID Number:', patientData.id_number);
+      console.log('Organization ID:', organizationId);
+      console.log('Client Organization ID:', clientOrganizationId);
+
+      // Get a few sample documents to analyze their structure
+      const { data: sampleDocs, error: sampleError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('client_organization_id', clientOrganizationId)
+        .in('status', ['processed', 'completed'])
+        .limit(3)
+        .order('created_at', { ascending: false });
+
+      if (sampleError) {
+        console.error('Error fetching sample documents:', sampleError);
+      } else if (sampleDocs && sampleDocs.length > 0) {
+        console.log(`📋 Analyzing structure of ${sampleDocs.length} sample documents:`);
+        
+        sampleDocs.forEach((doc, index) => {
+          console.log(`\n🔍 Document ${index + 1}: ${doc.file_name}`);
+          console.log(`📄 Document type: ${doc.document_type}`);
+          console.log(`📊 Status: ${doc.status}`);
+          
+          if (doc.extracted_data) {
+            console.log('📦 Full extracted_data structure:');
+            console.log(JSON.stringify(doc.extracted_data, null, 2));
+            
+            // Check for different possible locations of structured data
+            console.log('\n🔍 Checking for structured data locations:');
+            console.log('- extracted_data.structured_data exists:', !!doc.extracted_data.structured_data);
+            console.log('- extracted_data.certificate_info exists:', !!doc.extracted_data.certificate_info);
+            console.log('- extracted_data.patient exists:', !!doc.extracted_data.patient);
+            console.log('- extracted_data.chunks exists:', !!doc.extracted_data.chunks);
+            console.log('- extracted_data.raw_content exists:', !!doc.extracted_data.raw_content);
+            
+            // If structured_data exists, show its structure
+            if (doc.extracted_data.structured_data) {
+              console.log('📋 structured_data content:');
+              console.log(JSON.stringify(doc.extracted_data.structured_data, null, 2));
+            }
+            
+            // If certificate_info exists, show its structure
+            if (doc.extracted_data.certificate_info) {
+              console.log('📋 certificate_info content:');
+              console.log(JSON.stringify(doc.extracted_data.certificate_info, null, 2));
+            }
+            
+            // Check chunks for content
+            if (doc.extracted_data.chunks && Array.isArray(doc.extracted_data.chunks)) {
+              console.log(`📄 Found ${doc.extracted_data.chunks.length} chunks`);
+              const chunksWithContent = doc.extracted_data.chunks.filter(chunk => chunk.content && chunk.content.trim() !== '');
+              console.log(`📄 Chunks with actual content: ${chunksWithContent.length}`);
+              
+              if (chunksWithContent.length > 0) {
+                console.log('📄 Sample content from first chunk:');
+                console.log(chunksWithContent[0].content.substring(0, 200) + '...');
+              }
+            }
+          } else {
+            console.log('❌ No extracted_data found for this document');
+          }
+        });
+      }
+
+      // For now, just show empty results while we analyze
+      setDocuments([]);
 
     } catch (error) {
       console.error('Error in fetchData:', error);
@@ -279,44 +197,29 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Medical Certificates
+            Medical Certificates - Debug Mode
           </CardTitle>
           <CardDescription>
-            Medical certificates and fitness documentation for {patient?.first_name} {patient?.last_name}
+            Analyzing document structure for {patient?.first_name} {patient?.last_name}
             {clientOrganization && ` from ${clientOrganization.name}`}
+            <br />
+            <strong>Check the browser console for detailed document structure analysis</strong>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {documents.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Certificates Found</h3>
-              <p className="text-muted-foreground">
-                No medical certificates have been found for this patient.
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Patient: {patient?.first_name} {patient?.last_name} (ID: {patient?.id_number})
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Searched in: {clientOrganization?.name || 'Unknown Organization'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-sm text-muted-foreground mb-4">
-                Found {documents.length} certificate{documents.length !== 1 ? 's' : ''} for ID number: {patient?.id_number}
-              </div>
-              {documents.map((doc) => (
-                <DocumentItem
-                  key={doc.id}
-                  document={doc}
-                  onView={handleView}
-                  onDownload={handleDownload}
-                  showCertificateInfo={true}
-                />
-              ))}
-            </div>
-          )}
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Debug Mode Active</h3>
+            <p className="text-muted-foreground">
+              Please check the browser console to see the detailed analysis of document structures.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Patient: {patient?.first_name} {patient?.last_name} (ID: {patient?.id_number})
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Looking for documents in: {clientOrganization?.name || 'Unknown Organization'}
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
