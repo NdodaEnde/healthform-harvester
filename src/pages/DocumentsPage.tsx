@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrphanedDocumentFixer } from '@/components/OrphanedDocumentFixer';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Upload, Trash2, CheckCircle, AlertCircle, Eye, Filter, Search, LayoutGrid, LayoutList, Shield, Lock, Database, FileCheck } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -38,11 +38,14 @@ const DocumentsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [documentTypeFilter, setDocumentTypeFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [itemsPerPage] = useState(9);
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [deletingDocuments, setDeletingDocuments] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+  
+  // Get current page from URL search params, default to 1
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
   
   const { 
     currentOrganization, 
@@ -286,7 +289,8 @@ const DocumentsPage = () => {
   };
 
   const handleViewDocument = (documentId: string) => {
-    navigate(`/documents/${documentId}`);
+    // Preserve current page in URL when navigating to document details
+    navigate(`/documents/${documentId}?returnPage=${currentPage}`);
   };
 
   const updateDocumentReviewStatus = (documentId: string, reviewStatus: ReviewStatus, reviewNote?: string) => {
@@ -329,6 +333,24 @@ const DocumentsPage = () => {
   // Only show upload button if we have an organization context
   const canUpload = !!organizationId;
 
+  // Function to handle page changes with URL updates
+  const handlePageChange = (page: number) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('page', page.toString());
+      return newParams;
+    });
+  };
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('page', '1');
+      return newParams;
+    });
+  }, [searchTerm, statusFilter, documentTypeFilter, setSearchParams]);
+
   // Function to generate pagination links
   const generatePaginationItems = () => {
     const items = [];
@@ -338,7 +360,7 @@ const DocumentsPage = () => {
       <PaginationItem key="first">
         <PaginationLink 
           isActive={currentPage === 1} 
-          onClick={() => setCurrentPage(1)}
+          onClick={() => handlePageChange(1)}
         >
           1
         </PaginationLink>
@@ -360,7 +382,7 @@ const DocumentsPage = () => {
         <PaginationItem key={i}>
           <PaginationLink 
             isActive={currentPage === i} 
-            onClick={() => setCurrentPage(i)}
+            onClick={() => handlePageChange(i)}
           >
             {i}
           </PaginationLink>
@@ -383,7 +405,7 @@ const DocumentsPage = () => {
         <PaginationItem key="last">
           <PaginationLink 
             isActive={currentPage === totalPages} 
-            onClick={() => setCurrentPage(totalPages)}
+            onClick={() => handlePageChange(totalPages)}
           >
             {totalPages}
           </PaginationLink>
@@ -722,7 +744,11 @@ const DocumentsPage = () => {
                       value={searchTerm}
                       onChange={(e) => {
                         setSearchTerm(e.target.value);
-                        setCurrentPage(1); // Reset to first page on new search
+                        setSearchParams(prev => {
+                          const newParams = new URLSearchParams(prev);
+                          newParams.set('page', '1');
+                          return newParams;
+                        });
                       }}
                     />
                   </div>
@@ -732,7 +758,11 @@ const DocumentsPage = () => {
                     value={statusFilter} 
                     onValueChange={(value) => {
                       setStatusFilter(value);
-                      setCurrentPage(1); // Reset to first page on new filter
+                      setSearchParams(prev => {
+                        const newParams = new URLSearchParams(prev);
+                        newParams.set('page', '1');
+                        return newParams;
+                      });
                     }}
                   >
                     <SelectTrigger>
@@ -755,7 +785,11 @@ const DocumentsPage = () => {
                     value={documentTypeFilter} 
                     onValueChange={(value) => {
                       setDocumentTypeFilter(value);
-                      setCurrentPage(1); // Reset to first page on new filter
+                      setSearchParams(prev => {
+                        const newParams = new URLSearchParams(prev);
+                        newParams.set('page', '1');
+                        return newParams;
+                      });
                     }}
                   >
                     <SelectTrigger>
@@ -828,7 +862,7 @@ const DocumentsPage = () => {
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious 
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                           className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} 
                         />
                       </PaginationItem>
@@ -837,7 +871,7 @@ const DocumentsPage = () => {
                       
                       <PaginationItem>
                         <PaginationNext 
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                           className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
                         />
                       </PaginationItem>
