@@ -120,6 +120,7 @@ const PatientDetailPage: React.FC = () => {
                 <PatientCertificates 
                   patientId={patient.id} 
                   organizationId={currentOrganization.id} 
+                  clientOrganizationId={patient.client_organization_id}
                 />
               )}
             </TabsContent>

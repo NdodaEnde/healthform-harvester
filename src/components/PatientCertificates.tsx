@@ -50,16 +50,24 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
 
       // Fetch patient-specific documents/certificates
       try {
-        console.log('Fetching certificates for patient:', patientId, 'organization:', organizationId);
+        console.log('Fetching certificates for patient:', patientId, 'organization:', organizationId, 'client org:', clientOrganizationId);
         
-        const { data, error } = await supabase
+        // Build query to check for documents in either organization_id or client_organization_id
+        let query = supabase
           .from('documents')
           .select('*')
           .eq('owner_id', patientId)
-          .eq('organization_id', organizationId)
           .eq('status', 'processed')
-          .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
-          .order('created_at', { ascending: false });
+          .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate']);
+
+        // Add organization filter - check both organization_id and client_organization_id
+        if (clientOrganizationId) {
+          query = query.or(`organization_id.eq.${organizationId},client_organization_id.eq.${clientOrganizationId}`);
+        } else {
+          query = query.eq('organization_id', organizationId);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
           console.error('Error fetching patient certificates:', error);
@@ -67,6 +75,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         }
 
         console.log('Patient certificates found:', data?.length || 0);
+        console.log('Certificates data:', data);
         
         const cleanedDocuments = (data || []).map(doc => ({
           ...doc,
