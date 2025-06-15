@@ -48,13 +48,31 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
         console.error('Error fetching organization:', error);
       }
 
-      // Fetch documents
+      // Fetch patient-specific documents/certificates
       try {
-        const documentsData = await patientDataService.fetchPatientCertificates(organizationId);
-        const cleanedDocuments = documentsData.map(doc => ({
+        console.log('Fetching certificates for patient:', patientId, 'organization:', organizationId);
+        
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('owner_id', patientId)
+          .eq('organization_id', organizationId)
+          .eq('status', 'processed')
+          .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching patient certificates:', error);
+          throw error;
+        }
+
+        console.log('Patient certificates found:', data?.length || 0);
+        
+        const cleanedDocuments = (data || []).map(doc => ({
           ...doc,
           extracted_data: doc.extracted_data ? cleanCertificateData(doc.extracted_data) : null
         }));
+        
         setDocuments(cleanedDocuments);
       } catch (error) {
         console.error('Error fetching documents:', error);
@@ -135,7 +153,7 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
             Medical Certificates
           </CardTitle>
           <CardDescription>
-            Fitness certificates and medical documentation
+            Fitness certificates and medical documentation for {patient?.first_name} {patient?.last_name}
           </CardDescription>
         </CardHeader>
         <CardContent>

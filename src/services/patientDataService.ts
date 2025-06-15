@@ -43,24 +43,25 @@ export const patientDataService = {
     }
   },
 
-  async fetchPatientCertificates(organizationId: string): Promise<DatabaseDocument[]> {
+  async fetchPatientCertificates(patientId: string, organizationId: string): Promise<DatabaseDocument[]> {
     try {
       const { data, error } = await supabase
         .from('documents')
         .select('*')
+        .eq('owner_id', patientId)
         .eq('organization_id', organizationId)
         .eq('status', 'processed')
         .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'])
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching certificates:', error);
+        console.error('Error fetching patient certificates:', error);
         throw error;
       }
 
       return (data || []) as DatabaseDocument[];
     } catch (error) {
-      console.error('Certificates fetch failed:', error);
+      console.error('Patient certificates fetch failed:', error);
       throw error;
     }
   },
