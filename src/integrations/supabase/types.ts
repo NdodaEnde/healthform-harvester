@@ -315,6 +315,13 @@ export type Database = {
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "certificates_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "potentially_mislinked_documents"
+            referencedColumns: ["document_id"]
+          },
         ]
       }
       documents: {
@@ -662,6 +669,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "documents"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: true
+            referencedRelation: "potentially_mislinked_documents"
+            referencedColumns: ["document_id"]
           },
           {
             foreignKeyName: "medical_examinations_organization_id_fkey"
@@ -1167,6 +1181,21 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           name?: string | null
+        }
+        Relationships: []
+      }
+      potentially_mislinked_documents: {
+        Row: {
+          document_id: string | null
+          file_name: string | null
+          filename_id_number: string | null
+          first_name: string | null
+          last_linked: string | null
+          last_name: string | null
+          match_status: string | null
+          owner_id: string | null
+          patient_id_number: string | null
+          surname_patient_count: number | null
         }
         Relationships: []
       }

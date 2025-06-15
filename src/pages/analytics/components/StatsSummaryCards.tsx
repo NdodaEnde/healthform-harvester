@@ -8,39 +8,60 @@ import { Loader2 } from "lucide-react";
 
 interface StatsSummaryCardsProps {
   className?: string;
-  totalDocuments?: number;
-  isLoading?: boolean;
-  fitnessStatuses?: Record<string, number>;
 }
 
-export default function StatsSummaryCards({ 
-  className, 
-  totalDocuments: propsTotalDocuments, 
-  isLoading: propsIsLoading,
-  fitnessStatuses: propsFitnessStatuses 
-}: StatsSummaryCardsProps) {
+export default function StatsSummaryCards({ className }: StatsSummaryCardsProps) {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
   
-  // Fetch data only if not provided via props
+  // Fetch patients data
+  const { data: patientsData, isLoading: isLoadingPatients } = useQuery({
+    queryKey: ['patients-summary', organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('client_organization_id', organizationId);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organizationId,
+  });
+
+  // Fetch documents data
   const { data: documentsData, isLoading: isLoadingDocuments } = useQuery({
     queryKey: ['documents-summary', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('organization_id', organizationId);
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .eq('status', 'processed');
       
       if (error) throw error;
       return data || [];
     },
-    enabled: !!organizationId && propsTotalDocuments === undefined,
+    enabled: !!organizationId,
   });
 
-  // Calculate fitness statuses
-  const calculatedFitnessStatuses = React.useMemo(() => {
-    if (propsFitnessStatuses) return propsFitnessStatuses;
-    
+  // Fetch medical examinations data
+  const { data: examinationsData, isLoading: isLoadingExaminations } = useQuery({
+    queryKey: ['examinations-summary', organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('medical_examinations')
+        .select('*')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organizationId,
+  });
+
+  // Calculate fitness statuses from real data
+  const fitnessStatuses = React.useMemo(() => {
     if (!documentsData) return {
       "Fit": 0,
       "Fit with Restrictions": 0,
@@ -59,34 +80,24 @@ export default function StatsSummaryCards({
     
     documentsData.forEach(doc => {
       try {
-        // Add type checking before accessing properties
         const extractedData = doc.extracted_data;
-        if (!extractedData || typeof extractedData !== 'object') {
+        if (!extractedData || typeof extractedData !== 'object' || Array.isArray(extractedData)) {
           statuses['Unknown']++;
           return;
         }
         
-        // Check if extracted_data is an array
-        if (Array.isArray(extractedData)) {
-          statuses['Unknown']++;
-          return;
-        }
-        
-        // Now we know extractedData is an object type
         const structuredData = extractedData.structured_data;
         if (!structuredData || typeof structuredData !== 'object' || Array.isArray(structuredData)) {
           statuses['Unknown']++;
           return;
         }
         
-        // Check if certification exists and is an object
         const certification = structuredData.certification;
         if (!certification || typeof certification !== 'object' || Array.isArray(certification)) {
           statuses['Unknown']++;
           return;
         }
         
-        // Now safely access the certification data
         if (certification.fit || certification.fit_for_duty) {
           statuses['Fit']++;
         } else if (certification.fit_with_restrictions) {
@@ -104,15 +115,16 @@ export default function StatsSummaryCards({
     });
     
     return statuses;
-  }, [documentsData, propsFitnessStatuses]);
+  }, [documentsData]);
   
-  // Calculate totals
-  const totalDocuments = propsTotalDocuments || documentsData?.length || 0;
-  const totalFit = calculatedFitnessStatuses["Fit"] || 0;
-  const totalWithRestrictions = calculatedFitnessStatuses["Fit with Restrictions"] || 0;
-  const totalMedicalTests = Math.round(totalDocuments * 1.76); // Simple calculation for example
+  // Calculate totals from real data
+  const totalAssessments = documentsData?.length || 0;
+  const totalPatients = patientsData?.length || 0;
+  const totalFit = fitnessStatuses["Fit"] || 0;
+  const totalWithRestrictions = fitnessStatuses["Fit with Restrictions"] || 0;
+  const totalMedicalTests = examinationsData?.length || 0;
   
-  const isLoading = propsIsLoading || isLoadingDocuments;
+  const isLoading = isLoadingPatients || isLoadingDocuments || isLoadingExaminations;
   
   if (isLoading) {
     return (
@@ -133,15 +145,27 @@ export default function StatsSummaryCards({
   }
 
   // Calculate percentages
-  const percentageFit = totalDocuments > 0 ? ((totalFit / totalDocuments) * 100).toFixed(1) + '%' : '0%';
-  const percentageRestrictions = totalDocuments > 0 ? ((totalWithRestrictions / totalDocuments) * 100).toFixed(1) + '%' : '0%';
-  
-  // Sample growth statistics (in a real app, these would be calculated from historical data)
-  const growthAssessments = '+12%';
-  const growthTests = '+8.2%';
+  const percentageFit = totalAssessments > 0 ? ((totalFit / totalAssessments) * 100).toFixed(1) + '%' : '0%';
+  const percentageRestrictions = totalAssessments > 0 ? ((totalWithRestrictions / totalAssessments) * 100).toFixed(1) + '%' : '0%';
 
   return (
     <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 ${className}`}>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
+            Total Patients
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">
+            {totalPatients.toLocaleString()}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Registered patients
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">
@@ -150,10 +174,10 @@ export default function StatsSummaryCards({
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">
-            {totalDocuments.toLocaleString()}
+            {totalAssessments.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {growthAssessments} from previous period
+            Processed documents
           </p>
         </CardContent>
       </Card>
@@ -169,7 +193,7 @@ export default function StatsSummaryCards({
             {totalFit.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {percentageFit} of total
+            {percentageFit} of assessments
           </p>
         </CardContent>
       </Card>
@@ -185,23 +209,7 @@ export default function StatsSummaryCards({
             {totalWithRestrictions.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground">
-            {percentageRestrictions} of total
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">
-            Total Medical Tests
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold">
-            {totalMedicalTests.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {growthTests} from last month
+            {percentageRestrictions} of assessments
           </p>
         </CardContent>
       </Card>
