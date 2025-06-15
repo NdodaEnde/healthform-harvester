@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -51,6 +50,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
         toast.error('Failed to save validated data: ' + error.message);
       } else {
         toast.success('Validated data saved successfully');
+        // Don't call onValidationComplete here to avoid data refresh that might cause issues
         console.log('💾 Save completed successfully');
       }
     } catch (err) {
@@ -74,9 +74,13 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     
     console.log('🎉 Patient record creation completed');
     
+    // Just show success message - don't save again as this might overwrite data
     toast.success('Patient record created successfully!');
     
+    // Optionally refresh the document to show any status updates
+    // but don't trigger a save operation that might clear the template data
     if (onValidationComplete) {
+      // Add a small delay to ensure patient creation is fully complete
       setTimeout(() => {
         onValidationComplete();
       }, 1000);
@@ -233,9 +237,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     return null;
   }
 
-  // Check if document is already linked to a patient
-  const isLinkedToPatient = !!document.owner_id;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -253,12 +254,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
           <Badge variant="outline" className="bg-green-100 text-green-800">
             <Save className="h-3 w-3 mr-1" />
             Saved
-          </Badge>
-        )}
-        {isLinkedToPatient && (
-          <Badge variant="outline" className="bg-purple-100 text-purple-800">
-            <User className="h-3 w-3 mr-1" />
-            Patient Record Created
           </Badge>
         )}
       </div>
@@ -327,7 +322,7 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
         )}
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2">
         <Button 
           onClick={() => onValidationModeChange(true)}
           variant="outline"
