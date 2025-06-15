@@ -762,21 +762,12 @@ const DocumentsPage = () => {
                       placeholder="Search documents by name..."
                       className="pl-8"
                       value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setCurrentPage(1); // Reset to first page on new search
-                      }}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                 </div>
                 <div>
-                  <Select 
-                    value={statusFilter} 
-                    onValueChange={(value) => {
-                      setStatusFilter(value);
-                      setCurrentPage(1); // Reset to first page on new filter
-                    }}
-                  >
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger>
                       <span className="flex items-center gap-2">
                         <Filter className="h-4 w-4" />
@@ -793,13 +784,7 @@ const DocumentsPage = () => {
                   </Select>
                 </div>
                 <div>
-                  <Select 
-                    value={documentTypeFilter} 
-                    onValueChange={(value) => {
-                      setDocumentTypeFilter(value);
-                      setCurrentPage(1); // Reset to first page on new filter
-                    }}
-                  >
+                  <Select value={documentTypeFilter} onValueChange={setDocumentTypeFilter}>
                     <SelectTrigger>
                       <span className="flex items-center gap-2">
                         <Filter className="h-4 w-4" />
