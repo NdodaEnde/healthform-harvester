@@ -1,11 +1,11 @@
+
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { CheckCircle, Edit, User, Settings, Save, Link } from 'lucide-react';
+import { CheckCircle, Edit, User, Settings, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificatePromotionDialog from '../certificates/CertificatePromotionDialog';
-import LinkToPatientDialog from './LinkToPatientDialog';
 import { saveValidatedData } from '@/services/documentValidationService';
 import { toast } from 'sonner';
 import type { DatabaseDocument } from '@/types/database';
@@ -31,7 +31,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 }) => {
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
-  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // 🔧 ENHANCED: Save function that preserves template selection
@@ -66,21 +65,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     if (validatedData && currentOrganization) {
       console.log('🏥 Opening promotion dialog with validated data:', validatedData);
       setIsPromotionDialogOpen(true);
-    }
-  };
-
-  const handleLinkToPatient = () => {
-    setIsLinkDialogOpen(true);
-  };
-
-  const handleLinkComplete = () => {
-    setIsLinkDialogOpen(false);
-    toast.success('Document linked to patient successfully!');
-    
-    if (onValidationComplete) {
-      setTimeout(() => {
-        onValidationComplete();
-      }, 1000);
     }
   };
 
@@ -273,8 +257,8 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
         )}
         {isLinkedToPatient && (
           <Badge variant="outline" className="bg-purple-100 text-purple-800">
-            <Link className="h-3 w-3 mr-1" />
-            Linked to Patient
+            <User className="h-3 w-3 mr-1" />
+            Patient Record Created
           </Badge>
         )}
       </div>
@@ -375,18 +359,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             </Button>
           </>
         )}
-
-        {/* Link to Existing Patient Button */}
-        {!isLinkedToPatient && (
-          <Button 
-            onClick={handleLinkToPatient}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Link className="h-4 w-4" />
-            Link to Patient
-          </Button>
-        )}
       </div>
 
       {isPromotionDialogOpen && validatedData && currentOrganization && (
@@ -400,13 +372,6 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
           onPromotionComplete={handlePromotionComplete}
         />
       )}
-
-      <LinkToPatientDialog
-        isOpen={isLinkDialogOpen}
-        onClose={() => setIsLinkDialogOpen(false)}
-        document={document}
-        onLinked={handleLinkComplete}
-      />
     </div>
   );
 };
