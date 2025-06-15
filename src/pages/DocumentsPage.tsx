@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,7 @@ const DocumentsPage = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCleanupTools, setShowCleanupTools] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [documentTypeFilter, setDocumentTypeFilter] = useState('all');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,6 +50,19 @@ const DocumentsPage = () => {
   // Get the effective organization ID (either client organization if selected, or current organization)
   const organizationId = getEffectiveOrganizationId();
   const contextLabel = currentClient ? currentClient.name : currentOrganization?.name;
+
+  // Debounce search term to avoid triggering queries on every keystroke
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      // Only reset to page 1 when the debounced search term actually changes
+      if (searchTerm !== debouncedSearchTerm && currentPage !== 1) {
+        handlePageChange(1);
+      }
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Debug logging to understand the filtering context
   React.useEffect(() => {
@@ -104,13 +119,13 @@ const DocumentsPage = () => {
 
   // Main documents query with filtering and pagination
   const { data: documents, isLoading, error, refetch } = useQuery({
-    queryKey: ['documents', organizationId, statusFilter, documentTypeFilter, searchTerm, currentPage],
+    queryKey: ['documents', organizationId, statusFilter, documentTypeFilter, debouncedSearchTerm, currentPage],
     queryFn: async () => {
       console.log('🔍 Fetching documents with filters:');
       console.log('Organization ID:', organizationId);
       console.log('Status Filter:', statusFilter);
       console.log('Document Type Filter:', documentTypeFilter);
-      console.log('Search Term:', searchTerm);
+      console.log('Search Term:', debouncedSearchTerm);
       console.log('Current Page:', currentPage);
       
       let query = supabase
@@ -138,9 +153,9 @@ const DocumentsPage = () => {
         query = query.eq('document_type', documentTypeFilter);
       }
       
-      // Apply search filter on file name
-      if (searchTerm) {
-        query = query.ilike('file_name', `%${searchTerm}%`);
+      // Apply search filter on file name using debounced search term
+      if (debouncedSearchTerm) {
+        query = query.ilike('file_name', `%${debouncedSearchTerm}%`);
       }
       
       // Apply pagination
@@ -192,12 +207,10 @@ const DocumentsPage = () => {
     });
   };
 
-  // Handle filter changes and reset to page 1
+  // Handle filter changes and reset to page 1 only for non-search filters
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
-    if (currentPage !== 1) {
-      handlePageChange(1);
-    }
+    // Don't immediately reset page - let the debounce effect handle it
   };
 
   const handleStatusFilterChange = (value: string) => {

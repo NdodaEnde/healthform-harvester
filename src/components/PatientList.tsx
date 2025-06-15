@@ -40,12 +40,22 @@ const PatientList: React.FC<PatientListProps> = ({
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const { getEffectiveOrganizationId } = useOrganization();
   const navigate = useNavigate();
 
   // Get current page from URL search params, default to 1
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
+
+  // Debounce search term to avoid excessive filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchPatients = async () => {
     try {
@@ -130,9 +140,9 @@ const PatientList: React.FC<PatientListProps> = ({
     fetchPatients();
   }, [getEffectiveOrganizationId]);
 
-  // Filter patients based on search term
+  // Filter patients based on debounced search term
   const filteredPatients = patients.filter(patient => {
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = debouncedSearchTerm.toLowerCase();
     return (
       patient.first_name.toLowerCase().includes(searchLower) ||
       patient.last_name.toLowerCase().includes(searchLower) ||
@@ -146,16 +156,16 @@ const PatientList: React.FC<PatientListProps> = ({
   const endIndex = startIndex + PATIENTS_PER_PAGE;
   const currentPatients = filteredPatients.slice(startIndex, endIndex);
 
-  // Reset to first page when search term changes
+  // Reset to first page when debounced search term changes
   useEffect(() => {
-    if (searchTerm) {
+    if (debouncedSearchTerm !== searchTerm && debouncedSearchTerm) {
       setSearchParams(prev => {
         const newParams = new URLSearchParams(prev);
         newParams.set('page', '1');
         return newParams;
       });
     }
-  }, [searchTerm, setSearchParams]);
+  }, [debouncedSearchTerm, setSearchParams]);
 
   const handlePatientClick = (patient: Patient) => {
     if (allowSelection && onSelectPatient) {
