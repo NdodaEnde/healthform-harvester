@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
@@ -71,8 +71,9 @@ const PatientDetailPage: React.FC = () => {
       title: "Document uploaded",
       description: "Document has been successfully uploaded for this patient.",
     });
-    // Refresh any document-related queries if needed
+    // Refresh any document-related queries
     queryClient.invalidateQueries({ queryKey: ['documents', patientId] });
+    queryClient.invalidateQueries({ queryKey: ['patient-certificates', patientId] });
   };
 
   const handleUploadClick = () => {
@@ -102,18 +103,11 @@ const PatientDetailPage: React.FC = () => {
             organizationName={patientOrganization?.name}
           />
           
-          <Tabs defaultValue="visits" className="w-full">
+          <Tabs defaultValue="certificates" className="w-full">
             <TabsList className="mb-4">
-              <TabsTrigger value="visits">Visits</TabsTrigger>
               <TabsTrigger value="certificates">Certificates</TabsTrigger>
+              <TabsTrigger value="visits">Visits</TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="visits" className="space-y-6">
-              <PatientVisits 
-                patientId={patient.id} 
-                organizationId={patient.organization_id || ''} 
-              />
-            </TabsContent>
             
             <TabsContent value="certificates">
               {currentOrganization && (
@@ -123,6 +117,13 @@ const PatientDetailPage: React.FC = () => {
                   clientOrganizationId={patient.client_organization_id}
                 />
               )}
+            </TabsContent>
+            
+            <TabsContent value="visits" className="space-y-6">
+              <PatientVisits 
+                patientId={patient.id} 
+                organizationId={patient.organization_id || ''} 
+              />
             </TabsContent>
           </Tabs>
 

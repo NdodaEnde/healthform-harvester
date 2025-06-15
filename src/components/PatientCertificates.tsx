@@ -1,10 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cleanCertificateData } from '@/utils/certificate-data-cleaner';
-import { patientDataService } from '@/services/patientDataService';
 import type { DatabasePatient, DatabaseDocument, DatabaseOrganization } from '@/types/database';
 import DocumentItem from '@/components/documents/DocumentItem';
 
@@ -30,79 +30,65 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
       
       // Fetch patient data
       try {
-        const patientData = await patientDataService.fetchPatient(patientId);
-        setPatient(patientData);
-        console.log('Patient data loaded:', patientData);
+        const { data: patientData, error: patientError } = await supabase
+          .from('patients')
+          .select('*')
+          .eq('id', patientId)
+          .single();
+
+        if (patientError) {
+          console.error('Error fetching patient:', patientError);
+          toast.error('Failed to load patient information');
+        } else {
+          setPatient(patientData);
+          console.log('Patient data loaded:', patientData);
+        }
       } catch (error) {
         console.error('Error fetching patient:', error);
         toast.error('Failed to load patient information');
       }
 
-      // Fetch client organization data (the organization the patient belongs to)
+      // Fetch client organization data if available
       if (clientOrganizationId) {
         try {
-          const clientOrgData = await patientDataService.fetchOrganization(clientOrganizationId);
-          setClientOrganization(clientOrgData);
-          console.log('Client organization data loaded:', clientOrgData);
+          const { data: clientOrgData, error: orgError } = await supabase
+            .from('organizations')
+            .select('*')
+            .eq('id', clientOrganizationId)
+            .single();
+
+          if (orgError) {
+            console.error('Error fetching client organization:', orgError);
+          } else {
+            setClientOrganization(clientOrgData);
+            console.log('Client organization data loaded:', clientOrgData);
+          }
         } catch (error) {
           console.error('Error fetching client organization:', error);
         }
       }
 
-      // First, let's see ALL documents for this patient to debug
+      // Fetch all certificates/documents for this patient
       try {
-        console.log('=== DEBUGGING: Checking all documents for patient ===');
-        const { data: allDocs, error: allDocsError } = await supabase
+        console.log('=== FETCHING PATIENT CERTIFICATES ===');
+        console.log('Patient ID:', patientId);
+        console.log('Organization ID:', organizationId);
+        console.log('Client Organization ID:', clientOrganizationId);
+        
+        // Build the main query for patient documents
+        let query = supabase
           .from('documents')
           .select('*')
           .eq('owner_id', patientId);
 
-        if (allDocsError) {
-          console.error('Error fetching all patient documents:', allDocsError);
-        } else {
-          console.log('ALL documents for patient:', allDocs);
-          console.log('Total documents found:', allDocs?.length || 0);
-          
-          if (allDocs && allDocs.length > 0) {
-            allDocs.forEach((doc, index) => {
-              console.log(`Document ${index + 1}:`, {
-                id: doc.id,
-                file_name: doc.file_name,
-                document_type: doc.document_type,
-                status: doc.status,
-                organization_id: doc.organization_id,
-                client_organization_id: doc.client_organization_id,
-                owner_id: doc.owner_id
-              });
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error in debug query:', error);
-      }
-
-      // Now fetch patient-specific documents/certificates with the original query
-      try {
-        console.log('=== MAIN QUERY ===');
-        console.log('Fetching certificates for patient:', patientId);
-        console.log('Service provider organization:', organizationId);
-        console.log('Client organization:', clientOrganizationId);
-        
-        // Build query to check for documents in either organization_id or client_organization_id
-        let query = supabase
-          .from('documents')
-          .select('*')
-          .eq('owner_id', patientId)
-          .eq('status', 'processed')
-          .in('document_type', ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate']);
-
-        // Add organization filter - check both organization_id and client_organization_id
+        // Add organization filter - look in both organization_id and client_organization_id
         if (clientOrganizationId) {
           query = query.or(`organization_id.eq.${organizationId},client_organization_id.eq.${clientOrganizationId}`);
         } else {
           query = query.eq('organization_id', organizationId);
         }
 
+        // Order by creation date (most recent first)
         const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
@@ -110,37 +96,25 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
           throw error;
         }
 
-        console.log('Patient certificates found with main query:', data?.length || 0);
-        console.log('Certificates data:', data);
+        console.log('Raw documents found:', data?.length || 0);
+        console.log('Documents data:', data);
         
-        // If no results, let's try a more relaxed query to see what we can find
-        if (!data || data.length === 0) {
-          console.log('=== RELAXED QUERY (no status/type filter) ===');
-          let relaxedQuery = supabase
-            .from('documents')
-            .select('*')
-            .eq('owner_id', patientId);
-
-          if (clientOrganizationId) {
-            relaxedQuery = relaxedQuery.or(`organization_id.eq.${organizationId},client_organization_id.eq.${clientOrganizationId}`);
-          } else {
-            relaxedQuery = relaxedQuery.eq('organization_id', organizationId);
-          }
-
-          const { data: relaxedData, error: relaxedError } = await relaxedQuery.order('created_at', { ascending: false });
-
-          if (!relaxedError) {
-            console.log('Relaxed query results:', relaxedData?.length || 0);
-            console.log('Relaxed query data:', relaxedData);
-          }
-        }
+        // Filter for certificate-type documents and clean data
+        const certificateTypes = ['certificate-fitness', 'certificate', 'medical-certificate', 'fitness-certificate'];
+        const certificateDocuments = (data || []).filter(doc => 
+          certificateTypes.includes(doc.document_type || '') ||
+          (doc.status === 'completed' || doc.status === 'processed')
+        );
         
-        const cleanedDocuments = (data || []).map(doc => ({
+        console.log('Certificate documents found:', certificateDocuments.length);
+        
+        const cleanedDocuments = certificateDocuments.map(doc => ({
           ...doc,
           extracted_data: doc.extracted_data ? cleanCertificateData(doc.extracted_data) : null
         }));
         
         setDocuments(cleanedDocuments);
+
       } catch (error) {
         console.error('Error fetching documents:', error);
         toast.error('Failed to load certificates');
@@ -217,7 +191,8 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
             Medical Certificates
           </CardTitle>
           <CardDescription>
-            Fitness certificates and medical documentation for {patient?.first_name} {patient?.last_name}
+            Medical certificates and fitness documentation for {patient?.first_name} {patient?.last_name}
+            {clientOrganization && ` from ${clientOrganization.name}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -226,14 +201,17 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Certificates Found</h3>
               <p className="text-muted-foreground">
-                No medical certificates have been uploaded for this patient yet.
+                No medical certificates have been processed for this patient yet.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Check the browser console for debugging information about available documents.
+                Patient ID: {patientId} | Organization: {organizationId}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="text-sm text-muted-foreground mb-4">
+                Found {documents.length} certificate{documents.length !== 1 ? 's' : ''}
+              </div>
               {documents.map((doc) => (
                 <DocumentItem
                   key={doc.id}
