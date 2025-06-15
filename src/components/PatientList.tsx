@@ -159,15 +159,22 @@ const PatientList: React.FC<PatientListProps> = ({
 
   // Helper function to get the correct birthdate for display
   const getDisplayBirthdate = (patient: Patient): string => {
-    // Use birthdate_from_id if available, otherwise fall back to date_of_birth
+    // Prioritize birthdate_from_id (corrected birthdate) over date_of_birth
     const displayDate = patient.birthdate_from_id || patient.date_of_birth;
-    return new Date(displayDate).toLocaleDateString();
+    if (!displayDate) return 'Not specified';
+    
+    try {
+      return new Date(displayDate).toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting date:', displayDate, error);
+      return 'Invalid date';
+    }
   };
 
   // Helper function to get the correct gender for display
-  const getDisplayGender = (patient: Patient): string | undefined => {
-    // Use gender_from_id if available, otherwise fall back to gender
-    return patient.gender_from_id || patient.gender;
+  const getDisplayGender = (patient: Patient): string => {
+    // Prioritize gender_from_id (from ID number) over gender field
+    return patient.gender_from_id || patient.gender || 'Not specified';
   };
 
   if (loading) {
@@ -244,9 +251,7 @@ const PatientList: React.FC<PatientListProps> = ({
                           <span>ID: {patient.id_number}</span>
                         )}
                         <span>DOB: {getDisplayBirthdate(patient)}</span>
-                        {getDisplayGender(patient) && (
-                          <Badge variant="outline">{getDisplayGender(patient)}</Badge>
-                        )}
+                        <Badge variant="outline">{getDisplayGender(patient)}</Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
