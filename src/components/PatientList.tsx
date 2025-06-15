@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -162,6 +161,12 @@ const PatientList: React.FC<PatientListProps> = ({
     return new Date(displayDate).toLocaleDateString();
   };
 
+  // Helper function to get the correct gender for display
+  const getDisplayGender = (patient: Patient): string | undefined => {
+    // Use gender_from_id if available, otherwise fall back to gender
+    return patient.gender_from_id || patient.gender;
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -236,8 +241,8 @@ const PatientList: React.FC<PatientListProps> = ({
                           <span>ID: {patient.id_number}</span>
                         )}
                         <span>DOB: {getDisplayBirthdate(patient)}</span>
-                        {patient.gender && (
-                          <Badge variant="outline">{patient.gender}</Badge>
+                        {getDisplayGender(patient) && (
+                          <Badge variant="outline">{getDisplayGender(patient)}</Badge>
                         )}
                       </div>
                     </div>

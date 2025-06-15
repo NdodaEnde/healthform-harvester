@@ -36,6 +36,9 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient }) => {
 
   // Use birthdate_from_id if available, otherwise fall back to date_of_birth
   const displayBirthdate = patient.birthdate_from_id || patient.date_of_birth;
+  
+  // Use gender_from_id if available, otherwise fall back to gender
+  const displayGender = patient.gender_from_id || patient.gender;
 
   return (
     <Card>
@@ -57,10 +60,10 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient }) => {
             </span>
           </div>
           
-          {patient.gender && (
+          {displayGender && (
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Gender: {patient.gender}</span>
+              <span className="text-sm">Gender: {displayGender}</span>
             </div>
           )}
           
