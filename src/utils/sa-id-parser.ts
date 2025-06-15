@@ -74,13 +74,11 @@ const isValidDateYYMMDD = (dateStr: string): boolean => {
 
 /**
  * Determines the full year from a 2-digit year
- * Assumes 00-24 is 2000-2024, 25-99 is 1925-1999
+ * Pivot at 25: 00-24 is 2000-2024, 25-99 is 1925-1999
  */
 const getFullYear = (twoDigitYear: number): number => {
-  // Current pivot point
-  const pivotYear = 25;
-  
-  if (twoDigitYear < pivotYear) {
+  // Pivot point at 25
+  if (twoDigitYear < 25) {
     return 2000 + twoDigitYear;
   } else {
     return 1900 + twoDigitYear;
@@ -119,10 +117,13 @@ export const parseSouthAfricanIDNumber = (idNumber: string): SouthAfricanIDData 
     return { isValid: false };
   }
   
-  // Extract and process birth date
-  const year = getFullYear(parseInt(dobString.substring(0, 2)));
+  // Extract and process birth date using corrected algorithm
+  const twoDigitYear = parseInt(dobString.substring(0, 2));
+  const year = getFullYear(twoDigitYear);
   const month = parseInt(dobString.substring(2, 4)) - 1; // JS months are 0-indexed
   const day = parseInt(dobString.substring(4, 6));
+  
+  // Create date directly with the extracted values (no off-by-one error)
   const birthDate = new Date(year, month, day);
   
   // Extract gender

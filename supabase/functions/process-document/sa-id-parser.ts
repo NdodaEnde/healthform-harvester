@@ -1,4 +1,3 @@
-
 /**
  * South African ID Number Parser
  * 
@@ -76,33 +75,32 @@ function extractBirthdate(idNumber: string): string | null {
   const month = idNumber.substring(2, 4);
   const day = idNumber.substring(4, 6);
 
-  // Determine century - South African ID numbers use a 2-digit year
-  // so we need to determine if it's 19xx or 20xx
-  const currentYear = new Date().getFullYear();
-  const centuryPrefix = parseInt(year, 10) > (currentYear % 100) ? "19" : "20";
-  const fullYear = centuryPrefix + year;
-
   // Validate date components
   const monthInt = parseInt(month, 10);
   const dayInt = parseInt(day, 10);
+  const yearInt = parseInt(year, 10);
 
   if (monthInt < 1 || monthInt > 12 || dayInt < 1 || dayInt > 31) {
     return null;
   }
 
-  // Create the date object using the correct constructor
-  // Month in Date constructor is 0-based (0 = January, 11 = December)
-  const dateObj = new Date(parseInt(fullYear, 10), monthInt - 1, dayInt);
+  // Determine century - pivot at 25: 00-24 = 2000s, 25-99 = 1900s
+  const fullYear = yearInt < 25 ? 2000 + yearInt : 1900 + yearInt;
+
+  // Create the date string in ISO format (YYYY-MM-DD)
+  const dateString = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   
-  // Verify the date is valid and matches what we expect
-  if (dateObj.getFullYear() !== parseInt(fullYear, 10) || 
-      dateObj.getMonth() !== monthInt - 1 || 
+  // Validate the constructed date by creating a Date object
+  const dateObj = new Date(dateString);
+  
+  // Check if the date is valid and matches our input
+  if (dateObj.getFullYear() !== fullYear || 
+      dateObj.getMonth() + 1 !== monthInt || 
       dateObj.getDate() !== dayInt) {
     return null;
   }
 
-  // Format as ISO date string (YYYY-MM-DD)
-  return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  return dateString;
 }
 
 /**
