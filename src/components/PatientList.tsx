@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Plus, Search, Users, Edit, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +29,8 @@ interface PatientListProps {
   allowEdit?: boolean;
 }
 
+const PATIENTS_PER_PAGE = 10;
+
 const PatientList: React.FC<PatientListProps> = ({
   onSelectPatient,
   onEditPatient,
@@ -38,6 +40,7 @@ const PatientList: React.FC<PatientListProps> = ({
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const { getEffectiveOrganizationId } = useOrganization();
   const navigate = useNavigate();
 
@@ -124,6 +127,7 @@ const PatientList: React.FC<PatientListProps> = ({
     fetchPatients();
   }, [getEffectiveOrganizationId]);
 
+  // Filter patients based on search term
   const filteredPatients = patients.filter(patient => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -132,6 +136,17 @@ const PatientList: React.FC<PatientListProps> = ({
       (patient.id_number && patient.id_number.toLowerCase().includes(searchLower))
     );
   });
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * PATIENTS_PER_PAGE;
+  const endIndex = startIndex + PATIENTS_PER_PAGE;
+  const currentPatients = filteredPatients.slice(startIndex, endIndex);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const handlePatientClick = (patient: Patient) => {
     if (allowSelection && onSelectPatient) {
@@ -155,6 +170,10 @@ const PatientList: React.FC<PatientListProps> = ({
 
   const handleAddPatient = () => {
     navigate('/patients/new');
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   // Helper function to get the correct birthdate for display
@@ -218,7 +237,12 @@ const PatientList: React.FC<PatientListProps> = ({
             </div>
           </div>
 
-          {filteredPatients.length === 0 ? (
+          {/* Patient count and pagination info */}
+          <div className="mb-4 text-sm text-muted-foreground">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredPatients.length)} of {filteredPatients.length} patients
+          </div>
+
+          {currentPatients.length === 0 ? (
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">
@@ -232,51 +256,91 @@ const PatientList: React.FC<PatientListProps> = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredPatients.map((patient) => (
-                <div 
-                  key={patient.id} 
-                  className={`border rounded-lg p-4 transition-colors ${
-                    allowSelection ? 'hover:bg-accent cursor-pointer' : ''
-                  }`}
-                  onClick={() => handlePatientClick(patient)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium">
-                        {patient.first_name} {patient.last_name}
-                      </h4>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        {patient.id_number && (
-                          <span>ID: {patient.id_number}</span>
-                        )}
-                        <span>DOB: {getDisplayBirthdate(patient)}</span>
-                        <Badge variant="outline">{getDisplayGender(patient)}</Badge>
+            <>
+              <div className="space-y-4">
+                {currentPatients.map((patient) => (
+                  <div 
+                    key={patient.id} 
+                    className={`border rounded-lg p-4 transition-colors ${
+                      allowSelection ? 'hover:bg-accent cursor-pointer' : ''
+                    }`}
+                    onClick={() => handlePatientClick(patient)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium">
+                          {patient.first_name} {patient.last_name}
+                        </h4>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                          {patient.id_number && (
+                            <span>ID: {patient.id_number}</span>
+                          )}
+                          <span>DOB: {getDisplayBirthdate(patient)}</span>
+                          <Badge variant="outline">{getDisplayGender(patient)}</Badge>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={(e) => handleViewClick(e, patient)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      {allowEdit && (
+                      <div className="flex items-center gap-2">
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={(e) => handleEditClick(e, patient)}
+                          onClick={(e) => handleViewClick(e, patient)}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
                         </Button>
-                      )}
+                        {allowEdit && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => handleEditClick(e, patient)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-6 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      
+                      {[...Array(totalPages)].map((_, index) => {
+                        const page = index + 1;
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
