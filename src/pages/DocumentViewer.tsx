@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import type { DatabaseDocument } from '@/types/database';
 export default function DocumentViewer() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [document, setDocument] = useState<DatabaseDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -357,6 +358,17 @@ export default function DocumentViewer() {
     }
   };
 
+  const handleBackClick = () => {
+    const returnPage = searchParams.get('returnPage');
+    if (returnPage) {
+      // Navigate back to documents page with the preserved page number
+      navigate(`/documents?page=${returnPage}`);
+    } else {
+      // Fallback to browser back if no returnPage is specified
+      navigate(-1);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -372,7 +384,7 @@ export default function DocumentViewer() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
+          <Button variant="ghost" onClick={handleBackClick}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -399,7 +411,7 @@ export default function DocumentViewer() {
 
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
+        <Button variant="ghost" onClick={handleBackClick}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
