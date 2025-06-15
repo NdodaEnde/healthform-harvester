@@ -10,7 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
-import { CheckCircleIcon, AlertCircleIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { CheckCircleIcon, AlertCircleIcon, Loader2 } from "lucide-react";
 
 interface TestTypeBreakdownCardProps {
   className?: string;
@@ -24,164 +27,114 @@ export default function TestTypeBreakdownCard({
   description = "Detailed breakdown of medical examination tests by category",
 }: TestTypeBreakdownCardProps) {
   const [activeTab, setActiveTab] = useState<
-    "mandatory" | "specialized" | "follow-up"
-  >("mandatory");
+    "all" | "recent" | "follow-up"
+  >("all");
 
-  // Sample data for different test categories
-  const mandatoryTests = [
-    {
-      name: "Vision Assessment",
-      count: 1248,
-      completion: 98,
-      status: "high",
-      description: "Visual acuity, color vision, depth perception",
-    },
-    {
-      name: "Hearing Test",
-      count: 1156,
-      completion: 95,
-      status: "high",
-      description: "Audiometry, speech discrimination",
-    },
-    {
-      name: "Lung Function",
-      count: 987,
-      completion: 92,
-      status: "high",
-      description: "Spirometry, peak flow measurement",
-    },
-    {
-      name: "Blood Pressure",
-      count: 876,
-      completion: 99,
-      status: "high",
-      description: "Systolic and diastolic measurements",
-    },
-    {
-      name: "Drug Screen",
-      count: 945,
-      completion: 96,
-      status: "high",
-      description: "Substance detection and analysis",
-    },
-    {
-      name: "Working at Heights",
-      count: 823,
-      completion: 94,
-      status: "high",
-      description: "Balance, vertigo and spatial awareness",
-    },
-    {
-      name: "BMI Assessment",
-      count: 754,
-      completion: 97,
-      status: "high",
-      description: "Height, weight, body mass calculation",
-    },
-  ];
+  const { getEffectiveOrganizationId } = useOrganization();
+  const organizationId = getEffectiveOrganizationId();
 
-  const specializedTests = [
-    {
-      name: "Chest X-Ray",
-      count: 543,
-      completion: 87,
-      status: "medium",
-      description: "Pulmonary function assessment",
+  // Fetch documents with extracted medical test data
+  const { data: documentsData, isLoading } = useQuery({
+    queryKey: ['documents-test-breakdown', organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('extracted_data, created_at, status')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .eq('status', 'processed')
+        .not('extracted_data', 'is', null);
+      
+      if (error) throw error;
+      return data || [];
     },
-    {
-      name: "ECG",
-      count: 487,
-      completion: 85,
-      status: "medium",
-      description: "Cardiac electrical activity",
-    },
-    {
-      name: "Blood Tests",
-      count: 632,
-      completion: 90,
-      status: "high",
-      description: "Complete blood count, lipid profile",
-    },
-    {
-      name: "Drug Screen (Extended)",
-      count: 428,
-      completion: 88,
-      status: "medium",
-      description: "Comprehensive substance panel",
-    },
-    {
-      name: "Urinalysis",
-      count: 598,
-      completion: 88,
-      status: "medium",
-      description: "Kidney function, diabetes screening",
-    },
-    {
-      name: "Liver Function",
-      count: 412,
-      completion: 82,
-      status: "medium",
-      description: "AST, ALT, bilirubin levels",
-    },
-  ];
+    enabled: !!organizationId,
+  });
 
-  const followUpTests = [
-    {
-      name: "Repeat Vision",
-      count: 187,
-      completion: 76,
-      status: "medium",
-      description: "Follow-up for borderline results",
-    },
-    {
-      name: "Repeat Hearing",
-      count: 156,
-      completion: 72,
-      status: "medium",
-      description: "Confirmation of hearing thresholds",
-    },
-    {
-      name: "Extended Lung Function",
-      count: 134,
-      completion: 68,
-      status: "low",
-      description: "Detailed respiratory assessment",
-    },
-    {
-      name: "Heights Reassessment",
-      count: 112,
-      completion: 70,
-      status: "medium",
-      description: "Detailed balance and vertigo testing",
-    },
-    {
-      name: "Stress ECG",
-      count: 98,
-      completion: 65,
-      status: "low",
-      description: "Cardiac function under exertion",
-    },
-    {
-      name: "Specialist Referrals",
-      count: 76,
-      completion: 58,
-      status: "low",
-      description: "Ophthalmology, cardiology, pulmonology",
-    },
-  ];
+  // Process documents to extract test type information
+  const testTypes = React.useMemo(() => {
+    if (!documentsData) return [];
 
-  const getActiveTests = () => {
-    switch (activeTab) {
-      case "mandatory":
-        return mandatoryTests;
-      case "specialized":
-        return specializedTests;
-      case "follow-up":
-        return followUpTests;
-      default:
-        return mandatoryTests;
-    }
-  };
+    const testCounts: { [key: string]: { total: number, completed: number, required: boolean } } = {};
+
+    documentsData.forEach(doc => {
+      try {
+        const extractedData = doc.extracted_data;
+        if (!extractedData || typeof extractedData !== 'object') return;
+
+        const structuredData = (extractedData as any).structured_data;
+        if (!structuredData || typeof structuredData !== 'object') return;
+
+        // Check various test types in the structured data
+        const tests = structuredData.tests || structuredData.medical_tests || {};
+        
+        // Common test types to look for
+        const testTypeMapping = {
+          'vision': ['vision', 'visual_acuity', 'eye_test'],
+          'hearing': ['hearing', 'audiometry', 'audio'],
+          'lung_function': ['lung', 'spirometry', 'respiratory'],
+          'blood_pressure': ['blood_pressure', 'bp', 'cardiovascular'],
+          'drug_screen': ['drug', 'substance', 'alcohol'],
+          'heights': ['height', 'working_at_heights', 'vertigo'],
+          'bmi': ['bmi', 'weight', 'body_mass'],
+          'chest_xray': ['chest', 'xray', 'x_ray'],
+          'ecg': ['ecg', 'ekg', 'cardiac'],
+          'blood_tests': ['blood_test', 'blood_work', 'laboratory']
+        };
+
+        Object.entries(testTypeMapping).forEach(([testType, keywords]) => {
+          const testData = keywords.find(keyword => tests[keyword] !== undefined);
+          
+          if (testData || keywords.some(keyword => 
+            JSON.stringify(structuredData).toLowerCase().includes(keyword)
+          )) {
+            if (!testCounts[testType]) {
+              testCounts[testType] = { total: 0, completed: 0, required: true };
+            }
+            testCounts[testType].total++;
+            
+            // Check if test was completed/passed
+            const testResult = tests[testData || keywords[0]];
+            if (testResult && (
+              testResult === 'pass' || 
+              testResult === 'normal' || 
+              testResult === 'completed' ||
+              (typeof testResult === 'object' && testResult.status === 'completed')
+            )) {
+              testCounts[testType].completed++;
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error('Error processing document for test breakdown:', err);
+      }
+    });
+
+    return Object.entries(testCounts).map(([name, data]) => ({
+      name: name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      count: data.total,
+      completion: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,
+      status: data.completion >= 90 ? 'high' : data.completion >= 75 ? 'medium' : 'low',
+      description: getTestDescription(name)
+    })).sort((a, b) => b.count - a.count);
+
+  }, [documentsData]);
+
+  function getTestDescription(testType: string): string {
+    const descriptions: { [key: string]: string } = {
+      'vision': 'Visual acuity, color vision, depth perception',
+      'hearing': 'Audiometry, speech discrimination',
+      'lung_function': 'Spirometry, peak flow measurement',
+      'blood_pressure': 'Systolic and diastolic measurements',
+      'drug_screen': 'Substance detection and analysis',
+      'heights': 'Balance, vertigo and spatial awareness',
+      'bmi': 'Height, weight, body mass calculation',
+      'chest_xray': 'Pulmonary function assessment',
+      'ecg': 'Cardiac electrical activity',
+      'blood_tests': 'Complete blood count, lipid profile'
+    };
+    return descriptions[testType] || 'Medical assessment';
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -191,40 +144,68 @@ export default function TestTypeBreakdownCard({
             variant="outline"
             className="bg-green-50 text-green-700 border-green-200"
           >
-            <CheckCircleIcon className="mr-1 h-3 w-3" /> High Priority
+            <CheckCircleIcon className="mr-1 h-3 w-3" /> High Completion
           </Badge>
         );
-
       case "medium":
         return (
           <Badge
             variant="outline"
             className="bg-yellow-50 text-yellow-700 border-yellow-200"
           >
-            <AlertCircleIcon className="mr-1 h-3 w-3" /> Medium Priority
+            <AlertCircleIcon className="mr-1 h-3 w-3" /> Medium Completion
           </Badge>
         );
-
       case "low":
         return (
           <Badge
             variant="outline"
-            className="bg-blue-50 text-blue-700 border-blue-200"
+            className="bg-red-50 text-red-700 border-red-200"
           >
-            <AlertCircleIcon className="mr-1 h-3 w-3" /> Low Priority
+            <AlertCircleIcon className="mr-1 h-3 w-3" /> Low Completion
           </Badge>
         );
-
       default:
         return null;
     }
   };
 
   const getProgressColor = (completion: number) => {
-    if (completion >= 90) return "var(--chart-2)";
-    if (completion >= 75) return "var(--chart-3)";
-    return "var(--chart-5)";
+    if (completion >= 90) return "hsl(var(--chart-2))";
+    if (completion >= 75) return "hsl(var(--chart-3))";
+    return "hsl(var(--chart-5))";
   };
+
+  if (isLoading) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading Test Breakdown...
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-12 bg-muted rounded animate-pulse"></div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const filteredTests = testTypes.filter(test => {
+    switch (activeTab) {
+      case "recent":
+        return test.completion >= 75;
+      case "follow-up":
+        return test.completion < 75;
+      default:
+        return true;
+    }
+  });
 
   return (
     <Card className={className}>
@@ -234,46 +215,57 @@ export default function TestTypeBreakdownCard({
         <Tabs
           value={activeTab}
           onValueChange={(value) =>
-            setActiveTab(value as "mandatory" | "specialized" | "follow-up")
+            setActiveTab(value as "all" | "recent" | "follow-up")
           }
           className="mt-4"
         >
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="mandatory">Mandatory Tests</TabsTrigger>
-            <TabsTrigger value="specialized">Specialized Tests</TabsTrigger>
-            <TabsTrigger value="follow-up">Follow-up Tests</TabsTrigger>
+            <TabsTrigger value="all">All Tests</TabsTrigger>
+            <TabsTrigger value="recent">High Completion</TabsTrigger>
+            <TabsTrigger value="follow-up">Needs Follow-up</TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {getActiveTests().map((test, index) => (
-            <div key={index} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{test.name}</span>
-                    {getStatusBadge(test.status)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {test.description}
-                  </div>
-                </div>
-                <div className="text-sm font-medium">{test.count} tests</div>
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Completion Rate</span>
-                <span>{test.completion}%</span>
-              </div>
-              <Progress
-                value={test.completion}
-                className="h-2 bg-muted"
-                style={{ 
-                  "--progress-foreground": `hsl(${getProgressColor(test.completion)})` 
-                } as React.CSSProperties}
-              />
+          {filteredTests.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {activeTab === "all" 
+                ? "No test data available" 
+                : activeTab === "recent"
+                ? "No tests with high completion rates"
+                : "No tests requiring follow-up"
+              }
             </div>
-          ))}
+          ) : (
+            filteredTests.map((test, index) => (
+              <div key={index} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{test.name}</span>
+                      {getStatusBadge(test.status)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {test.description}
+                    </div>
+                  </div>
+                  <div className="text-sm font-medium">{test.count} tests</div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Completion Rate</span>
+                  <span>{test.completion}%</span>
+                </div>
+                <Progress
+                  value={test.completion}
+                  className="h-2 bg-muted"
+                  style={{ 
+                    "--progress-foreground": getProgressColor(test.completion)
+                  } as React.CSSProperties}
+                />
+              </div>
+            ))
+          )}
         </div>
       </CardContent>
     </Card>

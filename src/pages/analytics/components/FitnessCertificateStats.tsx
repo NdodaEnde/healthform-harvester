@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { Loader2 } from "lucide-react";
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -20,57 +24,154 @@ export default function FitnessCertificateStats({
   className,
 }: FitnessCertificateStatsProps) {
   const [period, setPeriod] = useState<"month" | "quarter" | "year">("month");
+  const { getEffectiveOrganizationId } = useOrganization();
+  const organizationId = getEffectiveOrganizationId();
 
-  // Sample data for certificate statistics
-  const certificateStats = {
-    month: {
-      total: 245,
-      fit: 158,
-      fitWithRestriction: 52,
-      fitWithCondition: 25,
-      temporaryUnfit: 7,
-      unfit: 3,
-      completionRate: 92,
-      expiringCertificates: 18,
-    },
-    quarter: {
-      total: 720,
-      fit: 468,
-      fitWithRestriction: 151,
-      fitWithCondition: 72,
-      temporaryUnfit: 22,
-      unfit: 7,
-      completionRate: 88,
-      expiringCertificates: 54,
-    },
-    year: {
-      total: 2850,
-      fit: 1853,
-      fitWithRestriction: 598,
-      fitWithCondition: 285,
-      temporaryUnfit: 85,
-      unfit: 29,
-      completionRate: 95,
-      expiringCertificates: 210,
-    },
-  };
+  // Fetch medical examinations data
+  const { data: examinationsData, isLoading } = useQuery({
+    queryKey: ['examinations-stats', organizationId, period],
+    queryFn: async () => {
+      const now = new Date();
+      let startDate = new Date();
+      
+      // Calculate date range based on period
+      switch (period) {
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        case 'quarter':
+          startDate.setMonth(now.getMonth() - 3);
+          break;
+        case 'year':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
 
-  const currentStats = certificateStats[period];
+      const { data, error } = await supabase
+        .from('medical_examinations')
+        .select('*')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .gte('examination_date', startDate.toISOString().split('T')[0]);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organizationId,
+  });
+
+  // Process data to calculate statistics
+  const certificateStats = React.useMemo(() => {
+    if (!examinationsData) return {
+      total: 0,
+      fit: 0,
+      fitWithRestriction: 0,
+      fitWithCondition: 0,
+      temporaryUnfit: 0,
+      unfit: 0,
+      completionRate: 0,
+      expiringCertificates: 0,
+    };
+
+    const total = examinationsData.length;
+    let fit = 0;
+    let fitWithRestriction = 0;
+    let fitWithCondition = 0;
+    let temporaryUnfit = 0;
+    let unfit = 0;
+    let expiringCertificates = 0;
+
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    examinationsData.forEach(exam => {
+      const status = exam.fitness_status?.toLowerCase() || '';
+      
+      if (status.includes('fit') && !status.includes('unfit') && !status.includes('restriction')) {
+        fit++;
+      } else if (status.includes('restriction')) {
+        fitWithRestriction++;
+      } else if (status.includes('condition')) {
+        fitWithCondition++;
+      } else if (status.includes('temporary') && status.includes('unfit')) {
+        temporaryUnfit++;
+      } else if (status.includes('unfit')) {
+        unfit++;
+      }
+
+      // Check for expiring certificates
+      if (exam.expiry_date) {
+        const expiryDate = new Date(exam.expiry_date);
+        if (expiryDate <= thirtyDaysFromNow && expiryDate > new Date()) {
+          expiringCertificates++;
+        }
+      }
+    });
+
+    const completionRate = total > 0 ? Math.round(((fit + fitWithRestriction + fitWithCondition) / total) * 100) : 0;
+
+    return {
+      total,
+      fit,
+      fitWithRestriction,
+      fitWithCondition,
+      temporaryUnfit,
+      unfit,
+      completionRate,
+      expiringCertificates,
+    };
+  }, [examinationsData]);
+
+  // Extract common restrictions from examination data
+  const commonRestrictions = React.useMemo(() => {
+    if (!examinationsData) return [];
+
+    const restrictionCount: { [key: string]: number } = {};
+
+    examinationsData.forEach(exam => {
+      if (exam.restrictions && Array.isArray(exam.restrictions)) {
+        exam.restrictions.forEach((restriction: string) => {
+          const key = restriction.toLowerCase();
+          restrictionCount[key] = (restrictionCount[key] || 0) + 1;
+        });
+      }
+    });
+
+    return Object.entries(restrictionCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([restriction, count]) => ({
+        name: restriction.charAt(0).toUpperCase() + restriction.slice(1),
+        count
+      }));
+  }, [examinationsData]);
+
+  if (isLoading) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading Certificate Statistics...
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-4 bg-muted rounded animate-pulse"></div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Calculate percentages
-  const fitPercent = Math.round((currentStats.fit / currentStats.total) * 100);
-  const fitWithRestrictionPercent = Math.round(
-    (currentStats.fitWithRestriction / currentStats.total) * 100,
-  );
-  const fitWithConditionPercent = Math.round(
-    (currentStats.fitWithCondition / currentStats.total) * 100,
-  );
-  const temporaryUnfitPercent = Math.round(
-    (currentStats.temporaryUnfit / currentStats.total) * 100,
-  );
-  const unfitPercent = Math.round(
-    (currentStats.unfit / currentStats.total) * 100,
-  );
+  const total = certificateStats.total;
+  const fitPercent = total > 0 ? Math.round((certificateStats.fit / total) * 100) : 0;
+  const fitWithRestrictionPercent = total > 0 ? Math.round((certificateStats.fitWithRestriction / total) * 100) : 0;
+  const fitWithConditionPercent = total > 0 ? Math.round((certificateStats.fitWithCondition / total) * 100) : 0;
+  const temporaryUnfitPercent = total > 0 ? Math.round((certificateStats.temporaryUnfit / total) * 100) : 0;
+  const unfitPercent = total > 0 ? Math.round((certificateStats.unfit / total) * 100) : 0;
 
   return (
     <Card className={className}>
@@ -98,7 +199,7 @@ export default function FitnessCertificateStats({
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Certificate Status Distribution</h3>
                 <span className="text-sm text-muted-foreground">
-                  Total: {currentStats.total}
+                  Total: {total}
                 </span>
               </div>
 
@@ -110,7 +211,7 @@ export default function FitnessCertificateStats({
                       <span>Fit</span>
                     </div>
                     <span>
-                      {currentStats.fit} ({fitPercent}%)
+                      {certificateStats.fit} ({fitPercent}%)
                     </span>
                   </div>
                   <Progress
@@ -126,7 +227,7 @@ export default function FitnessCertificateStats({
                       <span>Fit with Restriction</span>
                     </div>
                     <span>
-                      {currentStats.fitWithRestriction} (
+                      {certificateStats.fitWithRestriction} (
                       {fitWithRestrictionPercent}%)
                     </span>
                   </div>
@@ -143,7 +244,7 @@ export default function FitnessCertificateStats({
                       <span>Fit with Condition</span>
                     </div>
                     <span>
-                      {currentStats.fitWithCondition} ({fitWithConditionPercent}
+                      {certificateStats.fitWithCondition} ({fitWithConditionPercent}
                       %)
                     </span>
                   </div>
@@ -160,7 +261,7 @@ export default function FitnessCertificateStats({
                       <span>Temporary Unfit</span>
                     </div>
                     <span>
-                      {currentStats.temporaryUnfit} ({temporaryUnfitPercent}%)
+                      {certificateStats.temporaryUnfit} ({temporaryUnfitPercent}%)
                     </span>
                   </div>
                   <Progress
@@ -176,7 +277,7 @@ export default function FitnessCertificateStats({
                       <span>Unfit</span>
                     </div>
                     <span>
-                      {currentStats.unfit} ({unfitPercent}%)
+                      {certificateStats.unfit} ({unfitPercent}%)
                     </span>
                   </div>
                   <Progress
@@ -192,12 +293,12 @@ export default function FitnessCertificateStats({
               <div className="flex items-center">
                 <div className="flex-1">
                   <Progress
-                    value={currentStats.completionRate}
+                    value={certificateStats.completionRate}
                     className="h-3 bg-muted [&>div]:bg-blue-500"
                   />
                 </div>
                 <span className="ml-2 font-medium">
-                  {currentStats.completionRate}%
+                  {certificateStats.completionRate}%
                 </span>
               </div>
             </div>
@@ -211,7 +312,7 @@ export default function FitnessCertificateStats({
                   <span className="font-medium">Total Certificates</span>
                 </div>
                 <div className="mt-2 text-2xl font-bold">
-                  {currentStats.total}
+                  {total}
                 </div>
               </Card>
 
@@ -221,66 +322,33 @@ export default function FitnessCertificateStats({
                   <span className="font-medium">Expiring Soon</span>
                 </div>
                 <div className="mt-2 text-2xl font-bold">
-                  {currentStats.expiringCertificates}
+                  {certificateStats.expiringCertificates}
                 </div>
               </Card>
             </div>
 
-            <Card className="p-4">
-              <h3 className="font-medium mb-3">Common Restrictions</h3>
-              <div className="flex flex-wrap gap-2">
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-50 text-yellow-700 border-yellow-200"
-                >
-                  Heights
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-50 text-yellow-700 border-yellow-200"
-                >
-                  Dust Exposure
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-50 text-yellow-700 border-yellow-200"
-                >
-                  Chemical Exposure
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-50 text-yellow-700 border-yellow-200"
-                >
-                  Confined Spaces
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-50 text-yellow-700 border-yellow-200"
-                >
-                  Motorized Equipment
-                </Badge>
-              </div>
-            </Card>
+            {commonRestrictions.length > 0 && (
+              <Card className="p-4">
+                <h3 className="font-medium mb-3">Common Restrictions</h3>
+                <div className="flex flex-wrap gap-2">
+                  {commonRestrictions.map((restriction, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="bg-yellow-50 text-yellow-700 border-yellow-200"
+                    >
+                      {restriction.name} ({restriction.count})
+                    </Badge>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             <Card className="p-4">
-              <h3 className="font-medium mb-3">Required Protections</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center space-x-2">
-                  <EyeIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Wear Spectacles: 32%</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <HeartIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Chronic Conditions: 18%</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircleIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Hearing Protection: 45%</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircleIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Dust Protection: 28%</span>
-                </div>
+              <h3 className="font-medium mb-3">Data Period</h3>
+              <div className="text-sm text-muted-foreground">
+                Showing data from the last{" "}
+                {period === "month" ? "month" : period === "quarter" ? "3 months" : "year"}
               </div>
             </Card>
           </div>
