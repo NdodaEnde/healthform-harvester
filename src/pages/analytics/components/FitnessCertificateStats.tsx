@@ -53,6 +53,7 @@ export default function FitnessCertificateStats({
         .gte('examination_date', startDate.toISOString().split('T')[0]);
       
       if (error) throw error;
+      console.log('Examinations data:', data);
       return data || [];
     },
     enabled: !!organizationId,
@@ -83,6 +84,10 @@ export default function FitnessCertificateStats({
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     const today = new Date();
 
+    console.log('Processing examinations:', examinationsData.length);
+    console.log('Today:', today.toISOString());
+    console.log('Thirty days from now:', thirtyDaysFromNow.toISOString());
+
     examinationsData.forEach(exam => {
       const status = exam.fitness_status?.toLowerCase() || '';
       
@@ -101,7 +106,10 @@ export default function FitnessCertificateStats({
       // Check for expiring certificates using the expiry_date column
       if (exam.expiry_date) {
         const expiryDate = new Date(exam.expiry_date);
+        console.log('Checking expiry for exam:', exam.id, 'expiry_date:', exam.expiry_date, 'parsed:', expiryDate.toISOString());
+        
         if (expiryDate <= thirtyDaysFromNow && expiryDate >= today) {
+          console.log('Certificate expiring soon:', exam.id, 'expires:', expiryDate.toISOString());
           expiringCertificates++;
         }
       }
@@ -109,7 +117,7 @@ export default function FitnessCertificateStats({
 
     const completionRate = total > 0 ? Math.round(((fit + fitWithRestriction + fitWithCondition) / total) * 100) : 0;
 
-    return {
+    const stats = {
       total,
       fit,
       fitWithRestriction,
@@ -119,6 +127,9 @@ export default function FitnessCertificateStats({
       completionRate,
       expiringCertificates,
     };
+
+    console.log('Final certificate stats:', stats);
+    return stats;
   }, [examinationsData]);
 
   // Extract common restrictions from examination data
@@ -323,6 +334,9 @@ export default function FitnessCertificateStats({
                 </div>
                 <div className="mt-2 text-2xl font-bold">
                   {certificateStats.expiringCertificates}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Next 30 days
                 </div>
               </Card>
             </div>
