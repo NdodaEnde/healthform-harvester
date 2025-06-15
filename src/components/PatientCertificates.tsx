@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { cleanCertificateData } from '@/utils/certificate-data-cleaner';
 import { patientDataService } from '@/services/patientDataService';
 import type { DatabasePatient, DatabaseDocument, DatabaseOrganization } from '@/types/database';
-import PatientHeader from '@/components/patients/PatientHeader';
 import DocumentItem from '@/components/documents/DocumentItem';
 
 interface PatientCertificatesProps {
@@ -156,8 +155,6 @@ const PatientCertificates: React.FC<PatientCertificatesProps> = ({
 
   return (
     <div className="space-y-6">
-      {patient && <PatientHeader patient={patient} />}
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
