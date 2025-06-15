@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ interface Patient {
   first_name: string;
   last_name: string;
   date_of_birth: string;
+  birthdate_from_id?: string;
   gender?: string;
   id_number?: string;
   client_organization_id: string;
@@ -75,10 +77,10 @@ const PatientList: React.FC<PatientListProps> = ({
         console.log('Total documents found:', docCount);
       }
 
-      // Fetch actual patients data
+      // Fetch actual patients data - include birthdate_from_id
       const { data: patientsData, error: patientsError } = await supabase
         .from('patients')
-        .select('*')
+        .select('id, first_name, last_name, date_of_birth, birthdate_from_id, gender, id_number, client_organization_id')
         .eq('client_organization_id', effectiveOrgId as any)
         .order('last_name', { ascending: true })
         .order('first_name', { ascending: true });
@@ -97,6 +99,7 @@ const PatientList: React.FC<PatientListProps> = ({
           first_name: patient.first_name || '',
           last_name: patient.last_name || '',
           date_of_birth: patient.date_of_birth || '',
+          birthdate_from_id: patient.birthdate_from_id || undefined,
           gender: patient.gender || undefined,
           id_number: patient.id_number || undefined,
           client_organization_id: patient.client_organization_id || ''
@@ -150,6 +153,13 @@ const PatientList: React.FC<PatientListProps> = ({
 
   const handleAddPatient = () => {
     navigate('/patients/new');
+  };
+
+  // Helper function to get the correct birthdate for display
+  const getDisplayBirthdate = (patient: Patient): string => {
+    // Use birthdate_from_id if available, otherwise fall back to date_of_birth
+    const displayDate = patient.birthdate_from_id || patient.date_of_birth;
+    return new Date(displayDate).toLocaleDateString();
   };
 
   if (loading) {
@@ -225,9 +235,7 @@ const PatientList: React.FC<PatientListProps> = ({
                         {patient.id_number && (
                           <span>ID: {patient.id_number}</span>
                         )}
-                        {patient.date_of_birth && (
-                          <span>DOB: {new Date(patient.date_of_birth).toLocaleDateString()}</span>
-                        )}
+                        <span>DOB: {getDisplayBirthdate(patient)}</span>
                         {patient.gender && (
                           <Badge variant="outline">{patient.gender}</Badge>
                         )}
