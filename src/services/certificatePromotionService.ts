@@ -50,9 +50,30 @@ export const promoteToPatientRecord = async (
     console.log('🚀 Starting patient record promotion for document:', documentId);
     console.log('📋 Promotion data:', promotionData);
 
-    // Step 1: Check if patient already exists by ID number
+    // Step 1: Verify document exists and get its current state
+    console.log('🔍 Verifying document exists...');
+    const { data: document, error: docFetchError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single();
+
+    if (docFetchError || !document) {
+      console.error('❌ Document not found:', docFetchError);
+      throw new Error(`Document not found: ${docFetchError?.message || 'Unknown error'}`);
+    }
+
+    console.log('📄 Document found:', {
+      id: document.id,
+      file_name: document.file_name,
+      current_owner_id: document.owner_id,
+      status: document.status
+    });
+
+    // Step 2: Check if patient already exists by ID number
     let patientRecord = null;
     if (promotionData.patientId && promotionData.patientId !== 'Unknown') {
+      console.log('🔍 Searching for existing patient with ID:', promotionData.patientId);
       const { data: existingPatients, error: searchError } = await supabase
         .from('patients')
         .select('*')
@@ -63,11 +84,15 @@ export const promoteToPatientRecord = async (
         console.error('Error searching for existing patient:', searchError);
       } else if (existingPatients && existingPatients.length > 0) {
         patientRecord = existingPatients[0];
-        console.log('📌 Found existing patient:', patientRecord.id);
+        console.log('📌 Found existing patient:', {
+          id: patientRecord.id,
+          name: `${patientRecord.first_name} ${patientRecord.last_name}`,
+          id_number: patientRecord.id_number
+        });
       }
     }
 
-    // Step 2: Create new patient if doesn't exist
+    // Step 3: Create new patient if doesn't exist
     if (!patientRecord) {
       console.log('👤 Creating new patient record...');
       
@@ -91,32 +116,67 @@ export const promoteToPatientRecord = async (
         .single();
 
       if (patientError) {
-        console.error('Error creating patient:', patientError);
+        console.error('❌ Error creating patient:', patientError);
         throw new Error(`Failed to create patient: ${patientError.message}`);
       }
 
       patientRecord = newPatient;
-      console.log('✅ Created new patient with ID:', patientRecord.id);
+      console.log('✅ Created new patient:', {
+        id: patientRecord.id,
+        name: `${patientRecord.first_name} ${patientRecord.last_name}`,
+        id_number: patientRecord.id_number
+      });
     }
 
-    // Step 3: Update the document to link it to the patient
+    // Step 4: CRITICAL - Link the document to the patient
     console.log('🔗 Linking document to patient...');
-    const { error: documentUpdateError } = await supabase
+    console.log('📋 Update parameters:', {
+      documentId,
+      newOwnerId: patientRecord.id,
+      newStatus: 'completed'
+    });
+
+    const { data: updatedDocument, error: documentUpdateError } = await supabase
       .from('documents')
       .update({ 
         owner_id: patientRecord.id,
         status: 'completed' // Mark as completed since it's now processed and linked
       })
-      .eq('id', documentId);
+      .eq('id', documentId)
+      .select(); // Add select to return the updated data
 
     if (documentUpdateError) {
-      console.error('Error linking document to patient:', documentUpdateError);
+      console.error('❌ Error linking document to patient:', documentUpdateError);
       throw new Error(`Failed to link document to patient: ${documentUpdateError.message}`);
+    }
+
+    console.log('✅ Document update result:', updatedDocument);
+
+    // Verify the update worked
+    const { data: verifyDocument, error: verifyError } = await supabase
+      .from('documents')
+      .select('owner_id, status')
+      .eq('id', documentId)
+      .single();
+
+    if (verifyError) {
+      console.warn('⚠️ Could not verify document update:', verifyError);
+    } else {
+      console.log('🔍 Document verification:', {
+        owner_id: verifyDocument.owner_id,
+        status: verifyDocument.status,
+        expectedOwnerId: patientRecord.id
+      });
+
+      if (verifyDocument.owner_id !== patientRecord.id) {
+        console.error('❌ Document linking failed - owner_id mismatch!');
+        throw new Error('Document was not properly linked to patient');
+      }
     }
 
     console.log('✅ Document successfully linked to patient');
 
-    // Step 4: Create medical examination record
+    // Step 5: Create medical examination record
     console.log('🏥 Creating medical examination record...');
     
     const examinationData = {
@@ -137,6 +197,8 @@ export const promoteToPatientRecord = async (
       follow_up_actions: promotionData.followUpActions || ''
     };
 
+    console.log('📋 Examination data:', examinationData);
+
     const { data: examination, error: examinationError } = await supabase
       .from('medical_examinations')
       .insert([examinationData])
@@ -144,19 +206,27 @@ export const promoteToPatientRecord = async (
       .single();
 
     if (examinationError) {
-      console.error('Error creating medical examination:', examinationError);
+      console.error('❌ Error creating medical examination:', examinationError);
       throw new Error(`Failed to create medical examination: ${examinationError.message}`);
     }
 
-    console.log('✅ Medical examination created with ID:', examination.id);
+    console.log('✅ Medical examination created:', {
+      id: examination.id,
+      patient_id: examination.patient_id,
+      document_id: examination.document_id
+    });
 
-    // Step 5: Return success result
-    return {
+    // Step 6: Return success result
+    const result = {
       success: true,
       patientId: patientRecord.id,
       examinationId: examination.id,
+      documentId: documentId,
       message: 'Patient record and medical examination created successfully'
     };
+
+    console.log('🎉 Promotion completed successfully:', result);
+    return result;
 
   } catch (error) {
     console.error('❌ Error in promoteToPatientRecord:', error);
