@@ -120,11 +120,13 @@ export const parseSouthAfricanIDNumber = (idNumber: string): SouthAfricanIDData 
   // Extract and process birth date using corrected algorithm
   const twoDigitYear = parseInt(dobString.substring(0, 2));
   const year = getFullYear(twoDigitYear);
-  const month = parseInt(dobString.substring(2, 4)) - 1; // JS months are 0-indexed
+  const month = parseInt(dobString.substring(2, 4));
   const day = parseInt(dobString.substring(4, 6));
-  
-  // Create date directly with the extracted values (no off-by-one error)
-  const birthDate = new Date(year, month, day);
+
+  // Create date in South Africa timezone (UTC+2) to match SA ID context
+  const birthDateISO = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  const birthDate = new Date(birthDateISO + 'T00:00:00+02:00'); // South Africa timezone (UTC+2)
+
   
   // Extract gender
   const genderDigits = parseInt(normalizedID.substring(6, 10));
