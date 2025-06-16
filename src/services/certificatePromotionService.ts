@@ -74,73 +74,56 @@ export const promoteToPatientRecord = async (
   clientOrganizationId?: string
 ) => {
   try {
-    console.log('Starting promotion to patient record:', { documentId, validatedData });
-
-    // Validate the data structure
-    if (!validatedData || typeof validatedData !== 'object') {
-      throw new Error('Invalid validated data provided');
-    }
-
-    if (!validatedData.patientName || !validatedData.patientId) {
-      console.error('Missing required patient data:', validatedData);
-      throw new Error('Patient name and ID are required');
-    }
-
-    // Normalize the patient ID and dates
+    console.log('Starting promotion to patient record with data:', validatedData);
+    
+    // Step 1: Handle patient creation/finding with SA ID processing
     const normalizedPatientId = normalizePatientId(validatedData.patientId);
     const normalizedExamDate = normalizeDate(validatedData.examinationDate);
     const normalizedExpiryDate = validatedData.expiryDate ? normalizeDate(validatedData.expiryDate) : null;
-
-    // Parse South African ID number using your existing parser
-    const saIdData = parseSouthAfricanIDNumber(normalizedPatientId || validatedData.patientId);
-    console.log('SA ID parsing result:', saIdData);
-
+    
     console.log('Normalized data:', {
-      originalPatientId: validatedData.patientId,
-      normalizedPatientId,
-      originalExamDate: validatedData.examinationDate,
-      normalizedExamDate,
-      originalExpiryDate: validatedData.expiryDate,
-      normalizedExpiryDate,
-      saIdValid: saIdData.isValid,
-      extractedDOB: saIdData.birthDate,
-      extractedGender: saIdData.gender,
-      citizenshipStatus: saIdData.citizenshipStatus
+      patientId: normalizedPatientId,
+      examDate: normalizedExamDate,
+      expiryDate: normalizedExpiryDate
     });
 
-    // Step 1: Find or create patient
-    const { data: existingPatient, error: patientSearchError } = await supabase
+    // Extract first name and last name from patient name
+    const nameParts = validatedData.patientName.trim().split(/\s+/);
+    const firstName = nameParts[0] || 'Unknown';
+    const lastName = nameParts.slice(1).join(' ') || 'Patient';
+
+    // Check if patient already exists
+    const { data: existingPatient, error: searchError } = await supabase
       .from('patients')
       .select('id')
       .eq('id_number', normalizedPatientId)
       .eq('organization_id', organizationId)
       .maybeSingle();
 
-    if (patientSearchError) {
-      console.error('Error searching for patient:', patientSearchError);
+    if (searchError) {
+      console.error('Error searching for patient:', searchError);
       throw new Error('Failed to search for existing patient');
     }
 
-    let patientId = existingPatient?.id;
+    let patientId: string;
 
-    // Create patient if doesn't exist
-    if (!patientId) {
-      const nameParts = validatedData.patientName.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+    if (!existingPatient) {
+      console.log('Patient not found, creating new patient');
+      
+      // Process SA ID if available
+      let saIdData = { isValid: false };
+      let basicPatientInfo = { date_of_birth: null, gender: 'unknown' };
+      
+      try {
+        saIdData = parseSouthAfricanIDNumber(normalizedPatientId);
+        console.log('SA ID parsing result:', saIdData);
+      } catch (error) {
+        console.log('SA ID parsing failed, using basic patient info');
+      }
 
-      // Create a basic patient info object for processing
-      const basicPatientInfo = {
-        first_name: firstName,
-        last_name: lastName,
-        id_number: normalizedPatientId,
-        date_of_birth: new Date().toISOString().split('T')[0], // Default fallback
-        gender: 'unknown'
-      };
-
-      // Use your existing ID processor to enhance patient data with SA ID info
+      // Process patient info with SA ID data
       const processedPatientInfo = processIDNumberForPatient(
-        basicPatientInfo as any, 
+        basicPatientInfo,
         validatedData.patientId
       );
 
@@ -178,9 +161,11 @@ export const promoteToPatientRecord = async (
       patientId = newPatient.id;
       console.log('Created new patient with SA ID data:', patientId);
     } else {
-      console.log('Using existing patient:', patientId);
+      console.log('Using existing patient:', existingPatient.id);
+      patientId = existingPatient.id;
       
       // If patient exists, optionally update it with SA ID data if needed
+      const saIdData = parseSouthAfricanIDNumber(normalizedPatientId);
       if (saIdData.isValid) {
         const { data: existingPatientData } = await supabase
           .from('patients')
@@ -235,10 +220,13 @@ export const promoteToPatientRecord = async (
       p_job_title: validatedData.occupation,
       p_client_organization_id: clientOrganizationId,
       p_expiry_date: normalizedExpiryDate,
-      p_restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+      p_restrictions: validatedData.restrictionsText !== 'None' ? 
+        [validatedData.restrictionsText] : [],
       p_follow_up_actions: validatedData.followUpActions || null,
       p_comments: validatedData.comments || null
     });
+
+    let examinationId: string;
 
     if (rpcError) {
       console.error('RPC function failed, falling back to manual approach:', rpcError);
@@ -272,7 +260,8 @@ export const promoteToPatientRecord = async (
         fitness_status: validatedData.fitnessStatus,
         company_name: validatedData.companyName,
         job_title: validatedData.occupation,
-        restrictions: validatedData.restrictionsText !== 'None' ? [validatedData.restrictionsText] : [],
+        restrictions: validatedData.restrictionsText !== 'None' ? 
+          [validatedData.restrictionsText] : [],
         follow_up_actions: validatedData.followUpActions,
         comments: validatedData.comments,
         validated_by: currentUser.user?.id || null
@@ -292,11 +281,85 @@ export const promoteToPatientRecord = async (
       }
 
       console.log('Created new examination via fallback:', newExam.id);
-      return { patientId, examinationId: newExam.id };
+      examinationId = newExam.id;
+      
+      // 🔧 DOCUMENT LINKING FIX - Fallback Path
+      console.log('Linking document to patient (fallback path)...');
+      const { error: linkError } = await supabase
+        .from('documents')
+        .update({ 
+          owner_id: patientId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+
+      if (linkError) {
+        console.error('Warning: Failed to link document to patient (fallback):', linkError);
+        // Don't throw error - the main process succeeded, this is just a linking issue
+        toast.error('Document created but linking failed. You may need to manually link the document.');
+      } else {
+        console.log(`Successfully linked document ${documentId} to patient ${patientId} (fallback)`);
+      }
+
     } else {
       console.log('RPC function succeeded:', examination);
-      return { patientId, examinationId: examination[0]?.id };
+      examinationId = examination[0]?.id;
+      
+      // 🔧 DOCUMENT LINKING FIX - RPC Success Path
+      console.log('Linking document to patient (RPC path)...');
+      const { error: linkError } = await supabase
+        .from('documents')
+        .update({ 
+          owner_id: patientId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+
+      if (linkError) {
+        console.error('Warning: Failed to link document to patient (RPC):', linkError);
+        // Don't throw error - the main process succeeded, this is just a linking issue
+        toast.error('Document created but linking failed. You may need to manually link the document.');
+      } else {
+        console.log(`Successfully linked document ${documentId} to patient ${patientId} (RPC)`);
+      }
     }
+
+    // Step 3: Verify the complete chain of relationships
+    console.log('Verifying complete data chain...');
+    const { data: verificationData, error: verifyError } = await supabase
+      .from('documents')
+      .select(`
+        id,
+        file_name,
+        owner_id,
+        patients!owner_id (
+          id,
+          first_name,
+          last_name
+        ),
+        medical_examinations!document_id (
+          id,
+          examination_date,
+          fitness_status
+        )
+      `)
+      .eq('id', documentId)
+      .single();
+
+    if (verifyError) {
+      console.warn('Could not verify data chain:', verifyError);
+    } else {
+      console.log('✅ Complete data chain verification:', {
+        document: verificationData.file_name,
+        linkedToPatient: !!verificationData.owner_id,
+        patientName: verificationData.patients ? 
+          `${verificationData.patients.first_name} ${verificationData.patients.last_name}` : 'N/A',
+        hasExamination: verificationData.medical_examinations?.length > 0,
+        examinationDate: verificationData.medical_examinations?.[0]?.examination_date
+      });
+    }
+
+    return { patientId, examinationId };
 
   } catch (error) {
     console.error('Error in promoteToPatientRecord:', error);
