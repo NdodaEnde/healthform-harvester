@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { extractCertificateData, formatCertificateData } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -112,7 +113,15 @@ export const promoteToPatientRecord = async (
       
       // Process SA ID if available
       let saIdData = { isValid: false };
-      let basicPatientInfo = { date_of_birth: null, gender: 'unknown' };
+      let basicPatientInfo = { 
+        date_of_birth: null, 
+        gender: 'unknown',
+        id: '',
+        first_name: firstName,
+        last_name: lastName,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
       
       try {
         saIdData = parseSouthAfricanIDNumber(normalizedPatientId);
@@ -174,9 +183,20 @@ export const promoteToPatientRecord = async (
           .single();
           
         if (existingPatientData && !existingPatientData.id_number_valid) {
+          // Create proper patient info object for processing
+          const patientInfoForUpdate = {
+            id: patientId,
+            first_name: firstName,
+            last_name: lastName,
+            date_of_birth: existingPatientData.date_of_birth,
+            gender: existingPatientData.gender,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
           // Process the existing patient data with SA ID info
           const processedUpdate = processIDNumberForPatient(
-            existingPatientData as any,
+            patientInfoForUpdate,
             validatedData.patientId
           );
           
@@ -353,9 +373,9 @@ export const promoteToPatientRecord = async (
         document: verificationData.file_name,
         linkedToPatient: !!verificationData.owner_id,
         patientName: verificationData.patients ? 
-          `${verificationData.patients.first_name} ${verificationData.patients.last_name}` : 'N/A',
-        hasExamination: verificationData.medical_examinations?.length > 0,
-        examinationDate: verificationData.medical_examinations?.[0]?.examination_date
+          `${(verificationData.patients as any).first_name} ${(verificationData.patients as any).last_name}` : 'N/A',
+        hasExamination: (verificationData.medical_examinations as any)?.length > 0,
+        examinationDate: (verificationData.medical_examinations as any)?.[0]?.examination_date
       });
     }
 
