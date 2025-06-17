@@ -1247,6 +1247,13 @@ export type Database = {
         Args: { user_id: string; org_id: string; user_role?: string }
         Returns: string
       }
+      backfill_medical_test_results: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          examination_id: string
+          tests_extracted: number
+        }[]
+      }
       check_user_exists: {
         Args: { user_id: string }
         Returns: Json
@@ -1280,6 +1287,10 @@ export type Database = {
       direct_insert_profile: {
         Args: { p_id: string; p_email: string; p_full_name?: string }
         Returns: undefined
+      }
+      extract_medical_test_results: {
+        Args: { p_examination_id: string; p_extracted_data: Json }
+        Returns: number
       }
       force_insert_profile: {
         Args: { p_user_id: string; p_email: string; p_full_name?: string }

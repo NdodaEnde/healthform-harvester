@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { extractCertificateData, formatCertificateData } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -6,6 +5,7 @@ import { toast } from 'sonner';
 // Import your existing SA ID parser functions
 import { parseSouthAfricanIDNumber, normalizeIDNumber } from '@/utils/sa-id-parser';
 import { processIDNumberForPatient } from '@/utils/id-number-processor';
+import { extractMedicalTestResults } from './medicalTestExtractor';
 
 export interface PromotionData {
   patientName: string;
@@ -303,7 +303,7 @@ export const promoteToPatientRecord = async (
       console.log('Created new examination via fallback:', newExam.id);
       examinationId = newExam.id;
       
-      // 🔧 DOCUMENT LINKING FIX - Fallback Path
+      // Document linking fix - Fallback Path
       console.log('Linking document to patient (fallback path)...');
       const { error: linkError } = await supabase
         .from('documents')
@@ -315,7 +315,6 @@ export const promoteToPatientRecord = async (
 
       if (linkError) {
         console.error('Warning: Failed to link document to patient (fallback):', linkError);
-        // Don't throw error - the main process succeeded, this is just a linking issue
         toast.error('Document created but linking failed. You may need to manually link the document.');
       } else {
         console.log(`Successfully linked document ${documentId} to patient ${patientId} (fallback)`);
@@ -325,7 +324,7 @@ export const promoteToPatientRecord = async (
       console.log('RPC function succeeded:', examination);
       examinationId = examination[0]?.id;
       
-      // 🔧 DOCUMENT LINKING FIX - RPC Success Path
+      // Document linking fix - RPC Success Path
       console.log('Linking document to patient (RPC path)...');
       const { error: linkError } = await supabase
         .from('documents')
@@ -337,14 +336,39 @@ export const promoteToPatientRecord = async (
 
       if (linkError) {
         console.error('Warning: Failed to link document to patient (RPC):', linkError);
-        // Don't throw error - the main process succeeded, this is just a linking issue
         toast.error('Document created but linking failed. You may need to manually link the document.');
       } else {
         console.log(`Successfully linked document ${documentId} to patient ${patientId} (RPC)`);
       }
     }
 
-    // Step 3: Verify the complete chain of relationships
+    // Step 3: Extract and store medical test results
+    if (examinationId) {
+      console.log('Extracting medical test results for examination:', examinationId);
+      
+      try {
+        // Get the document's extracted data for medical test extraction
+        const { data: documentData, error: docError } = await supabase
+          .from('documents')
+          .select('extracted_data')
+          .eq('id', documentId)
+          .single();
+
+        if (docError) {
+          console.error('Error fetching document for test extraction:', docError);
+        } else if (documentData?.extracted_data) {
+          const testCount = await extractMedicalTestResults(examinationId, documentData.extracted_data);
+          console.log(`Successfully extracted ${testCount} medical test results`);
+        } else {
+          console.log('No extracted data available for medical test extraction');
+        }
+      } catch (testError) {
+        console.error('Error extracting medical test results:', testError);
+        // Don't fail the entire process if test extraction fails
+      }
+    }
+
+    // Step 4: Verify the complete chain of relationships
     console.log('Verifying complete data chain...');
     const { data: verificationData, error: verifyError } = await supabase
       .from('documents')
