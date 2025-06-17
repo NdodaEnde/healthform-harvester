@@ -13,12 +13,12 @@ const CertificateInfo: React.FC<CertificateInfoProps> = ({ extractedData }) => {
   if (!certInfo) return null;
 
   return (
-    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-      <h5 className="text-sm font-medium flex items-center gap-1 mb-2">
+    <div className="mt-3 p-3 bg-secondary/50 dark:bg-secondary/20 border border-border rounded-lg">
+      <h5 className="text-sm font-medium flex items-center gap-1 mb-2 text-foreground">
         <Info className="h-3 w-3" />
         Certificate Information
       </h5>
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
         {certInfo.validUntil && (
           <div>
             <span className="font-medium">Valid until:</span> {cleanCertificateText(certInfo.validUntil)}
