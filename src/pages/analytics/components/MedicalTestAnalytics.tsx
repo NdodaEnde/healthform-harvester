@@ -24,7 +24,6 @@ import {
 import { 
   Eye, 
   Ear, 
-  Lungs, 
   Heart, 
   Activity,
   TrendingUp,
@@ -125,7 +124,7 @@ export default function MedicalTestAnalytics({ className }: MedicalTestAnalytics
   const getTestIcon = (testType: string) => {
     if (testType.includes('vision') || testType.includes('visual')) return Eye;
     if (testType.includes('hearing') || testType.includes('audio')) return Ear;
-    if (testType.includes('lung') || testType.includes('spirometry') || testType.includes('chest')) return Lungs;
+    if (testType.includes('lung') || testType.includes('spirometry') || testType.includes('chest')) return Activity;
     if (testType.includes('heart') || testType.includes('blood_pressure')) return Heart;
     return Activity;
   };
