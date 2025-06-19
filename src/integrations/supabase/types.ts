@@ -155,6 +155,13 @@ export type Database = {
             referencedRelation: "patients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "certificate_compliance_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "v_patient_test_history"
+            referencedColumns: ["patient_id"]
+          },
         ]
       }
       certificate_expirations: {
@@ -213,6 +220,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "patients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_expirations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "v_patient_test_history"
+            referencedColumns: ["patient_id"]
           },
         ]
       }
@@ -697,6 +711,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "patients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "v_patient_test_history"
+            referencedColumns: ["patient_id"]
           },
         ]
       }
@@ -1225,6 +1246,392 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      v_company_health_benchmarks: {
+        Row: {
+          avg_cert_duration_days: number | null
+          client_organization_id: string | null
+          company_name: string | null
+          expired_count: number | null
+          expiring_soon_count: number | null
+          fit_count: number | null
+          fit_with_restrictions_count: number | null
+          fitness_rate: number | null
+          organization_id: string | null
+          total_completed_tests: number | null
+          total_employees: number | null
+          total_examinations: number | null
+          total_tests_ordered: number | null
+          unfit_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_executive_summary: {
+        Row: {
+          abnormal_rate: number | null
+          certificates_expired: number | null
+          certificates_expiring_soon: number | null
+          client_organization_id: string | null
+          drug_screen_tests: number | null
+          earliest_examination: string | null
+          health_score: number | null
+          hearing_tests: number | null
+          heights_tests: number | null
+          latest_examination: string | null
+          lung_function_tests: number | null
+          organization_id: string | null
+          overall_completion_rate: number | null
+          total_abnormal_results: number | null
+          total_companies: number | null
+          total_examinations: number | null
+          total_fit: number | null
+          total_patients: number | null
+          total_tests_completed: number | null
+          total_tests_conducted: number | null
+          vision_tests: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_executive_summary_refined: {
+        Row: {
+          client_organization_id: string | null
+          drug_screen_tests: number | null
+          earliest_examination: string | null
+          health_score: number | null
+          hearing_tests: number | null
+          heights_tests: number | null
+          high_risk_results: number | null
+          latest_examination: string | null
+          low_risk_results: number | null
+          lung_function_tests: number | null
+          medium_risk_results: number | null
+          organization_id: string | null
+          overall_completion_rate: number | null
+          policy_violations: number | null
+          total_companies: number | null
+          total_examinations: number | null
+          total_fit: number | null
+          total_patients: number | null
+          total_tests_completed: number | null
+          total_tests_conducted: number | null
+          vision_tests: number | null
+          workers_may_need_vision_correction: number | null
+          workers_need_hearing_protection: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_monthly_test_trends: {
+        Row: {
+          abnormal_count: number | null
+          abnormal_rate: number | null
+          client_organization_id: string | null
+          completed_count: number | null
+          completion_rate: number | null
+          organization_id: string | null
+          test_count: number | null
+          test_month: string | null
+          test_type: string | null
+          unique_companies: number | null
+          unique_patients_tested: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_patient_test_history: {
+        Row: {
+          client_organization_id: string | null
+          company_name: string | null
+          examination_date: string | null
+          expired: boolean | null
+          expiring_soon: boolean | null
+          expiry_date: string | null
+          fitness_status: string | null
+          id_number: string | null
+          job_title: string | null
+          notes: string | null
+          organization_id: string | null
+          patient_id: string | null
+          patient_name: string | null
+          test_done: boolean | null
+          test_result: string | null
+          test_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_risk_assessment_matrix: {
+        Row: {
+          avg_days_since_test: number | null
+          client_organization_id: string | null
+          company_name: string | null
+          job_title: string | null
+          organization_id: string | null
+          risk_level: string | null
+          test_count: number | null
+          test_result: string | null
+          test_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_risk_assessment_matrix_refined: {
+        Row: {
+          client_organization_id: string | null
+          company_name: string | null
+          job_title: string | null
+          organization_id: string | null
+          risk_explanation: string | null
+          risk_level: string | null
+          test_count: number | null
+          test_result: string | null
+          test_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_test_results_summary: {
+        Row: {
+          abnormal_count: number | null
+          abnormal_rate: number | null
+          client_organization_id: string | null
+          completed_tests: number | null
+          completion_rate: number | null
+          earliest_test_date: string | null
+          latest_test_date: string | null
+          organization_id: string | null
+          test_type: string | null
+          total_tests: number | null
+          unique_patients: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_examinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
