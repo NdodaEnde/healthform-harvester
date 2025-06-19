@@ -12,6 +12,7 @@ import OccupationalHealthMetricsChart from './components/OccupationalHealthMetri
 import CorporateHealthMetricsPanel from './components/CorporateHealthMetricsPanel';
 import ReportGeneratorCard from './components/ReportGeneratorCard';
 import EnhancedMedicalTestAnalytics from './components/EnhancedMedicalTestAnalytics';
+import ExecutiveSummaryBanner from './components/ExecutiveSummaryBanner';
 import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
 import { Helmet } from 'react-helmet';
 
@@ -28,6 +29,9 @@ const IntegratedOccupationalHealthPage = () => {
           Comprehensive insights into occupational health metrics, medical test results, risk factors, and compliance status.
         </p>
       </div>
+
+      {/* Executive Summary Banner */}
+      <ExecutiveSummaryBanner />
       
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
