@@ -11,7 +11,7 @@ import HealthMetricsAssessment from './components/HealthMetricsAssessment';
 import OccupationalHealthMetricsChart from './components/OccupationalHealthMetricsChart';
 import CorporateHealthMetricsPanel from './components/CorporateHealthMetricsPanel';
 import ReportGeneratorCard from './components/ReportGeneratorCard';
-import MedicalTestAnalytics from './components/MedicalTestAnalytics';
+import EnhancedMedicalTestAnalytics from './components/EnhancedMedicalTestAnalytics';
 import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
 import { Helmet } from 'react-helmet';
 
@@ -58,39 +58,7 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsContent>
         
         <TabsContent value="medical-tests" className="space-y-4">
-          <MedicalTestAnalytics />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Medical Test Insights</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Detailed analysis of vision tests, hearing tests, lung function tests, and other medical examinations 
-                extracted from your digitized certificates.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-4">
-                  <h4 className="font-medium mb-2">Vision Health</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Visual acuity, color vision, and peripheral vision test results and trends.
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h4 className="font-medium mb-2">Hearing Health</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Audiometry and hearing test performance across your workforce.
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h4 className="font-medium mb-2">Lung Function</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Spirometry and respiratory health assessments for occupational safety.
-                  </p>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
+          <EnhancedMedicalTestAnalytics />
         </TabsContent>
         
         <TabsContent value="compliance" className="space-y-4">
