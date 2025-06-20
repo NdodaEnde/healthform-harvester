@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
-import { AlertTriangle, Shield, TrendingUp, Users, Eye, Ear, Lungs, Activity } from 'lucide-react';
+import { AlertTriangle, Shield, TrendingUp, Users, Eye, Ear, Wind, Activity } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const RiskAnalysisDashboard = () => {
@@ -73,7 +72,7 @@ const RiskAnalysisDashboard = () => {
     const type = testType.toLowerCase();
     if (type.includes('vision') || type.includes('eye')) return Eye;
     if (type.includes('hearing') || type.includes('audio')) return Ear;
-    if (type.includes('lung') || type.includes('respiratory')) return Lungs;
+    if (type.includes('lung') || type.includes('respiratory')) return Wind;
     return Activity;
   };
 
