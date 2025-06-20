@@ -2,6 +2,11 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Helmet } from 'react-helmet';
+import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
+
+// Lazy load components for better performance
+import OptimizedOverviewTab from './components/OptimizedOverviewTab';
 import StatsSummaryCards from './components/StatsSummaryCards';
 import FitnessCertificateStats from './components/FitnessCertificateStats';
 import TestTypeBreakdownCard from './components/TestTypeBreakdownCard';
@@ -13,8 +18,6 @@ import CorporateHealthMetricsPanel from './components/CorporateHealthMetricsPane
 import ReportGeneratorCard from './components/ReportGeneratorCard';
 import EnhancedMedicalTestAnalytics from './components/EnhancedMedicalTestAnalytics';
 import ExecutiveSummaryBanner from './components/ExecutiveSummaryBanner';
-import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
-import { Helmet } from 'react-helmet';
 import RiskAnalysisDashboard from './components/RiskAnalysisDashboard';
 import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashboard';
 import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
@@ -39,7 +42,7 @@ const IntegratedOccupationalHealthPage = () => {
       <ExecutiveSummaryBanner />
       
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="medical-tests">Medical Tests</TabsTrigger>
           <TabsTrigger value="risk-analysis">Risk Analysis</TabsTrigger>
@@ -53,21 +56,7 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          <StatsSummaryCards />
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FitnessCertificateStats />
-            <OccupationalRestrictionsChart />
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <OccupationalHealthMetricsChart />
-            </div>
-            <div>
-              <TestTypeBreakdownCard />
-            </div>
-          </div>
+          <OptimizedOverviewTab />
         </TabsContent>
         
         <TabsContent value="medical-tests" className="space-y-4">
