@@ -63,7 +63,7 @@ export function DashboardSidebar() {
       href: "/clinical-analytics",
       icon: ActivitySquare,
       tier: "premium",
-      feature: "trend_analysis"
+      feature: "advanced_analytics"
     },
     {
       name: "Occupational Health",

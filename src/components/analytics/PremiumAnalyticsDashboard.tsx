@@ -26,18 +26,23 @@ const PremiumAnalyticsDashboard = () => {
 
   const trendData = monthlyTrends?.slice(-6).map(trend => ({
     month: new Date(trend.test_month).toLocaleDateString('en-US', { month: 'short' }),
-    tests: trend.total_tests,
-    fitness_rate: Math.round((trend.fit_count / trend.total_tests) * 100) || 0,
-    completion_rate: Math.round((trend.completed_tests / trend.total_tests) * 100) || 0
+    tests: trend.test_count,
+    fitness_rate: Math.round((trend.completed_count / trend.test_count) * 100) || 0,
+    completion_rate: Math.round(trend.completion_rate) || 0
   })) || [];
 
   const riskDistribution = React.useMemo(() => {
     if (!riskAssessment) return { low: 0, medium: 0, high: 0 };
     
     const distribution = riskAssessment.reduce((acc, item) => {
-      const riskLevel = item.avg_bmi > 30 || item.high_bp_percentage > 20 ? 'high' :
-                      item.avg_bmi > 25 || item.high_bp_percentage > 10 ? 'medium' : 'low';
-      acc[riskLevel] += item.test_count || 0;
+      const riskLevel = item.risk_level?.toLowerCase() || 'low';
+      if (riskLevel.includes('high')) {
+        acc.high += item.test_count || 0;
+      } else if (riskLevel.includes('medium')) {
+        acc.medium += item.test_count || 0;
+      } else {
+        acc.low += item.test_count || 0;
+      }
       return acc;
     }, { low: 0, medium: 0, high: 0 });
 
