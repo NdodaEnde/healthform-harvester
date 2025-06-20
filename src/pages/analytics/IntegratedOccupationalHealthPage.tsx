@@ -29,6 +29,10 @@ import MedicalFitnessDeclarationChart from './components/MedicalFitnessDeclarati
 import EnhancedRestrictionsAnalytics from './components/EnhancedRestrictionsAnalytics';
 import ExaminationTypeAnalytics from './components/ExaminationTypeAnalytics';
 
+// Import the new basic components
+import BasicOverviewTab from './components/BasicOverviewTab';
+import BasicReports from './components/BasicReports';
+
 const IntegratedOccupationalHealthPage = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -64,7 +68,7 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          <OptimizedOverviewTab />
+          <BasicOverviewTab />
         </TabsContent>
         
         <TabsContent value="fitness-declarations" className="space-y-4">
@@ -142,18 +146,11 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsContent>
         
         <TabsContent value="reports" className="space-y-4">
+          <BasicReports />
+          
           <FeatureGate requiredTier="premium">
             <AdvancedReportGenerator />
           </FeatureGate>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Legacy Report Generator</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ReportGeneratorCard />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="admin" className="space-y-4">
