@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +16,7 @@ import ExecutiveSummaryBanner from './components/ExecutiveSummaryBanner';
 import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
 import { Helmet } from 'react-helmet';
 import RiskAnalysisDashboard from './components/RiskAnalysisDashboard';
+import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashboard';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
@@ -38,6 +40,7 @@ const IntegratedOccupationalHealthPage = () => {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="medical-tests">Medical Tests</TabsTrigger>
           <TabsTrigger value="risk-analysis">Risk Analysis</TabsTrigger>
+          <TabsTrigger value="benchmarking">Benchmarking</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="health-metrics">Health Metrics</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -68,6 +71,10 @@ const IntegratedOccupationalHealthPage = () => {
         
         <TabsContent value="risk-analysis" className="space-y-4">
           <RiskAnalysisDashboard />
+        </TabsContent>
+        
+        <TabsContent value="benchmarking" className="space-y-4">
+          <CompanyBenchmarkingDashboard />
         </TabsContent>
         
         <TabsContent value="compliance" className="space-y-4">
