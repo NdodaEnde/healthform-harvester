@@ -17,6 +17,7 @@ import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUt
 import { Helmet } from 'react-helmet';
 import RiskAnalysisDashboard from './components/RiskAnalysisDashboard';
 import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashboard';
+import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
@@ -41,6 +42,7 @@ const IntegratedOccupationalHealthPage = () => {
           <TabsTrigger value="medical-tests">Medical Tests</TabsTrigger>
           <TabsTrigger value="risk-analysis">Risk Analysis</TabsTrigger>
           <TabsTrigger value="benchmarking">Benchmarking</TabsTrigger>
+          <TabsTrigger value="predictive">Predictive Analytics</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="health-metrics">Health Metrics</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -75,6 +77,10 @@ const IntegratedOccupationalHealthPage = () => {
         
         <TabsContent value="benchmarking" className="space-y-4">
           <CompanyBenchmarkingDashboard />
+        </TabsContent>
+        
+        <TabsContent value="predictive" className="space-y-4">
+          <PredictiveAnalyticsDashboard />
         </TabsContent>
         
         <TabsContent value="compliance" className="space-y-4">
