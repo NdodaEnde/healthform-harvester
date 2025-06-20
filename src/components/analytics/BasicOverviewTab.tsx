@@ -3,9 +3,13 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
 import { Users, Building2, FileText, TrendingUp, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 import BasicAnalyticsDashboard from './BasicAnalyticsDashboard';
+import ComplianceMonitoring from './ComplianceMonitoring';
+import MonthlyTestingMetrics from './MonthlyTestingMetrics';
+import EmployeeRoster from './EmployeeRoster';
 
 const BasicOverviewTab = () => {
   const { executiveSummary, isLoading } = useEnhancedAnalytics();
@@ -60,7 +64,7 @@ const BasicOverviewTab = () => {
                 Welcome to Your Health Analytics
               </h2>
               <p className="text-gray-600 mb-4">
-                Get essential insights into your workforce health and compliance status.
+                Essential insights into your workforce health and compliance status.
               </p>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="bg-white">
@@ -97,46 +101,31 @@ const BasicOverviewTab = () => {
         })}
       </div>
 
-      {/* Main Dashboard */}
-      <BasicAnalyticsDashboard />
-
-      {/* Getting Started Tips */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Getting Started Tips
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <h4 className="font-medium">📋 Upload Documents</h4>
-              <p className="text-sm text-muted-foreground">
-                Start by uploading medical certificates to populate your analytics dashboard.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <h4 className="font-medium">👥 Manage Patients</h4>
-              <p className="text-sm text-muted-foreground">
-                Add patient information to track health compliance across your organization.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <h4 className="font-medium">📊 Monitor Status</h4>
-              <p className="text-sm text-muted-foreground">
-                Keep track of fitness declarations and certificate expiration dates.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <h4 className="font-medium">📈 Generate Reports</h4>
-              <p className="text-sm text-muted-foreground">
-                Create basic reports to share health compliance status with stakeholders.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="dashboard" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly Metrics</TabsTrigger>
+          <TabsTrigger value="roster">Employee Roster</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="dashboard" className="space-y-4">
+          <BasicAnalyticsDashboard />
+        </TabsContent>
+        
+        <TabsContent value="compliance" className="space-y-4">
+          <ComplianceMonitoring />
+        </TabsContent>
+        
+        <TabsContent value="monthly" className="space-y-4">
+          <MonthlyTestingMetrics />
+        </TabsContent>
+        
+        <TabsContent value="roster" className="space-y-4">
+          <EmployeeRoster />
+        </TabsContent>
+      </Tabs>
 
       {/* Feature Comparison */}
       <Card className="border-dashed border-2 border-purple-200 bg-purple-50/30">
@@ -151,21 +140,23 @@ const BasicOverviewTab = () => {
             <div>
               <h4 className="font-medium text-green-600 mb-3">✅ Current Basic Features</h4>
               <ul className="space-y-2 text-sm">
-                <li>• Patient status overview</li>
-                <li>• Basic compliance tracking</li>
-                <li>• Simple reporting</li>
-                <li>• Certificate alerts</li>
-                <li>• Basic charts</li>
+                <li>• Employee status overview</li>
+                <li>• Compliance monitoring & alerts</li>
+                <li>• Monthly testing metrics</li>
+                <li>• Employee roster exports</li>
+                <li>• Certificate expiration tracking</li>
+                <li>• Processing turnaround times</li>
               </ul>
             </div>
             <div>
               <h4 className="font-medium text-purple-600 mb-3">🚀 Premium Features</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>• Advanced trend analysis</li>
-                <li>• Risk intelligence</li>
-                <li>• Department breakdowns</li>
-                <li>• Custom branding</li>
+                <li>• Risk intelligence dashboard</li>
+                <li>• Department-level breakdowns</li>
+                <li>• Custom branded reports</li>
                 <li>• Automated scheduling</li>
+                <li>• Predictive analytics</li>
               </ul>
             </div>
           </div>

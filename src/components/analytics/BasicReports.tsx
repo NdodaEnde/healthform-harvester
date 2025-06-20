@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
-import { Download, FileText, Calendar, Users, Building2, Zap } from 'lucide-react';
+import { Download, FileText, Calendar, Users, Building2, Zap, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BasicReports = () => {
@@ -32,6 +32,27 @@ const BasicReports = () => {
       name: 'Fitness Status Report',
       description: 'Current fitness declarations across your organization',
       icon: FileText,
+      available: true
+    },
+    {
+      id: 'monthly-summary',
+      name: 'Monthly Summary Report',
+      description: 'Comprehensive monthly health metrics and compliance status',
+      icon: Calendar,
+      available: true
+    },
+    {
+      id: 'compliance-alerts',
+      name: 'Compliance Alerts Report',
+      description: 'Certificate expirations and overdue requirements',
+      icon: AlertTriangle,
+      available: true
+    },
+    {
+      id: 'turnaround-times',
+      name: 'Processing Times Report',
+      description: 'Test processing and turnaround time analysis',
+      icon: Clock,
       available: true
     }
   ];
@@ -69,6 +90,9 @@ const BasicReports = () => {
       return;
     }
 
+    const currentDate = new Date();
+    const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
     const reportData = {
       'patient-summary': {
         title: 'Patient Summary Report',
@@ -76,6 +100,7 @@ const BasicReports = () => {
           totalPatients: executiveSummary.total_patients,
           totalCompanies: executiveSummary.total_companies,
           totalFit: executiveSummary.total_fit,
+          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
           generatedAt: new Date().toISOString()
         }
       },
@@ -84,7 +109,8 @@ const BasicReports = () => {
         data: {
           totalCompanies: executiveSummary.total_companies,
           totalExaminations: executiveSummary.total_examinations,
-          completionRate: executiveSummary.overall_completion_rate,
+          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
+          healthScore: executiveSummary.health_score || 'N/A',
           generatedAt: new Date().toISOString()
         }
       },
@@ -95,6 +121,43 @@ const BasicReports = () => {
           totalPatients: executiveSummary.total_patients,
           fitPercentage: executiveSummary.total_patients ? 
             ((executiveSummary.total_fit / executiveSummary.total_patients) * 100).toFixed(1) : 0,
+          totalExaminations: executiveSummary.total_examinations,
+          generatedAt: new Date().toISOString()
+        }
+      },
+      'monthly-summary': {
+        title: `Monthly Summary Report - ${currentMonth}`,
+        data: {
+          reportMonth: currentMonth,
+          totalPatients: executiveSummary.total_patients,
+          totalExaminations: executiveSummary.total_examinations,
+          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
+          totalFit: executiveSummary.total_fit,
+          healthScore: executiveSummary.health_score || 'N/A',
+          totalTestsConducted: executiveSummary.total_tests_conducted,
+          totalTestsCompleted: executiveSummary.total_tests_completed,
+          generatedAt: new Date().toISOString()
+        }
+      },
+      'compliance-alerts': {
+        title: 'Compliance Alerts Report',
+        data: {
+          totalPatients: executiveSummary.total_patients,
+          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
+          totalExaminations: executiveSummary.total_examinations,
+          urgentAction: 'Review certificates expiring in next 30 days',
+          recommendation: 'Schedule renewal examinations for expiring certificates',
+          generatedAt: new Date().toISOString()
+        }
+      },
+      'turnaround-times': {
+        title: 'Processing Times Report',
+        data: {
+          totalTestsConducted: executiveSummary.total_tests_conducted,
+          totalTestsCompleted: executiveSummary.total_tests_completed,
+          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
+          pendingTests: (executiveSummary.total_tests_conducted || 0) - (executiveSummary.total_tests_completed || 0),
+          averageProcessingNote: 'Detailed processing times available in Premium version',
           generatedAt: new Date().toISOString()
         }
       }
@@ -102,15 +165,23 @@ const BasicReports = () => {
 
     const report = reportData[reportId as keyof typeof reportData];
     if (report) {
-      // Create a simple text report
+      // Create a comprehensive text report
       const reportContent = `
 ${report.title}
 Generated: ${new Date(report.data.generatedAt).toLocaleDateString()}
+========================================
 
 ${Object.entries(report.data)
   .filter(([key]) => key !== 'generatedAt')
-  .map(([key, value]) => `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value}`)
+  .map(([key, value]) => {
+    const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    return `${label}: ${value}`;
+  })
   .join('\n')}
+
+========================================
+Report generated by Health Management System
+Basic Plan - For detailed analytics, upgrade to Premium
       `.trim();
 
       // Create and download the report
@@ -147,9 +218,9 @@ ${Object.entries(report.data)
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-semibold">Basic Reports</h3>
+          <h3 className="text-lg font-semibold">Essential Reports</h3>
           <p className="text-sm text-muted-foreground">
-            Generate essential reports for your organization
+            Generate comprehensive reports for your organization's health compliance
           </p>
         </div>
         <Badge variant="outline" className="bg-gray-50">
