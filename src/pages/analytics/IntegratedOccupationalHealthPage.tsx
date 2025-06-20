@@ -18,6 +18,7 @@ import { Helmet } from 'react-helmet';
 import RiskAnalysisDashboard from './components/RiskAnalysisDashboard';
 import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashboard';
 import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
+import InteractiveDataExploration from './components/InteractiveDataExploration';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
@@ -43,6 +44,7 @@ const IntegratedOccupationalHealthPage = () => {
           <TabsTrigger value="risk-analysis">Risk Analysis</TabsTrigger>
           <TabsTrigger value="benchmarking">Benchmarking</TabsTrigger>
           <TabsTrigger value="predictive">Predictive Analytics</TabsTrigger>
+          <TabsTrigger value="data-exploration">Data Exploration</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="health-metrics">Health Metrics</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -81,6 +83,10 @@ const IntegratedOccupationalHealthPage = () => {
         
         <TabsContent value="predictive" className="space-y-4">
           <PredictiveAnalyticsDashboard />
+        </TabsContent>
+        
+        <TabsContent value="data-exploration" className="space-y-4">
+          <InteractiveDataExploration />
         </TabsContent>
         
         <TabsContent value="compliance" className="space-y-4">
