@@ -24,6 +24,11 @@ import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashbo
 import InteractiveDataExploration from './components/InteractiveDataExploration';
 import AdvancedReportGenerator from './components/AdvancedReportGenerator';
 
+// Import the new analytics components
+import MedicalFitnessDeclarationChart from './components/MedicalFitnessDeclarationChart';
+import EnhancedRestrictionsAnalytics from './components/EnhancedRestrictionsAnalytics';
+import ExaminationTypeAnalytics from './components/ExaminationTypeAnalytics';
+
 const IntegratedOccupationalHealthPage = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -42,8 +47,11 @@ const IntegratedOccupationalHealthPage = () => {
       <ExecutiveSummaryBanner />
       
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="fitness-declarations">Fitness Declarations</TabsTrigger>
+          <TabsTrigger value="examination-types">Exam Types</TabsTrigger>
+          <TabsTrigger value="restrictions">Restrictions</TabsTrigger>
           <TabsTrigger value="medical-tests">Medical Tests</TabsTrigger>
           <TabsTrigger value="risk-analysis">Risk Analysis</TabsTrigger>
           <TabsTrigger value="benchmarking">Benchmarking</TabsTrigger>
@@ -57,6 +65,18 @@ const IntegratedOccupationalHealthPage = () => {
         
         <TabsContent value="overview" className="space-y-4">
           <OptimizedOverviewTab />
+        </TabsContent>
+        
+        <TabsContent value="fitness-declarations" className="space-y-4">
+          <MedicalFitnessDeclarationChart />
+        </TabsContent>
+        
+        <TabsContent value="examination-types" className="space-y-4">
+          <ExaminationTypeAnalytics />
+        </TabsContent>
+        
+        <TabsContent value="restrictions" className="space-y-4">
+          <EnhancedRestrictionsAnalytics />
         </TabsContent>
         
         <TabsContent value="medical-tests" className="space-y-4">
