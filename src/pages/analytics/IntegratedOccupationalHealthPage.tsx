@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Helmet } from 'react-helmet';
 import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
+import FeatureGate from '@/components/FeatureGate';
 
 // Lazy load components for better performance
 import OptimizedOverviewTab from './components/OptimizedOverviewTab';
@@ -76,7 +76,9 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsContent>
         
         <TabsContent value="restrictions" className="space-y-4">
-          <EnhancedRestrictionsAnalytics />
+          <FeatureGate requiredTier="premium">
+            <EnhancedRestrictionsAnalytics />
+          </FeatureGate>
         </TabsContent>
         
         <TabsContent value="medical-tests" className="space-y-4">
@@ -84,19 +86,27 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsContent>
         
         <TabsContent value="risk-analysis" className="space-y-4">
-          <RiskAnalysisDashboard />
+          <FeatureGate requiredTier="premium">
+            <RiskAnalysisDashboard />
+          </FeatureGate>
         </TabsContent>
         
         <TabsContent value="benchmarking" className="space-y-4">
-          <CompanyBenchmarkingDashboard />
+          <FeatureGate requiredTier="enterprise">
+            <CompanyBenchmarkingDashboard />
+          </FeatureGate>
         </TabsContent>
         
         <TabsContent value="predictive" className="space-y-4">
-          <PredictiveAnalyticsDashboard />
+          <FeatureGate requiredTier="enterprise">
+            <PredictiveAnalyticsDashboard />
+          </FeatureGate>
         </TabsContent>
         
         <TabsContent value="data-exploration" className="space-y-4">
-          <InteractiveDataExploration />
+          <FeatureGate requiredTier="premium">
+            <InteractiveDataExploration />
+          </FeatureGate>
         </TabsContent>
         
         <TabsContent value="compliance" className="space-y-4">
@@ -110,7 +120,6 @@ const IntegratedOccupationalHealthPage = () => {
                 <p className="text-muted-foreground">
                   List of certificates that will expire in the next 30 days.
                 </p>
-                {/* Expiring certificates list would go here */}
               </CardContent>
             </Card>
           </div>
@@ -127,11 +136,15 @@ const IntegratedOccupationalHealthPage = () => {
         
         <TabsContent value="health-metrics" className="space-y-4">
           <HealthMetricsAssessment />
-          <CorporateHealthMetricsPanel />
+          <FeatureGate requiredTier="premium">
+            <CorporateHealthMetricsPanel />
+          </FeatureGate>
         </TabsContent>
         
         <TabsContent value="reports" className="space-y-4">
-          <AdvancedReportGenerator />
+          <FeatureGate requiredTier="premium">
+            <AdvancedReportGenerator />
+          </FeatureGate>
           
           <Card>
             <CardHeader>
