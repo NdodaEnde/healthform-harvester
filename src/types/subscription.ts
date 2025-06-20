@@ -1,13 +1,32 @@
 
 export type PackageTier = 'basic' | 'premium' | 'enterprise';
 
+export type FeatureKey = 
+  | 'employee_status_overview'
+  | 'compliance_tracking'
+  | 'basic_reporting'
+  | 'certificate_alerts'
+  | 'simple_charts'
+  | 'trend_analysis'
+  | 'risk_intelligence'
+  | 'advanced_reporting'
+  | 'department_breakdowns'
+  | 'custom_branding'
+  | 'automated_scheduling'
+  | 'predictive_analytics'
+  | 'competitive_benchmarking'
+  | 'api_access'
+  | 'custom_integrations'
+  | 'white_label_reports'
+  | 'dedicated_support';
+
 export interface SubscriptionPackage {
   id: string;
   name: string;
   tier: PackageTier;
   price: number;
   billing_cycle: 'monthly' | 'annual';
-  features: string[];
+  features: FeatureKey[];
   max_users?: number;
   max_clients?: number;
   api_access: boolean;
@@ -28,7 +47,7 @@ export interface OrganizationSubscription {
   updated_at: string;
 }
 
-export const PACKAGE_FEATURES = {
+export const PACKAGE_FEATURES: Record<PackageTier, FeatureKey[]> = {
   basic: [
     'employee_status_overview',
     'compliance_tracking',
@@ -37,7 +56,11 @@ export const PACKAGE_FEATURES = {
     'simple_charts'
   ],
   premium: [
-    ...['employee_status_overview', 'compliance_tracking', 'basic_reporting', 'certificate_alerts', 'simple_charts'],
+    'employee_status_overview',
+    'compliance_tracking',
+    'basic_reporting',
+    'certificate_alerts',
+    'simple_charts',
     'trend_analysis',
     'risk_intelligence',
     'advanced_reporting',
@@ -46,7 +69,17 @@ export const PACKAGE_FEATURES = {
     'automated_scheduling'
   ],
   enterprise: [
-    ...['employee_status_overview', 'compliance_tracking', 'basic_reporting', 'certificate_alerts', 'simple_charts', 'trend_analysis', 'risk_intelligence', 'advanced_reporting', 'department_breakdowns', 'custom_branding', 'automated_scheduling'],
+    'employee_status_overview',
+    'compliance_tracking',
+    'basic_reporting',
+    'certificate_alerts',
+    'simple_charts',
+    'trend_analysis',
+    'risk_intelligence',
+    'advanced_reporting',
+    'department_breakdowns',
+    'custom_branding',
+    'automated_scheduling',
     'predictive_analytics',
     'competitive_benchmarking',
     'api_access',
@@ -54,7 +87,7 @@ export const PACKAGE_FEATURES = {
     'white_label_reports',
     'dedicated_support'
   ]
-} as const;
+};
 
 export const DEFAULT_PACKAGES: SubscriptionPackage[] = [
   {

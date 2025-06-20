@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { PackageTier, PACKAGE_FEATURES } from '@/types/subscription';
+import { PackageTier, PACKAGE_FEATURES, FeatureKey } from '@/types/subscription';
 
 interface SubscriptionData {
   package_tier: PackageTier;
@@ -55,7 +55,7 @@ export const useSubscription = () => {
     fetchSubscription();
   }, [currentOrganization]);
 
-  const hasFeature = (feature: string): boolean => {
+  const hasFeature = (feature: FeatureKey): boolean => {
     if (!subscription) return false;
     return PACKAGE_FEATURES[subscription.package_tier]?.includes(feature) || false;
   };
