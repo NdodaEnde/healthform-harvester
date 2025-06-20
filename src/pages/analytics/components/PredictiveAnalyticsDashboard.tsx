@@ -249,7 +249,7 @@ const PredictiveAnalyticsDashboard = () => {
                 <Tooltip 
                   formatter={(value, name) => [
                     typeof value === 'number' ? value : value,
-                    name === 'totalTests' ? 'Total Tests' : name
+                    name === 'totalTests' ? 'Total Tests' : String(name)
                   ]}
                 />
                 <Legend />
@@ -322,10 +322,10 @@ const PredictiveAnalyticsDashboard = () => {
               <YAxis yAxisId="right" orientation="right" />
               <Tooltip 
                 formatter={(value, name) => [
-                  `${value}${name.includes('Rate') ? '%' : ''}`,
-                  name === 'completionRate' ? 'Completion Rate' :
-                  name === 'abnormalRate' ? 'Abnormal Rate' :
-                  name === 'uniquePatients' ? 'Unique Patients' : name
+                  `${value}${String(name).includes('Rate') ? '%' : ''}`,
+                  String(name) === 'completionRate' ? 'Completion Rate' :
+                  String(name) === 'abnormalRate' ? 'Abnormal Rate' :
+                  String(name) === 'uniquePatients' ? 'Unique Patients' : String(name)
                 ]}
               />
               <Legend />
