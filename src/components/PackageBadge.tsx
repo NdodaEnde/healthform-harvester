@@ -1,40 +1,53 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Zap, Crown } from 'lucide-react';
+import { Zap, Crown, Shield } from 'lucide-react';
 import { PackageTier } from '@/types/subscription';
 
 interface PackageBadgeProps {
   tier: PackageTier;
-  size?: 'sm' | 'md';
+  className?: string;
 }
 
-const PackageBadge: React.FC<PackageBadgeProps> = ({ tier, size = 'sm' }) => {
-  const tierConfig = {
-    basic: {
-      icon: Lock,
-      label: 'Basic',
-      className: 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-    },
-    premium: {
-      icon: Zap,
-      label: 'Premium',
-      className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-    },
-    enterprise: {
-      icon: Crown,
-      label: 'Enterprise',
-      className: 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+const PackageBadge: React.FC<PackageBadgeProps> = ({ tier, className }) => {
+  const getTierConfig = (packageTier: PackageTier) => {
+    switch (packageTier) {
+      case 'basic':
+        return {
+          label: 'Basic',
+          icon: Shield,
+          className: 'bg-gray-100 text-gray-800 border-gray-300'
+        };
+      case 'premium':
+        return {
+          label: 'Premium',
+          icon: Zap,
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-300'
+        };
+      case 'enterprise':
+        return {
+          label: 'Enterprise',
+          icon: Crown,
+          className: 'bg-purple-100 text-purple-800 border-purple-300'
+        };
+      default:
+        return {
+          label: 'Basic',
+          icon: Shield,
+          className: 'bg-gray-100 text-gray-800 border-gray-300'
+        };
     }
   };
 
-  const config = tierConfig[tier];
-  const Icon = config.icon;
-  const iconSize = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
+  const config = getTierConfig(tier);
+  const IconComponent = config.icon;
 
   return (
-    <Badge className={config.className} variant="secondary">
-      <Icon className={`${iconSize} mr-1`} />
+    <Badge 
+      variant="outline" 
+      className={`${config.className} ${className || ''}`}
+    >
+      <IconComponent className="h-3 w-3 mr-1" />
       {config.label}
     </Badge>
   );

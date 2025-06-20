@@ -25,25 +25,24 @@ export const useSubscription = () => {
 
       try {
         // For now, we'll check if the organization has subscription info in settings
-        // Later this would be a separate subscriptions table
         const settings = currentOrganization.settings as any;
         const subscriptionData = settings?.subscription;
 
         if (subscriptionData) {
           setSubscription(subscriptionData);
         } else {
-          // Default to basic package for existing organizations
+          // Set to premium package for testing premium features
           setSubscription({
-            package_tier: 'basic',
+            package_tier: 'premium',
             status: 'active',
             current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
           });
         }
       } catch (error) {
         console.error('Error fetching subscription:', error);
-        // Fallback to basic
+        // Fallback to premium for testing
         setSubscription({
-          package_tier: 'basic',
+          package_tier: 'premium',
           status: 'active',
           current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         });
@@ -105,6 +104,6 @@ export const useSubscription = () => {
     hasFeature,
     canAccessFeature,
     upgradeSubscription,
-    currentTier: subscription?.package_tier || 'basic'
+    currentTier: subscription?.package_tier || 'premium'
   };
 };
