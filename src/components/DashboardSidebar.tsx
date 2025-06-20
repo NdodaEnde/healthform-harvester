@@ -116,10 +116,10 @@ export function DashboardSidebar() {
   const availableNavItems = navItems.filter(item => {
     if (item.tier === "basic") return true;
     if (item.tier === "premium" && (currentTier === "premium" || currentTier === "enterprise")) {
-      return item.feature ? hasFeature(item.feature) : true;
+      return item.feature ? hasFeature(item.feature as any) : true;
     }
     if (item.tier === "enterprise" && currentTier === "enterprise") {
-      return item.feature ? hasFeature(item.feature) : true;
+      return item.feature ? hasFeature(item.feature as any) : true;
     }
     return false;
   });
