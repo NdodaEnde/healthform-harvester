@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Zap, Crown } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
-import { PackageTier } from '@/types/subscription';
+import { PackageTier, FeatureKey } from '@/types/subscription';
 
 interface FeatureGateProps {
-  feature?: string;
+  feature?: FeatureKey;
   requiredTier?: PackageTier;
   children: React.ReactNode;
   fallback?: React.ReactNode;
@@ -37,7 +37,7 @@ const FeatureGate: React.FC<FeatureGateProps> = ({
   }
 
   // Determine the target tier for upgrade
-  const targetTier = requiredTier || (feature ? 'premium' : 'premium');
+  const targetTier = requiredTier || 'premium';
   const tierIcons = {
     basic: Lock,
     premium: Zap,
