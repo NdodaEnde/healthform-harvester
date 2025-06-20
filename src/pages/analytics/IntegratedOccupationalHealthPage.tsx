@@ -29,9 +29,9 @@ import MedicalFitnessDeclarationChart from './components/MedicalFitnessDeclarati
 import EnhancedRestrictionsAnalytics from './components/EnhancedRestrictionsAnalytics';
 import ExaminationTypeAnalytics from './components/ExaminationTypeAnalytics';
 
-// Import the new basic components
-import BasicOverviewTab from './components/BasicOverviewTab';
-import BasicReports from './components/BasicReports';
+// Import the new basic components with correct paths
+import BasicOverviewTab from '@/components/analytics/BasicOverviewTab';
+import BasicReports from '@/components/analytics/BasicReports';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
