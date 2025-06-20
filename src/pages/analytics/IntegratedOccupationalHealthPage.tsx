@@ -19,6 +19,7 @@ import RiskAnalysisDashboard from './components/RiskAnalysisDashboard';
 import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashboard';
 import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
 import InteractiveDataExploration from './components/InteractiveDataExploration';
+import AdvancedReportGenerator from './components/AdvancedReportGenerator';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
@@ -121,17 +122,14 @@ const IntegratedOccupationalHealthPage = () => {
         </TabsContent>
         
         <TabsContent value="reports" className="space-y-4">
-          <ReportGeneratorCard />
+          <AdvancedReportGenerator />
           
           <Card>
             <CardHeader>
-              <CardTitle>Recent Reports</CardTitle>
+              <CardTitle>Legacy Report Generator</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Access and download previously generated reports.
-              </p>
-              {/* Recent reports list would go here */}
+              <ReportGeneratorCard />
             </CardContent>
           </Card>
         </TabsContent>
