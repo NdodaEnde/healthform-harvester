@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { EnhancedFeatureGate } from '@/components/EnhancedFeatureGate';
+import EnhancedFeatureGate from '@/components/EnhancedFeatureGate';
 import { usePackage } from '@/contexts/PackageContext';
 import { FeatureKey, PackageTier } from '@/types/subscription';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
