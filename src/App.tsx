@@ -20,7 +20,9 @@ import OnboardingPage from './pages/onboarding/OnboardingPage';
 import TierTestingPage from './pages/TierTestingPage';
 import Auth from './pages/Auth';
 import PatientsPage from './pages/PatientsPage';
+import PatientDetailPage from './pages/PatientDetailPage';
 import DocumentsPage from './pages/DocumentsPage';
+import DocumentViewer from './pages/DocumentViewer';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
 import { OrganizationsPage, CreateOrganizationPage, EditOrganizationPage, OrganizationUsersPage, OrganizationClientsPage } from './pages/admin';
 
@@ -67,9 +69,29 @@ function App() {
                         <PatientsPage />
                       </DashboardLayout>
                     } />
+                    <Route path="/patients/:id" element={
+                      <DashboardLayout>
+                        <PatientDetailPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/patients/:id/edit" element={
+                      <DashboardLayout>
+                        <PatientDetailPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/patients/new" element={
+                      <DashboardLayout>
+                        <PatientsPage />
+                      </DashboardLayout>
+                    } />
                     <Route path="/documents" element={
                       <DashboardLayout>
                         <DocumentsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/documents/:id" element={
+                      <DashboardLayout>
+                        <DocumentViewer />
                       </DashboardLayout>
                     } />
                     <Route path="/reports" element={
