@@ -24,32 +24,7 @@ const PremiumOverviewTab: React.FC = () => {
     error 
   } = useOptimizedAnalytics();
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <FeatureSkeleton type="card" className="h-32" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <FeatureSkeleton key={i} type="card" className="h-32" />
-          ))}
-        </div>
-        <FeatureSkeleton type="chart" className="h-64" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">Unable to load premium analytics data. Please try again later.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+  // Always call all hooks before any early returns
   // Safely process trend data
   const trendData = React.useMemo(() => {
     if (!monthlyTrends || !Array.isArray(monthlyTrends)) return [];
@@ -81,7 +56,7 @@ const PremiumOverviewTab: React.FC = () => {
     }, { low: 0, medium: 0, high: 0 });
   }, [riskAssessment]);
 
-  const premiumMetrics = [
+  const premiumMetrics = React.useMemo(() => [
     {
       title: "Health Intelligence Score",
       value: computedMetrics?.healthScorePercentage?.toFixed(1) || "0.0",
@@ -114,7 +89,34 @@ const PremiumOverviewTab: React.FC = () => {
       color: "text-green-600",
       description: "Advanced completion tracking"
     }
-  ];
+  ], [computedMetrics, riskDistribution, riskAssessment]);
+
+  // Now we can safely return early after all hooks have been called
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <FeatureSkeleton type="card" className="h-32" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <FeatureSkeleton key={i} type="card" className="h-32" />
+          ))}
+        </div>
+        <FeatureSkeleton type="chart" className="h-64" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">Unable to load premium analytics data. Please try again later.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
