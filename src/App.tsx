@@ -13,7 +13,7 @@ import Index from '@/pages/Index';
 import Dashboard from '@/pages/Dashboard';
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage';
-import SettingsPage from './pages/settings/SettingsPage';
+import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
 import CertificatesPage from './pages/certificates/CertificatesPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
 import OnboardingPage from './pages/onboarding/OnboardingPage';
@@ -21,6 +21,7 @@ import TierTestingPage from './pages/TierTestingPage';
 import Auth from './pages/Auth';
 import PatientsPage from './pages/PatientsPage';
 import DocumentsPage from './pages/DocumentsPage';
+import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
 import { OrganizationsPage, CreateOrganizationPage, EditOrganizationPage, OrganizationUsersPage, OrganizationClientsPage } from './pages/admin';
 
 const queryClient = new QueryClient();
@@ -78,12 +79,12 @@ function App() {
                     } />
                     <Route path="/settings" element={
                       <DashboardLayout>
-                        <SettingsPage />
+                        <OrganizationSettingsPage />
                       </DashboardLayout>
                     } />
                     <Route path="/settings/organization" element={
                       <DashboardLayout>
-                        <SettingsPage />
+                        <OrganizationSettingsPage />
                       </DashboardLayout>
                     } />
                     <Route path="/certificates" element={
@@ -93,7 +94,7 @@ function App() {
                     } />
                     <Route path="/certificates/templates" element={
                       <DashboardLayout>
-                        <CertificatesPage />
+                        <CertificateTemplatesPage />
                       </DashboardLayout>
                     } />
                     <Route path="/employees" element={
