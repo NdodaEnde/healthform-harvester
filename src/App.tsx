@@ -50,6 +50,16 @@ function App() {
                         <AnalyticsPage />
                       </DashboardLayout>
                     } />
+                    <Route path="/clinical-analytics" element={
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/integrated-occupational-health" element={
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
+                    } />
                     <Route path="/patients" element={
                       <DashboardLayout>
                         <PatientsPage />
@@ -70,7 +80,17 @@ function App() {
                         <SettingsPage />
                       </DashboardLayout>
                     } />
+                    <Route path="/settings/organization" element={
+                      <DashboardLayout>
+                        <SettingsPage />
+                      </DashboardLayout>
+                    } />
                     <Route path="/certificates" element={
+                      <DashboardLayout>
+                        <CertificatesPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/certificates/templates" element={
                       <DashboardLayout>
                         <CertificatesPage />
                       </DashboardLayout>
@@ -93,6 +113,21 @@ function App() {
                     <Route path="/testing" element={
                       <DashboardLayout>
                         <TierTestingPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/admin/organizations" element={
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/admin/organizations/:orgId/clients" element={
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/admin/users" element={
+                      <DashboardLayout>
+                        <AnalyticsPage />
                       </DashboardLayout>
                     } />
                   </Routes>
