@@ -24,6 +24,26 @@ const PremiumOverviewTab = () => {
     }, 2000);
   };
 
+  // Always calculate advanced metrics - moved outside of useMemo to avoid conditional hook calls
+  const riskDistribution = riskAssessment?.reduce((acc, item) => {
+    const riskLevel = item.risk_level?.toLowerCase() || 'low';
+    if (riskLevel.includes('high')) acc.high += item.test_count || 0;
+    else if (riskLevel.includes('medium')) acc.medium += item.test_count || 0;
+    else acc.low += item.test_count || 0;
+    return acc;
+  }, { low: 0, medium: 0, high: 0 }) || { low: 0, medium: 0, high: 0 };
+
+  const trendAccuracy = monthlyTrends?.length > 2 ? 
+    Math.round(85 + Math.random() * 10) : 85; // Simulated ML accuracy
+
+  const advancedMetrics = {
+    healthScore: executiveSummary?.health_score?.toFixed(1) || "7.8",
+    riskPredictions: riskDistribution.high,
+    departmentCount: riskAssessment?.length || 0,
+    trendAccuracy: `${trendAccuracy}%`,
+    riskDistribution
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -38,28 +58,6 @@ const PremiumOverviewTab = () => {
       </div>
     );
   }
-
-  // Premium advanced metrics
-  const advancedMetrics = React.useMemo(() => {
-    const riskDistribution = riskAssessment?.reduce((acc, item) => {
-      const riskLevel = item.risk_level?.toLowerCase() || 'low';
-      if (riskLevel.includes('high')) acc.high += item.test_count || 0;
-      else if (riskLevel.includes('medium')) acc.medium += item.test_count || 0;
-      else acc.low += item.test_count || 0;
-      return acc;
-    }, { low: 0, medium: 0, high: 0 }) || { low: 0, medium: 0, high: 0 };
-
-    const trendAccuracy = monthlyTrends?.length > 2 ? 
-      Math.round(85 + Math.random() * 10) : 85; // Simulated ML accuracy
-
-    return {
-      healthScore: executiveSummary?.health_score?.toFixed(1) || "7.8",
-      riskPredictions: riskDistribution.high,
-      departmentCount: riskAssessment?.length || 0,
-      trendAccuracy: `${trendAccuracy}%`,
-      riskDistribution
-    };
-  }, [executiveSummary, riskAssessment, monthlyTrends]);
 
   const premiumStats = [
     {
