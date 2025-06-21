@@ -5,6 +5,7 @@ import { usePackage } from '@/contexts/PackageContext';
 import PremiumOverviewTab from '@/components/analytics/PremiumOverviewTab';
 import BasicOverviewTab from '@/components/analytics/BasicOverviewTab';
 import RealDataAnalyticsDashboard from '@/components/analytics/RealDataAnalyticsDashboard';
+import AdvancedAnalyticsTab from '@/components/analytics/AdvancedAnalyticsTab';
 import ExecutiveSummaryBanner from './components/ExecutiveSummaryBanner';
 import PackageStatusBanner from '@/components/PackageStatusBanner';
 import FeatureSkeleton from '@/components/FeatureSkeleton';
