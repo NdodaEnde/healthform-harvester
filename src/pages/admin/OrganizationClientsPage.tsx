@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,21 +16,30 @@ import ClientRelationshipTable from "@/components/admin/ClientRelationshipTable"
 import AddClientForm from "@/components/admin/AddClientForm";
 import { Organization } from "@/types/organization";
 
+interface ClientRelationship {
+  id: string;
+  client_id: string;
+  is_active: boolean;
+  relationship_start_date?: string;
+  client?: Organization;
+}
+
 export default function OrganizationClientsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [organizationLoading, setOrganizationLoading] = useState(true);
+  const [clients, setClients] = useState<ClientRelationship[]>([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     if (id) {
       fetchOrganization();
+      fetchClients();
     }
   }, [id]);
   
   const fetchOrganization = async () => {
     try {
-      setOrganizationLoading(true);
       const { data, error } = await supabase
         .from("organizations")
         .select("*")
@@ -56,25 +66,67 @@ export default function OrganizationClientsPage() {
         description: "Failed to load organization details",
         variant: "destructive",
       });
+    }
+  };
+  
+  const fetchClients = async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    try {
+      // First get the relationship records
+      const { data: relationships, error: relationshipsError } = await supabase
+        .from("organization_relationships")
+        .select(`
+          id,
+          client_id,
+          is_active,
+          relationship_start_date
+        `)
+        .eq("service_provider_id", id as any);
+        
+      if (relationshipsError) throw relationshipsError;
+      
+      // Now fetch the client details for each relationship
+      if (relationships && relationships.length > 0) {
+        const clientIds = relationships.map(rel => rel.client_id);
+        
+        const { data: clientsData, error: clientsError } = await supabase
+          .from("organizations")
+          .select("id, name, organization_type, contact_email")
+          .in("id", clientIds);
+          
+        if (clientsError) throw clientsError;
+        
+        // Combine the data
+        const clientsWithDetails: ClientRelationship[] = relationships.map(rel => {
+          const clientDetails = clientsData?.find(c => c.id === rel.client_id);
+          return {
+            ...rel,
+            client: clientDetails
+          };
+        });
+        
+        setClients(clientsWithDetails);
+      } else {
+        setClients([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching clients:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load client relationships",
+        variant: "destructive",
+      });
     } finally {
-      setOrganizationLoading(false);
+      setLoading(false);
     }
   };
   
   const handleClientAdded = () => {
-    // This will trigger the ClientRelationshipTable to refresh via its useEffect
-    // No need to manage client state here
+    // Refresh both lists after adding a client
+    fetchClients();
   };
-  
-  if (organizationLoading) {
-    return (
-      <div className="container py-10">
-        <div className="py-8 flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
-      </div>
-    );
-  }
   
   return (
     <div className="container py-10">
@@ -107,17 +159,21 @@ export default function OrganizationClientsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ClientRelationshipTable 
-                serviceProviderId={id || ""}
-                key={id} // Force re-render when ID changes
-              />
+              {loading ? (
+                <div className="py-8 flex justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : (
+                <ClientRelationshipTable 
+                  serviceProviderId={id || ""}
+                />
+              )}
             </CardContent>
           </Card>
         </div>
         
         <div>
           <AddClientForm 
-            serviceProviderId={id || ""}
             onSuccess={handleClientAdded}
           />
         </div>
