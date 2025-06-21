@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { usePackage } from '@/contexts/PackageContext';
 import AnalyticsService, { AnalyticsMetric } from '@/services/AnalyticsService';
 import AnalyticsFeatureGate from '@/components/analytics/AnalyticsFeatureGate';
+import AnalyticsExportButton from '@/components/analytics/AnalyticsExportButton';
 import { 
   Users, CheckCircle, Clock, FileText, Target, AlertTriangle, 
   Building2, BarChart3, TrendingUp, DollarSign, Shield, Settings,
@@ -131,9 +131,24 @@ const EnhancedMetricsDashboard: React.FC = () => {
              'Essential health metrics and compliance overview'}
           </p>
         </div>
-        <Badge variant="outline" className={`${colors.background} ${colors.text}`}>
-          {metrics.length} Metrics Available
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className={`${colors.background} ${colors.text}`}>
+            {metrics.length} Metrics Available
+          </Badge>
+          {(currentTier === 'premium' || currentTier === 'enterprise') && (
+            <AnalyticsExportButton
+              data={{
+                executiveSummary: { 
+                  total_metrics: metrics.length,
+                  tier: currentTier 
+                }
+              }}
+              title="Health Metrics Dashboard"
+              variant="outline"
+              size="sm"
+            />
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

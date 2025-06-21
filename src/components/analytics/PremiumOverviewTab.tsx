@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +6,7 @@ import { usePackage } from '@/contexts/PackageContext';
 import { useOptimizedAnalytics } from '@/hooks/useOptimizedAnalytics';
 import EnhancedMetricsDashboard from '@/components/analytics/EnhancedMetricsDashboard';
 import FeatureSkeleton from '@/components/FeatureSkeleton';
+import AnalyticsExportButton from '@/components/analytics/AnalyticsExportButton';
 import { 
   TrendingUp, AlertTriangle, Users, Building2, Target, BarChart3,
   Zap, Crown
@@ -134,19 +134,30 @@ const PremiumOverviewTab: React.FC = () => {
                   'Advanced insights with trend analysis, risk intelligence, and predictive analytics.'
                 }
               </p>
-              <Badge className={isEnterprise ? "bg-purple-100 text-purple-800" : "bg-yellow-100 text-yellow-800"}>
-                {isEnterprise ? (
-                  <>
-                    <Crown className="h-3 w-3 mr-1" />
-                    Enterprise Features Active
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-3 w-3 mr-1" />
-                    Premium Features Active
-                  </>
-                )}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge className={isEnterprise ? "bg-purple-100 text-purple-800" : "bg-yellow-100 text-yellow-800"}>
+                  {isEnterprise ? (
+                    <>
+                      <Crown className="h-3 w-3 mr-1" />
+                      Enterprise Features Active
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-3 w-3 mr-1" />
+                      Premium Features Active
+                    </>
+                  )}
+                </Badge>
+                <AnalyticsExportButton
+                  data={{
+                    executiveSummary,
+                    monthlyTrends,
+                    riskAssessment,
+                  }}
+                  title={isEnterprise ? 'Enterprise Analytics Report' : 'Premium Analytics Report'}
+                  size="sm"
+                />
+              </div>
             </div>
             {isEnterprise ? (
               <Crown className="h-12 w-12 text-purple-600" />

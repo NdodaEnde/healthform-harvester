@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
 import { Download, FileText, Calendar, Users, Building2, Zap, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import AnalyticsExportButton from '@/components/analytics/AnalyticsExportButton';
 
 const BasicReports = () => {
   const [selectedReport, setSelectedReport] = useState<string>('');
@@ -223,9 +223,17 @@ Basic Plan - For detailed analytics, upgrade to Premium
             Generate comprehensive reports for your organization's health compliance
           </p>
         </div>
-        <Badge variant="outline" className="bg-gray-50">
-          Basic Plan
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="bg-gray-50">
+            Basic Plan
+          </Badge>
+          <AnalyticsExportButton
+            data={{ executiveSummary }}
+            title="Basic Health Report"
+            variant="outline"
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* Report Generator */}
