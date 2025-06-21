@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
@@ -11,9 +12,11 @@ import OnboardingPage from './pages/onboarding/OnboardingPage';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { PackageProvider } from '@/contexts/PackageContext';
 
+const queryClient = new QueryClient();
+
 function App() {
   return (
-    <QueryClient>
+    <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
         <OrganizationProvider>
           <PackageProvider>
@@ -33,7 +36,7 @@ function App() {
           </PackageProvider>
         </OrganizationProvider>
       </ThemeProvider>
-    </QueryClient>
+    </QueryClientProvider>
   );
 }
 
