@@ -10,6 +10,7 @@ import SettingsPage from './pages/settings/SettingsPage';
 import CertificatesPage from './pages/certificates/CertificatesPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
 import OnboardingPage from './pages/onboarding/OnboardingPage';
+import TierTestingPage from './pages/TierTestingPage';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { PackageProvider } from '@/contexts/PackageContext';
 
@@ -31,6 +32,7 @@ function App() {
                   <Route path="/certificates" element={<CertificatesPage />} />
                   <Route path="/employees" element={<EmployeesPage />} />
                   <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route path="/testing" element={<TierTestingPage />} />
                 </Routes>
                 <Toaster />
               </div>
