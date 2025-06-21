@@ -16,19 +16,35 @@ const iconMap = {
   Users, CheckCircle, Clock, FileText, Target, AlertTriangle,
   Building2, BarChart3, TrendingUp, DollarSign, Shield, Settings,
   TrendingDown, Minus
-};
+} as const;
 
 const EnhancedMetricsDashboard: React.FC = () => {
   const { currentTier, hasFeature, colors } = usePackage();
-  const metrics = AnalyticsService.getMetricsForTier(currentTier);
+  
+  // Add error boundary for metrics loading
+  let metrics: AnalyticsMetric[] = [];
+  try {
+    metrics = AnalyticsService.getMetricsForTier(currentTier);
+  } catch (error) {
+    console.error('Error loading metrics:', error);
+    metrics = [];
+  }
 
   const renderMetricCard = (metric: AnalyticsMetric) => {
-    const IconComponent = iconMap[metric.icon as keyof typeof iconMap] || FileText;
+    // Safely get the icon component with fallback
+    const IconComponent = (metric.icon && iconMap[metric.icon as keyof typeof iconMap]) || FileText;
     const TrendIcon = metric.trend === 'up' ? ArrowUpRight : 
                      metric.trend === 'down' ? ArrowDownRight : Minus;
     
-    const trendColor = AnalyticsService.getTrendColor(metric.trend);
-    const formattedValue = AnalyticsService.formatMetricValue(metric);
+    let trendColor = 'text-gray-500';
+    let formattedValue = '0';
+    
+    try {
+      trendColor = AnalyticsService.getTrendColor(metric.trend);
+      formattedValue = AnalyticsService.formatMetricValue(metric);
+    } catch (error) {
+      console.error('Error formatting metric:', error);
+    }
 
     // Check if this metric requires a higher tier
     const requiresUpgrade = metric.tier && !hasFeature(metric.feature!);
@@ -44,7 +60,7 @@ const EnhancedMetricsDashboard: React.FC = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <IconComponent className={`h-4 w-4 ${metric.color}`} />
+                <IconComponent className={`h-4 w-4 ${metric.color || 'text-gray-600'}`} />
                 {metric.name}
               </CardTitle>
             </CardHeader>
@@ -73,7 +89,7 @@ const EnhancedMetricsDashboard: React.FC = () => {
         )}
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <IconComponent className={`h-4 w-4 ${metric.color}`} />
+            <IconComponent className={`h-4 w-4 ${metric.color || 'text-gray-600'}`} />
             {metric.name}
           </CardTitle>
         </CardHeader>
@@ -89,6 +105,18 @@ const EnhancedMetricsDashboard: React.FC = () => {
       </Card>
     );
   };
+
+  if (metrics.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">No metrics available for the current tier.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

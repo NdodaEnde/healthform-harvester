@@ -50,15 +50,23 @@ const PremiumOverviewTab: React.FC = () => {
     );
   }
 
-  const trendData = monthlyTrends?.slice(-6).map(trend => ({
-    month: new Date(trend.test_month).toLocaleDateString('en-US', { month: 'short' }),
-    tests: trend.test_count,
-    completion_rate: Math.round(trend.completion_rate) || 0,
-    abnormal_rate: Math.round(trend.abnormal_rate) || 0
-  })) || [];
+  // Safely process trend data
+  const trendData = React.useMemo(() => {
+    if (!monthlyTrends || !Array.isArray(monthlyTrends)) return [];
+    
+    return monthlyTrends.slice(-6).map(trend => ({
+      month: new Date(trend.test_month).toLocaleDateString('en-US', { month: 'short' }),
+      tests: trend.test_count || 0,
+      completion_rate: Math.round(trend.completion_rate || 0),
+      abnormal_rate: Math.round(trend.abnormal_rate || 0)
+    }));
+  }, [monthlyTrends]);
 
+  // Safely process risk distribution
   const riskDistribution = React.useMemo(() => {
-    if (!riskAssessment) return { low: 0, medium: 0, high: 0 };
+    if (!riskAssessment || !Array.isArray(riskAssessment)) {
+      return { low: 0, medium: 0, high: 0 };
+    }
     
     return riskAssessment.reduce((acc, item) => {
       const riskLevel = item.risk_level?.toLowerCase() || 'low';
@@ -92,7 +100,7 @@ const PremiumOverviewTab: React.FC = () => {
     },
     {
       title: "Department Insights",
-      value: riskAssessment?.length || 0,
+      value: (riskAssessment && Array.isArray(riskAssessment)) ? riskAssessment.length : 0,
       icon: Building2,
       trend: "Departments analyzed",
       color: "text-purple-600",
@@ -261,7 +269,9 @@ const PremiumOverviewTab: React.FC = () => {
       </div>
 
       {/* Enhanced Metrics Dashboard */}
-      <EnhancedMetricsDashboard />
+      <React.Suspense fallback={<FeatureSkeleton type="card" className="h-32" />}>
+        <EnhancedMetricsDashboard />
+      </React.Suspense>
 
       {/* Enterprise Upgrade Prompt */}
       {!isEnterprise && (
