@@ -143,7 +143,7 @@ function App() {
                     } />
                     <Route path="/admin/users" element={
                       <DashboardLayout>
-                        <OrganizationsPage />
+                        <OrganizationUsersPage />
                       </DashboardLayout>
                     } />
                   </Routes>

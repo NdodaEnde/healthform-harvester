@@ -114,7 +114,7 @@ export function DashboardSidebar() {
     ] : []),
     { 
       name: "Settings", 
-      href: "/settings/organization", 
+      href: "/settings", 
       icon: Settings,
       tier: "basic"
     }
