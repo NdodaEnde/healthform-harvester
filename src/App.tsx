@@ -4,6 +4,13 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { AuthProvider } from '@/contexts/AuthContext';
+import { OrganizationProvider } from '@/contexts/OrganizationContext';
+import { PackageProvider } from '@/contexts/PackageContext';
+import DashboardLayout from '@/components/DashboardLayout';
+import HeaderComponent from '@/components/HeaderComponent';
+import Index from '@/pages/Index';
+import Dashboard from '@/pages/Dashboard';
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/settings/SettingsPage';
@@ -11,8 +18,9 @@ import CertificatesPage from './pages/certificates/CertificatesPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
 import OnboardingPage from './pages/onboarding/OnboardingPage';
 import TierTestingPage from './pages/TierTestingPage';
-import { OrganizationProvider } from '@/contexts/OrganizationContext';
-import { PackageProvider } from '@/contexts/PackageContext';
+import Auth from './pages/Auth';
+import PatientsPage from './pages/PatientsPage';
+import DocumentsPage from './pages/DocumentsPage';
 
 const queryClient = new QueryClient();
 
@@ -20,26 +28,80 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-        <OrganizationProvider>
-          <PackageProvider>
-            <Router>
-              <div className="min-h-screen bg-background">
-                <Routes>
-                  <Route path="/" element={<AnalyticsPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/certificates" element={<CertificatesPage />} />
-                  <Route path="/employees" element={<EmployeesPage />} />
-                  <Route path="/onboarding" element={<OnboardingPage />} />
-                  <Route path="/tier-testing" element={<TierTestingPage />} />
-                  <Route path="/testing" element={<TierTestingPage />} />
-                </Routes>
-                <Toaster />
-              </div>
-            </Router>
-          </PackageProvider>
-        </OrganizationProvider>
+        <AuthProvider>
+          <OrganizationProvider>
+            <PackageProvider>
+              <Router>
+                <div className="min-h-screen bg-background">
+                  <HeaderComponent />
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    
+                    {/* Dashboard routes with sidebar */}
+                    <Route path="/dashboard" element={
+                      <DashboardLayout>
+                        <Dashboard />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/analytics" element={
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/patients" element={
+                      <DashboardLayout>
+                        <PatientsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/documents" element={
+                      <DashboardLayout>
+                        <DocumentsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/reports" element={
+                      <DashboardLayout>
+                        <ReportsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/settings" element={
+                      <DashboardLayout>
+                        <SettingsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/certificates" element={
+                      <DashboardLayout>
+                        <CertificatesPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/employees" element={
+                      <DashboardLayout>
+                        <EmployeesPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/onboarding" element={
+                      <DashboardLayout>
+                        <OnboardingPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/tier-testing" element={
+                      <DashboardLayout>
+                        <TierTestingPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/testing" element={
+                      <DashboardLayout>
+                        <TierTestingPage />
+                      </DashboardLayout>
+                    } />
+                  </Routes>
+                  <Toaster />
+                </div>
+              </Router>
+            </PackageProvider>
+          </OrganizationProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
