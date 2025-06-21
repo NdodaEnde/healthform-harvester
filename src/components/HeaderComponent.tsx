@@ -9,7 +9,6 @@ import { Button } from './ui/button';
 import OrganizationLogo from './OrganizationLogo';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import { DashboardSidebar } from './DashboardSidebar';
-import OrganizationSwitcher from './OrganizationSwitcher';
 import ThemeToggle from './ThemeToggle';
 
 const HeaderComponent: React.FC = () => {
@@ -44,15 +43,6 @@ const HeaderComponent: React.FC = () => {
             )}
           </Link>
         </div>
-        
-        {/* For medium screens and up, show the organization switcher in the header */}
-        {!isPublicPath && user && orgContext?.currentOrganization && (
-          <div className="hidden md:block absolute left-1/2 transform -translate-x-1/2">
-            <div className="bg-white dark:bg-gray-900 shadow-md rounded-md p-2 border border-gray-200 dark:border-gray-700 z-50">
-              <OrganizationSwitcher />
-            </div>
-          </div>
-        )}
         
         {user && (
           <div className="flex items-center gap-4">
