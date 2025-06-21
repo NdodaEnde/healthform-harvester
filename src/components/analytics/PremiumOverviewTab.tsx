@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePackage } from '@/contexts/PackageContext';
 import { useOptimizedAnalytics } from '@/hooks/useOptimizedAnalytics';
-import { EnhancedMetricsDashboard } from '@/components/analytics/EnhancedMetricsDashboard';
+import EnhancedMetricsDashboard from '@/components/analytics/EnhancedMetricsDashboard';
 import FeatureSkeleton from '@/components/FeatureSkeleton';
 import { 
   TrendingUp, AlertTriangle, Users, Building2, Target, BarChart3,
