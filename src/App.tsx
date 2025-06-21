@@ -32,6 +32,7 @@ function App() {
                   <Route path="/certificates" element={<CertificatesPage />} />
                   <Route path="/employees" element={<EmployeesPage />} />
                   <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route path="/tier-testing" element={<TierTestingPage />} />
                   <Route path="/testing" element={<TierTestingPage />} />
                 </Routes>
                 <Toaster />
