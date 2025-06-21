@@ -1,172 +1,122 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
-import { Users, Building2, FileText, TrendingUp, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
-import BasicAnalyticsDashboard from './BasicAnalyticsDashboard';
-import ComplianceMonitoring from './ComplianceMonitoring';
-import MonthlyTestingMetrics from './MonthlyTestingMetrics';
-import EmployeeRoster from './EmployeeRoster';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { usePackage } from '@/contexts/PackageContext';
+import AnalyticsService from '@/services/AnalyticsService';
+import UpgradePromptCard from '@/components/UpgradePromptCard';
+import { 
+  Users, CheckCircle, Clock, FileText, ArrowUpRight, 
+  ArrowDownRight, Minus, TrendingUp 
+} from 'lucide-react';
 
-const BasicOverviewTab = () => {
-  const { executiveSummary, isLoading } = useEnhancedAnalytics();
+const iconMap = {
+  Users, CheckCircle, Clock, FileText
+};
 
-  if (isLoading) {
+const BasicOverviewTab: React.FC = () => {
+  const { colors } = usePackage();
+  const metrics = AnalyticsService.getMetricsForTier('basic');
+
+  const renderBasicMetric = (metric: any) => {
+    const IconComponent = iconMap[metric.icon as keyof typeof iconMap] || FileText;
+    const TrendIcon = metric.trend === 'up' ? ArrowUpRight : 
+                     metric.trend === 'down' ? ArrowDownRight : Minus;
+    
+    const trendColor = AnalyticsService.getTrendColor(metric.trend);
+    const formattedValue = AnalyticsService.formatMetricValue(metric);
+
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <Card key={metric.id}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <IconComponent className={`h-4 w-4 ${metric.color}`} />
+            {metric.name}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formattedValue}</div>
+          {metric.change && (
+            <div className={`flex items-center text-sm ${trendColor}`}>
+              <TrendIcon className="h-3 w-3 mr-1" />
+              {Math.abs(metric.change)}%
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
-  }
-
-  const quickStats = [
-    {
-      title: "Active Patients",
-      value: executiveSummary?.total_patients || 0,
-      icon: Users,
-      trend: "+12% this month",
-      color: "text-blue-600"
-    },
-    {
-      title: "Health Checks",
-      value: executiveSummary?.total_examinations || 0,
-      icon: FileText,
-      trend: "Processing smoothly",
-      color: "text-green-600"
-    },
-    {
-      title: "Compliance Rate",
-      value: `${executiveSummary?.overall_completion_rate?.toFixed(1) || 0}%`,
-      icon: CheckCircle,
-      trend: "Within target",
-      color: "text-emerald-600"
-    }
-  ];
+  };
 
   return (
     <div className="space-y-6">
-      {/* Welcome Banner */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Welcome to Your Health Analytics
-              </h2>
-              <p className="text-gray-600 mb-4">
-                Essential insights into your workforce health and compliance status.
-              </p>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-white">
-                  Basic Plan
-                </Badge>
-                <span className="text-sm text-gray-500">
-                  Essential features for health management
-                </span>
-              </div>
-            </div>
-            <TrendingUp className="h-12 w-12 text-blue-600" />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {quickStats.map((stat) => {
-          const IconComponent = stat.icon;
-          return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <IconComponent className={`h-4 w-4 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stat.trend}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Essential Metrics */}
+      <div>
+        <h2 className={`text-xl font-bold ${colors.text} mb-4`}>
+          Essential Health Metrics
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {metrics.map(renderBasicMetric)}
+        </div>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly Metrics</TabsTrigger>
-          <TabsTrigger value="roster">Employee Roster</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="dashboard" className="space-y-4">
-          <BasicAnalyticsDashboard />
-        </TabsContent>
-        
-        <TabsContent value="compliance" className="space-y-4">
-          <ComplianceMonitoring />
-        </TabsContent>
-        
-        <TabsContent value="monthly" className="space-y-4">
-          <MonthlyTestingMetrics />
-        </TabsContent>
-        
-        <TabsContent value="roster" className="space-y-4">
-          <EmployeeRoster />
-        </TabsContent>
-      </Tabs>
-
-      {/* Feature Comparison */}
-      <Card className="border-dashed border-2 border-purple-200 bg-purple-50/30">
+      {/* Quick Actions */}
+      <Card>
         <CardHeader>
-          <CardTitle>Unlock More with Premium</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            See what additional features you could access with an upgrade
-          </p>
+          <CardTitle className="text-lg">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium text-green-600 mb-3">✅ Current Basic Features</h4>
-              <ul className="space-y-2 text-sm">
-                <li>• Employee status overview</li>
-                <li>• Compliance monitoring & alerts</li>
-                <li>• Monthly testing metrics</li>
-                <li>• Employee roster exports</li>
-                <li>• Certificate expiration tracking</li>
-                <li>• Processing turnaround times</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium text-purple-600 mb-3">🚀 Premium Features</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• Advanced trend analysis</li>
-                <li>• Risk intelligence dashboard</li>
-                <li>• Department-level breakdowns</li>
-                <li>• Custom branded reports</li>
-                <li>• Automated scheduling</li>
-                <li>• Predictive analytics</li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-6 text-center">
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              Upgrade to Premium - $299/month
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              Export Basic Report
+            </Button>
+            <Button variant="outline" size="sm">
+              View Compliance
+            </Button>
+            <Button variant="outline" size="sm">
+              Check Certificates
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Basic Insights */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Key Insight
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className={`p-4 ${colors.background} rounded-lg border ${colors.border}`}>
+            <h3 className={`font-medium ${colors.text} mb-2`}>
+              Compliance Rate Improvement
+            </h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Your compliance rate has improved by 2.1% this month, indicating better health management processes.
+            </p>
+            <p className={`text-sm ${colors.text} font-medium`}>
+              💡 Recommendation: Continue current practices and monitor monthly trends.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upgrade Prompt */}
+      <UpgradePromptCard
+        targetTier="premium"
+        title="Unlock AI-Powered Analytics"
+        description="Upgrade to Premium for advanced insights, predictive analytics, and automated reporting."
+        features={[
+          'AI-powered health intelligence scoring',
+          'Predictive risk analysis and alerts',
+          'Department-level performance breakdowns',
+          'Advanced trend analysis and forecasting',
+          'Automated report generation',
+          'Custom branding for reports'
+        ]}
+        variant="card"
+      />
     </div>
   );
 };
