@@ -21,6 +21,7 @@ import TierTestingPage from './pages/TierTestingPage';
 import Auth from './pages/Auth';
 import PatientsPage from './pages/PatientsPage';
 import DocumentsPage from './pages/DocumentsPage';
+import { OrganizationsPage, CreateOrganizationPage, EditOrganizationPage, OrganizationUsersPage, OrganizationClientsPage } from './pages/admin';
 
 const queryClient = new QueryClient();
 
@@ -117,17 +118,32 @@ function App() {
                     } />
                     <Route path="/admin/organizations" element={
                       <DashboardLayout>
-                        <AnalyticsPage />
+                        <OrganizationsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/admin/organizations/new" element={
+                      <DashboardLayout>
+                        <CreateOrganizationPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/admin/organizations/:id/edit" element={
+                      <DashboardLayout>
+                        <EditOrganizationPage />
                       </DashboardLayout>
                     } />
                     <Route path="/admin/organizations/:orgId/clients" element={
                       <DashboardLayout>
-                        <AnalyticsPage />
+                        <OrganizationClientsPage />
+                      </DashboardLayout>
+                    } />
+                    <Route path="/admin/organizations/:id/users" element={
+                      <DashboardLayout>
+                        <OrganizationUsersPage />
                       </DashboardLayout>
                     } />
                     <Route path="/admin/users" element={
                       <DashboardLayout>
-                        <AnalyticsPage />
+                        <OrganizationsPage />
                       </DashboardLayout>
                     } />
                   </Routes>
