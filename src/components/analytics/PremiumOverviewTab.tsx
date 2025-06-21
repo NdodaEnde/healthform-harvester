@@ -1,20 +1,22 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
+import { usePackage } from '@/contexts/PackageContext';
 import { Zap, TrendingUp, Target, AlertTriangle, Building2, Users, BarChart3, Download, Calendar, FileText } from 'lucide-react';
 import PremiumAnalyticsDashboard from './PremiumAnalyticsDashboard';
 import PremiumReports from './PremiumReports';
 import ComplianceMonitoring from './ComplianceMonitoring';
 import MonthlyTestingMetrics from './MonthlyTestingMetrics';
 import EmployeeRoster from './EmployeeRoster';
+import PackageAwareMetrics from './PackageAwareMetrics';
 import { toast } from 'sonner';
 
 const PremiumOverviewTab = () => {
   const { executiveSummary, riskAssessment, monthlyTrends, isLoading } = useEnhancedAnalytics();
+  const { colors, language, displayName, isEnterprise } = usePackage();
 
   const generateAdvancedReport = (reportType: string) => {
     toast.success(`Generating ${reportType} report with advanced analytics...`);
@@ -59,68 +61,29 @@ const PremiumOverviewTab = () => {
     );
   }
 
-  const premiumStats = [
-    {
-      title: "Health Intelligence Score",
-      value: advancedMetrics.healthScore,
-      icon: Target,
-      trend: "AI-powered insights",
-      color: "text-purple-600",
-      change: "+2.3 points this month",
-      description: "Advanced predictive health scoring"
-    },
-    {
-      title: "Risk Predictions",
-      value: advancedMetrics.riskPredictions,
-      icon: AlertTriangle,
-      trend: "Early warnings active",
-      color: "text-red-600",
-      change: "3 new alerts detected",
-      description: "ML-powered risk detection"
-    },
-    {
-      title: "Department Analytics",
-      value: advancedMetrics.departmentCount,
-      icon: Building2,
-      trend: "Departments analyzed",
-      color: "text-blue-600",
-      change: "Full coverage active",
-      description: "Granular department insights"
-    },
-    {
-      title: "Trend Accuracy",
-      value: advancedMetrics.trendAccuracy,
-      icon: BarChart3,
-      trend: "ML model performance",
-      color: "text-green-600",
-      change: "+1.8% improvement",
-      description: "Predictive model accuracy"
-    }
-  ];
-
   return (
     <div className="space-y-6">
       {/* Premium Welcome Banner */}
-      <Card className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+      <Card className={`bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200 ${isEnterprise ? 'from-purple-50 to-violet-50 border-purple-200' : ''}`}>
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Premium Analytics Suite
+                {language.dashboardTitle}
               </h2>
               <p className="text-gray-600 mb-4">
-                Advanced insights with trend analysis, risk intelligence, department breakdowns, and predictive analytics.
+                {language.executiveSummaryDescription}
               </p>
               <div className="flex items-center gap-4 mb-4">
-                <Badge className="bg-yellow-100 text-yellow-800">
+                <Badge className={`${colors.background} ${colors.text}`}>
                   <Zap className="h-3 w-3 mr-1" />
-                  Premium Plan Active
+                  {displayName} Active
                 </Badge>
                 <Button 
                   size="sm" 
                   variant="outline"
                   onClick={() => generateAdvancedReport('Executive Summary')}
-                  className="border-yellow-600 text-yellow-600 hover:bg-yellow-50"
+                  className={`border-yellow-600 text-yellow-600 hover:bg-yellow-50 ${isEnterprise ? 'border-purple-600 text-purple-600 hover:bg-purple-50' : ''}`}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Generate Executive Report
@@ -147,41 +110,17 @@ const PremiumOverviewTab = () => {
                 </div>
               </div>
             </div>
-            <TrendingUp className="h-12 w-12 text-yellow-600" />
+            <TrendingUp className={`h-12 w-12 ${colors.accent}`} />
           </div>
         </CardContent>
       </Card>
 
-      {/* Premium Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {premiumStats.map((stat) => {
-          const IconComponent = stat.icon;
-          return (
-            <Card key={stat.title} className="border-l-4 border-l-yellow-500 hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <IconComponent className={`h-4 w-4 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stat.trend}
-                </p>
-                <p className="text-xs text-yellow-700 mt-1 font-medium">
-                  {stat.change}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stat.description}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Package-Aware Metrics */}
+      <PackageAwareMetrics />
 
       {/* Premium Content Tabs */}
       <Tabs defaultValue="advanced-dashboard" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full grid-cols-5 ${colors.background}`}>
           <TabsTrigger value="advanced-dashboard">Advanced Dashboard</TabsTrigger>
           <TabsTrigger value="compliance">Smart Compliance</TabsTrigger>
           <TabsTrigger value="monthly">Monthly Analytics</TabsTrigger>
@@ -235,11 +174,11 @@ const PremiumOverviewTab = () => {
       </Tabs>
 
       {/* Premium Value Proposition */}
-      <Card className="border-2 border-yellow-300 bg-gradient-to-br from-yellow-50 to-amber-50">
+      <Card className={`border-2 ${colors.border} bg-gradient-to-br ${colors.background}`}>
         <CardHeader>
-          <CardTitle className="text-yellow-800 flex items-center gap-2">
+          <CardTitle className={`${colors.text} flex items-center gap-2`}>
             <Zap className="h-5 w-5" />
-            Premium Features Delivering Value
+            {displayName} Features Delivering Value
           </CardTitle>
         </CardHeader>
         <CardContent>
