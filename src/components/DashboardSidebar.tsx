@@ -1,4 +1,3 @@
-
 import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -27,12 +26,20 @@ import { useSubscription } from "@/hooks/useSubscription";
 import OrganizationSwitcher from "@/components/OrganizationSwitcher";
 import PackageBadge from "@/components/PackageBadge";
 import FeatureDiscoveryTooltip from "@/components/FeatureDiscoveryTooltip";
+import FeatureSkeleton from "@/components/FeatureSkeleton";
 
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { currentOrganization, isServiceProvider } = useOrganization();
   const { currentTier, hasFeature } = useSubscription();
   
+  // Simulate loading state
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Define nav items with package requirements
   const navItems = [
     { 
@@ -152,15 +159,15 @@ export function DashboardSidebar() {
         description={`Unlock ${item.name} with ${item.tier} subscription.`}
         benefits={benefits}
       >
-        <div className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60 cursor-pointer hover:bg-accent/50 transition-colors">
-          <item.icon size={20} />
+        <div className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60 cursor-pointer hover:bg-accent/50 transition-all duration-300 hover:scale-105 group">
+          <item.icon size={20} className="group-hover:text-muted-foreground transition-colors duration-300" />
           {!collapsed && (
             <>
-              <span>{item.name}</span>
+              <span className="group-hover:text-muted-foreground transition-colors duration-300">{item.name}</span>
               {item.tier === "premium" ? (
-                <Zap className="h-3 w-3 ml-auto text-yellow-600" />
+                <Zap className="h-3 w-3 ml-auto text-yellow-600 animate-pulse" />
               ) : (
-                <Crown className="h-3 w-3 ml-auto text-purple-600" />
+                <Crown className="h-3 w-3 ml-auto text-purple-600 animate-pulse" />
               )}
             </>
           )}
@@ -169,11 +176,48 @@ export function DashboardSidebar() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <div 
+        className={cn(
+          "fixed top-16 left-0 bg-background border-r transition-all duration-300 z-40",
+          "flex flex-col",
+          collapsed ? "w-16" : "w-64"
+        )}
+        style={{
+          height: 'calc(100vh - 4rem)',
+          minHeight: 'calc(100vh - 4rem)'
+        }}
+      >
+        <div className="h-full grid grid-rows-[auto_1fr_auto] overflow-hidden">
+          <div className="px-3 py-4 border-b">
+            <div className="flex items-center justify-between">
+              {!collapsed && <FeatureSkeleton className="h-6 w-20" />}
+              <FeatureSkeleton className={cn("h-8 w-8", collapsed && "mx-auto")} />
+            </div>
+          </div>
+          
+          <div className="px-2 overflow-y-auto">
+            <nav className="space-y-1 py-4">
+              {[...Array(6)].map((_, i) => (
+                <FeatureSkeleton key={i} className="h-10 w-full" />
+              ))}
+            </nav>
+          </div>
+          
+          <div className="p-4 border-t">
+            <FeatureSkeleton className="h-16 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       className={cn(
         "fixed top-16 left-0 bg-background border-r transition-all duration-300 z-40",
-        "flex flex-col",
+        "flex flex-col shadow-lg",
         collapsed ? "w-16" : "w-64"
       )}
       style={{
@@ -184,14 +228,21 @@ export function DashboardSidebar() {
       <div className="h-full grid grid-rows-[auto_1fr_auto] overflow-hidden">
         
         {/* Header with Package Badge and Collapse Toggle */}
-        <div className="px-3 py-4 border-b">
+        <div className="px-3 py-4 border-b bg-muted/20">
           <div className="flex items-center justify-between">
-            {!collapsed && <PackageBadge tier={currentTier} />}
+            {!collapsed && (
+              <div className="animate-fade-in">
+                <PackageBadge tier={currentTier} />
+              </div>
+            )}
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => setCollapsed(!collapsed)}
-              className={cn(collapsed && "mx-auto")}
+              className={cn(
+                "transition-all duration-300 hover:scale-110", 
+                collapsed && "mx-auto"
+              )}
             >
               {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </Button>
@@ -202,21 +253,23 @@ export function DashboardSidebar() {
         <div className="px-2 overflow-y-auto">
           <nav className="space-y-1 py-4">
             {/* Available Navigation Items */}
-            {availableNavItems.map((item) => (
+            {availableNavItems.map((item, index) => (
               <NavLink
                 key={item.name}
                 to={item.href}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-300",
+                    "hover:scale-105 animate-fade-in",
                     isActive 
-                      ? "bg-primary/10 text-primary" 
+                      ? "bg-primary/10 text-primary shadow-sm" 
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     collapsed && "justify-center px-0",
                     item.name === "Patients" && isActive && "bg-purple-100 text-purple-800",
                     item.name === "Occupational Health" && isActive && "bg-blue-100 text-blue-800"
                   )
                 }
+                style={{ animationDelay: `${index * 0.1}s` }}
               >
                 <item.icon size={20} />
                 {!collapsed && <span>{item.name}</span>}
@@ -227,10 +280,18 @@ export function DashboardSidebar() {
             {!collapsed && lockedNavItems.length > 0 && (
               <>
                 <div className="my-4 border-t"></div>
-                <div className="px-3 text-xs font-semibold text-muted-foreground mb-2">
-                  DISCOVER PREMIUM FEATURES
+                <div className="px-3 text-xs font-semibold text-muted-foreground mb-2 animate-fade-in">
+                  DISCOVER PREMIUM FEATURES ✨
                 </div>
-                {lockedNavItems.map(renderLockedNavItem)}
+                {lockedNavItems.map((item, index) => (
+                  <div 
+                    key={item.name}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${(availableNavItems.length + index) * 0.1}s` }}
+                  >
+                    {renderLockedNavItem(item)}
+                  </div>
+                ))}
               </>
             )}
           </nav>
@@ -239,7 +300,7 @@ export function DashboardSidebar() {
         {/* Organization Switcher - Fixed at bottom */}
         <div 
           className={cn(
-            "p-4 border-t bg-background",
+            "p-4 border-t bg-muted/10 transition-all duration-300",
             collapsed && "px-2"
           )}
           style={{
@@ -247,12 +308,14 @@ export function DashboardSidebar() {
           }}
         >
           {!collapsed && (
-            <>
+            <div className="animate-fade-in">
               <div className="mb-2 text-xs font-semibold text-muted-foreground">
                 ORGANIZATION
               </div>
-              <OrganizationSwitcher />
-            </>
+              <Suspense fallback={<FeatureSkeleton className="h-16 w-full" />}>
+                <OrganizationSwitcher />
+              </Suspense>
+            </div>
           )}
         </div>
         
