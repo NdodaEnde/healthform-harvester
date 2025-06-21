@@ -103,9 +103,7 @@ const EmployeesPage: React.FC = () => {
               );
             })}
           </div>
-        </Tab
-
-sContent>
+        </TabsContent>
         
         <TabsContent value="premium" className="space-y-4">
           {!isPremium && !isEnterprise && (
