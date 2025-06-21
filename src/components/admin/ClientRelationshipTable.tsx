@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Building, MoreHorizontal, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
@@ -22,9 +21,13 @@ interface ClientRelationship {
 
 interface ClientRelationshipTableProps {
   serviceProviderId?: string;
+  refreshTrigger?: number;
 }
 
-const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ serviceProviderId }) => {
+const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ 
+  serviceProviderId, 
+  refreshTrigger = 0 
+}) => {
   const [relationships, setRelationships] = useState<ClientRelationship[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentOrganization } = useOrganization();
@@ -34,7 +37,13 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
   const fetchRelationships = async () => {
     try {
       setLoading(true);
-      if (!providerId) return;
+      if (!providerId) {
+        console.log('No provider ID available');
+        setRelationships([]);
+        return;
+      }
+
+      console.log('Fetching relationships for provider:', providerId);
 
       const { data, error } = await supabase
         .from('organization_relationships')
@@ -49,7 +58,12 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
         .eq('service_provider_id', providerId as any)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Fetched relationships data:', data);
 
       // Transform the data to flatten client info
       const transformedData = (data || []).map((rel: any) => ({
@@ -62,6 +76,7 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
     } catch (error) {
       console.error('Error fetching client relationships:', error);
       toast.error('Failed to load client relationships');
+      setRelationships([]);
     } finally {
       setLoading(false);
     }
@@ -69,7 +84,7 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
 
   useEffect(() => {
     fetchRelationships();
-  }, [providerId]);
+  }, [providerId, refreshTrigger]);
 
   const toggleRelationshipStatus = async (relationshipId: string, currentStatus: boolean) => {
     try {
@@ -111,100 +126,87 @@ const ClientRelationshipTable: React.FC<ClientRelationshipTableProps> = ({ servi
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building className="h-5 w-5" />
-            Client Relationships
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">Loading...</div>
-        </CardContent>
-      </Card>
+      <div className="text-center py-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+        <p className="mt-2 text-sm text-muted-foreground">Loading client relationships...</p>
+      </div>
+    );
+  }
+
+  if (relationships.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No Client Relationships</h3>
+        <p className="text-muted-foreground">
+          No client relationships have been established yet.
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building className="h-5 w-5" />
-          Client Relationships ({relationships.length})
-        </CardTitle>
-        <CardDescription>
-          Manage relationships with client organizations
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {relationships.length === 0 ? (
-          <div className="text-center py-8">
-            <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Client Relationships</h3>
-            <p className="text-muted-foreground">
-              No client relationships have been established yet.
-            </p>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Building className="h-5 w-5" />
+        <span className="font-medium">Client Relationships ({relationships.length})</span>
+      </div>
+      
+      {relationships.map((relationship) => (
+        <div key={relationship.id} className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex-1">
+            <h4 className="font-medium">
+              {relationship.client_name || 'Unknown Client'}
+            </h4>
+            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+              {relationship.client_email && (
+                <span>{relationship.client_email}</span>
+              )}
+              {relationship.relationship_start_date && (
+                <span>Started: {new Date(relationship.relationship_start_date).toLocaleDateString()}</span>
+              )}
+              <span>Created: {new Date(relationship.created_at).toLocaleDateString()}</span>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {relationships.map((relationship) => (
-              <div key={relationship.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <h4 className="font-medium">
-                    {relationship.client_name || 'Unknown Client'}
-                  </h4>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                    {relationship.client_email && (
-                      <span>{relationship.client_email}</span>
-                    )}
-                    {relationship.relationship_start_date && (
-                      <span>Started: {new Date(relationship.relationship_start_date).toLocaleDateString()}</span>
-                    )}
-                    <span>Created: {new Date(relationship.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={relationship.is_active ? 'default' : 'secondary'}>
-                    {relationship.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => toggleRelationshipStatus(relationship.id, relationship.is_active)}
-                      >
-                        {relationship.is_active ? (
-                          <>
-                            <ToggleLeft className="h-4 w-4 mr-2" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <ToggleRight className="h-4 w-4 mr-2" />
-                            Activate
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => deleteRelationship(relationship.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center gap-2">
+            <Badge variant={relationship.is_active ? 'default' : 'secondary'}>
+              {relationship.is_active ? 'Active' : 'Inactive'}
+            </Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => toggleRelationshipStatus(relationship.id, relationship.is_active)}
+                >
+                  {relationship.is_active ? (
+                    <>
+                      <ToggleLeft className="h-4 w-4 mr-2" />
+                      Deactivate
+                    </>
+                  ) : (
+                    <>
+                      <ToggleRight className="h-4 w-4 mr-2" />
+                      Activate
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => deleteRelationship(relationship.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      ))}
+    </div>
   );
 };
 
