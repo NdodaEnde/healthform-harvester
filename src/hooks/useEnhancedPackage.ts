@@ -38,99 +38,204 @@ export interface EnhancedPackageHook {
 }
 
 export const useEnhancedPackage = (): EnhancedPackageHook => {
-  const { 
-    currentTier, 
-    hasFeature: originalHasFeature, 
-    canAccessFeature: originalCanAccessFeature,
-    upgradeSubscription,
-    loading 
-  } = useSubscription();
-
-  // Get package configuration
-  const packageConfig = useMemo(() => {
-    return PackageConfigurationService.getConfig(currentTier);
-  }, [currentTier]);
-
-  // Extract configuration elements
-  const metrics = useMemo(() => {
-    return PackageConfigurationService.getMetrics(currentTier);
-  }, [currentTier]);
-
-  const language = useMemo(() => {
-    return PackageConfigurationService.getLanguage(currentTier);
-  }, [currentTier]);
-
-  const colors = useMemo(() => {
-    return PackageConfigurationService.getColors(currentTier);
-  }, [currentTier]);
-
-  const displayName = useMemo(() => {
-    return PackageConfigurationService.getDisplayName(currentTier);
-  }, [currentTier]);
-
-  // Enhanced feature access functions
-  const hasFeature = useMemo(() => {
-    return (feature: FeatureKey) => {
-      return PackageConfigurationService.hasFeature(currentTier, feature);
-    };
-  }, [currentTier]);
-
-  const canAccessFeature = useMemo(() => {
-    return (requiredTier: PackageTier) => {
-      return originalCanAccessFeature(requiredTier);
-    };
-  }, [originalCanAccessFeature]);
-
-  const getFeatureGate = useMemo(() => {
-    return (feature: FeatureKey) => {
-      const gateConfig = PackageConfigurationService.getFeatureGateConfig(currentTier, feature);
-      return gateConfig || { hasAccess: false };
-    };
-  }, [currentTier]);
-
-  // Package type checks
-  const isBasic = currentTier === 'basic';
-  const isPremium = currentTier === 'premium';
-  const isEnterprise = currentTier === 'enterprise';
-
-  // Upgrade functionality
-  const upgradeTarget = PackageConfigurationService.getUpgradeTarget(currentTier);
+  console.log('useEnhancedPackage called');
   
-  const upgradePackage = async (newTier: PackageTier): Promise<boolean> => {
-    try {
-      return await upgradeSubscription(newTier);
-    } catch (error) {
-      console.error('Failed to upgrade package:', error);
-      return false;
-    }
-  };
+  try {
+    const subscriptionHook = useSubscription();
+    console.log('Subscription hook loaded:', subscriptionHook.currentTier);
+    
+    const { 
+      currentTier, 
+      hasFeature: originalHasFeature, 
+      canAccessFeature: originalCanAccessFeature,
+      upgradeSubscription,
+      loading 
+    } = subscriptionHook;
 
-  return {
-    // Current package info
-    currentTier,
-    packageConfig,
-    
-    // UI Configuration
-    metrics,
-    language,
-    colors,
-    displayName,
-    
-    // Feature access
-    hasFeature,
-    canAccessFeature,
-    getFeatureGate,
-    
+    // Get package configuration with error handling
+    const packageConfig = useMemo(() => {
+      try {
+        return PackageConfigurationService.getConfig(currentTier);
+      } catch (error) {
+        console.error('Error getting package config:', error);
+        return PackageConfigurationService.getConfig('basic');
+      }
+    }, [currentTier]);
+
+    // Extract configuration elements with error handling
+    const metrics = useMemo(() => {
+      try {
+        return PackageConfigurationService.getMetrics(currentTier);
+      } catch (error) {
+        console.error('Error getting metrics:', error);
+        return [];
+      }
+    }, [currentTier]);
+
+    const language = useMemo(() => {
+      try {
+        return PackageConfigurationService.getLanguage(currentTier);
+      } catch (error) {
+        console.error('Error getting language:', error);
+        return {
+          dashboardTitle: 'Dashboard',
+          executiveSummaryTitle: 'Summary',
+          executiveSummaryDescription: 'Basic overview',
+          upgradePromptTitle: 'Upgrade',
+          upgradePromptDescription: 'Upgrade for more features',
+          featuresTitle: 'Features'
+        };
+      }
+    }, [currentTier]);
+
+    const colors = useMemo(() => {
+      try {
+        return PackageConfigurationService.getColors(currentTier);
+      } catch (error) {
+        console.error('Error getting colors:', error);
+        return {
+          primary: 'bg-blue-600',
+          accent: 'text-blue-600',
+          background: 'bg-blue-50',
+          border: 'border-blue-200',
+          text: 'text-blue-800'
+        };
+      }
+    }, [currentTier]);
+
+    const displayName = useMemo(() => {
+      try {
+        return PackageConfigurationService.getDisplayName(currentTier);
+      } catch (error) {
+        console.error('Error getting display name:', error);
+        return 'Basic';
+      }
+    }, [currentTier]);
+
+    // Enhanced feature access functions
+    const hasFeature = useMemo(() => {
+      return (feature: FeatureKey) => {
+        try {
+          return PackageConfigurationService.hasFeature(currentTier, feature);
+        } catch (error) {
+          console.error('Error checking feature:', error);
+          return false;
+        }
+      };
+    }, [currentTier]);
+
+    const canAccessFeature = useMemo(() => {
+      return (requiredTier: PackageTier) => {
+        try {
+          return originalCanAccessFeature(requiredTier);
+        } catch (error) {
+          console.error('Error checking tier access:', error);
+          return false;
+        }
+      };
+    }, [originalCanAccessFeature]);
+
+    const getFeatureGate = useMemo(() => {
+      return (feature: FeatureKey) => {
+        try {
+          const gateConfig = PackageConfigurationService.getFeatureGateConfig(currentTier, feature);
+          return gateConfig || { hasAccess: false };
+        } catch (error) {
+          console.error('Error getting feature gate:', error);
+          return { hasAccess: false };
+        }
+      };
+    }, [currentTier]);
+
+    // Package type checks
+    const isBasic = currentTier === 'basic';
+    const isPremium = currentTier === 'premium';
+    const isEnterprise = currentTier === 'enterprise';
+
     // Upgrade functionality
-    upgradeTarget,
-    upgradePackage,
+    const upgradeTarget = useMemo(() => {
+      try {
+        return PackageConfigurationService.getUpgradeTarget(currentTier);
+      } catch (error) {
+        console.error('Error getting upgrade target:', error);
+        return undefined;
+      }
+    }, [currentTier]);
     
-    // Package comparison
-    isBasic,
-    isPremium,
-    isEnterprise,
+    const upgradePackage = async (newTier: PackageTier): Promise<boolean> => {
+      try {
+        return await upgradeSubscription(newTier);
+      } catch (error) {
+        console.error('Failed to upgrade package:', error);
+        return false;
+      }
+    };
+
+    const result = {
+      // Current package info
+      currentTier,
+      packageConfig,
+      
+      // UI Configuration
+      metrics,
+      language,
+      colors,
+      displayName,
+      
+      // Feature access
+      hasFeature,
+      canAccessFeature,
+      getFeatureGate,
+      
+      // Upgrade functionality
+      upgradeTarget,
+      upgradePackage,
+      
+      // Package comparison
+      isBasic,
+      isPremium,
+      isEnterprise,
+      
+      // Loading states
+      loading
+    };
+
+    console.log('Enhanced package hook result:', result);
+    return result;
     
-    // Loading states
-    loading
-  };
+  } catch (error) {
+    console.error('Critical error in useEnhancedPackage:', error);
+    
+    // Return a safe fallback to prevent app crash
+    return {
+      currentTier: 'basic',
+      packageConfig: PackageConfigurationService.getConfig('basic'),
+      metrics: [],
+      language: {
+        dashboardTitle: 'Dashboard',
+        executiveSummaryTitle: 'Summary',
+        executiveSummaryDescription: 'Basic overview',
+        upgradePromptTitle: 'Upgrade',
+        upgradePromptDescription: 'Upgrade for more features',
+        featuresTitle: 'Features'
+      },
+      colors: {
+        primary: 'bg-blue-600',
+        accent: 'text-blue-600',
+        background: 'bg-blue-50',
+        border: 'border-blue-200',
+        text: 'text-blue-800'
+      },
+      displayName: 'Basic',
+      hasFeature: () => false,
+      canAccessFeature: () => false,
+      getFeatureGate: () => ({ hasAccess: false }),
+      upgradeTarget: undefined,
+      upgradePackage: async () => false,
+      isBasic: true,
+      isPremium: false,
+      isEnterprise: false,
+      loading: false
+    };
+  }
 };
