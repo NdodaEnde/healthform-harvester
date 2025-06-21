@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -121,11 +120,24 @@ const ReportsGenerator: React.FC = () => {
   };
 
   const canAccessTemplate = (template: ReportTemplate) => {
+    // Basic templates are always accessible
     if (template.tier === 'basic') return true;
-    if (template.feature) return hasFeature(template.feature as any);
-    return currentTier === template.tier || 
-           (template.tier === 'premium' && isEnterprise) ||
-           (template.tier === 'basic' && (isPremium || isEnterprise));
+    
+    // Check feature access if template has a specific feature requirement
+    if (template.feature) {
+      return hasFeature(template.feature as any);
+    }
+    
+    // Check tier access for premium and enterprise templates
+    if (template.tier === 'premium') {
+      return isPremium || isEnterprise;
+    }
+    
+    if (template.tier === 'enterprise') {
+      return isEnterprise;
+    }
+    
+    return false;
   };
 
   const renderReportTemplate = (template: ReportTemplate) => {
