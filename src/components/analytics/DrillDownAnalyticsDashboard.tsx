@@ -50,12 +50,12 @@ const DrillDownAnalyticsDashboard: React.FC = () => {
     testType: result.test_type
   })) || [];
 
-  // Company performance data
+  // Company performance data - using correct property names
   const companyData = companyBenchmarks?.slice(0, 8).map(company => ({
     name: company.company_name || 'Unknown',
     fitnessRate: Math.round(company.fitness_rate || 0),
-    totalTests: company.total_tests || 0,
-    employees: company.employee_count || 0
+    totalTests: company.total_examinations || 0, // Changed from total_tests
+    employees: company.total_employees || 0 // Changed from employee_count
   })) || [];
 
   // Monthly trends data

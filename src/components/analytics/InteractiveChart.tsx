@@ -146,8 +146,6 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
                 dataKey={config.dataKey} 
                 stroke={colors[0]} 
                 strokeWidth={2}
-                dot={{ cursor: 'pointer' }}
-                onClick={handleItemClick}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -205,7 +203,7 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
           </div>
         )}
         
-        {currentLevel < drillDownLevels.length && (
+        {currentLevel < drillDownLevels.length && type !== 'line' && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-800 font-medium">
               💡 Click on any chart element to drill down for more detailed insights
