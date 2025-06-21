@@ -26,6 +26,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import OrganizationSwitcher from "@/components/OrganizationSwitcher";
 import PackageBadge from "@/components/PackageBadge";
+import FeatureDiscoveryTooltip from "@/components/FeatureDiscoveryTooltip";
 
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
@@ -124,13 +125,49 @@ export function DashboardSidebar() {
     return false;
   });
 
-  // Premium/Enterprise nav items to show as locked
+  // Premium/Enterprise nav items to show as locked with tooltips
   const lockedNavItems = navItems.filter(item => {
     if (item.tier === "basic") return false;
     if (item.tier === "premium" && currentTier === "basic") return true;
     if (item.tier === "enterprise" && (currentTier === "basic" || currentTier === "premium")) return true;
     return false;
   });
+
+  const renderLockedNavItem = (item: any) => {
+    const benefits = item.tier === "premium" ? [
+      "Advanced reporting capabilities",
+      "Custom branding options",
+      "AI-powered insights"
+    ] : [
+      "Strategic analytics",
+      "Competitive benchmarking", 
+      "API access"
+    ];
+
+    return (
+      <FeatureDiscoveryTooltip
+        key={item.name}
+        requiredTier={item.tier as any}
+        title={`${item.name} - ${item.tier.toUpperCase()} Feature`}
+        description={`Unlock ${item.name} with ${item.tier} subscription.`}
+        benefits={benefits}
+      >
+        <div className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60 cursor-pointer hover:bg-accent/50 transition-colors">
+          <item.icon size={20} />
+          {!collapsed && (
+            <>
+              <span>{item.name}</span>
+              {item.tier === "premium" ? (
+                <Zap className="h-3 w-3 ml-auto text-yellow-600" />
+              ) : (
+                <Crown className="h-3 w-3 ml-auto text-purple-600" />
+              )}
+            </>
+          )}
+        </div>
+      </FeatureDiscoveryTooltip>
+    );
+  };
 
   return (
     <div 
@@ -186,28 +223,14 @@ export function DashboardSidebar() {
               </NavLink>
             ))}
 
-            {/* Locked Items (Premium/Enterprise) */}
+            {/* Locked Items with Interactive Tooltips */}
             {!collapsed && lockedNavItems.length > 0 && (
               <>
                 <div className="my-4 border-t"></div>
                 <div className="px-3 text-xs font-semibold text-muted-foreground mb-2">
-                  UPGRADE TO UNLOCK
+                  DISCOVER PREMIUM FEATURES
                 </div>
-                {lockedNavItems.map((item) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60 cursor-not-allowed"
-                    title={`Upgrade to ${item.tier} to access ${item.name}`}
-                  >
-                    <item.icon size={20} />
-                    <span>{item.name}</span>
-                    {item.tier === "premium" ? (
-                      <Zap className="h-3 w-3 ml-auto text-yellow-600" />
-                    ) : (
-                      <Crown className="h-3 w-3 ml-auto text-purple-600" />
-                    )}
-                  </div>
-                ))}
+                {lockedNavItems.map(renderLockedNavItem)}
               </>
             )}
           </nav>
