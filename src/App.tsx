@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
+import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import CertificatesPage from './pages/certificates/CertificatesPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
@@ -25,6 +26,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<AnalyticsPage />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/certificates" element={<CertificatesPage />} />
                   <Route path="/employees" element={<EmployeesPage />} />

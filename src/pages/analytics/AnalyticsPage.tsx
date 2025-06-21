@@ -5,6 +5,7 @@ import { usePackage } from '@/contexts/PackageContext';
 import PremiumOverviewTab from '@/components/analytics/PremiumOverviewTab';
 import BasicOverviewTab from '@/components/analytics/BasicOverviewTab';
 import ExecutiveSummaryBanner from './components/ExecutiveSummaryBanner';
+import PackageStatusBanner from '@/components/PackageStatusBanner';
 import { Badge } from "@/components/ui/badge";
 
 const AnalyticsPage = () => {
@@ -48,6 +49,8 @@ const AnalyticsPage = () => {
           )}
         </div>
       </div>
+
+      <PackageStatusBanner />
 
       <ExecutiveSummaryBanner />
 
