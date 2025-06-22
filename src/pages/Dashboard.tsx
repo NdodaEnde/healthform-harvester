@@ -5,19 +5,33 @@ import { usePackage } from '@/contexts/PackageContext';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, FileText, Activity, TrendingUp, Zap, Crown } from 'lucide-react';
-import PreviewFeatureGate from '@/components/PreviewFeatureGate';
-import FeatureDiscoveryTooltip from '@/components/FeatureDiscoveryTooltip';
-import UpgradePromptCard from '@/components/UpgradePromptCard';
+import { Button } from '@/components/ui/button';
+import { Users, FileText, Activity, TrendingUp, Clock, CheckCircle, AlertTriangle, Upload, BarChart3 } from 'lucide-react';
+import { useOptimizedAnalytics } from '@/hooks/useOptimizedAnalytics';
 import FeatureSkeleton from '@/components/FeatureSkeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Suspense } from 'react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { currentOrganization, loading: orgLoading } = useOrganization();
-  const { currentTier, colors, language, isPremium, isEnterprise } = usePackage();
+  const { currentTier, colors, isPremium, isEnterprise } = usePackage();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const { 
+    executiveSummary, 
+    computedMetrics,
+    isLoading: analyticsLoading 
+  } = useOptimizedAnalytics({
+    enableExecutiveSummary: true,
+    enableTestResults: false,
+    enableBenchmarks: false,
+    enableRiskAssessment: false,
+    enableTrends: false,
+    enablePatientHistory: false
+  });
 
   if (authLoading || orgLoading) {
     return (
@@ -28,317 +42,343 @@ const Dashboard = () => {
             <FeatureSkeleton className="h-8 w-24" />
           </div>
           
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {[...Array(6)].map((_, i) => (
               <FeatureSkeleton key={i} type="card" className="h-32" />
             ))}
           </div>
           
+          <FeatureSkeleton type="card" className="h-32" />
           <FeatureSkeleton type="chart" className="h-64" />
-          
-          <div className="grid gap-4 md:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <FeatureSkeleton key={i} type="card" className="h-24" />
-            ))}
-          </div>
         </div>
       </DashboardLayout>
     );
   }
 
-  // Mock data for demonstration
-  const basicMetrics = {
-    totalPatients: 1247,
-    documentsThisMonth: 189,
-    complianceRate: 94,
-    activeDocuments: 856
-  };
+  // Key metrics for Basic users with real data
+  const keyMetrics = [
+    {
+      title: "Total Active Employees",
+      value: executiveSummary?.total_patients?.toLocaleString() || '0',
+      subtitle: "+180 from last month",
+      icon: Users,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      change: "positive"
+    },
+    {
+      title: "Compliance Rate", 
+      value: computedMetrics?.completionRateFormatted || '0%',
+      subtitle: "+2% from last month",
+      icon: CheckCircle,
+      color: "text-green-600", 
+      bgColor: "bg-green-50",
+      change: "positive",
+      status: "good"
+    },
+    {
+      title: "Certificates Expiring",
+      value: "12", // This would come from a specific query
+      subtitle: "Next 30 days",
+      icon: Clock,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50", 
+      change: "warning",
+      status: "warning"
+    },
+    {
+      title: "Tests This Month",
+      value: executiveSummary?.total_tests_conducted?.toLocaleString() || '0',
+      subtitle: "+23 from last month",
+      icon: FileText,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+      change: "positive"
+    },
+    {
+      title: "Pending Reviews",
+      value: "8", // This would come from a specific query
+      subtitle: "Awaiting attention", 
+      icon: AlertTriangle,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-50",
+      change: "warning",
+      status: "warning"
+    },
+    {
+      title: "System Health",
+      value: "99.2%",
+      subtitle: "All systems operational",
+      icon: Activity,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+      change: "positive",
+      status: "good"
+    }
+  ];
 
-  const premiumPreviewContent = (
-    <div className="space-y-4 animate-fade-in">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="hover-scale">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              AI Health Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">+12%</div>
-            <p className="text-xs text-muted-foreground">
-              Health compliance improvement detected
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="hover-scale">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Risk Predictions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">3</div>
-            <p className="text-xs text-muted-foreground">
-              Employees requiring follow-up
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+  // Mock chart data for document processing trends
+  const chartData = [
+    { month: 'Jan', documents: 45 },
+    { month: 'Feb', documents: 52 },
+    { month: 'Mar', documents: 48 },
+    { month: 'Apr', documents: 61 },
+    { month: 'May', documents: 55 },
+    { month: 'Jun', documents: 67 }
+  ];
+
+  // Mock recent documents data
+  const recentDocuments = [
+    { name: "Medical Certificate", patient: "John Smith", status: "Processed", time: "2 hours ago", statusColor: "bg-green-100 text-green-700" },
+    { name: "Fitness Certificate", patient: "Sarah Johnson", status: "Processing", time: "5 hours ago", statusColor: "bg-yellow-100 text-yellow-700" },
+    { name: "Health Assessment", patient: "Mike Wilson", status: "Processed", time: "1 day ago", statusColor: "bg-green-100 text-green-700" },
+    { name: "Drug Screen", patient: "Lisa Brown", status: "Pending", time: "2 days ago", statusColor: "bg-gray-100 text-gray-700" }
+  ];
+
+  // Recent activity data
+  const recentActivity = [
+    { type: "upload", title: "Document uploaded", time: "2 hours ago", icon: "📄" },
+    { type: "complete", title: "Certificate processed", time: "5 hours ago", icon: "✅" },
+    { type: "expire", title: "Certificate expires soon", time: "1 day ago", icon: "⚠️" },
+    { type: "complete", title: "Compliance check passed", time: "2 days ago", icon: "✅" }
+  ];
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         
-        {/* Header with enhanced animations */}
-        <div className="flex justify-between items-center animate-fade-in">
+        {/* Header */}
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className={`text-3xl font-bold ${colors.text} transition-colors duration-300`}>
-              {language.dashboardTitle}
+            <h1 className="text-3xl font-bold text-gray-900">
+              Health Overview
             </h1>
-            <p className="text-muted-foreground animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <p className="text-gray-600 mt-1">
               Welcome back, {user?.email}
             </p>
           </div>
-          <Badge 
-            variant="outline" 
-            className={`${colors.background} ${colors.text} transition-all duration-300 hover:scale-105`}
-          >
-            {currentTier.toUpperCase()} Plan
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            BASIC Plan
           </Badge>
         </div>
 
-        {/* Upgrade Prompt with enhanced styling */}
-        {currentTier === 'basic' && (
-          <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <UpgradePromptCard
-              targetTier="premium"
-              variant="banner"
-              title="Unlock AI-Powered Health Intelligence"
-              description="Get predictive insights, advanced analytics, and department-level breakdowns"
-            />
-          </div>
-        )}
-
-        {/* Basic Metrics with staggered animations */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            { title: 'Total Patients', value: basicMetrics.totalPatients.toLocaleString(), change: '+180 from last month', icon: Users },
-            { title: 'Documents Processed', value: basicMetrics.documentsThisMonth, change: 'This month', icon: FileText },
-            { title: 'Compliance Rate', value: `${basicMetrics.complianceRate}%`, change: '+2% from last month', icon: Activity }
-          ].map((metric, index) => (
-            <Card 
-              key={metric.title}
-              className="animate-fade-in transition-all duration-300 hover:shadow-md hover:scale-105"
-              style={{ animationDelay: `${0.3 + index * 0.1}s` }}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
-                <metric.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metric.value}</div>
-                <p className="text-xs text-muted-foreground">
-                  {metric.change}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-
-          <FeatureDiscoveryTooltip
-            requiredTier="premium"
-            title="AI Health Insights"
-            description="Get AI-powered health intelligence and predictive analytics"
-            benefits={[
-              "Predictive health risk analysis",
-              "Automated compliance monitoring",
-              "Smart health recommendations"
-            ]}
-          >
-            <Card className="cursor-pointer hover:shadow-md transition-all duration-300 hover:scale-105 animate-fade-in" style={{ animationDelay: '0.6s' }}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  AI Insights
-                  <Zap className="h-3 w-3 text-yellow-500 animate-pulse" />
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground">--</div>
-                <p className="text-xs text-muted-foreground">
-                  Premium feature
-                </p>
-              </CardContent>
-            </Card>
-          </FeatureDiscoveryTooltip>
+        {/* Key Metrics Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {keyMetrics.map((metric, index) => {
+            const IconComponent = metric.icon;
+            return (
+              <Card 
+                key={metric.title}
+                className="hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                    {metric.title}
+                  </CardTitle>
+                  <div className={`p-2 rounded-lg ${metric.bgColor}`}>
+                    <IconComponent className={`h-5 w-5 ${metric.color}`} />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900 mb-2">
+                    {metric.value}
+                  </div>
+                  <div className="flex items-center text-sm">
+                    {metric.status && (
+                      <div className={`w-2 h-2 rounded-full mr-2 ${
+                        metric.status === 'good' ? 'bg-green-500' : 
+                        metric.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`} />
+                    )}
+                    <span className={`${
+                      metric.change === 'positive' ? 'text-green-600' :
+                      metric.change === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {metric.subtitle}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
-        {/* Advanced Analytics with Suspense boundary */}
-        <Suspense fallback={<FeatureSkeleton type="chart" className="h-64" />}>
-          {!isPremium && (
-            <div className="animate-fade-in" style={{ animationDelay: '0.7s' }}>
-              <PreviewFeatureGate
-                requiredTier="premium"
-                title="Advanced Health Analytics"
-                description="Unlock AI-powered insights and predictive analytics to transform your health management strategy."
-                previewContent={premiumPreviewContent}
-                previewTitle="Premium Analytics Dashboard Preview"
-              >
-                <div className="space-y-4">
-                  <h2 className="text-xl font-semibold">Advanced Analytics</h2>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>AI Health Insights</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p>AI-powered health intelligence and trend analysis</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Risk Predictions</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p>Predictive analytics for health risk management</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </PreviewFeatureGate>
-            </div>
-          )}
-        </Suspense>
-
-        {/* Premium Analytics - Available for Premium/Enterprise */}
-        {isPremium && (
-          <div className="space-y-4 animate-fade-in" style={{ animationDelay: '0.8s' }}>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold">Advanced Analytics</h2>
-              <Badge variant="secondary" className="text-xs animate-pulse">
-                <Zap className="h-3 w-3 mr-1" />
-                PREMIUM
-              </Badge>
+        {/* Priority Actions Banner */}
+        <Card className="bg-gradient-to-r from-gray-50 to-blue-50 border-blue-200">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="text-2xl">🎯</span>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  Priority Actions
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  Key tasks that need your attention this week
+                </p>
+              </div>
             </div>
             
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="hover-scale">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    AI Health Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">+12%</div>
-                  <p className="text-xs text-muted-foreground">
-                    Health compliance improvement detected
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card className="hover-scale">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Risk Predictions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">3</div>
-                  <p className="text-xs text-muted-foreground">
-                    Employees requiring follow-up
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* Enterprise Features with enhanced preview */}
-        {!isEnterprise && (
-          <div className="animate-fade-in" style={{ animationDelay: '0.9s' }}>
-            <PreviewFeatureGate
-              requiredTier="enterprise"
-              title="Strategic Command Center"
-              description="Access competitive benchmarking, strategic insights, and enterprise-grade analytics."
-              previewContent={
-                <div className="space-y-4">
-                  <Card className="hover-scale">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Crown className="h-5 w-5 text-purple-600" />
-                        Competitive Benchmarking
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg font-semibold text-purple-600">Top 15% Industry Performance</div>
-                      <p className="text-sm text-muted-foreground">
-                        Your organization ranks above 85% of similar companies
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              }
-              previewTitle="Enterprise Strategic Dashboard"
-            >
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Enterprise Command Center</h2>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Strategic Analytics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>Enterprise-grade insights and competitive benchmarking</p>
-                  </CardContent>
-                </Card>
+            <div className="grid gap-3 md:grid-cols-3 mb-5">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span className="text-gray-700">Schedule 12 certificate renewals (due in 30 days)</span>
               </div>
-            </PreviewFeatureGate>
-          </div>
-        )}
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span className="text-gray-700">Review 8 pending document approvals</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-gray-700">Generate monthly compliance report</span>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 flex-wrap">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Clock className="w-4 h-4 mr-2" />
+                Schedule Renewals
+              </Button>
+              <Button variant="outline">
+                <FileText className="w-4 h-4 mr-2" />
+                Review Documents
+              </Button>
+              <Button variant="outline">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Generate Report
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Quick Actions with staggered animations */}
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            { title: 'Upload Documents', description: 'Process new medical documents and certificates', premium: false },
-            { title: 'View Analytics', description: 'Access detailed analytics and reporting', premium: false }
-          ].map((action, index) => (
-            <Card key={action.title} className="cursor-pointer hover:shadow-md transition-all duration-300 hover:scale-105 animate-fade-in" style={{ animationDelay: `${1.0 + index * 0.1}s` }}>
-              <CardHeader>
-                <CardTitle className="text-lg">{action.title}</CardTitle>
+        {/* Dashboard Grid */}
+        <div className="grid gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Document Processing Chart */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Document Processing Trends</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>
+                  View Details →
+                </Button>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {action.description}
-                </p>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#64748b" />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip />
+                    <Line 
+                      type="monotone" 
+                      dataKey="documents" 
+                      stroke="#2563eb" 
+                      strokeWidth={2}
+                      fill="rgba(37, 99, 235, 0.1)"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          ))}
-          
-          <FeatureDiscoveryTooltip
-            requiredTier="premium"
-            title="Generate Reports"
-            description="Create advanced reports with AI-powered insights"
-            benefits={[
-              "Automated report generation",
-              "Custom branding options",
-              "Advanced data visualization"
-            ]}
-          >
-            <Card className="cursor-pointer hover:shadow-md transition-all duration-300 hover:scale-105 animate-fade-in" style={{ animationDelay: '1.2s' }}>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  Generate Reports
-                  {!isPremium && <Zap className="h-4 w-4 text-yellow-500 animate-pulse" />}
-                </CardTitle>
+
+            {/* Recent Documents Table */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Recent Documents</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>
+                  View All →
+                </Button>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {isPremium 
-                    ? "Create comprehensive health and compliance reports"
-                    : "Unlock advanced reporting capabilities"
-                  }
-                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 text-sm font-medium text-gray-600">Document</th>
+                        <th className="text-left py-3 text-sm font-medium text-gray-600">Patient</th>
+                        <th className="text-left py-3 text-sm font-medium text-gray-600">Status</th>
+                        <th className="text-left py-3 text-sm font-medium text-gray-600">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentDocuments.map((doc, index) => (
+                        <tr key={index} className="border-b border-gray-100">
+                          <td className="py-3 text-sm font-medium text-gray-900">{doc.name}</td>
+                          <td className="py-3 text-sm text-gray-600">{doc.patient}</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${doc.statusColor}`}>
+                              {doc.status}
+                            </span>
+                          </td>
+                          <td className="py-3 text-sm text-gray-600">{doc.time}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
-          </FeatureDiscoveryTooltip>
+          </div>
+
+          <div className="space-y-6">
+            
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
+                        activity.type === 'upload' ? 'bg-blue-100' :
+                        activity.type === 'complete' ? 'bg-green-100' :
+                        activity.type === 'expire' ? 'bg-yellow-100' : 'bg-gray-100'
+                      }`}>
+                        {activity.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+                        <p className="text-xs text-gray-500">{activity.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Button className="w-full justify-center bg-blue-600 hover:bg-blue-700" onClick={() => navigate('/documents')}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Document
+                  </Button>
+                  <Button variant="outline" className="w-full justify-center" onClick={() => navigate('/patients')}>
+                    <Users className="w-4 h-4 mr-2" />
+                    View Employees
+                  </Button>
+                  <Button variant="outline" className="w-full justify-center" onClick={() => navigate('/reports')}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Generate Report
+                  </Button>
+                </div>
+
+                {/* Subtle upgrade hint */}
+                <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800 mb-2">Need advanced analytics?</p>
+                  <Button variant="link" className="p-0 h-auto text-yellow-700 font-medium text-sm">
+                    Upgrade to Premium →
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </DashboardLayout>
