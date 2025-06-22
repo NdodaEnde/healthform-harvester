@@ -19,7 +19,7 @@ import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
 export default function Dashboard() {
   const {
-    totalPatients,
+    totalActiveEmployees,
     complianceRate,
     certificatesExpiring,
     testsThisMonth,
@@ -27,9 +27,9 @@ export default function Dashboard() {
     pendingReviews,
     systemHealth,
     missingRecords,
-    isLoading,
+    loading,
     error,
-    refetchAll
+    refreshMetrics
   } = useDashboardMetrics();
 
   // Calculate month-over-month change
@@ -56,12 +56,12 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <Badge variant="outline">BASIC Plan</Badge>
           <Button 
-            onClick={refetchAll} 
+            onClick={refreshMetrics} 
             variant="outline" 
             size="sm"
-            disabled={isLoading}
+            disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -91,7 +91,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? '...' : totalPatients}
+              {loading ? '...' : totalActiveEmployees}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-green-600" />
@@ -108,7 +108,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${complianceRate >= 95 ? 'text-green-600' : complianceRate >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {isLoading ? '...' : `${complianceRate}%`}
+              {loading ? '...' : `${complianceRate}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Fitness compliance rate</span>
@@ -124,11 +124,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${certificatesExpiring > 10 ? 'text-red-600' : certificatesExpiring > 5 ? 'text-orange-600' : 'text-green-600'}`}>
-              {isLoading ? '...' : certificatesExpiring}
+              {loading ? '...' : certificatesExpiring}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Next 30 days</span>
-              {certificatesExpiring === 0 && !isLoading && (
+              {certificatesExpiring === 0 && !loading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   All current
                 </Badge>
@@ -145,11 +145,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? '...' : testsThisMonth}
+              {loading ? '...' : testsThisMonth}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-              {!isLoading && monthOverMonthChange !== 0 && (
+              {!loading && monthOverMonthChange !== 0 && (
                 <span className={`flex items-center gap-1 ${monthOverMonthChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {monthOverMonthChange > 0 ? '+' : ''}{monthOverMonthChange} from last month
                 </span>
@@ -166,11 +166,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${pendingReviews > 10 ? 'text-orange-600' : 'text-green-600'}`}>
-              {isLoading ? '...' : pendingReviews}
+              {loading ? '...' : pendingReviews}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Awaiting attention</span>
-              {pendingReviews <= 5 && !isLoading && (
+              {pendingReviews <= 5 && !loading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   Low backlog
                 </Badge>
@@ -187,11 +187,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${systemHealth >= 95 ? 'text-green-600' : systemHealth >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {isLoading ? '...' : `${systemHealth}%`}
+              {loading ? '...' : `${systemHealth}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Document processing rate</span>
-              {systemHealth >= 99 && !isLoading && (
+              {systemHealth >= 99 && !loading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   Excellent
                 </Badge>
@@ -215,7 +215,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {!isLoading && (
+            {!loading && (
               <>
                 {certificatesExpiring > 0 && (
                   <div className="flex items-center gap-3">
@@ -249,7 +249,7 @@ export default function Dashboard() {
                 )}
               </>
             )}
-            {isLoading && (
+            {loading && (
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
                 <span>Loading priority actions...</span>
