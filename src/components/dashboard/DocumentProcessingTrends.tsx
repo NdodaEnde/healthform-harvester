@@ -1,66 +1,58 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 export function DocumentProcessingTrends() {
-  // Mock data - in real app this would come from props or API
-  const trends = {
-    totalProcessed: 156,
-    successRate: 94,
-    pendingCount: 8,
-    failedCount: 3,
-    weeklyChange: 12
-  };
+  // Mock data to match the chart in the image
+  const chartData = [
+    { month: 'Jan', value: 45 },
+    { month: 'Feb', value: 52 },
+    { month: 'Mar', value: 48 },
+    { month: 'Apr', value: 61 },
+    { month: 'May', value: 55 },
+    { month: 'Jun', value: 67 }
+  ];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-blue-600" />
-          Document Processing Trends
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            Document Processing Trends
+          </CardTitle>
+          <a href="#" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+            View Details →
+          </a>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <FileText className="h-8 w-8 text-blue-500" />
-            <div>
-              <p className="text-2xl font-bold">{trends.totalProcessed}</p>
-              <p className="text-sm text-muted-foreground">Total Processed</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <CheckCircle className="h-8 w-8 text-green-500" />
-            <div>
-              <p className="text-2xl font-bold text-green-600">{trends.successRate}%</p>
-              <p className="text-sm text-muted-foreground">Success Rate</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-8 w-8 text-yellow-500" />
-            <div>
-              <p className="text-2xl font-bold text-yellow-600">{trends.pendingCount}</p>
-              <p className="text-sm text-muted-foreground">Pending</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-8 w-8 text-red-500" />
-            <div>
-              <p className="text-2xl font-bold text-red-600">{trends.failedCount}</p>
-              <p className="text-sm text-muted-foreground">Failed</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-4 pt-4 border-t">
-          <div className="flex items-center gap-2 text-sm">
-            <TrendingUp className="h-4 w-4 text-green-600" />
-            <span className="text-green-600">+{trends.weeklyChange}% from last week</span>
-          </div>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <XAxis 
+                dataKey="month" 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 12, fill: '#6B7280' }}
+              />
+              <YAxis 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 12, fill: '#6B7280' }}
+                domain={[0, 70]}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="value" 
+                stroke="#3B82F6" 
+                strokeWidth={2}
+                dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: '#3B82F6' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>

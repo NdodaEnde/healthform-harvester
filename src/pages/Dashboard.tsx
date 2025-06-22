@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -206,11 +205,11 @@ export default function Dashboard() {
 
       </div>
 
-      {/* New Dashboard Sections Grid */}
+      {/* New Dashboard Sections Grid - Matching the Image Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DocumentProcessingTrends />
-        <RecentDocuments />
         <RecentActivity />
+        <RecentDocuments />
         <QuickActions />
       </div>
 
