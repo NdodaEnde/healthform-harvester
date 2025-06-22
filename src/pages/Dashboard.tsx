@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Users, FileText, Activity, TrendingUp, Clock, CheckCircle, AlertTriangle, Upload, BarChart3 } from 'lucide-react';
 import { useOptimizedAnalytics } from '@/hooks/useOptimizedAnalytics';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import FeatureSkeleton from '@/components/FeatureSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
@@ -32,6 +33,16 @@ const Dashboard = () => {
     enablePatientHistory: false
   });
 
+  const {
+    certificatesExpiring,
+    pendingReviews,
+    testsThisMonth,
+    testsLastMonth,
+    systemHealth,
+    complianceRate,
+    isLoading: metricsLoading
+  } = useDashboardMetrics();
+
   if (authLoading || orgLoading) {
     return (
       <DashboardLayout>
@@ -54,65 +65,76 @@ const Dashboard = () => {
     );
   }
 
+  // Calculate month-over-month change for tests
+  const testsChange = testsLastMonth > 0 
+    ? Math.round(((testsThisMonth - testsLastMonth) / testsLastMonth) * 100)
+    : testsThisMonth > 0 ? 100 : 0;
+
+  const testsChangeText = testsChange > 0 
+    ? `+${testsChange}% from last month`
+    : testsChange < 0 
+      ? `${testsChange}% from last month`
+      : 'No change from last month';
+
   // Key metrics for Basic users with real data
   const keyMetrics = [
     {
       title: "Total Active Employees",
-      value: executiveSummary?.total_patients?.toLocaleString() || '34',
-      subtitle: "+180 from last month",
+      value: executiveSummary?.total_patients?.toLocaleString() || '0',
+      subtitle: "Registered in system",
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
-      change: "positive"
+      change: "neutral"
     },
     {
       title: "Compliance Rate", 
-      value: computedMetrics?.completionRateFormatted || '1000%',
-      subtitle: "+2% from last month",
+      value: metricsLoading ? "..." : `${complianceRate}%`,
+      subtitle: "Fitness compliance rate",
       icon: CheckCircle,
       color: "text-green-600", 
       bgColor: "bg-green-50",
-      change: "positive",
-      status: "good"
+      change: complianceRate >= 80 ? "positive" : complianceRate >= 60 ? "warning" : "negative",
+      status: complianceRate >= 80 ? "good" : complianceRate >= 60 ? "warning" : "poor"
     },
     {
       title: "Certificates Expiring",
-      value: "12",
+      value: metricsLoading ? "..." : certificatesExpiring.toString(),
       subtitle: "Next 30 days",
       icon: Clock,
       color: "text-orange-600",
       bgColor: "bg-orange-50", 
-      change: "warning",
-      status: "warning"
+      change: certificatesExpiring > 10 ? "warning" : "neutral",
+      status: certificatesExpiring > 10 ? "warning" : "good"
     },
     {
       title: "Tests This Month",
-      value: executiveSummary?.total_tests_conducted?.toLocaleString() || '202',
-      subtitle: "+23 from last month",
+      value: metricsLoading ? "..." : testsThisMonth.toLocaleString(),
+      subtitle: testsChangeText,
       icon: FileText,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
-      change: "positive"
+      change: testsChange > 0 ? "positive" : testsChange < 0 ? "negative" : "neutral"
     },
     {
       title: "Pending Reviews",
-      value: "8",
+      value: metricsLoading ? "..." : pendingReviews.toString(),
       subtitle: "Awaiting attention", 
       icon: AlertTriangle,
       color: "text-yellow-600",
       bgColor: "bg-yellow-50",
-      change: "warning",
-      status: "warning"
+      change: pendingReviews > 0 ? "warning" : "positive",
+      status: pendingReviews > 0 ? "warning" : "good"
     },
     {
       title: "System Health",
-      value: "99.2%",
-      subtitle: "All systems operational",
+      value: metricsLoading ? "..." : `${systemHealth}%`,
+      subtitle: systemHealth >= 95 ? "All systems operational" : "Some processing issues",
       icon: Activity,
       color: "text-emerald-600",
       bgColor: "bg-emerald-50",
-      change: "positive",
-      status: "good"
+      change: systemHealth >= 95 ? "positive" : systemHealth >= 85 ? "warning" : "negative",
+      status: systemHealth >= 95 ? "good" : systemHealth >= 85 ? "warning" : "poor"
     }
   ];
 
@@ -190,7 +212,8 @@ const Dashboard = () => {
                     )}
                     <span className={`${
                       metric.change === 'positive' ? 'text-green-600' :
-                      metric.change === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                      metric.change === 'warning' ? 'text-yellow-600' : 
+                      metric.change === 'negative' ? 'text-red-600' : 'text-gray-600'
                     }`}>
                       {metric.subtitle}
                     </span>
@@ -219,11 +242,15 @@ const Dashboard = () => {
             <div className="grid gap-3 md:grid-cols-3 mb-5">
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                <span className="text-gray-700">Schedule 12 certificate renewals (due in 30 days)</span>
+                <span className="text-gray-700">
+                  Schedule {certificatesExpiring} certificate renewals (due in 30 days)
+                </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                <span className="text-gray-700">Review 8 pending document approvals</span>
+                <span className="text-gray-700">
+                  Review {pendingReviews} pending document approvals
+                </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-green-500" />
