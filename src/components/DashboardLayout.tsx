@@ -1,4 +1,3 @@
-
 import { ReactNode } from "react";
 import DashboardSidebar from "./DashboardSidebar";
 
@@ -11,13 +10,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
       {/* 
-        DEFINITIVE FIX: 
-        1. Remove max-w-7xl (width constraint)
-        2. Remove any container classes from children
-        3. Use simple padding instead of px-6
-        4. Content will now use full available width
+        CRITICAL FIX: Remove px-4 md:px-8 padding completely!
+        This padding was creating the gap you see in the image.
+        Now content will start right at the sidebar edge.
       */}
-      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 px-4 md:px-8 w-full">
+      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 w-full">
         {children}
       </div>
     </div>
