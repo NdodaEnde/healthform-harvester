@@ -330,7 +330,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Recent Patients Section */}
+        {/* Recent Patients Section - Fixed: removed limit prop */}
         <div className="mt-8">
           <Card>
             <CardHeader>
@@ -340,7 +340,7 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PatientList limit={5} />
+              <PatientList />
             </CardContent>
           </Card>
         </div>
