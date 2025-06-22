@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -14,67 +15,32 @@ import {
   TrendingUp,
   AlertCircle
 } from 'lucide-react';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
-// Real dashboard metrics hook (replace hardcoded values)
-function useRealDashboardMetrics() {
-  const [metrics, setMetrics] = useState({
-    totalActiveEmployees: 187,
-    complianceRate: 84.49,
-    certificatesExpiring: 0,
-    testsThisMonth: 13,
-    pendingReviews: 1,
-    systemHealth: 99.5,
-    missingRecords: 15,
-    loading: false,
-    error: null,
-    lastUpdated: new Date()
-  });
-
-  // In a real implementation, this would call your API/Supabase
-  const refreshMetrics = async () => {
-    setMetrics(prev => ({ ...prev, loading: true }));
-    
-    try {
-      // This would be replaced with actual Supabase query:
-      // const { data } = await supabase.rpc('get_dashboard_metrics_for_client', {
-      //   service_provider_id: 'e95df707-d618-4ca4-9e2f-d80359e96622',
-      //   target_client_id: null // or specific client ID based on context
-      // });
-      
-      // For now, using the real data we discovered
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      setMetrics(prev => ({
-        ...prev,
-        loading: false,
-        lastUpdated: new Date()
-      }));
-    } catch (error) {
-      setMetrics(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Failed to refresh metrics'
-      }));
-    }
-  };
-
-  return { ...metrics, refreshMetrics };
-}
-
-export default function RealDashboard() {
+export default function Dashboard() {
   const {
-    totalActiveEmployees,
+    totalPatients,
     complianceRate,
     certificatesExpiring,
     testsThisMonth,
+    testsLastMonth,
     pendingReviews,
     systemHealth,
     missingRecords,
-    loading,
+    isLoading,
     error,
-    lastUpdated,
-    refreshMetrics
-  } = useRealDashboardMetrics();
+    refetchAll
+  } = useDashboardMetrics();
+
+  // Calculate month-over-month change
+  const monthOverMonthChange = testsThisMonth - testsLastMonth;
+  const monthOverMonthPercentage = testsLastMonth > 0 
+    ? Math.round(((testsThisMonth - testsLastMonth) / testsLastMonth) * 100)
+    : 0;
+
+  if (error) {
+    console.error('Dashboard metrics error:', error);
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -90,12 +56,12 @@ export default function RealDashboard() {
         <div className="flex items-center gap-2">
           <Badge variant="outline">BASIC Plan</Badge>
           <Button 
-            onClick={refreshMetrics} 
+            onClick={refetchAll} 
             variant="outline" 
             size="sm"
-            disabled={loading}
+            disabled={isLoading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -124,7 +90,9 @@ export default function RealDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalActiveEmployees}</div>
+            <div className="text-2xl font-bold">
+              {isLoading ? '...' : totalPatients}
+            </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-green-600" />
               <span>Registered in system</span>
@@ -140,7 +108,7 @@ export default function RealDashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${complianceRate >= 95 ? 'text-green-600' : complianceRate >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {complianceRate.toFixed(1)}%
+              {isLoading ? '...' : `${complianceRate}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Fitness compliance rate</span>
@@ -156,11 +124,11 @@ export default function RealDashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${certificatesExpiring > 10 ? 'text-red-600' : certificatesExpiring > 5 ? 'text-orange-600' : 'text-green-600'}`}>
-              {certificatesExpiring}
+              {isLoading ? '...' : certificatesExpiring}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Next 30 days</span>
-              {certificatesExpiring === 0 && (
+              {certificatesExpiring === 0 && !isLoading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   All current
                 </Badge>
@@ -176,9 +144,16 @@ export default function RealDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{testsThisMonth}</div>
+            <div className="text-2xl font-bold">
+              {isLoading ? '...' : testsThisMonth}
+            </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+              {!isLoading && monthOverMonthChange !== 0 && (
+                <span className={`flex items-center gap-1 ${monthOverMonthChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {monthOverMonthChange > 0 ? '+' : ''}{monthOverMonthChange} from last month
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -191,11 +166,11 @@ export default function RealDashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${pendingReviews > 10 ? 'text-orange-600' : 'text-green-600'}`}>
-              {pendingReviews}
+              {isLoading ? '...' : pendingReviews}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Awaiting attention</span>
-              {pendingReviews <= 5 && (
+              {pendingReviews <= 5 && !isLoading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   Low backlog
                 </Badge>
@@ -212,11 +187,11 @@ export default function RealDashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${systemHealth >= 95 ? 'text-green-600' : systemHealth >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {systemHealth.toFixed(1)}%
+              {isLoading ? '...' : `${systemHealth}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Document processing rate</span>
-              {systemHealth >= 99 && (
+              {systemHealth >= 99 && !isLoading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   Excellent
                 </Badge>
@@ -240,34 +215,44 @@ export default function RealDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {certificatesExpiring > 0 && (
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                <span>Schedule {certificatesExpiring} certificate renewals (due in 30 days)</span>
-              </div>
+            {!isLoading && (
+              <>
+                {certificatesExpiring > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span>Schedule {certificatesExpiring} certificate renewals (due in 30 days)</span>
+                  </div>
+                )}
+                {pendingReviews > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <span>Review {pendingReviews} pending document approvals</span>
+                  </div>
+                )}
+                {complianceRate < 90 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <span>Improve compliance rate (currently {complianceRate}%)</span>
+                  </div>
+                )}
+                {missingRecords > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span>Complete compliance records for {missingRecords} patients</span>
+                  </div>
+                )}
+                {certificatesExpiring === 0 && pendingReviews <= 5 && complianceRate >= 90 && missingRecords === 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>All systems operating normally - no urgent actions required</span>
+                  </div>
+                )}
+              </>
             )}
-            {pendingReviews > 0 && (
+            {isLoading && (
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span>Review {pendingReviews} pending document approvals</span>
-              </div>
-            )}
-            {complianceRate < 90 && (
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span>Improve compliance rate (currently {complianceRate.toFixed(1)}%)</span>
-              </div>
-            )}
-            {missingRecords > 0 && (
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>Complete compliance records for {missingRecords} patients</span>
-              </div>
-            )}
-            {certificatesExpiring === 0 && pendingReviews <= 5 && complianceRate >= 90 && missingRecords === 0 && (
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>All systems operating normally - no urgent actions required</span>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                <span>Loading priority actions...</span>
               </div>
             )}
           </div>
@@ -291,8 +276,13 @@ export default function RealDashboard() {
 
       {/* Footer */}
       <div className="text-xs text-muted-foreground">
-        Last updated: {lastUpdated.toLocaleTimeString()} • 
+        Last updated: {new Date().toLocaleTimeString()} • 
         Data source: Real-time database queries
+        {error && (
+          <span className="text-red-600 ml-2">
+            (Some data may be unavailable due to errors)
+          </span>
+        )}
       </div>
       
     </div>

@@ -7,6 +7,22 @@ export const useDashboardMetrics = () => {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
 
+  // Total patients count
+  const totalPatients = useQuery({
+    queryKey: ['total-patients', organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('id')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      
+      if (error) throw error;
+      return data?.length || 0;
+    },
+    enabled: !!organizationId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Certificates expiring in next 30 days
   const certificatesExpiring = useQuery({
     queryKey: ['certificates-expiring', organizationId],
@@ -136,38 +152,75 @@ export const useDashboardMetrics = () => {
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
+  // Missing compliance records calculation
+  const missingRecords = useQuery({
+    queryKey: ['missing-records', organizationId],
+    queryFn: async () => {
+      // Get total patients
+      const { data: patients, error: patientsError } = await supabase
+        .from('patients')
+        .select('id')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      
+      if (patientsError) throw patientsError;
+      
+      // Get patients with compliance records
+      const { data: compliance, error: complianceError } = await supabase
+        .from('certificate_compliance')
+        .select('patient_id')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      
+      if (complianceError) throw complianceError;
+      
+      const totalPatients = patients?.length || 0;
+      const patientsWithCompliance = compliance?.length || 0;
+      
+      return Math.max(0, totalPatients - patientsWithCompliance);
+    },
+    enabled: !!organizationId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+
   const isLoading = 
+    totalPatients.isLoading ||
     certificatesExpiring.isLoading ||
     pendingReviews.isLoading ||
     testsThisMonth.isLoading ||
     testsLastMonth.isLoading ||
     systemHealth.isLoading ||
-    complianceRate.isLoading;
+    complianceRate.isLoading ||
+    missingRecords.isLoading;
 
   const error = 
+    totalPatients.error ||
     certificatesExpiring.error ||
     pendingReviews.error ||
     testsThisMonth.error ||
     testsLastMonth.error ||
     systemHealth.error ||
-    complianceRate.error;
+    complianceRate.error ||
+    missingRecords.error;
 
   return {
+    totalPatients: totalPatients.data || 0,
     certificatesExpiring: certificatesExpiring.data || 0,
     pendingReviews: pendingReviews.data || 0,
     testsThisMonth: testsThisMonth.data || 0,
     testsLastMonth: testsLastMonth.data || 0,
     systemHealth: systemHealth.data || 100,
     complianceRate: complianceRate.data || 0,
+    missingRecords: missingRecords.data || 0,
     isLoading,
     error,
     refetchAll: () => {
+      totalPatients.refetch();
       certificatesExpiring.refetch();
       pendingReviews.refetch();
       testsThisMonth.refetch();
       testsLastMonth.refetch();
       systemHealth.refetch();
       complianceRate.refetch();
+      missingRecords.refetch();
     }
   };
 };

@@ -164,6 +164,54 @@ export type Database = {
           },
         ]
       }
+      certificate_compliance_backup: {
+        Row: {
+          client_organization_id: string | null
+          compliance_notes: string | null
+          current_examination_id: string | null
+          current_expiry_date: string | null
+          current_fitness_status: string | null
+          days_until_expiry: number | null
+          id: string | null
+          is_compliant: boolean | null
+          next_exit_due: string | null
+          next_periodic_due: string | null
+          organization_id: string | null
+          patient_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_organization_id?: string | null
+          compliance_notes?: string | null
+          current_examination_id?: string | null
+          current_expiry_date?: string | null
+          current_fitness_status?: string | null
+          days_until_expiry?: number | null
+          id?: string | null
+          is_compliant?: boolean | null
+          next_exit_due?: string | null
+          next_periodic_due?: string | null
+          organization_id?: string | null
+          patient_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_organization_id?: string | null
+          compliance_notes?: string | null
+          current_examination_id?: string | null
+          current_expiry_date?: string | null
+          current_fitness_status?: string | null
+          days_until_expiry?: number | null
+          id?: string | null
+          is_compliant?: boolean | null
+          next_exit_due?: string | null
+          next_periodic_due?: string | null
+          organization_id?: string | null
+          patient_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       certificate_expirations: {
         Row: {
           certificate_id: string | null
@@ -1247,6 +1295,113 @@ export type Database = {
         }
         Relationships: []
       }
+      v_certificate_compliance_live: {
+        Row: {
+          client_organization_id: string | null
+          compliance_notes: string | null
+          current_examination_id: string | null
+          current_expiry_date: string | null
+          current_fitness_status: string | null
+          days_until_expiry: number | null
+          expiry_status: string | null
+          id: string | null
+          is_compliant: boolean | null
+          live_days_until_expiry: number | null
+          live_is_compliant: boolean | null
+          next_exit_due: string | null
+          next_periodic_due: string | null
+          organization_id: string | null
+          patient_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_organization_id?: string | null
+          compliance_notes?: string | null
+          current_examination_id?: string | null
+          current_expiry_date?: string | null
+          current_fitness_status?: string | null
+          days_until_expiry?: number | null
+          expiry_status?: never
+          id?: string | null
+          is_compliant?: boolean | null
+          live_days_until_expiry?: never
+          live_is_compliant?: never
+          next_exit_due?: string | null
+          next_periodic_due?: string | null
+          organization_id?: string | null
+          patient_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_organization_id?: string | null
+          compliance_notes?: string | null
+          current_examination_id?: string | null
+          current_expiry_date?: string | null
+          current_fitness_status?: string | null
+          days_until_expiry?: number | null
+          expiry_status?: never
+          id?: string | null
+          is_compliant?: boolean | null
+          live_days_until_expiry?: never
+          live_is_compliant?: never
+          next_exit_due?: string | null
+          next_periodic_due?: string | null
+          organization_id?: string | null
+          patient_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificate_compliance_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_client_organization_id_fkey"
+            columns: ["client_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_current_examination_id_fkey"
+            columns: ["current_examination_id"]
+            isOneToOne: false
+            referencedRelation: "medical_examinations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_compliance_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "v_patient_test_history"
+            referencedColumns: ["patient_id"]
+          },
+        ]
+      }
       v_company_health_benchmarks: {
         Row: {
           avg_cert_duration_days: number | null
@@ -1294,6 +1449,67 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_current_org_dashboard: {
+        Row: {
+          client_name: string | null
+          compliance_rate: number | null
+          compliant_patients: number | null
+          data_quality_status: string | null
+          expired_patients: number | null
+          expiring_30_days: number | null
+          missing_compliance_records: number | null
+          pending_documents: number | null
+          system_health_percentage: number | null
+          tests_this_month: number | null
+          total_patients: number | null
+        }
+        Relationships: []
+      }
+      v_dashboard_all_clients: {
+        Row: {
+          client_name: string | null
+          compliance_rate: number | null
+          compliant_patients: number | null
+          expired_patients: number | null
+          expiring_30_days: number | null
+          missing_compliance_records: number | null
+          pending_documents: number | null
+          system_health_percentage: number | null
+          tests_this_month: number | null
+          total_patients: number | null
+        }
+        Relationships: []
+      }
+      v_dashboard_rsc: {
+        Row: {
+          client_name: string | null
+          compliance_rate: number | null
+          compliant_patients: number | null
+          expired_patients: number | null
+          expiring_30_days: number | null
+          missing_compliance_records: number | null
+          pending_documents: number | null
+          system_health_percentage: number | null
+          tests_this_month: number | null
+          total_patients: number | null
+        }
+        Relationships: []
+      }
+      v_dashboard_she_group: {
+        Row: {
+          client_name: string | null
+          compliance_rate: number | null
+          compliant_patients: number | null
+          expired_patients: number | null
+          expiring_30_days: number | null
+          missing_compliance_records: number | null
+          pending_documents: number | null
+          system_health_percentage: number | null
+          tests_this_month: number | null
+          total_patients: number | null
+        }
+        Relationships: []
       }
       v_executive_summary: {
         Row: {
@@ -1706,6 +1922,21 @@ export type Database = {
       get_client_organizations: {
         Args: { provider_id: string }
         Returns: Json
+      }
+      get_dashboard_metrics_for_client: {
+        Args: { service_provider_id?: string; target_client_id?: string }
+        Returns: {
+          total_patients: number
+          compliant_patients: number
+          expired_patients: number
+          expiring_30_days: number
+          compliance_rate: number
+          pending_documents: number
+          system_health_percentage: number
+          tests_this_month: number
+          client_name: string
+          missing_compliance_records: number
+        }[]
       }
       get_service_provider_organizations: {
         Args: Record<PropertyKey, never>
