@@ -1,4 +1,4 @@
-// src/hooks/useDashboardMetrics.ts - FIXED VERSION
+// src/hooks/useDashboardMetrics.ts - COMPLETE VERSION WITH testsLastMonth
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -8,7 +8,7 @@ interface DashboardMetrics {
   complianceRate: number;
   certificatesExpiring: number;
   testsThisMonth: number;
-  testsLastMonth: number; 
+  testsLastMonth: number;        // ✅ Added
   pendingReviews: number;
   systemHealth: number;
   missingRecords: number;
@@ -25,7 +25,7 @@ export function useDashboardMetrics() {
     complianceRate: 0,
     certificatesExpiring: 0,
     testsThisMonth: 0,
-    testsLastMonth: 0,
+    testsLastMonth: 0,             // ✅ Added
     pendingReviews: 0,
     systemHealth: 0,
     missingRecords: 0,
@@ -58,7 +58,7 @@ export function useDashboardMetrics() {
         ? `organization_id.eq.${organizationId}`
         : `client_organization_id.eq.${organizationId}`;
 
-      // 1. TOTAL PATIENTS - ✅ This was working correctly
+      // 1. TOTAL PATIENTS
       const { count: patientCount, error: patientError } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
@@ -66,8 +66,7 @@ export function useDashboardMetrics() {
 
       if (patientError) throw patientError;
 
-      // 2. COMPLIANCE RATE - 🔧 FIXED CALCULATION
-      // Problem: Was calculating wrong - need to use certificate_compliance table properly
+      // 2. COMPLIANCE RATE - FIXED CALCULATION
       const { data: complianceData, error: complianceError } = await supabase
         .from('certificate_compliance')
         .select('is_compliant, current_expiry_date')
@@ -75,13 +74,9 @@ export function useDashboardMetrics() {
 
       if (complianceError) throw complianceError;
 
-      // Calculate REAL compliance rate (matches our SQL findings)
+      // Calculate REAL compliance rate
       const totalComplianceRecords = complianceData?.length || 0;
       const compliantRecords = complianceData?.filter(record => {
-        // A record is compliant if:
-        // 1. is_compliant is true, OR
-        // 2. No expiry date (assumed compliant), OR  
-        // 3. Expiry date is in the future
         if (record.is_compliant === true) return true;
         if (!record.current_expiry_date) return true;
         return new Date(record.current_expiry_date) >= new Date();
@@ -97,7 +92,7 @@ export function useDashboardMetrics() {
         rate: realComplianceRate
       });
 
-      // 3. CERTIFICATES EXPIRING - ✅ This was working correctly
+      // 3. CERTIFICATES EXPIRING
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
       const today = new Date();
@@ -108,8 +103,7 @@ export function useDashboardMetrics() {
         return expiryDate >= today && expiryDate <= thirtyDaysFromNow;
       }).length || 0;
 
-      // 4. TESTS THIS MONTH - 🔧 FIXED CALCULATION  
-      // Problem: Was using wrong date filtering
+      // 4. TESTS THIS MONTH - FIXED CALCULATION
       const currentDate = new Date();
       const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const firstDayOfMonthStr = firstDayOfMonth.toISOString().split('T')[0];
@@ -126,7 +120,7 @@ export function useDashboardMetrics() {
 
       console.log('🧪 Tests this month found:', testsThisMonth);
 
-      // 4. TESTS LAST MONTH - 🔧 NEW CALCULATION
+      // 5. TESTS LAST MONTH - NEW CALCULATION ✅
       const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
       const thisMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const lastMonthStr = lastMonth.toISOString().split('T')[0];
@@ -145,8 +139,7 @@ export function useDashboardMetrics() {
 
       console.log('🧪 Tests last month found:', testsLastMonth);
 
-      // 5. PENDING REVIEWS - 🔧 IMPROVED CALCULATION
-      // Get patient IDs for this organization first
+      // 6. PENDING REVIEWS
       const { data: orgPatients, error: patientsError } = await supabase
         .from('patients')
         .select('id')
@@ -156,17 +149,15 @@ export function useDashboardMetrics() {
 
       const patientIds = orgPatients?.map(p => p.id) || [];
 
-      // Then get documents for those patients
       const { count: pendingDocuments, error: docError } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true })
         .in('owner_id', patientIds)
-        .eq('status', 'uploaded'); // Only uploaded (not processed) documents
+        .eq('status', 'uploaded');
 
       if (docError) throw docError;
 
-      // 6. SYSTEM HEALTH - 🔧 FIXED CALCULATION
-      // Problem: Was calculating wrong - need proper processed vs total ratio
+      // 7. SYSTEM HEALTH - FIXED CALCULATION
       const { data: allDocuments, error: allDocsError } = await supabase
         .from('documents')
         .select('status')
@@ -174,7 +165,7 @@ export function useDashboardMetrics() {
 
       if (allDocsError) throw allDocsError;
 
-      const totalDocuments = allDocuments?.length || 1; // Avoid division by zero
+      const totalDocuments = allDocuments?.length || 1;
       const processedDocuments = allDocuments?.filter(doc => doc.status === 'processed').length || 0;
       const realSystemHealth = (processedDocuments / totalDocuments) * 100;
 
@@ -184,17 +175,18 @@ export function useDashboardMetrics() {
         health: realSystemHealth
       });
 
-      // 7. MISSING RECORDS - ✅ This was working correctly
+      // 8. MISSING RECORDS
       const missingRecords = Math.max(0, (patientCount || 0) - totalComplianceRecords);
 
-      // Update with CORRECTED metrics
+      // ✅ FIXED: Update with ALL metrics including testsLastMonth
       setMetrics({
         totalActiveEmployees: patientCount || 0,
-        complianceRate: Math.round(realComplianceRate * 100) / 100, // 🔧 FIXED
+        complianceRate: Math.round(realComplianceRate * 100) / 100,
         certificatesExpiring: expiringCount,
-        testsThisMonth: testsThisMonth || 0, // 🔧 FIXED  
+        testsThisMonth: testsThisMonth || 0,
+        testsLastMonth: testsLastMonth || 0,     // ✅ Added this line
         pendingReviews: pendingDocuments || 0,
-        systemHealth: Math.round(realSystemHealth * 100) / 100, // 🔧 FIXED
+        systemHealth: Math.round(realSystemHealth * 100) / 100,
         missingRecords,
         clientName: currentOrganization?.name || 'Unknown Organization',
         loading: false,
@@ -202,7 +194,7 @@ export function useDashboardMetrics() {
         lastUpdated: new Date()
       });
 
-      console.log('✅ Updated metrics with corrected calculations');
+      console.log('✅ Updated metrics with corrected calculations including testsLastMonth');
 
     } catch (error) {
       console.error('❌ Error fetching dashboard metrics:', error);
