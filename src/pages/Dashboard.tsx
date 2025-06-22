@@ -1,9 +1,7 @@
-
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePackage } from '@/contexts/PackageContext';
-//import DashboardLayout from '@/components/DashboardLayout';
-import DashboardLayout from '../components/DashboardLayout';
+import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -145,9 +143,8 @@ const Dashboard = () => {
   ];
 
   return (
-  <DashboardLayout>
-    <>
-        
+    <DashboardLayout>
+      <div className="space-y-8 p-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -381,8 +378,8 @@ const Dashboard = () => {
             </Card>
           </div>
         </div>
-      </>  {/* Use this instead */}
-  </DashboardLayout>
+      </div>
+    </DashboardLayout>
   );
 };
 
