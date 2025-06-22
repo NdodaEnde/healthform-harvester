@@ -12,7 +12,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
       {/* ONLY CHANGE: Remove max-w-7xl and adjust padding */}
-      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 px-4 md:px-8">
+      <div className="flex-1 pl-16 md:pl-64 pt-16 pb-12 pr-4 md:pr-8">
         {children}
       </div>
     </div>
