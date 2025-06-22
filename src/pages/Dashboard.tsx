@@ -205,15 +205,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* New Dashboard Sections Grid - Matching the Image Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DocumentProcessingTrends />
-        <RecentActivity />
-        <RecentDocuments />
-        <QuickActions />
-      </div>
-
-      {/* Priority Actions */}
+      {/* Priority Actions - MOVED ABOVE the dashboard sections */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -284,6 +276,14 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* New Dashboard Sections Grid - NOW BELOW Priority Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <DocumentProcessingTrends />
+        <RecentActivity />
+        <RecentDocuments />
+        <QuickActions />
+      </div>
 
       {/* Footer */}
       <div className="text-xs text-muted-foreground">
