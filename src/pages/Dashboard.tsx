@@ -16,6 +16,10 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { DocumentProcessingTrends } from '@/components/dashboard/DocumentProcessingTrends';
+import { RecentDocuments } from '@/components/dashboard/RecentDocuments';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
+import { QuickActions } from '@/components/dashboard/QuickActions';
 
 export default function Dashboard() {
   const {
@@ -200,6 +204,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+      </div>
+
+      {/* New Dashboard Sections Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <DocumentProcessingTrends />
+        <RecentDocuments />
+        <RecentActivity />
+        <QuickActions />
       </div>
 
       {/* Priority Actions */}
