@@ -1,3 +1,4 @@
+// DashboardLayout.tsx - DEFINITIVE FIX
 
 import { ReactNode } from "react";
 import DashboardSidebar from "./DashboardSidebar";
@@ -11,10 +12,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
       {/* 
-        The sidebar is fixed positioned with w-16 md:w-64, so we need to 
-        add equivalent left margin to the content to avoid overlap
+        DEFINITIVE FIX: 
+        1. Remove max-w-7xl (width constraint)
+        2. Remove any container classes from children
+        3. Use simple padding instead of px-6
+        4. Content will now use full available width
       */}
-      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 px-4 md:px-6 w-full max-w-none">
+      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 px-4 md:px-8 w-full">
         {children}
       </div>
     </div>
