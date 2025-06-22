@@ -1,226 +1,212 @@
+// src/hooks/useDashboardMetrics.ts - FIXED VERSION
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useOrganization } from "@/contexts/OrganizationContext";
+interface DashboardMetrics {
+  totalActiveEmployees: number;
+  complianceRate: number;
+  certificatesExpiring: number;
+  testsThisMonth: number;
+  pendingReviews: number;
+  systemHealth: number;
+  missingRecords: number;
+  clientName: string;
+  loading: boolean;
+  error: string | null;
+  lastUpdated: Date;
+}
 
-export const useDashboardMetrics = () => {
-  const { getEffectiveOrganizationId } = useOrganization();
-  const organizationId = getEffectiveOrganizationId();
-
-  // Total patients count
-  const totalPatients = useQuery({
-    queryKey: ['total-patients', organizationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
-      
-      if (error) throw error;
-      return data?.length || 0;
-    },
-    enabled: !!organizationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+export function useDashboardMetrics() {
+  const { getEffectiveOrganizationId, currentOrganization } = useOrganization();
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    totalActiveEmployees: 0,
+    complianceRate: 0,
+    certificatesExpiring: 0,
+    testsThisMonth: 0,
+    pendingReviews: 0,
+    systemHealth: 0,
+    missingRecords: 0,
+    clientName: 'Loading...',
+    loading: true,
+    error: null,
+    lastUpdated: new Date()
   });
 
-  // Certificates expiring in next 30 days
-  const certificatesExpiring = useQuery({
-    queryKey: ['certificates-expiring', organizationId],
-    queryFn: async () => {
+  const fetchMetrics = useCallback(async () => {
+    const organizationId = getEffectiveOrganizationId();
+    
+    if (!organizationId) {
+      setMetrics(prev => ({
+        ...prev,
+        loading: false,
+        error: 'No organization selected'
+      }));
+      return;
+    }
+
+    setMetrics(prev => ({ ...prev, loading: true, error: null }));
+
+    try {
+      console.log('🔍 Fetching corrected metrics for organization:', organizationId);
+
+      // Determine organization filter
+      const isServiceProvider = organizationId === 'e95df707-d618-4ca4-9e2f-d80359e96622';
+      const orgFilter = isServiceProvider 
+        ? `organization_id.eq.${organizationId}`
+        : `client_organization_id.eq.${organizationId}`;
+
+      // 1. TOTAL PATIENTS - ✅ This was working correctly
+      const { count: patientCount, error: patientError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .or(orgFilter);
+
+      if (patientError) throw patientError;
+
+      // 2. COMPLIANCE RATE - 🔧 FIXED CALCULATION
+      // Problem: Was calculating wrong - need to use certificate_compliance table properly
+      const { data: complianceData, error: complianceError } = await supabase
+        .from('certificate_compliance')
+        .select('is_compliant, current_expiry_date')
+        .or(orgFilter);
+
+      if (complianceError) throw complianceError;
+
+      // Calculate REAL compliance rate (matches our SQL findings)
+      const totalComplianceRecords = complianceData?.length || 0;
+      const compliantRecords = complianceData?.filter(record => {
+        // A record is compliant if:
+        // 1. is_compliant is true, OR
+        // 2. No expiry date (assumed compliant), OR  
+        // 3. Expiry date is in the future
+        if (record.is_compliant === true) return true;
+        if (!record.current_expiry_date) return true;
+        return new Date(record.current_expiry_date) >= new Date();
+      }).length || 0;
+
+      const realComplianceRate = totalComplianceRecords > 0 
+        ? (compliantRecords / totalComplianceRecords) * 100 
+        : 100;
+
+      console.log('📊 Compliance calculation:', {
+        totalRecords: totalComplianceRecords,
+        compliantRecords,
+        rate: realComplianceRate
+      });
+
+      // 3. CERTIFICATES EXPIRING - ✅ This was working correctly
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      
-      const { data, error } = await supabase
+      const today = new Date();
+
+      const expiringCount = complianceData?.filter(record => {
+        if (!record.current_expiry_date) return false;
+        const expiryDate = new Date(record.current_expiry_date);
+        return expiryDate >= today && expiryDate <= thirtyDaysFromNow;
+      }).length || 0;
+
+      // 4. TESTS THIS MONTH - 🔧 FIXED CALCULATION  
+      // Problem: Was using wrong date filtering
+      const currentDate = new Date();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const firstDayOfMonthStr = firstDayOfMonth.toISOString().split('T')[0];
+
+      console.log('📅 Searching for tests since:', firstDayOfMonthStr);
+
+      const { count: testsThisMonth, error: testsError } = await supabase
         .from('medical_examinations')
-        .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .not('expiry_date', 'is', null)
-        .gte('expiry_date', new Date().toISOString().split('T')[0])
-        .lte('expiry_date', thirtyDaysFromNow.toISOString().split('T')[0]);
-      
-      if (error) throw error;
-      return data?.length || 0;
-    },
-    enabled: !!organizationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+        .select('*', { count: 'exact', head: true })
+        .or(orgFilter)
+        .gte('examination_date', firstDayOfMonthStr);
 
-  // Pending document reviews
-  const pendingReviews = useQuery({
-    queryKey: ['pending-reviews', organizationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .in('status', ['pending', 'processing'])
-        .eq('validation_status', 'pending');
-      
-      if (error) throw error;
-      return data?.length || 0;
-    },
-    enabled: !!organizationId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
+      if (testsError) throw testsError;
 
-  // Tests conducted this month
-  const testsThisMonth = useQuery({
-    queryKey: ['tests-this-month', organizationId],
-    queryFn: async () => {
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      const { data, error } = await supabase
-        .from('medical_examinations')
-        .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .gte('examination_date', firstDayOfMonth.toISOString().split('T')[0])
-        .lte('examination_date', lastDayOfMonth.toISOString().split('T')[0]);
-      
-      if (error) throw error;
-      return data?.length || 0;
-    },
-    enabled: !!organizationId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
+      console.log('🧪 Tests this month found:', testsThisMonth);
 
-  // Tests conducted last month for comparison
-  const testsLastMonth = useQuery({
-    queryKey: ['tests-last-month', organizationId],
-    queryFn: async () => {
-      const now = new Date();
-      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-      
-      const { data, error } = await supabase
-        .from('medical_examinations')
-        .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .gte('examination_date', firstDayOfLastMonth.toISOString().split('T')[0])
-        .lte('examination_date', lastDayOfLastMonth.toISOString().split('T')[0]);
-      
-      if (error) throw error;
-      return data?.length || 0;
-    },
-    enabled: !!organizationId,
-    staleTime: 30 * 60 * 1000, // 30 minutes (less frequent updates for historical data)
-  });
-
-  // System health based on document processing success rate
-  const systemHealth = useQuery({
-    queryKey: ['system-health', organizationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('status')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
-      
-      if (error) throw error;
-      if (!data || data.length === 0) return 100;
-      
-      const processed = data.filter(doc => doc.status === 'processed').length;
-      const total = data.length;
-      return Math.round((processed / total) * 100);
-    },
-    enabled: !!organizationId,
-    staleTime: 15 * 60 * 1000, // 15 minutes
-  });
-
-  // Fixed compliance rate calculation
-  const complianceRate = useQuery({
-    queryKey: ['compliance-rate-fixed', organizationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('medical_examinations')
-        .select('fitness_status')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .not('fitness_status', 'is', null);
-      
-      if (error) throw error;
-      if (!data || data.length === 0) return 0;
-      
-      const compliant = data.filter(exam => 
-        exam.fitness_status?.toLowerCase().includes('fit') || 
-        exam.fitness_status?.toLowerCase().includes('pass')
-      ).length;
-      
-      return Math.round((compliant / data.length) * 100);
-    },
-    enabled: !!organizationId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-
-  // Missing compliance records calculation
-  const missingRecords = useQuery({
-    queryKey: ['missing-records', organizationId],
-    queryFn: async () => {
-      // Get total patients
-      const { data: patients, error: patientsError } = await supabase
+      // 5. PENDING REVIEWS - 🔧 IMPROVED CALCULATION
+      // Get patient IDs for this organization first
+      const { data: orgPatients, error: patientsError } = await supabase
         .from('patients')
         .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
-      
+        .or(orgFilter);
+
       if (patientsError) throw patientsError;
-      
-      // Get patients with compliance records
-      const { data: compliance, error: complianceError } = await supabase
-        .from('certificate_compliance')
-        .select('patient_id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
-      
-      if (complianceError) throw complianceError;
-      
-      const totalPatients = patients?.length || 0;
-      const patientsWithCompliance = compliance?.length || 0;
-      
-      return Math.max(0, totalPatients - patientsWithCompliance);
-    },
-    enabled: !!organizationId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
 
-  const isLoading = 
-    totalPatients.isLoading ||
-    certificatesExpiring.isLoading ||
-    pendingReviews.isLoading ||
-    testsThisMonth.isLoading ||
-    testsLastMonth.isLoading ||
-    systemHealth.isLoading ||
-    complianceRate.isLoading ||
-    missingRecords.isLoading;
+      const patientIds = orgPatients?.map(p => p.id) || [];
 
-  const error = 
-    totalPatients.error ||
-    certificatesExpiring.error ||
-    pendingReviews.error ||
-    testsThisMonth.error ||
-    testsLastMonth.error ||
-    systemHealth.error ||
-    complianceRate.error ||
-    missingRecords.error;
+      // Then get documents for those patients
+      const { count: pendingDocuments, error: docError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .in('owner_id', patientIds)
+        .eq('status', 'uploaded'); // Only uploaded (not processed) documents
+
+      if (docError) throw docError;
+
+      // 6. SYSTEM HEALTH - 🔧 FIXED CALCULATION
+      // Problem: Was calculating wrong - need proper processed vs total ratio
+      const { data: allDocuments, error: allDocsError } = await supabase
+        .from('documents')
+        .select('status')
+        .in('owner_id', patientIds);
+
+      if (allDocsError) throw allDocsError;
+
+      const totalDocuments = allDocuments?.length || 1; // Avoid division by zero
+      const processedDocuments = allDocuments?.filter(doc => doc.status === 'processed').length || 0;
+      const realSystemHealth = (processedDocuments / totalDocuments) * 100;
+
+      console.log('🏥 System health calculation:', {
+        totalDocs: totalDocuments,
+        processedDocs: processedDocuments,
+        health: realSystemHealth
+      });
+
+      // 7. MISSING RECORDS - ✅ This was working correctly
+      const missingRecords = Math.max(0, (patientCount || 0) - totalComplianceRecords);
+
+      // Update with CORRECTED metrics
+      setMetrics({
+        totalActiveEmployees: patientCount || 0,
+        complianceRate: Math.round(realComplianceRate * 100) / 100, // 🔧 FIXED
+        certificatesExpiring: expiringCount,
+        testsThisMonth: testsThisMonth || 0, // 🔧 FIXED  
+        pendingReviews: pendingDocuments || 0,
+        systemHealth: Math.round(realSystemHealth * 100) / 100, // 🔧 FIXED
+        missingRecords,
+        clientName: currentOrganization?.name || 'Unknown Organization',
+        loading: false,
+        error: null,
+        lastUpdated: new Date()
+      });
+
+      console.log('✅ Updated metrics with corrected calculations');
+
+    } catch (error) {
+      console.error('❌ Error fetching dashboard metrics:', error);
+      setMetrics(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch metrics'
+      }));
+    }
+  }, [getEffectiveOrganizationId, currentOrganization]);
+
+  // Fetch metrics when organization changes
+  useEffect(() => {
+    console.log('🔄 Organization changed, fetching corrected metrics...');
+    fetchMetrics();
+  }, [fetchMetrics]);
+
+  // Refresh function
+  const refreshMetrics = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
+    fetchMetrics();
+  }, [fetchMetrics]);
 
   return {
-    totalPatients: totalPatients.data || 0,
-    certificatesExpiring: certificatesExpiring.data || 0,
-    pendingReviews: pendingReviews.data || 0,
-    testsThisMonth: testsThisMonth.data || 0,
-    testsLastMonth: testsLastMonth.data || 0,
-    systemHealth: systemHealth.data || 100,
-    complianceRate: complianceRate.data || 0,
-    missingRecords: missingRecords.data || 0,
-    isLoading,
-    error,
-    refetchAll: () => {
-      totalPatients.refetch();
-      certificatesExpiring.refetch();
-      pendingReviews.refetch();
-      testsThisMonth.refetch();
-      testsLastMonth.refetch();
-      systemHealth.refetch();
-      complianceRate.refetch();
-      missingRecords.refetch();
-    }
+    ...metrics,
+    refreshMetrics
   };
-};
+}
