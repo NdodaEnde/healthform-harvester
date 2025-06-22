@@ -15,11 +15,11 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
       <div className={cn(
         "flex-1 transition-all duration-300",
         "ml-16 md:ml-64", // Responsive margin based on sidebar width
-        "pt-16 pb-12 px-4 sm:px-6", // Responsive padding
+        "pt-16 pb-12 px-6 lg:px-8", // Better responsive padding with more space on larger screens
         "max-w-full overflow-x-auto", // Prevent horizontal overflow
         className
       )}>
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-none w-full"> {/* Changed from max-w-7xl to max-w-none and added w-full */}
           {children}
         </div>
       </div>
