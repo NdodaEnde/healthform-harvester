@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -114,7 +115,7 @@ export default function Dashboard() {
               {loading ? '...' : `${complianceRate}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Fitness compliance rate</span>
+              <span>Valid medical certificates</span>
             </div>
           </CardContent>
         </Card>
