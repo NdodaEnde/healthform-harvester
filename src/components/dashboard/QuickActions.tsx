@@ -3,10 +3,27 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Users, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function QuickActions() {
+  const navigate = useNavigate();
+
   const handleAction = (action: string) => {
     console.log(`Quick action triggered: ${action}`);
+    
+    switch (action) {
+      case 'upload':
+        navigate('/documents');
+        break;
+      case 'view-employees':
+        navigate('/patients');
+        break;
+      case 'generate-report':
+        navigate('/reports');
+        break;
+      default:
+        console.log(`Unknown action: ${action}`);
+    }
   };
 
   return (

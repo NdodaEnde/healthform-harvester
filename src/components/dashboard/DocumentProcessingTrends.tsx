@@ -2,38 +2,69 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 export function DocumentProcessingTrends() {
-  const { loading } = useDashboardMetrics();
+  const { getEffectiveOrganizationId } = useOrganization();
+  const organizationId = getEffectiveOrganizationId();
 
-  // Generate realistic trend data based on current month
-  const getCurrentMonthTrends = () => {
-    const currentDate = new Date();
-    const months = [];
-    
-    // Get last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(currentDate.getMonth() - i);
+  // Fetch real document processing trends from the last 6 months
+  const { data: trendsData, isLoading } = useQuery({
+    queryKey: ['document-processing-trends', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+
+      const isServiceProvider = organizationId === 'e95df707-d618-4ca4-9e2f-d80359e96622';
+      const orgFilter = isServiceProvider 
+        ? `organization_id.eq.${organizationId}`
+        : `client_organization_id.eq.${organizationId}`;
+
+      // Get documents processed in the last 6 months, grouped by month
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const { data, error } = await supabase
+        .from('documents')
+        .select('processed_at, created_at')
+        .or(orgFilter)
+        .eq('status', 'processed')
+        .gte('processed_at', sixMonthsAgo.toISOString())
+        .order('processed_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Group by month
+      const monthlyData = {};
+      const currentDate = new Date();
       
-      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-      
-      // Generate realistic values that trend upward with some variation
-      const baseValue = 30 + (5 - i) * 5; // Base trending upward
-      const variation = Math.floor(Math.random() * 15) - 7; // Random variation ±7
-      const value = Math.max(20, baseValue + variation); // Ensure minimum of 20
-      
-      months.push({
-        month: monthName,
-        value: value
+      // Initialize last 6 months with 0 values
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(currentDate.getMonth() - i);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
+        const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        monthlyData[yearMonth] = { month: monthKey, value: 0 };
+      }
+
+      // Count processed documents by month
+      data?.forEach(doc => {
+        if (doc.processed_at) {
+          const date = new Date(doc.processed_at);
+          const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+          if (monthlyData[yearMonth]) {
+            monthlyData[yearMonth].value++;
+          }
+        }
       });
-    }
-    
-    return months;
-  };
 
-  const chartData = getCurrentMonthTrends();
+      return Object.values(monthlyData);
+    },
+    enabled: !!organizationId,
+  });
+
+  const chartData = trendsData || [];
 
   return (
     <Card>
@@ -42,14 +73,14 @@ export function DocumentProcessingTrends() {
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             Document Processing Trends
           </CardTitle>
-          <a href="#" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+          <a href="/documents" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
             View Details →
           </a>
         </div>
       </CardHeader>
       <CardContent>
         <div className="h-64 w-full">
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-sm text-muted-foreground">Loading trends...</div>
             </div>
@@ -66,7 +97,7 @@ export function DocumentProcessingTrends() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: '#6B7280' }}
-                  domain={[0, 'dataMax + 10']}
+                  domain={[0, 'dataMax + 5']}
                 />
                 <Line 
                   type="monotone" 
