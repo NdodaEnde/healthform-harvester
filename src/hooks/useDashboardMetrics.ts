@@ -8,6 +8,7 @@ interface DashboardMetrics {
   complianceRate: number;
   certificatesExpiring: number;
   testsThisMonth: number;
+  testsLastMonth: number; 
   pendingReviews: number;
   systemHealth: number;
   missingRecords: number;
@@ -24,6 +25,7 @@ export function useDashboardMetrics() {
     complianceRate: 0,
     certificatesExpiring: 0,
     testsThisMonth: 0,
+    testsLastMonth: 0,
     pendingReviews: 0,
     systemHealth: 0,
     missingRecords: 0,
@@ -123,6 +125,25 @@ export function useDashboardMetrics() {
       if (testsError) throw testsError;
 
       console.log('🧪 Tests this month found:', testsThisMonth);
+
+      // 4. TESTS LAST MONTH - 🔧 NEW CALCULATION
+      const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      const thisMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const lastMonthStr = lastMonth.toISOString().split('T')[0];
+      const thisMonthStr = thisMonth.toISOString().split('T')[0];
+
+      console.log('📅 Searching for last month tests:', lastMonthStr, 'to', thisMonthStr);
+
+      const { count: testsLastMonth, error: lastMonthTestsError } = await supabase
+        .from('medical_examinations')
+        .select('*', { count: 'exact', head: true })
+        .or(orgFilter)
+        .gte('examination_date', lastMonthStr)
+        .lt('examination_date', thisMonthStr);
+
+      if (lastMonthTestsError) throw lastMonthTestsError;
+
+      console.log('🧪 Tests last month found:', testsLastMonth);
 
       // 5. PENDING REVIEWS - 🔧 IMPROVED CALCULATION
       // Get patient IDs for this organization first
