@@ -1,3 +1,4 @@
+
 import { ReactNode } from "react";
 import DashboardSidebar from "./DashboardSidebar";
 
@@ -10,11 +11,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
       {/* 
-        CORRECT FIX: Keep the flex layout but fix the spacing issue.
-        The problem was max-w-7xl constraining width and creating gap.
-        We keep ml-16 md:ml-64 because that's the correct spacing for the fixed sidebar.
+        The sidebar is fixed positioned with w-16 md:w-64, so we need to 
+        add equivalent left margin to the content to avoid overlap
       */}
-      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 px-4 md:px-6">
+      <div className="flex-1 ml-16 md:ml-64 pt-16 pb-12 px-4 md:px-6 w-full max-w-none">
         {children}
       </div>
     </div>
