@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,6 +34,9 @@ import ExaminationTypeAnalytics from './components/ExaminationTypeAnalytics';
 import BasicOverviewTab from '@/components/analytics/BasicOverviewTab';
 import BasicReports from '@/components/analytics/BasicReports';
 
+// Import the new task management component
+import TaskManagementDashboard from '@/components/tasks/TaskManagementDashboard';
+
 const IntegratedOccupationalHealthPage = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -51,7 +55,7 @@ const IntegratedOccupationalHealthPage = () => {
       <ExecutiveSummaryBanner />
       
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12">
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-14">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="fitness-declarations">Fitness Declarations</TabsTrigger>
           <TabsTrigger value="examination-types">Exam Types</TabsTrigger>
@@ -64,6 +68,7 @@ const IntegratedOccupationalHealthPage = () => {
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="health-metrics">Health Metrics</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="admin">Admin Tools</TabsTrigger>
         </TabsList>
         
@@ -151,6 +156,10 @@ const IntegratedOccupationalHealthPage = () => {
           <FeatureGate requiredTier="premium">
             <AdvancedReportGenerator />
           </FeatureGate>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="space-y-4">
+          <TaskManagementDashboard />
         </TabsContent>
 
         <TabsContent value="admin" className="space-y-4">

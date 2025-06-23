@@ -1170,48 +1170,117 @@ export type Database = {
         }
         Relationships: []
       }
+      task_templates: {
+        Row: {
+          auto_assign_rules: Json | null
+          created_at: string | null
+          description: string | null
+          estimated_duration: unknown | null
+          id: string
+          name: string
+          organization_id: string | null
+          priority: string
+          template_data: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_assign_rules?: Json | null
+          created_at?: string | null
+          description?: string | null
+          estimated_duration?: unknown | null
+          id?: string
+          name: string
+          organization_id?: string | null
+          priority: string
+          template_data?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_assign_rules?: Json | null
+          created_at?: string | null
+          description?: string | null
+          estimated_duration?: unknown | null
+          id?: string
+          name?: string
+          organization_id?: string | null
+          priority?: string
+          template_data?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_queue: {
         Row: {
           assigned_to: string | null
+          compliance_deadline: string | null
           created_at: string
           description: string | null
           due_date: string | null
+          estimated_duration: unknown | null
+          generated_from_analytics: boolean | null
           id: string
           organization_id: string | null
           priority: string
           related_entity_id: string | null
           related_entity_type: string | null
+          risk_score: string | null
           status: string
+          task_template_id: string | null
           title: string
           type: string
           updated_at: string
         }
         Insert: {
           assigned_to?: string | null
+          compliance_deadline?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
+          estimated_duration?: unknown | null
+          generated_from_analytics?: boolean | null
           id?: string
           organization_id?: string | null
           priority: string
           related_entity_id?: string | null
           related_entity_type?: string | null
+          risk_score?: string | null
           status?: string
+          task_template_id?: string | null
           title: string
           type: string
           updated_at?: string
         }
         Update: {
           assigned_to?: string | null
+          compliance_deadline?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
+          estimated_duration?: unknown | null
+          generated_from_analytics?: boolean | null
           id?: string
           organization_id?: string | null
           priority?: string
           related_entity_id?: string | null
           related_entity_type?: string | null
+          risk_score?: string | null
           status?: string
+          task_template_id?: string | null
           title?: string
           type?: string
           updated_at?: string
@@ -1934,6 +2003,14 @@ export type Database = {
       force_insert_profile: {
         Args: { p_user_id: string; p_email: string; p_full_name?: string }
         Returns: boolean
+      }
+      generate_compliance_tasks: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      generate_risk_followup_tasks: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_basic_analytics: {
         Args: { org_id: string }

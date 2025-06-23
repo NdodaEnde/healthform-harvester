@@ -26,6 +26,7 @@ import { DocumentProcessingTrends } from '@/components/dashboard/DocumentProcess
 import { RecentDocuments } from '@/components/dashboard/RecentDocuments';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
+import TaskWidget from '@/components/tasks/TaskWidget';
 
 export default function Dashboard() {
   const { currentTier, isPremium, isEnterprise } = usePackage();
@@ -394,6 +395,7 @@ export default function Dashboard() {
       {/* Dashboard Sections Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DocumentProcessingTrends />
+        <TaskWidget variant="detailed" maxTasks={5} />
         <RecentActivity />
         <RecentDocuments />
         <QuickActions />
