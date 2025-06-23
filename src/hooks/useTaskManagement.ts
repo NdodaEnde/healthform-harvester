@@ -72,7 +72,10 @@ export function useTaskManagement() {
         ...task,
         priority: ['low', 'medium', 'high', 'urgent'].includes(task.priority) 
           ? task.priority as 'low' | 'medium' | 'high' | 'urgent'
-          : 'medium' // fallback to medium if invalid priority
+          : 'medium', // fallback to medium if invalid priority
+        status: ['pending', 'in_progress', 'completed', 'cancelled'].includes(task.status)
+          ? task.status as 'pending' | 'in_progress' | 'completed' | 'cancelled'
+          : 'pending' // fallback to pending if invalid status
       }));
 
       const now = new Date();
