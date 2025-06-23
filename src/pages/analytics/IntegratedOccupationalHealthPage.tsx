@@ -69,19 +69,35 @@ const IntegratedOccupationalHealthPage = () => {
           <BasicOverviewTab />
         </TabsContent>
         
-        {/* Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="grid gap-6">
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Medical Analytics</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Analytics Tab - Redesigned */}
+        <TabsContent value="analytics" className="space-y-8">
+          <div className="space-y-8">
+            {/* Key Health Metrics Section */}
+            <div className="space-y-6">
+              <div className="border-b pb-3">
+                <h2 className="text-2xl font-semibold text-gray-900">Key Health Metrics</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Overview of essential health indicators and compliance rates
+                </p>
+              </div>
+              
+              {/* Medical Fitness Overview - 2x2 Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <MedicalFitnessDeclarationChart />
                 <ExaminationTypeAnalytics />
               </div>
             </div>
             
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Test Results Analysis</h2>
+            {/* Medical Test Analysis Section */}
+            <div className="space-y-6">
+              <div className="border-b pb-3">
+                <h2 className="text-2xl font-semibold text-gray-900">Medical Test Analysis</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Detailed breakdown of medical test results and trends
+                </p>
+              </div>
+              
+              {/* Full-width test analytics */}
               <EnhancedMedicalTestAnalytics />
             </div>
           </div>
