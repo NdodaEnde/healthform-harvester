@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -75,7 +74,16 @@ export function useTaskManagement() {
           : 'medium', // fallback to medium if invalid priority
         status: ['pending', 'in_progress', 'completed', 'cancelled'].includes(task.status)
           ? task.status as 'pending' | 'in_progress' | 'completed' | 'cancelled'
-          : 'pending' // fallback to pending if invalid status
+          : 'pending', // fallback to pending if invalid status
+        estimated_duration: task.estimated_duration ? String(task.estimated_duration) : undefined,
+        description: task.description || '',
+        assigned_to: task.assigned_to || undefined,
+        related_entity_id: task.related_entity_id || undefined,
+        related_entity_type: task.related_entity_type || undefined,
+        due_date: task.due_date || undefined,
+        task_template_id: task.task_template_id || undefined,
+        risk_score: task.risk_score || undefined,
+        compliance_deadline: task.compliance_deadline || undefined
       }));
 
       const now = new Date();
