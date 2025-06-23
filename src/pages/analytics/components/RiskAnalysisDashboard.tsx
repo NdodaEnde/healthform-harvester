@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,22 +9,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 const RiskAnalysisDashboard = () => {
   const { riskAssessment, executiveSummary, isLoading } = useEnhancedAnalytics();
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-slate-200 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-slate-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate risk metrics
+  // Calculate risk metrics - always call this hook
   const riskMetrics = React.useMemo(() => {
     if (!riskAssessment || !executiveSummary) return null;
 
@@ -46,7 +32,7 @@ const RiskAnalysisDashboard = () => {
     };
   }, [riskAssessment, executiveSummary]);
 
-  // Process risk by test type
+  // Process risk by test type - always call this hook
   const riskByTestType = React.useMemo(() => {
     if (!riskAssessment) return [];
 
@@ -85,6 +71,23 @@ const RiskAnalysisDashboard = () => {
     }
   };
 
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-slate-200 rounded w-1/3 mb-4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-slate-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle no data state
   if (!riskMetrics) {
     return (
       <Card className="border-amber-200 bg-amber-50">
