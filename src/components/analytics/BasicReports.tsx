@@ -1,57 +1,59 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
+import { useBasicAnalytics } from '@/hooks/useBasicAnalytics';
 import { Download, FileText, Calendar, Users, Building2, Zap, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import AnalyticsExportButton from '@/components/analytics/AnalyticsExportButton';
+import { format } from 'date-fns';
 
 const BasicReports = () => {
   const [selectedReport, setSelectedReport] = useState<string>('');
-  const { executiveSummary, isLoading } = useEnhancedAnalytics();
+  const { data: analytics, isLoading } = useBasicAnalytics();
 
   const basicReports = [
     {
       id: 'patient-summary',
       name: 'Patient Summary Report',
-      description: 'Basic overview of all patients and their current status',
+      description: `Overview of ${analytics.totalPatients || 0} patients across ${analytics.totalCompanies || 0} companies`,
       icon: Users,
       available: true
     },
     {
       id: 'company-overview',
       name: 'Company Overview Report',
-      description: 'Summary of organizations and their workforce health',
+      description: `Health summary for ${analytics.totalCompanies || 0} organizations with workforce analysis`,
       icon: Building2,
       available: true
     },
     {
       id: 'fitness-status',
       name: 'Fitness Status Report',
-      description: 'Current fitness declarations across your organization',
+      description: `Current fitness declarations - ${analytics.totalFit || 0} fit workers (${analytics.complianceRate || 0}% compliance)`,
       icon: FileText,
       available: true
     },
     {
       id: 'monthly-summary',
       name: 'Monthly Summary Report',
-      description: 'Comprehensive monthly health metrics and compliance status',
+      description: `Comprehensive monthly metrics with ${analytics.totalExaminations || 0} examinations completed`,
       icon: Calendar,
       available: true
     },
     {
       id: 'compliance-alerts',
       name: 'Compliance Alerts Report',
-      description: 'Certificate expirations and overdue requirements',
+      description: `${analytics.certificatesExpiring || 0} certificates expiring soon requiring attention`,
       icon: AlertTriangle,
       available: true
     },
     {
       id: 'turnaround-times',
       name: 'Processing Times Report',
-      description: 'Test processing and turnaround time analysis',
+      description: `${analytics.completionRate || 0}% completion rate with ${analytics.pendingDocuments || 0} pending documents`,
       icon: Clock,
       available: true
     }
@@ -85,8 +87,8 @@ const BasicReports = () => {
   ];
 
   const generateBasicReport = (reportId: string) => {
-    if (!executiveSummary) {
-      toast.error('No data available for report generation');
+    if (!analytics) {
+      toast.error('Analytics data not available. Please try again.');
       return;
     }
 
@@ -97,31 +99,35 @@ const BasicReports = () => {
       'patient-summary': {
         title: 'Patient Summary Report',
         data: {
-          totalPatients: executiveSummary.total_patients,
-          totalCompanies: executiveSummary.total_companies,
-          totalFit: executiveSummary.total_fit,
-          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
+          totalPatients: analytics.totalPatients,
+          totalCompanies: analytics.totalCompanies,
+          totalFit: analytics.totalFit,
+          complianceRate: `${analytics.complianceRate}%`,
+          totalExaminations: analytics.totalExaminations,
           generatedAt: new Date().toISOString()
         }
       },
       'company-overview': {
         title: 'Company Overview Report',
         data: {
-          totalCompanies: executiveSummary.total_companies,
-          totalExaminations: executiveSummary.total_examinations,
-          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
-          healthScore: executiveSummary.health_score || 'N/A',
+          totalCompanies: analytics.totalCompanies,
+          totalPatients: analytics.totalPatients,
+          totalExaminations: analytics.totalExaminations,
+          completionRate: `${analytics.completionRate}%`,
+          complianceRate: `${analytics.complianceRate}%`,
+          recentActivity: analytics.recentActivityCount,
           generatedAt: new Date().toISOString()
         }
       },
       'fitness-status': {
         title: 'Fitness Status Report',
         data: {
-          totalFit: executiveSummary.total_fit,
-          totalPatients: executiveSummary.total_patients,
-          fitPercentage: executiveSummary.total_patients ? 
-            ((executiveSummary.total_fit / executiveSummary.total_patients) * 100).toFixed(1) : 0,
-          totalExaminations: executiveSummary.total_examinations,
+          totalFit: analytics.totalFit,
+          totalPatients: analytics.totalPatients,
+          fitPercentage: analytics.totalPatients ? 
+            ((analytics.totalFit / analytics.totalPatients) * 100).toFixed(1) : '0',
+          totalExaminations: analytics.totalExaminations,
+          complianceRate: `${analytics.complianceRate}%`,
           generatedAt: new Date().toISOString()
         }
       },
@@ -129,35 +135,44 @@ const BasicReports = () => {
         title: `Monthly Summary Report - ${currentMonth}`,
         data: {
           reportMonth: currentMonth,
-          totalPatients: executiveSummary.total_patients,
-          totalExaminations: executiveSummary.total_examinations,
-          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
-          totalFit: executiveSummary.total_fit,
-          healthScore: executiveSummary.health_score || 'N/A',
-          totalTestsConducted: executiveSummary.total_tests_conducted,
-          totalTestsCompleted: executiveSummary.total_tests_completed,
+          totalPatients: analytics.totalPatients,
+          totalExaminations: analytics.totalExaminations,
+          completionRate: `${analytics.completionRate}%`,
+          totalFit: analytics.totalFit,
+          complianceRate: `${analytics.complianceRate}%`,
+          certificatesExpiring: analytics.certificatesExpiring,
+          pendingDocuments: analytics.pendingDocuments,
+          recentActivity: analytics.recentActivityCount,
           generatedAt: new Date().toISOString()
         }
       },
       'compliance-alerts': {
         title: 'Compliance Alerts Report',
         data: {
-          totalPatients: executiveSummary.total_patients,
-          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
-          totalExaminations: executiveSummary.total_examinations,
-          urgentAction: 'Review certificates expiring in next 30 days',
-          recommendation: 'Schedule renewal examinations for expiring certificates',
+          totalPatients: analytics.totalPatients,
+          complianceRate: `${analytics.complianceRate}%`,
+          totalFit: analytics.totalFit,
+          certificatesExpiring: analytics.certificatesExpiring,
+          pendingDocuments: analytics.pendingDocuments,
+          urgentAction: analytics.certificatesExpiring > 0 ? 
+            `Review ${analytics.certificatesExpiring} certificates expiring in next 30 days` : 
+            'No immediate certificate renewals required',
+          recommendation: analytics.certificatesExpiring > 0 ? 
+            'Schedule renewal examinations for expiring certificates' : 
+            'Continue monitoring certificate expiration dates',
           generatedAt: new Date().toISOString()
         }
       },
       'turnaround-times': {
         title: 'Processing Times Report',
         data: {
-          totalTestsConducted: executiveSummary.total_tests_conducted,
-          totalTestsCompleted: executiveSummary.total_tests_completed,
-          completionRate: `${(executiveSummary.overall_completion_rate || 0).toFixed(1)}%`,
-          pendingTests: (executiveSummary.total_tests_conducted || 0) - (executiveSummary.total_tests_completed || 0),
-          averageProcessingNote: 'Detailed processing times available in Premium version',
+          totalExaminations: analytics.totalExaminations,
+          totalPatients: analytics.totalPatients,
+          completionRate: `${analytics.completionRate}%`,
+          pendingDocuments: analytics.pendingDocuments,
+          recentActivity: analytics.recentActivityCount,
+          processingEfficiency: analytics.pendingDocuments === 0 ? 'Excellent' : 
+            analytics.pendingDocuments < 5 ? 'Good' : 'Needs Attention',
           generatedAt: new Date().toISOString()
         }
       }
@@ -168,7 +183,7 @@ const BasicReports = () => {
       // Create a comprehensive text report
       const reportContent = `
 ${report.title}
-Generated: ${new Date(report.data.generatedAt).toLocaleDateString()}
+Generated: ${format(new Date(report.data.generatedAt), 'PPpp')}
 ========================================
 
 ${Object.entries(report.data)
@@ -180,8 +195,30 @@ ${Object.entries(report.data)
   .join('\n')}
 
 ========================================
+SUMMARY INSIGHTS
+
+${reportId === 'patient-summary' ? `
+This organization manages ${analytics.totalPatients} patients across ${analytics.totalCompanies} companies.
+Current compliance rate of ${analytics.complianceRate}% indicates ${analytics.complianceRate >= 85 ? 'strong' : 'moderate'} health management performance.
+${analytics.totalFit} workers are currently fit for duty.
+` : ''}
+
+${reportId === 'compliance-alerts' ? `
+COMPLIANCE STATUS: ${analytics.complianceRate >= 90 ? 'EXCELLENT' : analytics.complianceRate >= 75 ? 'GOOD' : 'NEEDS IMPROVEMENT'}
+IMMEDIATE ACTIONS REQUIRED: ${analytics.certificatesExpiring + analytics.pendingDocuments}
+PRIORITY: ${analytics.certificatesExpiring > 10 || analytics.pendingDocuments > 5 ? 'HIGH' : 'NORMAL'}
+` : ''}
+
+${reportId === 'fitness-status' ? `
+FITNESS RATE: ${((analytics.totalFit / analytics.totalPatients) * 100).toFixed(1)}%
+WORKFORCE READINESS: ${analytics.totalFit >= analytics.totalPatients * 0.9 ? 'EXCELLENT' : 'GOOD'}
+EXAMINATION COVERAGE: ${analytics.completionRate}%
+` : ''}
+
+========================================
 Report generated by Health Management System
-Basic Plan - For detailed analytics, upgrade to Premium
+Based on real-time database analytics
+Basic Plan - For advanced analytics, upgrade to Premium
       `.trim();
 
       // Create and download the report
@@ -189,13 +226,13 @@ Basic Plan - For detailed analytics, upgrade to Premium
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${report.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+      a.download = `${report.title.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Report generated successfully!');
+      toast.success(`${report.title} generated successfully with live data!`);
     }
   };
 
@@ -220,21 +257,51 @@ Basic Plan - For detailed analytics, upgrade to Premium
         <div>
           <h3 className="text-lg font-semibold">Essential Reports</h3>
           <p className="text-sm text-muted-foreground">
-            Generate comprehensive reports for your organization's health compliance
+            Generate comprehensive reports based on real-time data from {analytics.totalPatients} patients
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="bg-gray-50">
             Basic Plan
           </Badge>
+          <Badge variant="outline" className="bg-blue-50 text-blue-800">
+            Live Data
+          </Badge>
           <AnalyticsExportButton
-            data={{ executiveSummary }}
+            data={{ analytics }}
             title="Basic Health Report"
             variant="outline"
             size="sm"
           />
         </div>
       </div>
+
+      {/* Quick Stats */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Current Data Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-xl font-bold text-blue-600">{analytics.totalPatients}</div>
+              <div className="text-xs text-muted-foreground">Total Patients</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-green-600">{analytics.complianceRate}%</div>
+              <div className="text-xs text-muted-foreground">Compliance Rate</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-purple-600">{analytics.totalExaminations}</div>
+              <div className="text-xs text-muted-foreground">Examinations</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-orange-600">{analytics.certificatesExpiring}</div>
+              <div className="text-xs text-muted-foreground">Expiring Soon</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Report Generator */}
       <Card>
@@ -260,7 +327,7 @@ Basic Plan - For detailed analytics, upgrade to Premium
             </Select>
             <Button 
               onClick={() => selectedReport && generateBasicReport(selectedReport)}
-              disabled={!selectedReport || !executiveSummary}
+              disabled={!selectedReport || !analytics}
             >
               <Download className="h-4 w-4 mr-2" />
               Generate
@@ -286,7 +353,7 @@ Basic Plan - For detailed analytics, upgrade to Premium
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <IconComponent className="h-6 w-6 text-blue-600" />
-                  <Badge variant="secondary">Available</Badge>
+                  <Badge variant="secondary">Live Data</Badge>
                 </div>
                 <CardTitle className="text-base">{report.name}</CardTitle>
               </CardHeader>
@@ -298,7 +365,7 @@ Basic Plan - For detailed analytics, upgrade to Premium
                   size="sm" 
                   className="w-full"
                   onClick={() => generateBasicReport(report.id)}
-                  disabled={!executiveSummary}
+                  disabled={!analytics}
                 >
                   Generate Report
                 </Button>

@@ -34,6 +34,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useBasicAnalytics } from '@/hooks/useBasicAnalytics';
+import { toast } from 'sonner';
 
 // Define DateRange type
 interface DateRange {
@@ -42,7 +44,7 @@ interface DateRange {
 }
 
 export default function ReportGeneratorCard() {
-  const [reportType, setReportType] = useState("document-processing");
+  const [reportType, setReportType] = useState("patient-overview");
   const [outputFormat, setOutputFormat] = useState("pdf");
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(2023, 4, 1),
@@ -55,6 +57,8 @@ export default function ReportGeneratorCard() {
     patientDetails: false,
   });
 
+  const { data: analytics, isLoading } = useBasicAnalytics();
+
   const handleCheckboxChange = (key: keyof typeof includeOptions) => {
     setIncludeOptions((prev) => ({
       ...prev,
@@ -64,41 +68,170 @@ export default function ReportGeneratorCard() {
 
   const reportTypes = [
     {
-      value: "document-processing",
+      value: "patient-overview",
+      label: "Patient Overview",
+      description: `${analytics.totalPatients} patients across ${analytics.totalCompanies} companies`,
+    },
+    {
+      value: "compliance-status",
+      label: "Compliance Status",
+      description: `${analytics.complianceRate}% compliance rate with ${analytics.certificatesExpiring} expiring soon`,
+    },
+    {
+      value: "fitness-declarations",
+      label: "Fitness Declarations",
+      description: `${analytics.totalFit} fit workers out of ${analytics.totalPatients} total`,
+    },
+    {
+      value: "examination-summary",
+      label: "Medical Examinations",
+      description: `${analytics.totalExaminations} examinations with ${analytics.completionRate}% completion rate`,
+    },
+    {
+      value: "pending-documents",
       label: "Document Processing",
-      description: "Statistics on document uploads and processing",
-    },
-    {
-      value: "patient-records",
-      label: "Patient Records",
-      description: "Summary of patient record activities",
-    },
-    {
-      value: "occupational-health",
-      label: "Occupational Health",
-      description: "Occupational health and medical examination data",
-    },
-    {
-      value: "system-performance",
-      label: "System Performance",
-      description: "System performance and uptime metrics",
-    },
-    {
-      value: "user-activity",
-      label: "User Activity",
-      description: "User login and activity statistics",
+      description: `${analytics.pendingDocuments} pending documents requiring attention`,
     },
   ];
+
+  const generateReport = async () => {
+    if (!analytics || isLoading) {
+      toast.error('Analytics data not available. Please try again.');
+      return;
+    }
+
+    const selectedReportType = reportTypes.find(r => r.value === reportType);
+    if (!selectedReportType) return;
+
+    // Generate report content based on real data
+    const reportContent = generateReportContent(selectedReportType, analytics, date, includeOptions);
+    
+    // Create and download the report
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedReportType.label.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.${outputFormat === 'pdf' ? 'txt' : outputFormat}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success(`${selectedReportType.label} generated successfully!`);
+  };
+
+  const generateReportContent = (reportType: any, data: any, dateRange: DateRange | undefined, options: any) => {
+    const header = `
+${reportType.label}
+Generated: ${format(new Date(), 'PPpp')}
+Date Range: ${dateRange?.from ? format(dateRange.from, 'PPP') : 'All time'} - ${dateRange?.to ? format(dateRange.to, 'PPP') : 'Present'}
+========================================
+
+`;
+
+    let content = '';
+
+    switch (reportType.value) {
+      case 'patient-overview':
+        content = `
+PATIENT OVERVIEW SUMMARY
+Total Patients: ${data.totalPatients}
+Active Companies: ${data.totalCompanies}
+Compliance Rate: ${data.complianceRate}%
+Recent Activity: ${data.recentActivityCount} actions in last 7 days
+
+${options.summary ? `
+EXECUTIVE SUMMARY
+This report provides an overview of all patients in the system. With ${data.totalPatients} total patients across ${data.totalCompanies} companies, the organization maintains a ${data.complianceRate}% compliance rate. Recent activity shows ${data.recentActivityCount} actions in the past week, indicating an active health management program.
+` : ''}
+`;
+        break;
+
+      case 'compliance-status':
+        content = `
+COMPLIANCE STATUS REPORT
+Current Compliance Rate: ${data.complianceRate}%
+Compliant Workers: ${data.totalFit}
+Total Workers: ${data.totalPatients}
+Certificates Expiring Soon: ${data.certificatesExpiring}
+Pending Documents: ${data.pendingDocuments}
+
+${options.summary ? `
+COMPLIANCE ANALYSIS
+The organization maintains a ${data.complianceRate}% compliance rate with ${data.totalFit} workers currently fit for duty. ${data.certificatesExpiring} certificates are expiring soon and require attention. There are ${data.pendingDocuments} pending documents that need processing to maintain compliance standards.
+` : ''}
+`;
+        break;
+
+      case 'fitness-declarations':
+        content = `
+FITNESS DECLARATIONS REPORT
+Total Fit Workers: ${data.totalFit}
+Total Workers: ${data.totalPatients}
+Fitness Rate: ${((data.totalFit / data.totalPatients) * 100).toFixed(1)}%
+Total Examinations: ${data.totalExaminations}
+Completion Rate: ${data.completionRate}%
+
+${options.summary ? `
+FITNESS OVERVIEW
+Out of ${data.totalPatients} total workers, ${data.totalFit} are currently declared fit for duty, representing a ${((data.totalFit / data.totalPatients) * 100).toFixed(1)}% fitness rate. ${data.totalExaminations} medical examinations have been completed with a ${data.completionRate}% completion rate.
+` : ''}
+`;
+        break;
+
+      case 'examination-summary':
+        content = `
+MEDICAL EXAMINATIONS REPORT
+Total Examinations: ${data.totalExaminations}
+Completion Rate: ${data.completionRate}%
+Total Patients: ${data.totalPatients}
+Companies Served: ${data.totalCompanies}
+Recent Activity: ${data.recentActivityCount} in last 7 days
+
+${options.summary ? `
+EXAMINATION OVERVIEW
+${data.totalExaminations} medical examinations have been conducted across ${data.totalCompanies} companies with a ${data.completionRate}% completion rate. Recent activity shows ${data.recentActivityCount} examination-related actions in the past week, indicating consistent health monitoring practices.
+` : ''}
+`;
+        break;
+
+      case 'pending-documents':
+        content = `
+DOCUMENT PROCESSING REPORT
+Pending Documents: ${data.pendingDocuments}
+Total Patients: ${data.totalPatients}
+Processing Rate: ${(((data.totalPatients - data.pendingDocuments) / data.totalPatients) * 100).toFixed(1)}%
+Recent Activity: ${data.recentActivityCount} actions in last 7 days
+
+${options.summary ? `
+DOCUMENT PROCESSING STATUS
+There are currently ${data.pendingDocuments} documents pending processing out of ${data.totalPatients} total patient records. This represents a ${(((data.totalPatients - data.pendingDocuments) / data.totalPatients) * 100).toFixed(1)}% processing rate. Recent activity shows ${data.recentActivityCount} document-related actions in the past week.
+` : ''}
+`;
+        break;
+
+      default:
+        content = 'Report content not available.';
+    }
+
+    return header + content + `
+
+========================================
+Report generated by Health Management System
+Data sourced from live database
+Options: ${Object.entries(options).filter(([_, v]) => v).map(([k, _]) => k).join(', ')}
+`;
+  };
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ClipboardList className="h-5 w-5" />
-          Report Generator
+          Analytics Report Generator
         </CardTitle>
         <CardDescription>
-          Generate customized reports for your healthcare data
+          Generate detailed reports based on real-time data from your organization
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -169,22 +302,16 @@ export default function ReportGeneratorCard() {
               <SelectValue placeholder="Select format" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pdf">
+              <SelectItem value="txt">
                 <div className="flex items-center">
                   <FileText className="mr-2 h-4 w-4" />
-                  PDF Document
+                  Text Document
                 </div>
               </SelectItem>
               <SelectItem value="csv">
                 <div className="flex items-center">
                   <FileText className="mr-2 h-4 w-4" />
                   CSV Spreadsheet
-                </div>
-              </SelectItem>
-              <SelectItem value="xlsx">
-                <div className="flex items-center">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Excel Spreadsheet
                 </div>
               </SelectItem>
             </SelectContent>
@@ -238,15 +365,27 @@ export default function ReportGeneratorCard() {
             </div>
           </div>
         </div>
+
+        {isLoading && (
+          <div className="text-sm text-muted-foreground">
+            Loading analytics data...
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button variant="outline">Reset</Button>
+        <Button variant="outline" onClick={() => {
+          setReportType("patient-overview");
+          setDate({ from: new Date(2023, 4, 1), to: new Date() });
+          setIncludeOptions({ charts: true, tables: true, summary: true, patientDetails: false });
+        }}>
+          Reset
+        </Button>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" disabled>
             <Mail className="mr-2 h-4 w-4" />
             Email Report
           </Button>
-          <Button>
+          <Button onClick={generateReport} disabled={isLoading}>
             <Download className="mr-2 h-4 w-4" />
             Generate Report
           </Button>
