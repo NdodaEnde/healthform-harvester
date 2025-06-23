@@ -2,8 +2,8 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePackage } from '@/contexts/PackageContext';
-import BusinessAnalyticsDashboard from '@/components/analytics/BusinessAnalyticsDashboard';
-import BusinessReports from '@/components/analytics/BusinessReports';
+import ComprehensiveAnalyticsDashboard from '@/components/analytics/ComprehensiveAnalyticsDashboard';
+import MedicalReports from '@/components/analytics/MedicalReports';
 import PremiumOverviewTab from '@/components/analytics/PremiumOverviewTab';
 import PremiumReports from '@/components/analytics/PremiumReports';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,9 +18,9 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Business Analytics Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Strategic insights and business intelligence for your organization
+            Real-time data insights and business intelligence for your organization
           </p>
         </div>
         <Badge variant="outline" className={`
@@ -36,11 +36,11 @@ export default function AnalyticsPage() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            Business Overview
+            Live Analytics
           </TabsTrigger>
           <TabsTrigger value="reports" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Business Reports
+            Reports & Exports
           </TabsTrigger>
           <TabsTrigger 
             value="insights" 
@@ -61,19 +61,11 @@ export default function AnalyticsPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {isBasic ? (
-            <BusinessAnalyticsDashboard />
-          ) : (
-            <PremiumOverviewTab />
-          )}
+          <ComprehensiveAnalyticsDashboard />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">
-          {isBasic ? (
-            <BusinessReports />
-          ) : (
-            <PremiumReports />
-          )}
+          <MedicalReports />
         </TabsContent>
 
         <TabsContent value="insights" className="space-y-6">
@@ -87,7 +79,7 @@ export default function AnalyticsPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Premium Feature</h3>
                     <p className="text-muted-foreground mb-4">
-                      Advanced business insights and predictive analytics are available with Premium subscription.
+                      Advanced analytics insights and predictive modeling are available with Premium subscription.
                     </p>
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-800">
                       Upgrade to Premium

@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Helmet } from 'react-helmet';
 import OccupationalHealthDashboard from '@/components/analytics/OccupationalHealthDashboard';
-import MedicalReports from '@/components/analytics/MedicalReports';
 import BackfillTestResultsUtility from '@/components/admin/BackfillTestResultsUtility';
 import FeatureGate from '@/components/FeatureGate';
 
@@ -20,42 +19,40 @@ const IntegratedOccupationalHealthPage = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
       <Helmet>
-        <title>Occupational Health Analytics | Health Management System</title>
+        <title>Occupational Health Management | Clinical Operations</title>
       </Helmet>
       
       <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Occupational Health Analytics</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Occupational Health Management</h1>
         <p className="text-muted-foreground">
-          Clinical insights, medical test analytics, and health compliance monitoring for occupational health professionals.
+          Clinical workflows, medical assessments, and occupational health operations for healthcare professionals.
         </p>
       </div>
       
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="workflow" className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Health Overview</TabsTrigger>
-          <TabsTrigger value="medical-reports">Clinical Reports</TabsTrigger>
-          <TabsTrigger value="fitness-declarations">Fitness Status</TabsTrigger>
-          <TabsTrigger value="medical-tests">Medical Tests</TabsTrigger>
+          <TabsTrigger value="workflow">Clinical Workflow</TabsTrigger>
+          <TabsTrigger value="assessments">Medical Assessments</TabsTrigger>
+          <TabsTrigger value="fitness-status">Fitness Management</TabsTrigger>
+          <TabsTrigger value="medical-protocols">Medical Protocols</TabsTrigger>
           <TabsTrigger value="compliance">Health Compliance</TabsTrigger>
-          <TabsTrigger value="admin">Clinical Tools</TabsTrigger>
+          <TabsTrigger value="clinical-tools">Clinical Tools</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="overview" className="space-y-4">
+        <TabsContent value="workflow" className="space-y-4">
           <OccupationalHealthDashboard />
         </TabsContent>
         
-        <TabsContent value="medical-reports" className="space-y-4">
-          <MedicalReports />
-        </TabsContent>
-        
-        <TabsContent value="fitness-declarations" className="space-y-4">
-          <MedicalFitnessDeclarationChart />
-        </TabsContent>
-        
-        <TabsContent value="medical-tests" className="space-y-4">
+        <TabsContent value="assessments" className="space-y-4">
           <div className="space-y-6">
             <EnhancedMedicalTestAnalytics />
             <ExaminationTypeAnalytics />
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="fitness-status" className="space-y-4">
+          <div className="space-y-6">
+            <MedicalFitnessDeclarationChart />
             
             <FeatureGate requiredTier="premium">
               <EnhancedRestrictionsAnalytics />
@@ -63,16 +60,49 @@ const IntegratedOccupationalHealthPage = () => {
           </div>
         </TabsContent>
         
+        <TabsContent value="medical-protocols" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Medical Testing Protocols</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Standardized medical examination protocols and clinical procedures.
+              </p>
+              <div className="space-y-4">
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-medium mb-2">Pre-Employment Medical Protocol</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Comprehensive health assessment for new employees including vision, hearing, and fitness evaluation.
+                  </p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-medium mb-2">Periodic Health Surveillance</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Regular health monitoring for employees in high-risk occupations with exposure-specific testing.
+                  </p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-medium mb-2">Return to Work Assessment</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Medical clearance process following injury or illness to ensure safe return to work.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="compliance" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <CertificateComplianceCard />
             <Card>
               <CardHeader>
-                <CardTitle>Medical Compliance Status</CardTitle>
+                <CardTitle>Medical Compliance Monitoring</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Overview of medical compliance requirements and certification status.
+                  Track medical compliance requirements and certification status across your workforce.
                 </p>
               </CardContent>
             </Card>
@@ -81,14 +111,14 @@ const IntegratedOccupationalHealthPage = () => {
           <HealthMetricsAssessment />
         </TabsContent>
 
-        <TabsContent value="admin" className="space-y-4">
+        <TabsContent value="clinical-tools" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Clinical Administration Tools</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Tools for clinical data management and medical test administration.
+                Professional tools for clinical data management and medical examination administration.
               </p>
             </CardContent>
           </Card>
@@ -97,11 +127,11 @@ const IntegratedOccupationalHealthPage = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle>Medical Data Quality Tools</CardTitle>
+              <CardTitle>Medical Data Quality Management</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">
-                Tools for maintaining medical data quality and resolving issues with medical test extraction.
+                Tools for maintaining medical data integrity and resolving issues with clinical data extraction and processing.
               </p>
             </CardContent>
           </Card>
