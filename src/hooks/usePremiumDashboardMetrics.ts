@@ -94,30 +94,22 @@ export function usePremiumDashboardMetrics() {
       const uniqueJobTitles = new Set(examinations?.map(e => e.job_title)).size;
       const departmentsTracked = uniqueJobTitles;
 
-      // 4. Prediction Accuracy (based on successful predictions vs actual outcomes)
-      // For now, using a calculated score based on data consistency
-      const { data: recentExams } = await supabase
-        .from('medical_examinations')
-        .select('fitness_status, examination_date')
-        .or(orgFilter)
-        .gte('examination_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-
-      const fitResults = recentExams?.filter(e => e.fitness_status === 'Fit').length || 0;
-      const totalRecentExams = recentExams?.length || 1;
-      const predictionAccuracy = Math.round((fitResults / totalRecentExams) * 100);
+      // 4. Prediction Accuracy - Coming Soon (placeholder for future ML model)
+      // For now, showing 0 as it's not yet implemented
+      const predictionAccuracy = 0;
 
       console.log('📊 Premium metrics calculated:', {
         healthIntelligenceScore,
         activeRiskAlerts,
         departmentsTracked,
-        predictionAccuracy
+        predictionAccuracy: 'Coming Soon'
       });
 
       setMetrics({
         healthIntelligenceScore: Math.min(100, Math.max(0, healthIntelligenceScore)),
         activeRiskAlerts,
         departmentsTracked,
-        predictionAccuracy: Math.min(100, Math.max(0, predictionAccuracy)),
+        predictionAccuracy,
         loading: false,
         error: null
       });

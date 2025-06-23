@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -295,23 +296,21 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Prediction Accuracy */}
-            <Card className="border-emerald-200 bg-emerald-50">
+            {/* Prediction Accuracy - Coming Soon */}
+            <Card className="border-gray-200 bg-gray-50 opacity-75">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Prediction Accuracy</CardTitle>
-                <Target className="h-4 w-4 text-emerald-600" />
+                <Target className="h-4 w-4 text-gray-500" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${predictionAccuracy >= 90 ? 'text-emerald-600' : predictionAccuracy >= 75 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {isLoading ? '...' : `${predictionAccuracy}%`}
+                <div className="text-2xl font-bold text-gray-500">
+                  --
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>ML model performance</span>
-                  {predictionAccuracy >= 95 && !isLoading && (
-                    <Badge variant="outline" className="text-emerald-600 border-emerald-200">
-                      Excellent
-                    </Badge>
-                  )}
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">
+                    Coming Soon
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
