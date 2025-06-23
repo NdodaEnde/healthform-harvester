@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-  Plus, 
   RefreshCw, 
   Calendar,
   AlertTriangle,
@@ -14,8 +13,8 @@ import {
   Clock,
   Zap,
   BarChart3,
-  Users,
-  TrendingUp
+  TrendingUp,
+  Plus
 } from 'lucide-react';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import TaskWidget from './TaskWidget';
@@ -72,23 +71,22 @@ const TaskManagementDashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Task Management</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">Task Management</h1>
           <p className="text-muted-foreground">
             Intelligent task automation and workflow management
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={fetchTasks} 
-            variant="outline" 
-            size="sm"
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
+        <Button 
+          onClick={fetchTasks} 
+          variant="outline" 
+          size="sm"
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Error Alert */}
@@ -101,80 +99,73 @@ const TaskManagementDashboard: React.FC = () => {
         </Alert>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+      {/* Quick Stats - Simplified Layout */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-blue-600" />
+              Total Tasks
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalTasks}</div>
-            <p className="text-xs text-muted-foreground">
-              All tasks in system
-            </p>
+            <div className="text-2xl font-bold text-blue-700">{totalTasks}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-red-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Urgent Tasks</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              Urgent
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{urgentTasks}</div>
-            <p className="text-xs text-muted-foreground">
-              Require immediate attention
-            </p>
+            <div className="text-2xl font-bold text-red-700">{urgentTasks}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-orange-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Tasks</CardTitle>
-            <Clock className="h-4 w-4 text-orange-600" />
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4 text-orange-600" />
+              Overdue
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{overdueTasks}</div>
-            <p className="text-xs text-muted-foreground">
-              Past due date
-            </p>
+            <div className="text-2xl font-bold text-orange-700">{overdueTasks}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-green-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-green-600" />
+              Completion
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-green-700">
               {Math.round(completionRate)}%
             </div>
-            <p className="text-xs text-muted-foreground">
-              Tasks completed
-            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Task Generation Actions */}
+      {/* Task Generation - Compact Design */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Zap className="h-5 w-5 text-purple-600" />
             Intelligent Task Generation
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Auto-generate tasks from analytics data and risk assessments
-          </p>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button 
               onClick={handleGenerateComplianceTasks}
               disabled={generatingTasks}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
             >
               <Calendar className="h-4 w-4" />
               Generate Compliance Tasks
@@ -183,14 +174,14 @@ const TaskManagementDashboard: React.FC = () => {
               onClick={handleGenerateRiskTasks}
               disabled={generatingTasks}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
             >
               <AlertTriangle className="h-4 w-4" />
               Generate Risk Follow-ups
             </Button>
             <Button 
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-gray-300"
             >
               <Plus className="h-4 w-4" />
               Create Manual Task
@@ -199,14 +190,16 @@ const TaskManagementDashboard: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Task Tabs */}
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Tasks ({totalTasks})</TabsTrigger>
+      {/* Task Content */}
+      <Tabs defaultValue="active" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="active">
+            Active ({tasksByStatus.pending.length + tasksByStatus.in_progress.length})
+          </TabsTrigger>
           <TabsTrigger value="pending">
             Pending ({tasksByStatus.pending.length})
           </TabsTrigger>
-          <TabsTrigger value="in_progress">
+          <TabsTrigger value="progress">
             In Progress ({tasksByStatus.in_progress.length})
           </TabsTrigger>
           <TabsTrigger value="completed">
@@ -214,17 +207,31 @@ const TaskManagementDashboard: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TabsContent value="active" className="space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <TaskWidget variant="detailed" maxTasks={10} />
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle className="text-lg">Task Analytics</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  Task activity timeline will be displayed here
-                </p>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Active Tasks</span>
+                    <span className="font-medium">{tasksByStatus.pending.length + tasksByStatus.in_progress.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Completion Rate</span>
+                    <span className="font-medium">{Math.round(completionRate)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Priority Distribution</span>
+                    <div className="flex gap-1">
+                      {urgentTasks > 0 && <Badge variant="destructive" className="text-xs">High</Badge>}
+                      <Badge variant="secondary" className="text-xs">Normal</Badge>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -234,25 +241,27 @@ const TaskManagementDashboard: React.FC = () => {
           <TaskWidget variant="detailed" maxTasks={20} />
         </TabsContent>
 
-        <TabsContent value="in_progress">
+        <TabsContent value="progress">
           <div className="space-y-4">
             {tasksByStatus.in_progress.length === 0 ? (
               <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">No tasks in progress</p>
+                <CardContent className="py-12 text-center">
+                  <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground text-lg">No tasks in progress</p>
+                  <p className="text-sm text-muted-foreground">Tasks will appear here when started</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid gap-4">
                 {tasksByStatus.in_progress.map((task) => (
-                  <Card key={task.id}>
+                  <Card key={task.id} className="border-blue-200 bg-blue-50">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="space-y-1">
                           <h3 className="font-medium">{task.title}</h3>
                           <p className="text-sm text-muted-foreground">{task.description}</p>
                         </div>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-300">
                           In Progress
                         </Badge>
                       </div>
@@ -268,21 +277,23 @@ const TaskManagementDashboard: React.FC = () => {
           <div className="space-y-4">
             {tasksByStatus.completed.length === 0 ? (
               <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">No completed tasks</p>
+                <CardContent className="py-12 text-center">
+                  <CheckCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground text-lg">No completed tasks</p>
+                  <p className="text-sm text-muted-foreground">Completed tasks will appear here</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid gap-4">
                 {tasksByStatus.completed.map((task) => (
-                  <Card key={task.id}>
+                  <Card key={task.id} className="border-green-200 bg-green-50">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="space-y-1">
                           <h3 className="font-medium">{task.title}</h3>
                           <p className="text-sm text-muted-foreground">{task.description}</p>
                         </div>
-                        <Badge variant="outline" className="bg-green-50 text-green-700">
+                        <Badge className="bg-green-100 text-green-700 border-green-300">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Completed
                         </Badge>
