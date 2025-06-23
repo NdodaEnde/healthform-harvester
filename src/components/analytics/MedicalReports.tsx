@@ -17,14 +17,14 @@ const MedicalReports = () => {
     {
       id: 'health-assessment-summary',
       name: 'Health Assessment Summary',
-      description: `Clinical overview of ${analytics.totalExaminations || 0} medical examinations and health status`,
+      description: `Clinical overview of ${analytics?.totalExaminations || 0} medical examinations and health status`,
       icon: Stethoscope,
       available: true
     },
     {
       id: 'fitness-declarations',
       name: 'Fitness for Duty Report',
-      description: `Detailed analysis of ${analytics.totalFit || 0} fit workers and fitness declarations`,
+      description: `Detailed analysis of ${analytics?.totalFit || 0} fit workers and fitness declarations`,
       icon: Heart,
       available: true
     },
@@ -169,7 +169,7 @@ Testing Recommendations:
 ${Object.entries(report.data)
   .filter(([key]) => key !== 'generatedAt')
   .map(([key, value]) => {
-    const label = key.replace(/([A-Z])/g, ' $1').replace /^./, str => str.toUpperCase());
+    const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
     return `${label}: ${value}`;
   })
   .join('\n')}
