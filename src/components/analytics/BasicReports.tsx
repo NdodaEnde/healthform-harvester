@@ -268,7 +268,7 @@ Basic Plan - For advanced analytics, upgrade to Premium
             Live Data
           </Badge>
           <AnalyticsExportButton
-            data={{ analytics }}
+            data={analytics}
             title="Basic Health Report"
             variant="outline"
             size="sm"
