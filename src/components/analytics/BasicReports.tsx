@@ -236,6 +236,18 @@ Basic Plan - For advanced analytics, upgrade to Premium
     }
   };
 
+  // Convert BasicAnalyticsData to ExportData format for AnalyticsExportButton
+  const exportData = {
+    executiveSummary: {
+      total_patients: analytics.totalPatients,
+      total_companies: analytics.totalCompanies,
+      total_examinations: analytics.totalExaminations,
+      overall_completion_rate: analytics.completionRate,
+      health_score: Math.round(analytics.complianceRate / 10),
+      total_fit: analytics.totalFit
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -268,7 +280,7 @@ Basic Plan - For advanced analytics, upgrade to Premium
             Live Data
           </Badge>
           <AnalyticsExportButton
-            data={analytics}
+            data={exportData}
             title="Basic Health Report"
             variant="outline"
             size="sm"
