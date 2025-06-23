@@ -59,7 +59,7 @@ export function useTaskManagement() {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      const { data: tasks, error } = await supabase
+      const { data: rawTasks, error } = await supabase
         .from('work_queue')
         .select('*')
         .eq('organization_id', organizationId)
@@ -67,19 +67,27 @@ export function useTaskManagement() {
 
       if (error) throw error;
 
+      // Transform raw tasks to ensure type safety
+      const tasks: Task[] = (rawTasks || []).map(task => ({
+        ...task,
+        priority: ['low', 'medium', 'high', 'urgent'].includes(task.priority) 
+          ? task.priority as 'low' | 'medium' | 'high' | 'urgent'
+          : 'medium' // fallback to medium if invalid priority
+      }));
+
       const now = new Date();
-      const urgentTasks = tasks?.filter(task => task.priority === 'urgent' && task.status === 'pending').length || 0;
-      const overdueTasks = tasks?.filter(task => 
+      const urgentTasks = tasks.filter(task => task.priority === 'urgent' && task.status === 'pending').length;
+      const overdueTasks = tasks.filter(task => 
         task.due_date && 
         new Date(task.due_date) < now && 
         task.status === 'pending'
-      ).length || 0;
+      ).length;
 
       setState({
-        tasks: tasks || [],
+        tasks,
         loading: false,
         error: null,
-        totalTasks: tasks?.length || 0,
+        totalTasks: tasks.length,
         urgentTasks,
         overdueTasks,
       });
@@ -149,14 +157,28 @@ export function useTaskManagement() {
     if (!organizationId) throw new Error('No organization selected');
 
     try {
+      // Map our Task interface to the database schema
+      const dbTaskData = {
+        title: taskData.title || '',
+        description: taskData.description,
+        type: taskData.type || 'general',
+        priority: taskData.priority || 'medium',
+        organization_id: organizationId,
+        status: 'pending',
+        generated_from_analytics: false,
+        assigned_to: taskData.assigned_to,
+        related_entity_id: taskData.related_entity_id,
+        related_entity_type: taskData.related_entity_type,
+        due_date: taskData.due_date,
+        task_template_id: taskData.task_template_id,
+        risk_score: taskData.risk_score,
+        estimated_duration: taskData.estimated_duration,
+        compliance_deadline: taskData.compliance_deadline,
+      };
+
       const { data, error } = await supabase
         .from('work_queue')
-        .insert({
-          ...taskData,
-          organization_id: organizationId,
-          status: 'pending',
-          generated_from_analytics: false,
-        })
+        .insert(dbTaskData)
         .select()
         .single();
 
