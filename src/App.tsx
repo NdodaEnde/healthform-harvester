@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,6 +11,8 @@ import HeaderComponent from '@/components/HeaderComponent';
 import Index from '@/pages/Index';
 import Dashboard from '@/pages/Dashboard';
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
+import ClinicalAnalyticsPage from './pages/analytics/ClinicalAnalyticsPage';
+import IntegratedOccupationalHealthPage from './pages/analytics/IntegratedOccupationalHealthPage';
 import ReportsPage from './pages/ReportsPage';
 import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
 import CertificatesPage from './pages/certificates/CertificatesPage';
@@ -56,12 +57,12 @@ function App() {
                     } />
                     <Route path="/clinical-analytics" element={
                       <DashboardLayout>
-                        <AnalyticsPage />
+                        <ClinicalAnalyticsPage />
                       </DashboardLayout>
                     } />
                     <Route path="/integrated-occupational-health" element={
                       <DashboardLayout>
-                        <AnalyticsPage />
+                        <IntegratedOccupationalHealthPage />
                       </DashboardLayout>
                     } />
                     <Route path="/patients" element={
