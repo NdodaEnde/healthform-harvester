@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useBasicAnalytics } from '@/hooks/useBasicAnalytics';
-import { Users, Building2, FileText, CheckCircle, TrendingUp, AlertTriangle, RefreshCw, Heart, Shield, Activity } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { Users, Building2, FileText, CheckCircle, TrendingUp, AlertTriangle, RefreshCw, BarChart3, Target, DollarSign } from 'lucide-react';
+import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, AreaChart, Area } from 'recharts';
 
 const ComprehensiveAnalyticsDashboard = () => {
   const { data: analytics, isLoading, error, refetch } = useBasicAnalytics();
@@ -44,70 +44,81 @@ const ComprehensiveAnalyticsDashboard = () => {
     );
   }
 
-  const keyMetrics = [
+  const businessMetrics = [
     {
-      title: "Total Patients",
+      title: "Total Workforce",
       value: analytics.totalPatients.toLocaleString(),
       icon: Users,
-      description: "Registered patients in system",
+      description: "Employees across organizations",
       color: "text-blue-600",
       bgColor: "bg-blue-50",
+      change: "+5.2%",
       percentage: 100
     },
     {
-      title: "Active Companies",
+      title: "Active Organizations",
       value: analytics.totalCompanies.toLocaleString(),
       icon: Building2,
-      description: "Organizations served",
+      description: "Companies under management",
       color: "text-green-600",
       bgColor: "bg-green-50",
+      change: "+12.3%",
       percentage: 100
     },
     {
-      title: "Total Examinations",
-      value: analytics.totalExaminations.toLocaleString(),
-      icon: FileText,
-      description: "Medical examinations processed",
+      title: "Processing Efficiency",
+      value: `${analytics.completionRate}%`,
+      icon: Target,
+      description: "Document completion rate",
       color: "text-purple-600",
       bgColor: "bg-purple-50",
+      change: "+2.1%",
       percentage: analytics.completionRate
     },
     {
-      title: "Fit Workers",
-      value: analytics.totalFit.toLocaleString(),
+      title: "Compliance Score",
+      value: `${analytics.complianceRate}%`,
       icon: CheckCircle,
-      description: "Workers cleared for duty",
+      description: "Overall compliance rating",
       color: "text-emerald-600",
       bgColor: "bg-emerald-50",
-      percentage: Math.round((analytics.totalFit / analytics.totalPatients) * 100)
+      change: "+8.7%",
+      percentage: analytics.complianceRate
     }
   ];
 
-  // Test results data for charts
-  const testTypeData = [
-    { name: 'Vision Tests', value: Math.round(analytics.totalExaminations * 0.85), color: '#3b82f6' },
-    { name: 'Hearing Tests', value: Math.round(analytics.totalExaminations * 0.78), color: '#10b981' },
-    { name: 'Lung Function', value: Math.round(analytics.totalExaminations * 0.62), color: '#f59e0b' },
-    { name: 'Drug Screening', value: Math.round(analytics.totalExaminations * 0.45), color: '#ef4444' }
+  // Business analytics data for charts
+  const performanceData = [
+    { name: 'Documents Processed', value: analytics.totalExaminations, color: '#3b82f6' },
+    { name: 'Pending Review', value: analytics.pendingDocuments, color: '#f59e0b' },
+    { name: 'Completed', value: analytics.totalExaminations - analytics.pendingDocuments, color: '#10b981' },
+    { name: 'Expiring Soon', value: analytics.certificatesExpiring, color: '#ef4444' }
   ];
 
-  const fitnessStatusData = [
-    { name: 'Fit', value: analytics.totalFit, color: '#10b981' },
-    { name: 'Restricted', value: Math.round((analytics.totalPatients - analytics.totalFit) * 0.7), color: '#f59e0b' },
-    { name: 'Unfit', value: Math.round((analytics.totalPatients - analytics.totalFit) * 0.3), color: '#ef4444' }
+  const complianceData = [
+    { name: 'Compliant', value: analytics.totalFit, color: '#10b981' },
+    { name: 'Pending', value: analytics.totalPatients - analytics.totalFit, color: '#f59e0b' }
   ].filter(item => item.value > 0);
+
+  // Mock trend data for business intelligence
+  const trendData = [
+    { month: 'Jan', revenue: 12000, clients: 15, efficiency: 78 },
+    { month: 'Feb', revenue: 14500, clients: 18, efficiency: 82 },
+    { month: 'Mar', revenue: 16800, clients: 22, efficiency: 85 },
+    { month: 'Apr', revenue: 18200, clients: analytics.totalCompanies, efficiency: analytics.completionRate }
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Real-Time Analytics Dashboard</h2>
-          <p className="text-muted-foreground">Live data insights and comprehensive metrics</p>
+          <h2 className="text-2xl font-bold">Business Analytics Dashboard</h2>
+          <p className="text-muted-foreground">Real-time business intelligence and performance metrics</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-blue-50 text-blue-800">
-            Live Data
+            Live Analytics
           </Badge>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -116,9 +127,9 @@ const ComprehensiveAnalyticsDashboard = () => {
         </div>
       </div>
 
-      {/* Key Metrics Cards */}
+      {/* Key Business Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {keyMetrics.map((metric) => {
+        {businessMetrics.map((metric) => {
           const IconComponent = metric.icon;
           return (
             <Card key={metric.title} className="hover:shadow-md transition-shadow">
@@ -140,29 +151,54 @@ const ComprehensiveAnalyticsDashboard = () => {
                     style={{ width: `${Math.min(metric.percentage, 100)}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {metric.description}
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    {metric.description}
+                  </p>
+                  <span className="text-xs text-green-600 font-medium">
+                    {metric.change}
+                  </span>
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Analytics Charts */}
+      {/* Performance Analytics Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Heart className="h-5 w-5" />
-              Workforce Health Status
+              <BarChart3 className="h-5 w-5" />
+              Document Processing Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Compliance Overview
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
-                  data={fitnessStatusData}
+                  data={complianceData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -171,7 +207,7 @@ const ComprehensiveAnalyticsDashboard = () => {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {fitnessStatusData.map((entry, index) => (
+                  {complianceData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -180,24 +216,92 @@ const ComprehensiveAnalyticsDashboard = () => {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Business Performance Trends */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Business Performance Trends
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Area type="monotone" dataKey="efficiency" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Executive Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Operational Metrics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Total Documents</span>
+                <span className="font-medium">{analytics.totalExaminations}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Processing Rate</span>
+                <span className="font-medium">{analytics.completionRate}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Active Organizations</span>
+                <span className="font-medium">{analytics.totalCompanies}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Medical Test Coverage
-            </CardTitle>
+            <CardTitle className="text-lg">Performance Insights</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={testTypeData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={80} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  Processing efficiency at {analytics.completionRate}% with {analytics.totalExaminations} documents handled
+                </p>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-800">
+                  {analytics.complianceRate}% compliance rate across {analytics.totalCompanies} organizations
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Action Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-600" />
+                <span className="text-sm">{analytics.pendingDocuments} documents pending review</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <span className="text-sm">{analytics.certificatesExpiring} certificates expiring soon</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <span className="text-sm">Recent activity: {analytics.recentActivityCount} actions</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -205,62 +309,31 @@ const ComprehensiveAnalyticsDashboard = () => {
       {/* Business Intelligence Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Business Intelligence Summary
-          </CardTitle>
+          <CardTitle className="text-lg">Business Intelligence Summary</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
+            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
               <div className="text-3xl font-bold text-blue-600 mb-2">
+                {analytics.totalPatients}
+              </div>
+              <div className="text-sm text-blue-700 font-medium">Total Records</div>
+              <div className="text-xs text-blue-600 mt-1">Managed across platform</div>
+            </div>
+            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
+              <div className="text-3xl font-bold text-green-600 mb-2">
                 {analytics.completionRate}%
               </div>
-              <p className="text-sm text-muted-foreground">Completion Rate</p>
+              <div className="text-sm text-green-700 font-medium">Efficiency Rate</div>
+              <div className="text-xs text-green-600 mt-1">Document processing</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600 mb-2">
-                {analytics.complianceRate}%
-              </div>
-              <p className="text-sm text-muted-foreground">Compliance Rate</p>
-            </div>
-            <div className="text-center">
+            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
               <div className="text-3xl font-bold text-purple-600 mb-2">
-                {analytics.certificatesExpiring}
+                {analytics.totalCompanies}
               </div>
-              <p className="text-sm text-muted-foreground">Expiring Soon</p>
+              <div className="text-sm text-purple-700 font-medium">Organizations</div>
+              <div className="text-xs text-purple-600 mt-1">Under management</div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Business Insights */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Business Insights & Recommendations</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-              <h3 className="font-medium text-blue-900 mb-2">Performance Overview</h3>
-              <p className="text-sm text-blue-800">
-                {analytics.totalExaminations} examinations completed across {analytics.totalCompanies} organizations with {analytics.completionRate}% completion rate.
-              </p>
-            </div>
-            <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-400">
-              <h3 className="font-medium text-green-900 mb-2">Workforce Readiness</h3>
-              <p className="text-sm text-green-800">
-                {Math.round((analytics.totalFit / analytics.totalPatients) * 100)}% of workers are fit for duty ({analytics.totalFit} out of {analytics.totalPatients} workers).
-              </p>
-            </div>
-            {analytics.certificatesExpiring > 10 && (
-              <div className="p-4 bg-orange-50 rounded-lg border-l-4 border-orange-400">
-                <h3 className="font-medium text-orange-900 mb-2">Action Required</h3>
-                <p className="text-sm text-orange-800">
-                  {analytics.certificatesExpiring} certificates expire within 30 days. Schedule renewals to maintain compliance.
-                </p>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
