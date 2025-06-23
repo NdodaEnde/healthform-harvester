@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useBasicAnalytics } from '@/hooks/useBasicAnalytics';
-import { Heart, Shield, AlertTriangle, Activity, Stethoscope, Eye, Ear, Lungs } from 'lucide-react';
+import { Heart, Shield, AlertTriangle, Activity, Stethoscope, Eye, Ear, Wind } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 const OccupationalHealthDashboard = () => {
@@ -293,7 +292,7 @@ const OccupationalHealthDashboard = () => {
               Hearing Assessment
             </Button>
             <Button variant="outline" size="sm">
-              <Lungs className="h-4 w-4 mr-2" />
+              <Wind className="h-4 w-4 mr-2" />
               Respiratory Health
             </Button>
             <Button variant="outline" size="sm">

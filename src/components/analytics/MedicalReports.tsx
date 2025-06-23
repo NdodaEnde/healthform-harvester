@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBasicAnalytics } from '@/hooks/useBasicAnalytics';
-import { Download, Heart, Shield, Activity, Stethoscope, Eye, Ear, Lungs, AlertTriangle } from 'lucide-react';
+import { Download, Heart, Shield, Activity, Stethoscope, Eye, Ear, Wind, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
