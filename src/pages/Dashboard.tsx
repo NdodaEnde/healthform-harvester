@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,15 +12,22 @@ import {
   Activity,
   RefreshCw,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Brain,
+  Shield,
+  Building2,
+  Target
 } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { usePremiumDashboardMetrics } from '@/hooks/usePremiumDashboardMetrics';
+import { usePackage } from '@/contexts/PackageContext';
 import { DocumentProcessingTrends } from '@/components/dashboard/DocumentProcessingTrends';
 import { RecentDocuments } from '@/components/dashboard/RecentDocuments';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 
 export default function Dashboard() {
+  const { currentTier, isPremium, isEnterprise } = usePackage();
   const {
     totalActiveEmployees,
     complianceRate,
@@ -36,11 +42,26 @@ export default function Dashboard() {
     refreshMetrics
   } = useDashboardMetrics();
 
+  const {
+    healthIntelligenceScore,
+    activeRiskAlerts,
+    departmentsTracked,
+    predictionAccuracy,
+    loading: premiumLoading,
+    refreshMetrics: refreshPremiumMetrics
+  } = usePremiumDashboardMetrics();
+
   // Calculate month-over-month change
   const monthOverMonthChange = testsThisMonth - testsLastMonth;
-  const monthOverMonthPercentage = testsLastMonth > 0 
-    ? Math.round(((testsThisMonth - testsLastMonth) / testsLastMonth) * 100)
-    : 0;
+
+  const handleRefresh = () => {
+    refreshMetrics();
+    if (isPremium || isEnterprise) {
+      refreshPremiumMetrics();
+    }
+  };
+
+  const isLoading = loading || (isPremium || isEnterprise ? premiumLoading : false);
 
   if (error) {
     console.error('Dashboard metrics error:', error);
@@ -58,14 +79,20 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">BASIC Plan</Badge>
+          <Badge variant="outline" className={`
+            ${isEnterprise ? 'bg-purple-100 text-purple-800' : ''}
+            ${isPremium ? 'bg-yellow-100 text-yellow-800' : ''}
+            ${currentTier === 'basic' ? 'bg-blue-100 text-blue-800' : ''}
+          `}>
+            {currentTier.toUpperCase()} Plan
+          </Badge>
           <Button 
-            onClick={refreshMetrics} 
+            onClick={handleRefresh} 
             variant="outline" 
             size="sm"
-            disabled={loading}
+            disabled={isLoading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -84,10 +111,12 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      {/* Main Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Main Metrics Grid - Dynamic based on tier */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${isPremium || isEnterprise ? 'xl:grid-cols-5' : ''} gap-6`}>
         
-        {/* Total Active Employees - REAL DATA ✅ */}
+        {/* Basic Metrics - Available to all tiers */}
+        
+        {/* Total Active Employees */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Active Employees</CardTitle>
@@ -95,7 +124,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? '...' : totalActiveEmployees}
+              {isLoading ? '...' : totalActiveEmployees}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-green-600" />
@@ -104,7 +133,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Compliance Rate - REAL DATA ✅ */}
+        {/* Compliance Rate */}
         <Card className={complianceRate >= 95 ? "border-green-200" : complianceRate >= 80 ? "border-yellow-200" : "border-red-200"}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Compliance Rate</CardTitle>
@@ -112,7 +141,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${complianceRate >= 95 ? 'text-green-600' : complianceRate >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {loading ? '...' : `${complianceRate}%`}
+              {isLoading ? '...' : `${complianceRate}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Valid medical certificates</span>
@@ -120,7 +149,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Certificates Expiring - REAL DATA ✅ */}
+        {/* Certificates Expiring */}
         <Card className={certificatesExpiring > 10 ? "border-red-200" : certificatesExpiring > 5 ? "border-orange-200" : "border-green-200"}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Certificates Expiring</CardTitle>
@@ -128,11 +157,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${certificatesExpiring > 10 ? 'text-red-600' : certificatesExpiring > 5 ? 'text-orange-600' : 'text-green-600'}`}>
-              {loading ? '...' : certificatesExpiring}
+              {isLoading ? '...' : certificatesExpiring}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Next 30 days</span>
-              {certificatesExpiring === 0 && !loading && (
+              {certificatesExpiring === 0 && !isLoading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   All current
                 </Badge>
@@ -141,7 +170,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Tests This Month - REAL DATA ✅ */}
+        {/* Tests This Month */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tests This Month</CardTitle>
@@ -149,11 +178,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? '...' : testsThisMonth}
+              {isLoading ? '...' : testsThisMonth}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-              {!loading && monthOverMonthChange !== 0 && (
+              {!isLoading && monthOverMonthChange !== 0 && (
                 <span className={`flex items-center gap-1 ${monthOverMonthChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {monthOverMonthChange > 0 ? '+' : ''}{monthOverMonthChange} from last month
                 </span>
@@ -162,7 +191,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Pending Reviews - REAL DATA ✅ */}
+        {/* Pending Reviews */}
         <Card className={pendingReviews > 10 ? "border-orange-200" : "border-green-200"}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
@@ -170,11 +199,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${pendingReviews > 10 ? 'text-orange-600' : 'text-green-600'}`}>
-              {loading ? '...' : pendingReviews}
+              {isLoading ? '...' : pendingReviews}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Awaiting attention</span>
-              {pendingReviews <= 5 && !loading && (
+              {pendingReviews <= 5 && !isLoading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   Low backlog
                 </Badge>
@@ -183,7 +212,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* System Health - REAL DATA ✅ */}
+        {/* System Health */}
         <Card className={systemHealth >= 95 ? "border-green-200" : systemHealth >= 85 ? "border-yellow-200" : "border-red-200"}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">System Health</CardTitle>
@@ -191,11 +220,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${systemHealth >= 95 ? 'text-green-600' : systemHealth >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {loading ? '...' : `${systemHealth}%`}
+              {isLoading ? '...' : `${systemHealth}%`}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Document processing rate</span>
-              {systemHealth >= 99 && !loading && (
+              {systemHealth >= 99 && !isLoading && (
                 <Badge variant="outline" className="text-green-600 border-green-200">
                   Excellent
                 </Badge>
@@ -204,9 +233,94 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Premium Metrics - Only for Premium and Enterprise users */}
+        {(isPremium || isEnterprise) && (
+          <>
+            {/* Health Intelligence Score */}
+            <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Health Intelligence Score</CardTitle>
+                <Brain className="h-4 w-4 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${healthIntelligenceScore >= 85 ? 'text-green-600' : healthIntelligenceScore >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {isLoading ? '...' : `${healthIntelligenceScore}/100`}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>AI-powered health assessment</span>
+                  <Badge variant="outline" className="text-purple-600 border-purple-200">
+                    Premium
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Active Risk Alerts */}
+            <Card className={activeRiskAlerts > 5 ? "border-red-200 bg-red-50" : activeRiskAlerts > 0 ? "border-orange-200 bg-orange-50" : "border-green-200 bg-green-50"}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Risk Alerts</CardTitle>
+                <Shield className="h-4 w-4 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${activeRiskAlerts > 5 ? 'text-red-600' : activeRiskAlerts > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  {isLoading ? '...' : activeRiskAlerts}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>Require immediate attention</span>
+                  {activeRiskAlerts === 0 && !isLoading && (
+                    <Badge variant="outline" className="text-green-600 border-green-200">
+                      All clear
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Departments Tracked */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Departments Tracked</CardTitle>
+                <Building2 className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {isLoading ? '...' : departmentsTracked}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>Unique job categories</span>
+                  <Badge variant="outline" className="text-blue-600 border-blue-200">
+                    Analytics
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Prediction Accuracy */}
+            <Card className="border-emerald-200 bg-emerald-50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Prediction Accuracy</CardTitle>
+                <Target className="h-4 w-4 text-emerald-600" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${predictionAccuracy >= 90 ? 'text-emerald-600' : predictionAccuracy >= 75 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {isLoading ? '...' : `${predictionAccuracy}%`}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>ML model performance</span>
+                  {predictionAccuracy >= 95 && !isLoading && (
+                    <Badge variant="outline" className="text-emerald-600 border-emerald-200">
+                      Excellent
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
       </div>
 
-      {/* Priority Actions - MOVED ABOVE the dashboard sections */}
+      {/* Priority Actions */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -278,7 +392,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* New Dashboard Sections Grid - NOW BELOW Priority Actions */}
+      {/* Dashboard Sections Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DocumentProcessingTrends />
         <RecentActivity />
