@@ -1877,12 +1877,28 @@ export type Database = {
           tests_extracted: number
         }[]
       }
+      check_analytics_health: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          component: string
+          status: string
+          details: string
+        }[]
+      }
       check_user_exists: {
         Args: { user_id: string }
         Returns: Json
       }
+      create_analytics_indexes: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       create_auth_and_profile: {
         Args: { p_email: string; p_full_name?: string }
+        Returns: string
+      }
+      create_basic_analytics_view: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       create_client_organization: {
@@ -1919,6 +1935,34 @@ export type Database = {
         Args: { p_user_id: string; p_email: string; p_full_name?: string }
         Returns: boolean
       }
+      get_basic_analytics: {
+        Args: { org_id: string }
+        Returns: {
+          total_patients: number
+          total_companies: number
+          total_examinations: number
+          total_fit: number
+          overall_completion_rate: number
+          current_month_tests: number
+          expiring_certificates: number
+          total_restricted: number
+          recent_activity_count: number
+        }[]
+      }
+      get_basic_analytics_fallback: {
+        Args: { org_id: string }
+        Returns: {
+          total_patients: number
+          total_companies: number
+          total_examinations: number
+          total_fit: number
+          overall_completion_rate: number
+          current_month_tests: number
+          expiring_certificates: number
+          total_restricted: number
+          recent_activity_count: number
+        }[]
+      }
       get_client_organizations: {
         Args: { provider_id: string }
         Returns: Json
@@ -1953,6 +1997,10 @@ export type Database = {
       is_superadmin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      setup_basic_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       upsert_medical_examination: {
         Args: {

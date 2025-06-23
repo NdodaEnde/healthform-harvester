@@ -3,12 +3,13 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useEnhancedAnalytics } from '@/hooks/useEnhancedAnalytics';
-import { Users, Building2, FileText, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
+import { useBasicAnalytics } from '@/hooks/useBasicAnalytics';
+import { Users, Building2, FileText, Calendar, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import AnalyticsSetupComponent from './AnalyticsSetupComponent';
 
 const BasicAnalyticsDashboard = () => {
-  const { executiveSummary, isLoading } = useEnhancedAnalytics();
+  const { data: analytics, isLoading, error, refetch } = useBasicAnalytics();
 
   if (isLoading) {
     return (
@@ -29,56 +30,86 @@ const BasicAnalyticsDashboard = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-muted-foreground mb-4">
+              Unable to load analytics data. This might be because the analytics infrastructure needs to be set up.
+            </p>
+            <Button onClick={() => refetch()} className="mb-6">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+        
+        {/* Show setup component when there's an error */}
+        <AnalyticsSetupComponent />
+      </div>
+    );
+  }
+
   const basicMetrics = [
     {
       title: "Total Patients",
-      value: executiveSummary?.total_patients?.toLocaleString() || '0',
+      value: analytics.totalPatients.toLocaleString(),
       icon: Users,
       description: "Registered patients in system",
-      color: "text-blue-600"
+      color: "text-blue-600",
+      bgColor: "bg-blue-50"
     },
     {
       title: "Active Companies",
-      value: executiveSummary?.total_companies?.toLocaleString() || '0',
+      value: analytics.totalCompanies.toLocaleString(),
       icon: Building2,
       description: "Organizations served",
-      color: "text-green-600"
+      color: "text-green-600",
+      bgColor: "bg-green-50"
     },
     {
       title: "Total Examinations",
-      value: executiveSummary?.total_examinations?.toLocaleString() || '0',
+      value: analytics.totalExaminations.toLocaleString(),
       icon: FileText,
       description: "Medical examinations processed",
-      color: "text-purple-600"
+      color: "text-purple-600",
+      bgColor: "bg-purple-50"
     },
     {
       title: "Fit Workers",
-      value: executiveSummary?.total_fit?.toLocaleString() || '0',
+      value: analytics.totalFit.toLocaleString(),
       icon: Calendar,
       description: "Workers cleared for duty",
-      color: "text-emerald-600"
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50"
     }
   ];
 
-  // Simple fitness status distribution for basic users
+  // Fitness status distribution
   const fitnessData = [
-    { name: 'Fit', value: executiveSummary?.total_fit || 0, color: '#10b981' },
-    { name: 'Restricted', value: (executiveSummary?.total_patients || 0) - (executiveSummary?.total_fit || 0), color: '#f59e0b' }
+    { name: 'Fit', value: analytics.totalFit, color: '#10b981' },
+    { name: 'Restricted/Other', value: analytics.totalPatients - analytics.totalFit, color: '#f59e0b' }
   ].filter(item => item.value > 0);
-
-  const completionRate = executiveSummary?.overall_completion_rate || 0;
 
   return (
     <div className="space-y-6">
-      {/* Header with upgrade prompt */}
+      {/* Header with refresh */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Basic Analytics Overview</h2>
-          <p className="text-muted-foreground">Essential health metrics for your organization</p>
+          <p className="text-muted-foreground">Essential health metrics powered by RPC functions</p>
         </div>
-        <Badge variant="outline" className="bg-gray-50">
-          Basic Plan
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-blue-50 text-blue-800">
+            Basic Plan
+          </Badge>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Key Metrics Cards */}
@@ -86,12 +117,14 @@ const BasicAnalyticsDashboard = () => {
         {basicMetrics.map((metric) => {
           const IconComponent = metric.icon;
           return (
-            <Card key={metric.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
-                <IconComponent className={`h-4 w-4 ${metric.color}`} />
+            <Card key={metric.title} className="hover:shadow-md transition-shadow">
+              <CardHeader className={`${metric.bgColor} pb-2`}>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <IconComponent className={`h-4 w-4 ${metric.color}`} />
+                  {metric.title}
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 <div className="text-2xl font-bold">{metric.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {metric.description}
@@ -102,87 +135,109 @@ const BasicAnalyticsDashboard = () => {
         })}
       </div>
 
-      {/* Basic Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Fitness Status Distribution */}
+      {/* Key Statistics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Worker Fitness Status</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Overview of your workforce health status
-            </p>
+            <CardTitle className="text-lg">Compliance Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            {fitnessData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={fitnessData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {fitnessData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                No fitness data available
-              </div>
-            )}
+            <div className="text-3xl font-bold text-green-600 mb-2">
+              {analytics.complianceRate}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(analytics.complianceRate, 100)}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {analytics.totalFit} of {analytics.totalPatients} workers fit for duty
+            </p>
           </CardContent>
         </Card>
 
-        {/* Completion Rate Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Health Check Completion</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Track your medical examination progress
-            </p>
+            <CardTitle className="text-lg">Completion Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className="text-4xl font-bold text-blue-600">
-                  {completionRate.toFixed(1)}%
-                </div>
-                <p className="text-sm text-muted-foreground">Overall completion rate</p>
-              </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(completionRate, 100)}%` }}
-                ></div>
-              </div>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {analytics.completionRate}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(analytics.completionRate, 100)}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Medical examination progress
+            </p>
+          </CardContent>
+        </Card>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="text-center">
-                  <div className="font-semibold text-green-600">
-                    {executiveSummary?.total_tests_completed || 0}
-                  </div>
-                  <div className="text-muted-foreground">Completed</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-orange-600">
-                    {(executiveSummary?.total_tests_conducted || 0) - (executiveSummary?.total_tests_completed || 0)}
-                  </div>
-                  <div className="text-muted-foreground">Pending</div>
-                </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Alerts & Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Expiring Soon</span>
+                <Badge variant={analytics.certificatesExpiring > 10 ? "destructive" : "secondary"}>
+                  {analytics.certificatesExpiring}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Recent Activity</span>
+                <Badge variant="outline">
+                  {analytics.recentActivityCount}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Pending Documents</span>
+                <Badge variant={analytics.pendingDocuments > 0 ? "secondary" : "outline"}>
+                  {analytics.pendingDocuments}
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Fitness Distribution Chart */}
+      {fitnessData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Worker Fitness Distribution</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Overview of your workforce health status
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={fitnessData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {fitnessData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Upgrade Prompt */}
       <Card className="border-dashed border-2 border-blue-200 bg-blue-50/30">
