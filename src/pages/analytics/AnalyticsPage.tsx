@@ -6,6 +6,7 @@ import EnhancedBasicOverviewTab from '@/components/analytics/EnhancedBasicOvervi
 import PremiumOverviewTab from '@/components/analytics/PremiumOverviewTab';
 import BasicReports from '@/components/analytics/BasicReports';
 import PremiumReports from '@/components/analytics/PremiumReports';
+import BasicAnalyticsDashboard from '@/components/analytics/BasicAnalyticsDashboard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, FileText, BarChart3, Zap } from 'lucide-react';
@@ -62,7 +63,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="overview" className="space-y-6">
           {isBasic ? (
-            <EnhancedBasicOverviewTab />
+            <BasicAnalyticsDashboard />
           ) : (
             <PremiumOverviewTab />
           )}

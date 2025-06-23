@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +44,7 @@ export function RecentDocuments() {
       return data?.map(doc => ({
         id: doc.id,
         document: formatDocumentType(doc.document_type || 'Document'),
-        patient: `${doc.patients.first_name} ${doc.patients.last_name}`,
+        patient: `${doc.patients[0]?.first_name || ''} ${doc.patients[0]?.last_name || ''}`.trim() || 'Unknown Patient',
         status: formatStatus(doc.status),
         date: formatTimeAgo(new Date(doc.created_at)),
         statusColor: getStatusColor(doc.status)
