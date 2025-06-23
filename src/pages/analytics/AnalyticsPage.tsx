@@ -1,144 +1,127 @@
 
-import React, { Suspense } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePackage } from '@/contexts/PackageContext';
+import EnhancedBasicOverviewTab from '@/components/analytics/EnhancedBasicOverviewTab';
 import PremiumOverviewTab from '@/components/analytics/PremiumOverviewTab';
-import BasicOverviewTab from '@/components/analytics/BasicOverviewTab';
-import RealDataAnalyticsDashboard from '@/components/analytics/RealDataAnalyticsDashboard';
-import AdvancedAnalyticsTab from '@/components/analytics/AdvancedAnalyticsTab';
-import ExecutiveSummaryBanner from './components/ExecutiveSummaryBanner';
-import PackageStatusBanner from '@/components/PackageStatusBanner';
-import FeatureSkeleton from '@/components/FeatureSkeleton';
-import { Badge } from "@/components/ui/badge";
-import { Sparkles, Database } from "lucide-react";
+import BasicReports from '@/components/analytics/BasicReports';
+import PremiumReports from '@/components/analytics/PremiumReports';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { TrendingUp, FileText, BarChart3, Zap } from 'lucide-react';
 
-const AnalyticsPage = () => {
-  const { 
-    currentTier, 
-    language, 
-    colors, 
-    displayName, 
-    canAccessFeature,
-    isPremium,
-    isEnterprise 
-  } = usePackage();
-
-  const isPremiumOrHigher = canAccessFeature('premium');
+export default function AnalyticsPage() {
+  const { currentTier, isBasic, isPremium, isEnterprise } = usePackage();
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 animate-fade-in">
-        <div className="space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
-            <h1 className={`text-2xl sm:text-3xl font-bold ${colors.text} transition-colors duration-300`}>
-              {language.dashboardTitle}
-            </h1>
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant="outline" 
-                className={`${colors.background} ${colors.border} ${colors.accent} transition-all duration-300 hover:scale-105 w-fit`}
-              >
-                <Sparkles className="h-3 w-3 mr-1" />
-                {displayName}
-              </Badge>
-              <Badge 
-                variant="secondary" 
-                className="bg-green-100 text-green-800 border-green-200"
-              >
-                <Database className="h-3 w-3 mr-1" />
-                Real-Time Data
-              </Badge>
-            </div>
-          </div>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            {isPremiumOrHigher 
-              ? language.executiveSummaryDescription
-              : "Essential health metrics and compliance overview with live data integration"
-            }
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Comprehensive health analytics and insights for your organization
           </p>
-          {isEnterprise && (
-            <p className="text-sm text-purple-600 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-              ✨ Strategic Command Center with competitive benchmarking and real-time intelligence
-            </p>
+        </div>
+        <Badge variant="outline" className={`
+          ${isEnterprise ? 'bg-purple-100 text-purple-800' : ''}
+          ${isPremium ? 'bg-yellow-100 text-yellow-800' : ''}
+          ${isBasic ? 'bg-blue-100 text-blue-800' : ''}
+        `}>
+          {currentTier.toUpperCase()} Plan
+        </Badge>
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Reports
+          </TabsTrigger>
+          <TabsTrigger 
+            value="insights" 
+            className="flex items-center gap-2"
+            disabled={isBasic}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Insights {isBasic && <span className="text-xs">(Premium)</span>}
+          </TabsTrigger>
+          <TabsTrigger 
+            value="advanced" 
+            className="flex items-center gap-2"
+            disabled={!isEnterprise}
+          >
+            <Zap className="h-4 w-4" />
+            Advanced {!isEnterprise && <span className="text-xs">(Enterprise)</span>}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          {isBasic ? (
+            <EnhancedBasicOverviewTab />
+          ) : (
+            <PremiumOverviewTab />
           )}
-        </div>
-      </div>
+        </TabsContent>
 
-      <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-        <PackageStatusBanner />
-      </div>
+        <TabsContent value="reports" className="space-y-6">
+          {isBasic ? (
+            <BasicReports />
+          ) : (
+            <PremiumReports />
+          )}
+        </TabsContent>
 
-      <Suspense fallback={<FeatureSkeleton type="card" className="h-32" />}>
-        <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
-          <ExecutiveSummaryBanner />
-        </div>
-      </Suspense>
+        <TabsContent value="insights" className="space-y-6">
+          {isBasic ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="p-3 bg-yellow-100 rounded-full">
+                    <Zap className="h-8 w-8 text-yellow-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Premium Feature</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Advanced insights and trend analysis are available with Premium subscription.
+                    </p>
+                    <Badge variant="outline" className="bg-yellow-50 text-yellow-800">
+                      Upgrade to Premium
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <PremiumOverviewTab />
+          )}
+        </TabsContent>
 
-      <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className={`${colors.background} grid w-full max-w-lg transition-all duration-300`}>
-            <TabsTrigger 
-              value="overview" 
-              className={`data-[state=active]:${colors.primary} data-[state=active]:text-white transition-all duration-300`}
-            >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
-              value="realtime" 
-              className={`data-[state=active]:${colors.primary} data-[state=active]:text-white transition-all duration-300`}
-            >
-              Real-Time Data
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview" className="space-y-4 min-h-[400px]">
-            <Suspense fallback={
-              <div className="space-y-4">
-                <FeatureSkeleton type="chart" className="h-64" />
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {[...Array(3)].map((_, i) => (
-                    <FeatureSkeleton key={i} type="card" className="h-32" />
-                  ))}
+        <TabsContent value="advanced" className="space-y-6">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <Zap className="h-8 w-8 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Enterprise Feature</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Advanced analytics, competitive benchmarking, and strategic insights are available with Enterprise subscription.
+                  </p>
+                  <Badge variant="outline" className="bg-purple-50 text-purple-800">
+                    Upgrade to Enterprise
+                  </Badge>
                 </div>
               </div>
-            }>
-              {isPremiumOrHigher ? (
-                <div className="animate-fade-in">
-                  <PremiumOverviewTab />
-                </div>
-              ) : (
-                <div className="animate-fade-in">
-                  <BasicOverviewTab />
-                </div>
-              )}
-            </Suspense>
-          </TabsContent>
-
-          <TabsContent value="realtime" className="space-y-4 min-h-[400px]">
-            <Suspense fallback={
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {[...Array(4)].map((_, i) => (
-                    <FeatureSkeleton key={i} type="card" className="h-32" />
-                  ))}
-                </div>
-                <FeatureSkeleton type="chart" className="h-64" />
-                <div className="grid gap-4 md:grid-cols-2">
-                  {[...Array(2)].map((_, i) => (
-                    <FeatureSkeleton key={i} type="chart" className="h-64" />
-                  ))}
-                </div>
-              </div>
-            }>
-              <div className="animate-fade-in">
-                <RealDataAnalyticsDashboard />
-              </div>
-            </Suspense>
-          </TabsContent>
-        </Tabs>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-};
-
-export default AnalyticsPage;
+}
