@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -69,35 +68,135 @@ const IntegratedOccupationalHealthPage = () => {
           <BasicOverviewTab />
         </TabsContent>
         
-        {/* Analytics Tab - Redesigned */}
+        {/* Analytics Tab - Restructured Layout */}
         <TabsContent value="analytics" className="space-y-8">
           <div className="space-y-8">
-            {/* Key Health Metrics Section */}
+            {/* Examination Volume Overview */}
             <div className="space-y-6">
               <div className="border-b pb-3">
-                <h2 className="text-2xl font-semibold text-gray-900">Key Health Metrics</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">Examination Volume Overview</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Overview of essential health indicators and compliance rates
+                  Breakdown of examination types and volumes
                 </p>
               </div>
               
-              {/* Medical Fitness Overview - 2x2 Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Row 1: Pre-employment, Periodical, Exit - using basic metric cards from existing components */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-blue-700">Pre-employment</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-blue-800">333</div>
+                    <p className="text-sm text-blue-600 mt-1">Initial health screenings</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-green-700">Periodical</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-800">370</div>
+                    <p className="text-sm text-green-600 mt-1">Regular health checkups</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-amber-700">Exit</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-amber-800">37</div>
+                    <p className="text-sm text-amber-600 mt-1">End of employment</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Fitness Status Summary */}
+            <div className="space-y-6">
+              <div className="border-b pb-3">
+                <h2 className="text-2xl font-semibold text-gray-900">Fitness Status Summary</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Current workforce fitness declarations
+                </p>
+              </div>
+              
+              {/* Row 2: Fit, Fit with Restrictions, Fit with Condition */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-emerald-700">Fit</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-emerald-800">263</div>
+                    <p className="text-sm text-emerald-600 mt-1">No restrictions required</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-orange-700">Fit with Restrictions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-orange-800">4</div>
+                    <p className="text-sm text-orange-600 mt-1">Limited work activities</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-purple-700">Fit with Condition</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-purple-800">2</div>
+                    <p className="text-sm text-purple-600 mt-1">Conditional fitness</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Distribution Analysis */}
+            <div className="space-y-6">
+              <div className="border-b pb-3">
+                <h2 className="text-2xl font-semibold text-gray-900">Distribution Analysis</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Visual breakdown of fitness declarations and status comparisons
+                </p>
+              </div>
+              
+              {/* Row 3: Medical Fitness Declaration Distribution + Fitness Status Comparison */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <MedicalFitnessDeclarationChart />
+              </div>
+            </div>
+
+            {/* Type-based Analytics */}
+            <div className="space-y-6">
+              <div className="border-b pb-3">
+                <h2 className="text-2xl font-semibold text-gray-900">Type-based Analytics</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Examination type distribution and volume comparisons
+                </p>
+              </div>
+              
+              {/* Row 4: Examination Type Distribution + Examination Volume Comparison */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <ExaminationTypeAnalytics />
               </div>
             </div>
-            
-            {/* Medical Test Analysis Section */}
+
+            {/* Historical Trends */}
             <div className="space-y-6">
               <div className="border-b pb-3">
-                <h2 className="text-2xl font-semibold text-gray-900">Medical Test Analysis</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">Historical Trends</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Detailed breakdown of medical test results and trends
+                  Examination trends and patterns over time
                 </p>
               </div>
               
-              {/* Full-width test analytics */}
+              {/* Row 5: Full-width Enhanced Medical Test Analytics */}
               <EnhancedMedicalTestAnalytics />
             </div>
           </div>
