@@ -28,13 +28,13 @@ export function QuickActions() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <CardContent className="pt-0 pb-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <Button 
-            className="justify-center gap-2 h-12 bg-black hover:bg-gray-800 text-white font-medium"
+            className="flex-1 justify-center gap-2 h-12 bg-black hover:bg-gray-800 text-white font-medium"
             onClick={() => handleAction('upload')}
           >
             <Upload className="h-4 w-4" />
@@ -43,7 +43,7 @@ export function QuickActions() {
           
           <Button 
             variant="outline" 
-            className="justify-center gap-2 h-12 border-gray-200 hover:bg-gray-50 font-medium"
+            className="flex-1 justify-center gap-2 h-12 border-gray-200 hover:bg-gray-50 font-medium"
             onClick={() => handleAction('view-employees')}
           >
             <Users className="h-4 w-4" />
@@ -52,7 +52,7 @@ export function QuickActions() {
           
           <Button 
             variant="outline" 
-            className="justify-center gap-2 h-12 border-gray-200 hover:bg-gray-50 font-medium"
+            className="flex-1 justify-center gap-2 h-12 border-gray-200 hover:bg-gray-50 font-medium"
             onClick={() => handleAction('generate-report')}
           >
             <FileText className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function QuickActions() {
         </div>
         
         {/* Upgrade Prompt */}
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800 mb-2">Need advanced analytics?</p>
           <a href="#" className="text-sm font-medium text-orange-600 hover:text-orange-800">
             Upgrade to Premium →
