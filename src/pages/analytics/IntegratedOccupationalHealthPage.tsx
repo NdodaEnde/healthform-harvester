@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,7 +24,6 @@ import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashbo
 import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
 import InteractiveDataExploration from './components/InteractiveDataExploration';
 import TestTypeBreakdownCard from './components/TestTypeBreakdownCard';
-import FitnessStatusBarChart from '@/components/analytics/FitnessStatusBarChart';
 import FitnessCertificateStats from './components/FitnessCertificateStats';
 
 const IntegratedOccupationalHealthPage = () => {
@@ -119,56 +117,16 @@ const IntegratedOccupationalHealthPage = () => {
               </div>
             </div>
 
-            {/* Fitness Status Summary with Bar Chart - Basic tier */}
+            {/* Fitness Certificate Statistics - Basic tier */}
             <div className="space-y-6">
               <div className="border-b pb-3">
-                <h2 className="text-2xl font-semibold text-gray-900">Fitness Status Summary</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">Fitness Certificate Analytics</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Current workforce fitness declarations and visual breakdown
+                  Comprehensive fitness status analysis with interactive charts
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg text-emerald-700">Fit</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-emerald-800">263</div>
-                    <p className="text-sm text-emerald-600 mt-1">No restrictions required</p>
-                  </CardContent>
-                </Card>
-                
-                <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg text-orange-700">Fit with Restrictions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-orange-800">4</div>
-                    <p className="text-sm text-orange-600 mt-1">Limited work activities</p>
-                  </CardContent>
-                </Card>
-                
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg text-purple-700">Fit with Condition</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-purple-800">2</div>
-                    <p className="text-sm text-purple-600 mt-1">Conditional fitness</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Add the fitness status bar chart here */}
-              <FitnessStatusBarChart data={{
-                fit: 263,
-                fitWithRestriction: 4,
-                fitWithCondition: 2,
-                temporaryUnfit: 0,
-                unfit: 0,
-                total: 269
-              }} />
+              <FitnessCertificateStats />
             </div>
 
             {/* Medical Tests Overview - Basic tier */}
