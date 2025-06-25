@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +14,7 @@ import {
   EyeIcon,
   HeartIcon,
 } from "lucide-react";
+import FitnessStatusBarChart from "@/components/analytics/FitnessStatusBarChart";
 
 interface FitnessCertificateStatsProps {
   className?: string;
@@ -319,6 +319,9 @@ export default function FitnessCertificateStats({
                 </span>
               </div>
             </div>
+
+            {/* Add the new bar chart here */}
+            <FitnessStatusBarChart data={certificateStats} />
           </div>
 
           <div className="space-y-4">
