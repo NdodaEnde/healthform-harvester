@@ -319,9 +319,6 @@ export default function FitnessCertificateStats({
                 </span>
               </div>
             </div>
-
-            {/* Add the new bar chart here */}
-            <FitnessStatusBarChart data={certificateStats} />
           </div>
 
           <div className="space-y-4">

@@ -25,6 +25,8 @@ import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashbo
 import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
 import InteractiveDataExploration from './components/InteractiveDataExploration';
 import TestTypeBreakdownCard from './components/TestTypeBreakdownCard';
+import FitnessStatusBarChart from '@/components/analytics/FitnessStatusBarChart';
+import FitnessCertificateStats from './components/FitnessCertificateStats';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
@@ -117,12 +119,12 @@ const IntegratedOccupationalHealthPage = () => {
               </div>
             </div>
 
-            {/* Fitness Status Summary - Basic tier */}
+            {/* Fitness Status Summary with Bar Chart - Basic tier */}
             <div className="space-y-6">
               <div className="border-b pb-3">
                 <h2 className="text-2xl font-semibold text-gray-900">Fitness Status Summary</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Current workforce fitness declarations
+                  Current workforce fitness declarations and visual breakdown
                 </p>
               </div>
               
@@ -157,6 +159,16 @@ const IntegratedOccupationalHealthPage = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Add the fitness status bar chart here */}
+              <FitnessStatusBarChart data={{
+                fit: 263,
+                fitWithRestriction: 4,
+                fitWithCondition: 2,
+                temporaryUnfit: 0,
+                unfit: 0,
+                total: 269
+              }} />
             </div>
 
             {/* Medical Tests Overview - Basic tier */}
