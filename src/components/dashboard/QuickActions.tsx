@@ -31,35 +31,37 @@ export function QuickActions() {
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <Button 
-          className="w-full justify-start gap-3 h-12 bg-blue-600 hover:bg-blue-700"
-          onClick={() => handleAction('upload')}
-        >
-          <Upload className="h-5 w-5" />
-          Upload Document
-        </Button>
-        
-        <Button 
-          variant="outline" 
-          className="w-full justify-start gap-3 h-12"
-          onClick={() => handleAction('view-employees')}
-        >
-          <Users className="h-5 w-5" />
-          View Employees
-        </Button>
-        
-        <Button 
-          variant="outline" 
-          className="w-full justify-start gap-3 h-12"
-          onClick={() => handleAction('generate-report')}
-        >
-          <FileText className="h-5 w-5" />
-          Generate Report
-        </Button>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button 
+            className="flex-1 justify-start gap-3 h-12 bg-blue-600 hover:bg-blue-700"
+            onClick={() => handleAction('upload')}
+          >
+            <Upload className="h-5 w-5" />
+            Upload Document
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            className="flex-1 justify-start gap-3 h-12"
+            onClick={() => handleAction('view-employees')}
+          >
+            <Users className="h-5 w-5" />
+            View Employees
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            className="flex-1 justify-start gap-3 h-12"
+            onClick={() => handleAction('generate-report')}
+          >
+            <FileText className="h-5 w-5" />
+            Generate Report
+          </Button>
+        </div>
         
         {/* Upgrade Prompt */}
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800 mb-2">Need advanced analytics?</p>
           <a href="#" className="text-sm font-medium text-orange-600 hover:text-orange-800">
             Upgrade to Premium →
