@@ -50,11 +50,11 @@ export default function TestTypeBreakdownCard({
     enabled: !!organizationId,
   });
 
-  // Process documents to extract test type information
+  // Process documents to extract test type information based on actual test structure
   const testTypes = React.useMemo(() => {
     if (!documentsData) return [];
 
-    const testCounts: { [key: string]: { total: number, completed: number, required: boolean } } = {};
+    const testCounts: { [key: string]: { total: number, completed: number } } = {};
 
     documentsData.forEach(doc => {
       try {
@@ -64,43 +64,54 @@ export default function TestTypeBreakdownCard({
         const structuredData = (extractedData as any).structured_data;
         if (!structuredData || typeof structuredData !== 'object') return;
 
-        // Check various test types in the structured data
-        const tests = structuredData.tests || structuredData.medical_tests || {};
-        
-        // Common test types to look for
-        const testTypeMapping = {
-          'vision': ['vision', 'visual_acuity', 'eye_test'],
-          'hearing': ['hearing', 'audiometry', 'audio'],
-          'lung_function': ['lung', 'spirometry', 'respiratory'],
-          'blood_pressure': ['blood_pressure', 'bp', 'cardiovascular'],
-          'drug_screen': ['drug', 'substance', 'alcohol'],
-          'heights': ['height', 'working_at_heights', 'vertigo'],
-          'bmi': ['bmi', 'weight', 'body_mass'],
-          'chest_xray': ['chest', 'xray', 'x_ray'],
-          'ecg': ['ecg', 'ekg', 'cardiac'],
-          'blood_tests': ['blood_test', 'blood_work', 'laboratory']
+        const testResults = structuredData.examination_results?.test_results;
+        if (!testResults || typeof testResults !== 'object') return;
+
+        // Map actual test fields from your medical examination structure
+        const testMapping = {
+          'Blood Tests': {
+            done: testResults.bloods_done,
+            results: testResults.bloods_results
+          },
+          'Vision Tests': {
+            // Combine all vision-related tests
+            done: testResults.far_near_vision_done || testResults.night_vision_done || testResults.side_depth_done,
+            results: testResults.far_near_vision_results || testResults.night_vision_results || testResults.side_depth_results
+          },
+          'Hearing Tests': {
+            done: testResults.hearing_done,
+            results: testResults.hearing_results
+          },
+          'Working At Heights': {
+            done: testResults.heights_done || testResults.working_at_heights_done,
+            results: testResults.heights_results || testResults.working_at_heights_results
+          },
+          'Lung Function': {
+            done: testResults.lung_function_done,
+            results: testResults.lung_function_results
+          },
+          'Drug Screen': {
+            done: testResults.drug_screen_done,
+            results: testResults.drug_screen_results
+          },
+          'X-Ray': {
+            done: testResults.x_ray_done,
+            results: testResults.x_ray_results
+          }
         };
 
-        Object.entries(testTypeMapping).forEach(([testType, keywords]) => {
-          const testData = keywords.find(keyword => tests[keyword] !== undefined);
-          
-          if (testData || keywords.some(keyword => 
-            JSON.stringify(structuredData).toLowerCase().includes(keyword)
-          )) {
-            if (!testCounts[testType]) {
-              testCounts[testType] = { total: 0, completed: 0, required: true };
+        Object.entries(testMapping).forEach(([testName, testData]) => {
+          // Only count if the test was actually done or has results
+          if (testData.done === true || (testData.results && testData.results !== 'N/A')) {
+            if (!testCounts[testName]) {
+              testCounts[testName] = { total: 0, completed: 0 };
             }
-            testCounts[testType].total++;
+            testCounts[testName].total++;
             
-            // Check if test was completed/passed
-            const testResult = tests[testData || keywords[0]];
-            if (testResult && (
-              testResult === 'pass' || 
-              testResult === 'normal' || 
-              testResult === 'completed' ||
-              (typeof testResult === 'object' && testResult.status === 'completed')
-            )) {
-              testCounts[testType].completed++;
+            // Test is completed if it was done and has meaningful results
+            if (testData.done === true && testData.results && 
+                testData.results !== 'N/A' && testData.results.toString().trim() !== '') {
+              testCounts[testName].completed++;
             }
           }
         });
@@ -111,7 +122,7 @@ export default function TestTypeBreakdownCard({
     });
 
     return Object.entries(testCounts).map(([name, data]) => ({
-      name: name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      name,
       count: data.total,
       completion: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,
       status: data.total > 0 ? (Math.round((data.completed / data.total) * 100) >= 90 ? 'high' : Math.round((data.completed / data.total) * 100) >= 75 ? 'medium' : 'low') : 'low',
@@ -122,16 +133,13 @@ export default function TestTypeBreakdownCard({
 
   function getTestDescription(testType: string): string {
     const descriptions: { [key: string]: string } = {
-      'vision': 'Visual acuity, color vision, depth perception',
-      'hearing': 'Audiometry, speech discrimination',
-      'lung_function': 'Spirometry, peak flow measurement',
-      'blood_pressure': 'Systolic and diastolic measurements',
-      'drug_screen': 'Substance detection and analysis',
-      'heights': 'Balance, vertigo and spatial awareness',
-      'bmi': 'Height, weight, body mass calculation',
-      'chest_xray': 'Pulmonary function assessment',
-      'ecg': 'Cardiac electrical activity',
-      'blood_tests': 'Complete blood count, lipid profile'
+      'Blood Tests': 'Blood analysis and laboratory work',
+      'Vision Tests': 'Visual acuity, night vision, peripheral vision',
+      'Hearing Tests': 'Auditory function assessment',
+      'Working At Heights': 'Balance and spatial awareness evaluation',
+      'Lung Function': 'Spirometry and respiratory assessment',
+      'Drug Screen': 'Substance detection and analysis',
+      'X-Ray': 'Radiological examination'
     };
     return descriptions[testType] || 'Medical assessment';
   }
