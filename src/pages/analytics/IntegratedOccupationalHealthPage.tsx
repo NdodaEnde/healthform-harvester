@@ -32,6 +32,7 @@ import InteractiveDataExploration from './components/InteractiveDataExploration'
 import TestTypeBreakdownCard from './components/TestTypeBreakdownCard';
 import FitnessCertificateStats from './components/FitnessCertificateStats';
 import FitnessStatusBarChart from '@/components/analytics/FitnessStatusBarChart';
+import ExaminationTypeBarChart from '@/components/analytics/ExaminationTypeBarChart';
 
 const IntegratedOccupationalHealthPage = () => {
   const { data: examinationData, isLoading: examinationLoading } = useExaminationAnalytics();
@@ -188,9 +189,12 @@ const IntegratedOccupationalHealthPage = () => {
                   </Card>
                 </div>
 
-                {/* Add the fitness status pie chart with live data */}
+                {/* Add both pie charts side by side with live data */}
                 {examinationData && (
-                  <FitnessStatusBarChart data={examinationData.fitnessStatus} />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <FitnessStatusBarChart data={examinationData.fitnessStatus} />
+                    <ExaminationTypeBarChart data={examinationData.examinationTypes} />
+                  </div>
                 )}
               </div>
 
