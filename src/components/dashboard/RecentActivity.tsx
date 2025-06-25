@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, CheckCircle, AlertTriangle, Users } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, UserPlus, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -16,90 +16,122 @@ export function RecentActivity() {
     queryFn: async () => {
       if (!organizationId) return [];
 
-      const isServiceProvider = organizationId === 'e95df707-d618-4ca4-9e2f-d80359e96622';
-      const orgFilter = isServiceProvider 
-        ? `organization_id.eq.${organizationId}`
-        : `client_organization_id.eq.${organizationId}`;
-
       const activities = [];
 
-      // Get recent documents
+      // Get recent documents (last 7 days)
       const { data: recentDocs } = await supabase
         .from('documents')
-        .select('created_at, status, file_name')
-        .or(orgFilter)
+        .select('created_at, processed_at, status, file_name, document_type')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      recentDocs?.forEach(doc => {
+        if (doc.status === 'processed' && doc.processed_at) {
+          activities.push({
+            id: `doc-processed-${doc.created_at}`,
+            type: `${formatDocumentType(doc.document_type)} processed`,
+            time: new Date(doc.processed_at),
+            icon: CheckCircle,
+            iconColor: 'text-green-600',
+            bgColor: 'bg-green-100',
+            description: doc.file_name?.substring(0, 30) + '...' || 'Document processed'
+          });
+        } else if (doc.status === 'uploaded') {
+          activities.push({
+            id: `doc-uploaded-${doc.created_at}`,
+            type: `${formatDocumentType(doc.document_type)} uploaded`,
+            time: new Date(doc.created_at),
+            icon: FileText,
+            iconColor: 'text-blue-600',
+            bgColor: 'bg-blue-100',
+            description: doc.file_name?.substring(0, 30) + '...' || 'Document uploaded'
+          });
+        }
+      });
+
+      // Get recent medical examinations (last 7 days)
+      const { data: recentExams } = await supabase
+        .from('medical_examinations')
+        .select(`
+          created_at, 
+          examination_date, 
+          fitness_status,
+          patients!inner(first_name, last_name)
+        `)
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
         .limit(5);
 
-      recentDocs?.forEach(doc => {
-        activities.push({
-          id: `doc-${doc.created_at}`,
-          type: doc.status === 'processed' ? 'Document processed' : 'Document uploaded',
-          time: new Date(doc.created_at),
-          icon: doc.status === 'processed' ? CheckCircle : FileText,
-          iconColor: doc.status === 'processed' ? 'text-green-600' : 'text-blue-600',
-          bgColor: doc.status === 'processed' ? 'bg-green-100' : 'bg-blue-100'
-        });
-      });
-
-      // Get recent examinations
-      const { data: recentExams } = await supabase
-        .from('medical_examinations')
-        .select('created_at, fitness_status')
-        .or(orgFilter)
-        .order('created_at', { ascending: false })
-        .limit(3);
-
       recentExams?.forEach(exam => {
+        const patientName = `${exam.patients[0]?.first_name || ''} ${exam.patients[0]?.last_name || ''}`.trim();
         activities.push({
           id: `exam-${exam.created_at}`,
-          type: exam.fitness_status === 'Fit' ? 'Certificate processed' : 'Medical examination completed',
+          type: 'Medical examination completed',
           time: new Date(exam.created_at),
           icon: CheckCircle,
-          iconColor: 'text-green-600',
-          bgColor: 'bg-green-100'
+          iconColor: exam.fitness_status === 'fit' ? 'text-green-600' : 'text-yellow-600',
+          bgColor: exam.fitness_status === 'fit' ? 'bg-green-100' : 'bg-yellow-100',
+          description: patientName || 'Medical examination'
         });
       });
 
-      // Get expiring certificates
-      const { data: expiringCerts } = await supabase
-        .from('certificate_compliance')
-        .select('current_expiry_date')
-        .or(orgFilter)
-        .not('current_expiry_date', 'is', null)
-        .gte('current_expiry_date', new Date().toISOString().split('T')[0])
-        .lte('current_expiry_date', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .limit(2);
+      // Get recent patients added (last 7 days)
+      const { data: recentPatients } = await supabase
+        .from('patients')
+        .select('created_at, first_name, last_name')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-      expiringCerts?.forEach(cert => {
+      recentPatients?.forEach(patient => {
+        const patientName = `${patient.first_name || ''} ${patient.last_name || ''}`.trim();
         activities.push({
-          id: `cert-exp-${cert.current_expiry_date}`,
-          type: 'Certificate expires soon',
-          time: new Date(cert.current_expiry_date),
-          icon: AlertTriangle,
-          iconColor: 'text-yellow-600',
-          bgColor: 'bg-yellow-100'
+          id: `patient-${patient.created_at}`,
+          type: 'New patient registered',
+          time: new Date(patient.created_at),
+          icon: UserPlus,
+          iconColor: 'text-blue-600',
+          bgColor: 'bg-blue-100',
+          description: patientName || 'New patient'
         });
       });
 
-      // Sort by time and return most recent 4
+      // Sort by time and return most recent 6
       return activities
         .sort((a, b) => b.time.getTime() - a.time.getTime())
-        .slice(0, 4)
+        .slice(0, 6)
         .map(activity => ({
           ...activity,
-          time: formatTimeAgo(activity.time)
+          timeAgo: formatTimeAgo(activity.time)
         }));
     },
     enabled: !!organizationId,
   });
+
+  const formatDocumentType = (type: string) => {
+    switch (type) {
+      case 'certificate-fitness':
+      case 'fitness-certificate':
+        return 'Certificate';
+      case 'medical-certificate':
+        return 'Medical Certificate';
+      case 'medical-questionnaire':
+        return 'Questionnaire';
+      default:
+        return 'Document';
+    }
+  };
 
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
     
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays === 1) return '1 day ago';
@@ -121,13 +153,14 @@ export function RecentActivity() {
             activities.map((activity) => {
               const IconComponent = activity.icon;
               return (
-                <div key={activity.id} className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${activity.bgColor}`}>
+                <div key={activity.id} className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg ${activity.bgColor} flex-shrink-0`}>
                     <IconComponent className={`h-4 w-4 ${activity.iconColor}`} />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{activity.type}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                    <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{activity.timeAgo}</p>
                   </div>
                 </div>
               );

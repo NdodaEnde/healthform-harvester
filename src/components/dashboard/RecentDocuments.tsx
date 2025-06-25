@@ -16,11 +16,6 @@ export function RecentDocuments() {
     queryFn: async () => {
       if (!organizationId) return [];
 
-      const isServiceProvider = organizationId === 'e95df707-d618-4ca4-9e2f-d80359e96622';
-      const orgFilter = isServiceProvider 
-        ? `organization_id.eq.${organizationId}`
-        : `client_organization_id.eq.${organizationId}`;
-
       const { data, error } = await supabase
         .from('documents')
         .select(`
@@ -29,25 +24,29 @@ export function RecentDocuments() {
           file_name,
           status,
           created_at,
+          processed_at,
           owner_id,
-          patients!inner(
+          patients(
             first_name,
             last_name
           )
         `)
-        .or(orgFilter)
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(5);
 
       if (error) throw error;
 
       return data?.map(doc => ({
         id: doc.id,
         document: formatDocumentType(doc.document_type || 'Document'),
-        patient: `${doc.patients[0]?.first_name || ''} ${doc.patients[0]?.last_name || ''}`.trim() || 'Unknown Patient',
+        patient: doc.patients?.length > 0 
+          ? `${doc.patients[0]?.first_name || ''} ${doc.patients[0]?.last_name || ''}`.trim() || 'Unknown Patient'
+          : 'Unassigned',
         status: formatStatus(doc.status),
         date: formatTimeAgo(new Date(doc.created_at)),
-        statusColor: getStatusColor(doc.status)
+        statusColor: getStatusColor(doc.status),
+        fileName: doc.file_name
       })) || [];
     },
     enabled: !!organizationId,
@@ -85,14 +84,14 @@ export function RecentDocuments() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'processed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'uploaded':
       case 'pending':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'failed':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -101,11 +100,11 @@ export function RecentDocuments() {
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
     
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays === 1) return '1 day ago';
-    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
     
     return date.toLocaleDateString();
   };
@@ -135,9 +134,13 @@ export function RecentDocuments() {
             <div className="text-sm text-muted-foreground">Loading documents...</div>
           ) : documents && documents.length > 0 ? (
             documents.map((doc) => (
-              <div key={doc.id} className="grid grid-cols-4 gap-4 text-sm py-2">
-                <div className="font-medium">{doc.document}</div>
-                <div className="text-muted-foreground">{doc.patient}</div>
+              <div key={doc.id} className="grid grid-cols-4 gap-4 text-sm py-2 hover:bg-gray-50 rounded">
+                <div className="font-medium truncate" title={doc.fileName}>
+                  {doc.document}
+                </div>
+                <div className="text-muted-foreground truncate" title={doc.patient}>
+                  {doc.patient}
+                </div>
                 <div>
                   <Badge variant="outline" className={doc.statusColor}>
                     {doc.status}
@@ -147,7 +150,9 @@ export function RecentDocuments() {
               </div>
             ))
           ) : (
-            <div className="text-sm text-muted-foreground">No recent documents</div>
+            <div className="text-sm text-muted-foreground text-center py-4">
+              No recent documents
+            </div>
           )}
         </div>
       </CardContent>

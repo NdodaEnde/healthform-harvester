@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -16,26 +16,20 @@ export function DocumentProcessingTrends() {
     queryFn: async () => {
       if (!organizationId) return [];
 
-      const isServiceProvider = organizationId === 'e95df707-d618-4ca4-9e2f-d80359e96622';
-      const orgFilter = isServiceProvider 
-        ? `organization_id.eq.${organizationId}`
-        : `client_organization_id.eq.${organizationId}`;
-
       // Get documents processed in the last 6 months, grouped by month
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
       const { data, error } = await supabase
         .from('documents')
-        .select('processed_at, created_at')
-        .or(orgFilter)
-        .eq('status', 'processed')
-        .gte('processed_at', sixMonthsAgo.toISOString())
-        .order('processed_at', { ascending: true });
+        .select('processed_at, created_at, status')
+        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+        .gte('created_at', sixMonthsAgo.toISOString())
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      // Group by month
+      // Group by month and count processed vs total
       const monthlyData = {};
       const currentDate = new Date();
       
@@ -45,18 +39,29 @@ export function DocumentProcessingTrends() {
         date.setMonth(currentDate.getMonth() - i);
         const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
         const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        monthlyData[yearMonth] = { month: monthKey, value: 0 };
+        monthlyData[yearMonth] = { 
+          month: monthKey, 
+          total: 0, 
+          processed: 0,
+          value: 0 // This will be the processed count for the chart
+        };
       }
 
-      // Count processed documents by month
+      // Count documents by month
       data?.forEach(doc => {
-        if (doc.processed_at) {
-          const date = new Date(doc.processed_at);
-          const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-          if (monthlyData[yearMonth]) {
-            monthlyData[yearMonth].value++;
+        const date = new Date(doc.created_at);
+        const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        if (monthlyData[yearMonth]) {
+          monthlyData[yearMonth].total++;
+          if (doc.status === 'processed') {
+            monthlyData[yearMonth].processed++;
           }
         }
+      });
+
+      // Set the value for chart display (processed documents)
+      Object.keys(monthlyData).forEach(key => {
+        monthlyData[key].value = monthlyData[key].processed;
       });
 
       return Object.values(monthlyData);
@@ -97,7 +102,15 @@ export function DocumentProcessingTrends() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: '#6B7280' }}
-                  domain={[0, 'dataMax + 5']}
+                  domain={[0, 'dataMax + 2']}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: '6px' 
+                  }}
+                  formatter={(value, name) => [value, 'Documents Processed']}
                 />
                 <Line 
                   type="monotone" 
