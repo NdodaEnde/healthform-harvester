@@ -1,7 +1,9 @@
 
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSubscription } from '@/hooks/useSubscription';
 import TaskManagementDashboard from '@/components/tasks/TaskManagementDashboard';
+import BasicTaskManagement from '@/components/tasks/BasicTaskManagement';
 
 // Import refactored components
 import AnalyticsPageHeader from './components/AnalyticsPageHeader';
@@ -12,6 +14,8 @@ import RiskComplianceTab from './components/RiskComplianceTab';
 import ReportsToolsTab from './components/ReportsToolsTab';
 
 const IntegratedOccupationalHealthPage = () => {
+  const { canAccessFeature } = useSubscription();
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <AnalyticsPageHeader />
@@ -52,9 +56,13 @@ const IntegratedOccupationalHealthPage = () => {
           <RiskComplianceTab />
         </TabsContent>
 
-        {/* Task Management Tab */}
+        {/* Task Management Tab - Now Gated by Subscription */}
         <TabsContent value="tasks" className="space-y-6">
-          <TaskManagementDashboard />
+          {canAccessFeature('premium') ? (
+            <TaskManagementDashboard />
+          ) : (
+            <BasicTaskManagement />
+          )}
         </TabsContent>
 
         {/* Reports & Tools Tab */}

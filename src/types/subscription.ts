@@ -7,18 +7,22 @@ export type FeatureKey =
   | 'basic_reporting'
   | 'certificate_alerts'
   | 'simple_charts'
+  | 'basic_task_management'
   | 'trend_analysis'
   | 'risk_intelligence'
   | 'advanced_reporting'
   | 'department_breakdowns'
   | 'custom_branding'
   | 'automated_scheduling'
+  | 'automated_task_generation'
+  | 'advanced_task_management'
   | 'predictive_analytics'
   | 'competitive_benchmarking'
   | 'api_access'
   | 'custom_integrations'
   | 'white_label_reports'
-  | 'dedicated_support';
+  | 'dedicated_support'
+  | 'enterprise_task_management';
 
 export interface SubscriptionPackage {
   id: string;
@@ -53,7 +57,8 @@ export const PACKAGE_FEATURES: Record<PackageTier, FeatureKey[]> = {
     'compliance_tracking',
     'basic_reporting',
     'certificate_alerts',
-    'simple_charts'
+    'simple_charts',
+    'basic_task_management'
   ],
   premium: [
     'employee_status_overview',
@@ -61,12 +66,15 @@ export const PACKAGE_FEATURES: Record<PackageTier, FeatureKey[]> = {
     'basic_reporting',
     'certificate_alerts',
     'simple_charts',
+    'basic_task_management',
     'trend_analysis',
     'risk_intelligence',
     'advanced_reporting',
     'department_breakdowns',
     'custom_branding',
-    'automated_scheduling'
+    'automated_scheduling',
+    'automated_task_generation',
+    'advanced_task_management'
   ],
   enterprise: [
     'employee_status_overview',
@@ -74,18 +82,22 @@ export const PACKAGE_FEATURES: Record<PackageTier, FeatureKey[]> = {
     'basic_reporting',
     'certificate_alerts',
     'simple_charts',
+    'basic_task_management',
     'trend_analysis',
     'risk_intelligence',
     'advanced_reporting',
     'department_breakdowns',
     'custom_branding',
     'automated_scheduling',
+    'automated_task_generation',
+    'advanced_task_management',
     'predictive_analytics',
     'competitive_benchmarking',
     'api_access',
     'custom_integrations',
     'white_label_reports',
-    'dedicated_support'
+    'dedicated_support',
+    'enterprise_task_management'
   ]
 };
 
