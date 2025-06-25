@@ -32,30 +32,30 @@ export function QuickActions() {
         <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Button 
-            className="justify-start gap-3 h-12 bg-blue-600 hover:bg-blue-700"
+            className="justify-center gap-2 h-12 bg-black hover:bg-gray-800 text-white font-medium"
             onClick={() => handleAction('upload')}
           >
-            <Upload className="h-5 w-5" />
+            <Upload className="h-4 w-4" />
             Upload Document
           </Button>
           
           <Button 
             variant="outline" 
-            className="justify-start gap-3 h-12"
+            className="justify-center gap-2 h-12 border-gray-200 hover:bg-gray-50 font-medium"
             onClick={() => handleAction('view-employees')}
           >
-            <Users className="h-5 w-5" />
-            View Employees
+            <Users className="h-4 w-4" />
+            Review Documents
           </Button>
           
           <Button 
             variant="outline" 
-            className="justify-start gap-3 h-12"
+            className="justify-center gap-2 h-12 border-gray-200 hover:bg-gray-50 font-medium"
             onClick={() => handleAction('generate-report')}
           >
-            <FileText className="h-5 w-5" />
+            <FileText className="h-4 w-4" />
             Generate Report
           </Button>
         </div>
