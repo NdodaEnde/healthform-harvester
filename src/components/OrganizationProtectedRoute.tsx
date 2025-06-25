@@ -22,14 +22,14 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        console.log("Checking authentication status");
+        console.log("OrganizationProtectedRoute: Checking authentication status");
         const { data } = await supabase.auth.getSession();
         
         if (data.session) {
-          console.log("User is authenticated");
+          console.log("OrganizationProtectedRoute: User is authenticated");
           setIsAuthenticated(true);
         } else {
-          console.log("No active session found");
+          console.log("OrganizationProtectedRoute: No active session found");
           setIsAuthenticated(false);
           
           // If not on a public route, show notification
@@ -40,7 +40,7 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
           }
         }
       } catch (err) {
-        console.error("Error checking auth status:", err);
+        console.error("OrganizationProtectedRoute: Error checking auth status:", err);
         setIsAuthenticated(false);
       } finally {
         setIsAuthenticating(false);
@@ -48,6 +48,25 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
     };
     
     checkAuthStatus();
+
+    // Listen for auth state changes to handle logout immediately
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("OrganizationProtectedRoute: Auth state changed:", event);
+      
+      if (event === 'SIGNED_OUT' || !session) {
+        console.log("OrganizationProtectedRoute: User signed out, clearing state");
+        setIsAuthenticated(false);
+        setIsAuthenticating(false);
+      } else if (event === 'SIGNED_IN' && session) {
+        console.log("OrganizationProtectedRoute: User signed in");
+        setIsAuthenticated(true);
+        setIsAuthenticating(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [location.pathname]);
   
   // Check for special URL paths that need handling
@@ -71,38 +90,38 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   
   // If still checking authentication or loading organization data, show loading indicator
   if (isAuthenticating || (loading && !isPublicRoute(location.pathname))) {
-    console.log("Loading state: authenticating or loading org data");
+    console.log("OrganizationProtectedRoute: Loading state - authenticating or loading org data");
     return <LoadingFallback />;
   }
   
   // Don't enforce organization context on public routes
   if (isPublicRoute(location.pathname)) {
-    console.log("On public route:", location.pathname);
+    console.log("OrganizationProtectedRoute: On public route:", location.pathname);
     return <>{children}</>;
   }
   
-  // If not authenticated and not on a public route, redirect to auth
+  // If not authenticated and not on a public route, redirect to auth immediately
   if (!isAuthenticated) {
-    console.log("Not authenticated, redirecting to auth");
+    console.log("OrganizationProtectedRoute: Not authenticated, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
   // We can only enforce organization requirements once data has loaded
   if (!initialLoadComplete) {
-    console.log("Organization data still loading...");
+    console.log("OrganizationProtectedRoute: Organization data still loading...");
     return <LoadingFallback />;
   }
   
   // Important change: Redirect users with organizations away from setup page
   if (location.pathname === "/setup" && userOrganizations.length > 0) {
-    console.log("User has organizations but is on setup page, redirecting to dashboard");
+    console.log("OrganizationProtectedRoute: User has organizations but is on setup page, redirecting to dashboard");
     return <Navigate to="/dashboard" state={{ from: location }} replace />;
   }
   
   // Special handling for setup page - only allow when user has no organizations
   if (location.pathname === "/setup") {
     if (userOrganizations.length === 0) {
-      console.log("On setup page with no organizations, allowing access");
+      console.log("OrganizationProtectedRoute: On setup page with no organizations, allowing access");
       return <>{children}</>;
     }
   }
@@ -112,16 +131,16 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
     if (userOrganizations.length > 0) {
       // This shouldn't happen as the enforcer should have selected an organization,
       // but just in case, redirect to dashboard
-      console.log("No current organization but has organizations, redirecting to dashboard");
+      console.log("OrganizationProtectedRoute: No current organization but has organizations, redirecting to dashboard");
       return <Navigate to="/dashboard" state={{ from: location }} replace />;
     } else {
-      console.log("No organization context, redirecting to setup");
+      console.log("OrganizationProtectedRoute: No organization context, redirecting to setup");
       return <Navigate to="/setup" state={{ from: location }} replace />;
     }
   }
   
   // User is authenticated and has organization context (or is on a public route)
-  console.log("Rendering protected content");
+  console.log("OrganizationProtectedRoute: Rendering protected content");
   return <>{children}</>;
 };
 
