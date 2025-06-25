@@ -38,81 +38,44 @@ export function usePremiumDashboardMetrics() {
     setMetrics(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      console.log('🔍 Fetching premium metrics for organization:', organizationId);
+      console.log('🔍 Fetching premium dashboard metrics via RPC for organization:', organizationId);
 
-      const isServiceProvider = organizationId === 'e95df707-d618-4ca4-9e2f-d80359e96622';
-      const orgFilter = isServiceProvider 
-        ? `organization_id.eq.${organizationId}`
-        : `client_organization_id.eq.${organizationId}`;
+      const { data, error } = await supabase
+        .rpc('get_premium_dashboard_metrics', { org_id: organizationId });
 
-      // 1. Health Intelligence Score (0-100 based on various factors)
-      const { data: complianceData } = await supabase
-        .from('certificate_compliance')
-        .select('is_compliant, current_expiry_date')
-        .or(orgFilter);
+      if (error) {
+        console.error('Premium dashboard metrics RPC error:', error);
+        throw error;
+      }
 
-      const { data: testResults } = await supabase
-        .from('medical_test_results')
-        .select('test_result, examination_id')
-        .neq('test_result', null);
+      console.log('📊 Premium dashboard metrics RPC response:', data);
 
-      // Calculate health intelligence score based on compliance, test results, and system health
-      const totalCompliance = complianceData?.length || 1;
-      const compliantCount = complianceData?.filter(c => c.is_compliant).length || 0;
-      const complianceScore = (compliantCount / totalCompliance) * 40;
+      // The RPC function returns an array with one row
+      const result = data[0];
 
-      const abnormalTests = testResults?.filter(t => 
-        t.test_result?.toLowerCase().includes('abnormal') || 
-        t.test_result?.toLowerCase().includes('fail')
-      ).length || 0;
-      const totalTests = testResults?.length || 1;
-      const testHealthScore = ((totalTests - abnormalTests) / totalTests) * 40;
-
-      const systemHealthScore = 20; // Base system health component
-      const healthIntelligenceScore = Math.round(complianceScore + testHealthScore + systemHealthScore);
-
-      // 2. Active Risk Alerts (based on abnormal test results and expired certificates)
-      const expiredCerts = complianceData?.filter(c => {
-        if (!c.current_expiry_date) return false;
-        return new Date(c.current_expiry_date) < new Date();
-      }).length || 0;
-
-      const recentAbnormalTests = testResults?.filter(t => 
-        t.test_result?.toLowerCase().includes('abnormal') || 
-        t.test_result?.toLowerCase().includes('high risk')
-      ).length || 0;
-
-      const activeRiskAlerts = expiredCerts + recentAbnormalTests;
-
-      // 3. Departments Tracked (unique job titles)
-      const { data: examinations } = await supabase
-        .from('medical_examinations')
-        .select('job_title')
-        .or(orgFilter)
-        .not('job_title', 'is', null);
-
-      const uniqueJobTitles = new Set(examinations?.map(e => e.job_title)).size;
-      const departmentsTracked = uniqueJobTitles;
-
-      // 4. Prediction Accuracy - Coming Soon (placeholder for future ML model)
-      // For now, showing 0 as it's not yet implemented
-      const predictionAccuracy = 0;
-
-      console.log('📊 Premium metrics calculated:', {
-        healthIntelligenceScore,
-        activeRiskAlerts,
-        departmentsTracked,
-        predictionAccuracy: 'Coming Soon'
-      });
+      if (!result) {
+        console.log('No premium metrics data returned for organization:', organizationId);
+        setMetrics({
+          healthIntelligenceScore: 0,
+          activeRiskAlerts: 0,
+          departmentsTracked: 0,
+          predictionAccuracy: 0,
+          loading: false,
+          error: null
+        });
+        return;
+      }
 
       setMetrics({
-        healthIntelligenceScore: Math.min(100, Math.max(0, healthIntelligenceScore)),
-        activeRiskAlerts,
-        departmentsTracked,
-        predictionAccuracy,
+        healthIntelligenceScore: Number(result.health_intelligence_score) || 0,
+        activeRiskAlerts: Number(result.active_risk_alerts) || 0,
+        departmentsTracked: Number(result.departments_tracked) || 0,
+        predictionAccuracy: Number(result.prediction_accuracy) || 0,
         loading: false,
         error: null
       });
+
+      console.log('✅ Premium dashboard metrics updated successfully via RPC');
 
     } catch (error) {
       console.error('❌ Error fetching premium dashboard metrics:', error);
@@ -125,10 +88,12 @@ export function usePremiumDashboardMetrics() {
   }, [getEffectiveOrganizationId]);
 
   useEffect(() => {
+    console.log('🔄 Organization changed, fetching premium metrics via RPC...');
     fetchPremiumMetrics();
   }, [fetchPremiumMetrics]);
 
   const refreshMetrics = useCallback(() => {
+    console.log('🔄 Manual refresh triggered for premium metrics');
     fetchPremiumMetrics();
   }, [fetchPremiumMetrics]);
 

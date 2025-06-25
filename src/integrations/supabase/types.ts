@@ -2044,6 +2044,19 @@ export type Database = {
         Args: { provider_id: string }
         Returns: Json
       }
+      get_dashboard_metrics: {
+        Args: { org_id: string }
+        Returns: {
+          total_active_employees: number
+          compliance_rate: number
+          certificates_expiring: number
+          tests_this_month: number
+          tests_last_month: number
+          pending_reviews: number
+          system_health: number
+          missing_records: number
+        }[]
+      }
       get_dashboard_metrics_for_client: {
         Args: { service_provider_id?: string; target_client_id?: string }
         Returns: {
@@ -2074,6 +2087,31 @@ export type Database = {
           this_month_examinations: number
           expiring_certificates: number
           total_patients: number
+        }[]
+      }
+      get_optimized_analytics: {
+        Args: { org_id: string }
+        Returns: {
+          total_patients: number
+          total_companies: number
+          total_examinations: number
+          total_fit: number
+          overall_completion_rate: number
+          health_score: number
+          low_risk_results: number
+          medium_risk_results: number
+          high_risk_results: number
+          latest_examination: string
+          earliest_examination: string
+        }[]
+      }
+      get_premium_dashboard_metrics: {
+        Args: { org_id: string }
+        Returns: {
+          health_intelligence_score: number
+          active_risk_alerts: number
+          departments_tracked: number
+          prediction_accuracy: number
         }[]
       }
       get_risk_compliance_analytics: {

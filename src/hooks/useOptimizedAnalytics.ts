@@ -4,6 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useMemo } from "react";
 
+interface OptimizedAnalyticsData {
+  total_patients: number;
+  total_companies: number;
+  total_examinations: number;
+  total_fit: number;
+  overall_completion_rate: number;
+  health_score: number;
+  low_risk_results: number;
+  medium_risk_results: number;
+  high_risk_results: number;
+  latest_examination: string | null;
+  earliest_examination: string | null;
+}
+
 export const useOptimizedAnalytics = (options?: {
   enableExecutiveSummary?: boolean;
   enableTestResults?: boolean;
@@ -24,18 +38,58 @@ export const useOptimizedAnalytics = (options?: {
     enablePatientHistory = true,
   } = options || {};
 
-  // Executive Summary with longer cache time for summary data
-  const executiveSummary = useQuery({
-    queryKey: ['executive-summary-refined', organizationId],
-    queryFn: async () => {
+  // Main analytics data using RPC
+  const optimizedAnalytics = useQuery({
+    queryKey: ['optimized-analytics-rpc', organizationId],
+    queryFn: async (): Promise<OptimizedAnalyticsData> => {
+      if (!organizationId) {
+        throw new Error('No organization ID available');
+      }
+
+      console.log('Fetching optimized analytics via RPC for organization:', organizationId);
+
       const { data, error } = await supabase
-        .from('v_executive_summary_refined')
-        .select('*')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .single();
-      
-      if (error) throw error;
-      return data;
+        .rpc('get_optimized_analytics', { org_id: organizationId });
+
+      if (error) {
+        console.error('Optimized analytics RPC error:', error);
+        throw error;
+      }
+
+      console.log('Optimized analytics RPC response:', data);
+
+      // The RPC function returns an array with one row
+      const result = data[0];
+
+      if (!result) {
+        return {
+          total_patients: 0,
+          total_companies: 0,
+          total_examinations: 0,
+          total_fit: 0,
+          overall_completion_rate: 0,
+          health_score: 0,
+          low_risk_results: 0,
+          medium_risk_results: 0,
+          high_risk_results: 0,
+          latest_examination: null,
+          earliest_examination: null,
+        };
+      }
+
+      return {
+        total_patients: Number(result.total_patients) || 0,
+        total_companies: Number(result.total_companies) || 0,
+        total_examinations: Number(result.total_examinations) || 0,
+        total_fit: Number(result.total_fit) || 0,
+        overall_completion_rate: Number(result.overall_completion_rate) || 0,
+        health_score: Number(result.health_score) || 0,
+        low_risk_results: Number(result.low_risk_results) || 0,
+        medium_risk_results: Number(result.medium_risk_results) || 0,
+        high_risk_results: Number(result.high_risk_results) || 0,
+        latest_examination: result.latest_examination,
+        earliest_examination: result.earliest_examination,
+      };
     },
     enabled: !!organizationId && enableExecutiveSummary,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -51,17 +105,16 @@ export const useOptimizedAnalytics = (options?: {
         .select('*')
         .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
         .order('total_tests', { ascending: false })
-        .limit(50); // Limit initial load
+        .limit(50);
       
       if (error) throw error;
       return data || [];
     },
     enabled: !!organizationId && enableTestResults,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
-  // Company Benchmarks with selective loading
   const companyBenchmarks = useQuery({
     queryKey: ['company-health-benchmarks', organizationId],
     queryFn: async () => {
@@ -70,17 +123,16 @@ export const useOptimizedAnalytics = (options?: {
         .select('*')
         .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
         .order('fitness_rate', { ascending: false })
-        .limit(20); // Top 20 companies
+        .limit(20);
       
       if (error) throw error;
       return data || [];
     },
     enabled: !!organizationId && enableBenchmarks,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  // Risk Assessment with caching
   const riskAssessment = useQuery({
     queryKey: ['risk-assessment-matrix-refined', organizationId],
     queryFn: async () => {
@@ -89,17 +141,16 @@ export const useOptimizedAnalytics = (options?: {
         .select('*')
         .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
         .order('test_count', { ascending: false })
-        .limit(100); // Limit for performance
+        .limit(100);
       
       if (error) throw error;
       return data || [];
     },
     enabled: !!organizationId && enableRiskAssessment,
-    staleTime: 3 * 60 * 1000, // 3 minutes
-    gcTime: 8 * 60 * 1000, // 8 minutes
+    staleTime: 3 * 60 * 1000,
+    gcTime: 8 * 60 * 1000,
   });
 
-  // Monthly Trends with date range optimization
   const monthlyTrends = useQuery({
     queryKey: ['monthly-test-trends', organizationId],
     queryFn: async () => {
@@ -118,11 +169,10 @@ export const useOptimizedAnalytics = (options?: {
       return data || [];
     },
     enabled: !!organizationId && enableTrends,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
-  // Patient Test History with pagination
   const patientTestHistory = useQuery({
     queryKey: ['patient-test-history-recent', organizationId],
     queryFn: async () => {
@@ -131,24 +181,24 @@ export const useOptimizedAnalytics = (options?: {
         .select('*')
         .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
         .order('examination_date', { ascending: false })
-        .limit(50); // Reduced from 100
+        .limit(50);
       
       if (error) throw error;
       return data || [];
     },
     enabled: !!organizationId && enablePatientHistory,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    gcTime: 3 * 60 * 1000, // 3 minutes
+    staleTime: 1 * 60 * 1000,
+    gcTime: 3 * 60 * 1000,
   });
 
-  // Memoized computed values
+  // Memoized computed values based on RPC data
   const computedMetrics = useMemo(() => {
-    if (!executiveSummary.data) return null;
+    if (!optimizedAnalytics.data) return null;
 
-    const data = executiveSummary.data;
+    const data = optimizedAnalytics.data;
     return {
       healthScorePercentage: Math.round((data.health_score || 0) * 10) / 10,
-      completionRateFormatted: `${Math.round((data.overall_completion_rate || 0) * 100)}%`,
+      completionRateFormatted: `${Math.round((data.overall_completion_rate || 0))}%`,
       riskDistribution: {
         low: data.low_risk_results || 0,
         medium: data.medium_risk_results || 0,
@@ -156,10 +206,10 @@ export const useOptimizedAnalytics = (options?: {
       },
       totalRiskTests: (data.low_risk_results || 0) + (data.medium_risk_results || 0) + (data.high_risk_results || 0),
     };
-  }, [executiveSummary.data]);
+  }, [optimizedAnalytics.data]);
 
   const isLoading = 
-    (enableExecutiveSummary && executiveSummary.isLoading) ||
+    (enableExecutiveSummary && optimizedAnalytics.isLoading) ||
     (enableTestResults && testResultsSummary.isLoading) ||
     (enableBenchmarks && companyBenchmarks.isLoading) ||
     (enableRiskAssessment && riskAssessment.isLoading) ||
@@ -167,7 +217,7 @@ export const useOptimizedAnalytics = (options?: {
     (enablePatientHistory && patientTestHistory.isLoading);
 
   const error = 
-    executiveSummary.error ||
+    optimizedAnalytics.error ||
     testResultsSummary.error ||
     companyBenchmarks.error ||
     riskAssessment.error ||
@@ -175,7 +225,7 @@ export const useOptimizedAnalytics = (options?: {
     patientTestHistory.error;
 
   const refetchAll = () => {
-    if (enableExecutiveSummary) executiveSummary.refetch();
+    if (enableExecutiveSummary) optimizedAnalytics.refetch();
     if (enableTestResults) testResultsSummary.refetch();
     if (enableBenchmarks) companyBenchmarks.refetch();
     if (enableRiskAssessment) riskAssessment.refetch();
@@ -184,7 +234,7 @@ export const useOptimizedAnalytics = (options?: {
   };
 
   return {
-    executiveSummary: executiveSummary.data,
+    executiveSummary: optimizedAnalytics.data,
     testResultsSummary: testResultsSummary.data,
     companyBenchmarks: companyBenchmarks.data,
     riskAssessment: riskAssessment.data,
@@ -196,7 +246,7 @@ export const useOptimizedAnalytics = (options?: {
     refetchAll,
     // Individual loading states for selective rendering
     loadingStates: {
-      executiveSummary: executiveSummary.isLoading,
+      executiveSummary: optimizedAnalytics.isLoading,
       testResultsSummary: testResultsSummary.isLoading,
       companyBenchmarks: companyBenchmarks.isLoading,
       riskAssessment: riskAssessment.isLoading,
