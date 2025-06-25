@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Helmet } from 'react-helmet';
 import { Badge } from "@/components/ui/badge";
 import FeatureGate from '@/components/FeatureGate';
+import AnalyticsFeatureGate from '@/components/analytics/AnalyticsFeatureGate';
 
 // Import components
 import BasicOverviewTab from '@/components/analytics/BasicOverviewTab';
@@ -68,10 +70,10 @@ const IntegratedOccupationalHealthPage = () => {
           <BasicOverviewTab />
         </TabsContent>
         
-        {/* Analytics Tab - Restructured Layout */}
+        {/* Analytics Tab - Now with Feature Gates */}
         <TabsContent value="analytics" className="space-y-8">
           <div className="space-y-8">
-            {/* Examination Volume Overview */}
+            {/* Basic Analytics - Available to all tiers */}
             <div className="space-y-6">
               <div className="border-b pb-3">
                 <h2 className="text-2xl font-semibold text-gray-900">Examination Volume Overview</h2>
@@ -80,7 +82,7 @@ const IntegratedOccupationalHealthPage = () => {
                 </p>
               </div>
               
-              {/* Row 1: Pre-employment, Periodical, Exit - using basic metric cards from existing components */}
+              {/* Row 1: Pre-employment, Periodical, Exit - Basic tier metrics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
                   <CardHeader className="pb-3">
@@ -114,7 +116,7 @@ const IntegratedOccupationalHealthPage = () => {
               </div>
             </div>
 
-            {/* Fitness Status Summary */}
+            {/* Fitness Status Summary - Basic tier */}
             <div className="space-y-6">
               <div className="border-b pb-3">
                 <h2 className="text-2xl font-semibold text-gray-900">Fitness Status Summary</h2>
@@ -123,7 +125,6 @@ const IntegratedOccupationalHealthPage = () => {
                 </p>
               </div>
               
-              {/* Row 2: Fit, Fit with Restrictions, Fit with Condition */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100">
                   <CardHeader className="pb-3">
@@ -157,48 +158,63 @@ const IntegratedOccupationalHealthPage = () => {
               </div>
             </div>
 
-            {/* Distribution Analysis */}
-            <div className="space-y-6">
-              <div className="border-b pb-3">
-                <h2 className="text-2xl font-semibold text-gray-900">Distribution Analysis</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Visual breakdown of fitness declarations and status comparisons
-                </p>
+            {/* Distribution Analysis - Premium Feature */}
+            <AnalyticsFeatureGate 
+              requiredTier="premium"
+              title="Advanced Distribution Analysis"
+              description="Visual breakdown of fitness declarations with advanced charting and analytics."
+            >
+              <div className="space-y-6">
+                <div className="border-b pb-3">
+                  <h2 className="text-2xl font-semibold text-gray-900">Distribution Analysis</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Visual breakdown of fitness declarations and status comparisons
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <MedicalFitnessDeclarationChart />
+                </div>
               </div>
-              
-              {/* Row 3: Medical Fitness Declaration Distribution + Fitness Status Comparison */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <MedicalFitnessDeclarationChart />
-              </div>
-            </div>
+            </AnalyticsFeatureGate>
 
-            {/* Type-based Analytics */}
-            <div className="space-y-6">
-              <div className="border-b pb-3">
-                <h2 className="text-2xl font-semibold text-gray-900">Type-based Analytics</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Examination type distribution and volume comparisons
-                </p>
+            {/* Type-based Analytics - Premium Feature */}
+            <AnalyticsFeatureGate 
+              requiredTier="premium"
+              title="Advanced Type-based Analytics"
+              description="Detailed examination type distribution and volume comparisons with trend analysis."
+            >
+              <div className="space-y-6">
+                <div className="border-b pb-3">
+                  <h2 className="text-2xl font-semibold text-gray-900">Type-based Analytics</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Examination type distribution and volume comparisons
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <ExaminationTypeAnalytics />
+                </div>
               </div>
-              
-              {/* Row 4: Examination Type Distribution + Examination Volume Comparison */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <ExaminationTypeAnalytics />
-              </div>
-            </div>
+            </AnalyticsFeatureGate>
 
-            {/* Historical Trends */}
-            <div className="space-y-6">
-              <div className="border-b pb-3">
-                <h2 className="text-2xl font-semibold text-gray-900">Historical Trends</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Examination trends and patterns over time
-                </p>
+            {/* Historical Trends - Premium Feature */}
+            <AnalyticsFeatureGate 
+              requiredTier="premium"
+              title="Historical Trends & Patterns"
+              description="Advanced historical analysis with trend detection and pattern recognition."
+            >
+              <div className="space-y-6">
+                <div className="border-b pb-3">
+                  <h2 className="text-2xl font-semibold text-gray-900">Historical Trends</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Examination trends and patterns over time
+                  </p>
+                </div>
+                
+                <EnhancedMedicalTestAnalytics />
               </div>
-              
-              {/* Row 5: Full-width Enhanced Medical Test Analytics */}
-              <EnhancedMedicalTestAnalytics />
-            </div>
+            </AnalyticsFeatureGate>
           </div>
         </TabsContent>
         
