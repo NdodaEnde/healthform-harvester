@@ -1,8 +1,8 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
 
 type AuthContextType = {
   session: Session | null;
@@ -168,18 +168,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    console.log("Signing out user");
     await supabase.auth.signOut();
-    
-    // Redirect to landing page after sign out
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 100);
   };
 
   const resetPassword = async (email: string) => {
+    const origin = window.location.origin;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      redirectTo: `${origin}/update-password`,
     });
     return { error };
   };

@@ -15,7 +15,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 
 const FirstTimeSetupPage = () => {
   const navigate = useNavigate();
-  const { userOrganizations, initialLoadComplete, loading } = useOrganization();
+  const { userOrganizations, initialLoadComplete } = useOrganization();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasOrganizations, setHasOrganizations] = useState(false);
@@ -45,13 +45,11 @@ const FirstTimeSetupPage = () => {
         
         console.log("User authenticated:", session.user.id);
         
-        // Wait for organization data to load completely
-        if (!initialLoadComplete || loading) {
-          console.log("Waiting for organization data to load...", { initialLoadComplete, loading });
+        // Wait for organization data to load
+        if (!initialLoadComplete) {
+          console.log("Waiting for organization data to load...");
           return;
         }
-        
-        console.log("Organization data loaded, checking organizations:", userOrganizations.length);
         
         // If this component is mounted but user already has organizations, 
         // they should be redirected to dashboard
@@ -78,7 +76,7 @@ const FirstTimeSetupPage = () => {
     };
     
     checkAuth();
-  }, [navigate, userOrganizations, initialLoadComplete, loading]);
+  }, [navigate, userOrganizations, initialLoadComplete]);
 
   // Function to handle joining an existing organization
   const handleJoinExistingOrg = () => {
@@ -98,8 +96,7 @@ const FirstTimeSetupPage = () => {
     navigate("/dashboard");
   };
 
-  // Show loading while waiting for organization data
-  if (isLoading || loading || !initialLoadComplete) {
+  if (isLoading) {
     return <LoadingFallback />;
   }
 

@@ -22,14 +22,14 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        console.log("OrganizationProtectedRoute: Checking authentication status");
+        console.log("Checking authentication status");
         const { data } = await supabase.auth.getSession();
         
         if (data.session) {
-          console.log("OrganizationProtectedRoute: User is authenticated");
+          console.log("User is authenticated");
           setIsAuthenticated(true);
         } else {
-          console.log("OrganizationProtectedRoute: No active session found");
+          console.log("No active session found");
           setIsAuthenticated(false);
           
           // If not on a public route, show notification
@@ -40,7 +40,7 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
           }
         }
       } catch (err) {
-        console.error("OrganizationProtectedRoute: Error checking auth status:", err);
+        console.error("Error checking auth status:", err);
         setIsAuthenticated(false);
       } finally {
         setIsAuthenticating(false);
@@ -65,70 +65,63 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
         location.pathname.includes('/auth/callback') || 
         location.pathname.includes('/callback') ||
         (inviteToken && location.pathname.includes('/accept-invite'))) {
-      console.log("OrganizationProtectedRoute: Processing authentication flow, staying in loading state");
       setIsAuthenticating(true);
     }
   }, [location]);
   
-  // Don't enforce organization context on public routes
-  if (isPublicRoute(location.pathname)) {
-    console.log("OrganizationProtectedRoute: On public route:", location.pathname);
-    return <>{children}</>;
+  // If still checking authentication or loading organization data, show loading indicator
+  if (isAuthenticating || (loading && !isPublicRoute(location.pathname))) {
+    console.log("Loading state: authenticating or loading org data");
+    return <LoadingFallback />;
   }
   
-  // If still checking authentication, show loading indicator
-  if (isAuthenticating) {
-    console.log("OrganizationProtectedRoute: Still authenticating, showing loading");
-    return <LoadingFallback />;
+  // Don't enforce organization context on public routes
+  if (isPublicRoute(location.pathname)) {
+    console.log("On public route:", location.pathname);
+    return <>{children}</>;
   }
   
   // If not authenticated and not on a public route, redirect to auth
   if (!isAuthenticated) {
-    console.log("OrganizationProtectedRoute: Not authenticated, redirecting to auth");
+    console.log("Not authenticated, redirecting to auth");
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // CRITICAL: Wait for organization data to be fully loaded before making any decisions
-  if (!initialLoadComplete || loading) {
-    console.log("OrganizationProtectedRoute: Organization data still loading, showing loading fallback", {
-      initialLoadComplete,
-      loading,
-      userOrganizations: userOrganizations.length
-    });
+  // We can only enforce organization requirements once data has loaded
+  if (!initialLoadComplete) {
+    console.log("Organization data still loading...");
     return <LoadingFallback />;
   }
   
-  // Now we can safely make routing decisions based on complete data
-  console.log("OrganizationProtectedRoute: Organization data loaded, making routing decisions", {
-    currentOrganization: currentOrganization?.name || "None",
-    userOrganizationsCount: userOrganizations.length,
-    currentPath: location.pathname
-  });
+  // Important change: Redirect users with organizations away from setup page
+  if (location.pathname === "/setup" && userOrganizations.length > 0) {
+    console.log("User has organizations but is on setup page, redirecting to dashboard");
+    return <Navigate to="/dashboard" state={{ from: location }} replace />;
+  }
   
   // Special handling for setup page - only allow when user has no organizations
   if (location.pathname === "/setup") {
     if (userOrganizations.length === 0) {
-      console.log("OrganizationProtectedRoute: On setup page with no organizations, allowing access");
+      console.log("On setup page with no organizations, allowing access");
       return <>{children}</>;
-    } else {
-      console.log("OrganizationProtectedRoute: User has organizations but is on setup page, redirecting to dashboard");
-      return <Navigate to="/dashboard" state={{ from: location }} replace />;
     }
   }
   
-  // For all other protected routes, enforce organization context
-  if (userOrganizations.length === 0) {
-    console.log("OrganizationProtectedRoute: No organizations found, redirecting to setup");
-    return <Navigate to="/setup" state={{ from: location }} replace />;
+  // For all protected routes except setup, enforce organization context
+  if (!currentOrganization && !isPublicRoute(location.pathname)) {
+    if (userOrganizations.length > 0) {
+      // This shouldn't happen as the enforcer should have selected an organization,
+      // but just in case, redirect to dashboard
+      console.log("No current organization but has organizations, redirecting to dashboard");
+      return <Navigate to="/dashboard" state={{ from: location }} replace />;
+    } else {
+      console.log("No organization context, redirecting to setup");
+      return <Navigate to="/setup" state={{ from: location }} replace />;
+    }
   }
   
-  if (!currentOrganization) {
-    console.log("OrganizationProtectedRoute: No current organization selected, showing loading while enforcer handles selection");
-    return <LoadingFallback />;
-  }
-  
-  // User is authenticated and has organization context
-  console.log("OrganizationProtectedRoute: All checks passed, rendering protected content");
+  // User is authenticated and has organization context (or is on a public route)
+  console.log("Rendering protected content");
   return <>{children}</>;
 };
 

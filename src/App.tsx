@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,8 +8,6 @@ import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { PackageProvider } from '@/contexts/PackageContext';
 import DashboardLayout from '@/components/DashboardLayout';
 import HeaderComponent from '@/components/HeaderComponent';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import OrganizationProtectedRoute from '@/components/OrganizationProtectedRoute';
 import Index from '@/pages/Index';
 import Dashboard from '@/pages/Dashboard';
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
@@ -47,231 +44,131 @@ function App() {
                     <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
                     
-                    {/* Protected dashboard routes with sidebar */}
+                    {/* Dashboard routes with sidebar */}
                     <Route path="/dashboard" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <Dashboard />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <Dashboard />
+                      </DashboardLayout>
                     } />
                     <Route path="/analytics" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <AnalyticsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <AnalyticsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/clinical-analytics" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <ClinicalAnalyticsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <ClinicalAnalyticsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/integrated-occupational-health" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <IntegratedOccupationalHealthPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <IntegratedOccupationalHealthPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/patients" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <PatientsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <PatientsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/patients/:id" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <PatientDetailPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <PatientDetailPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/patients/:id/edit" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <PatientDetailPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <PatientDetailPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/patients/new" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <PatientsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <PatientsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/documents" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <DocumentsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <DocumentsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/documents/:id" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <DocumentViewer />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <DocumentViewer />
+                      </DashboardLayout>
                     } />
                     <Route path="/reports" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <ReportsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <ReportsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/settings" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OrganizationSettingsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OrganizationSettingsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/settings/organization" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OrganizationSettingsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OrganizationSettingsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/certificates" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <CertificatesPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <CertificatesPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/certificates/templates" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <CertificateTemplatesPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <CertificateTemplatesPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/employees" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <EmployeesPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <EmployeesPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/onboarding" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OnboardingPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OnboardingPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/tier-testing" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <TierTestingPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <TierTestingPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/testing" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <TierTestingPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <TierTestingPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/admin/organizations" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OrganizationsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OrganizationsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/admin/organizations/new" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <CreateOrganizationPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <CreateOrganizationPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/admin/organizations/:id/edit" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <EditOrganizationPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <EditOrganizationPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/admin/organizations/:orgId/clients" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OrganizationClientsPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OrganizationClientsPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/admin/organizations/:id/users" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OrganizationUsersPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OrganizationUsersPage />
+                      </DashboardLayout>
                     } />
                     <Route path="/admin/users" element={
-                      <ProtectedRoute>
-                        <OrganizationProtectedRoute>
-                          <DashboardLayout>
-                            <OrganizationUsersPage />
-                          </DashboardLayout>
-                        </OrganizationProtectedRoute>
-                      </ProtectedRoute>
+                      <DashboardLayout>
+                        <OrganizationUsersPage />
+                      </DashboardLayout>
                     } />
                   </Routes>
                   <Toaster />
