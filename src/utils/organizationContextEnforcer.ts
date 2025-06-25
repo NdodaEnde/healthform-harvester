@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -17,9 +16,13 @@ export const useOrganizationEnforcer = () => {
   } = useOrganization();
 
   useEffect(() => {
-    // Skip if data hasn't loaded yet
-    if (!initialLoadComplete) {
-      console.log("OrganizationEnforcer: Organization data still initializing, waiting...");
+    // Skip if data hasn't loaded yet - THIS IS CRITICAL
+    if (!initialLoadComplete || loading) {
+      console.log("OrganizationEnforcer: Organization data still initializing, waiting...", { 
+        initialLoadComplete, 
+        loading, 
+        userOrganizations: userOrganizations.length 
+      });
       return;
     }
 
@@ -61,30 +64,32 @@ export const useOrganizationEnforcer = () => {
       console.log("OrganizationEnforcer: Session exists, checking organization state");
       console.log("OrganizationEnforcer: Current organization:", currentOrganization?.name || "None");
       console.log("OrganizationEnforcer: User organizations count:", userOrganizations.length);
+      console.log("OrganizationEnforcer: Loading states:", { loading, initialLoadComplete });
       
-      // If user has organizations but none is selected, select the first one
-      if (!currentOrganization && userOrganizations.length > 0) {
-        console.log("OrganizationEnforcer: User has organizations but none selected, selecting first one");
-        switchOrganization(userOrganizations[0].id);
-        return;
-      }
-      
-      // If authenticated but no organization data (after loading is complete)
-      if (!currentOrganization && userOrganizations.length === 0 && !loading) {
+      // CRITICAL: Only make decisions after data is fully loaded
+      if (userOrganizations.length > 0) {
+        // User has organizations - ensure one is selected
+        if (!currentOrganization) {
+          console.log("OrganizationEnforcer: User has organizations but none selected, selecting first one");
+          switchOrganization(userOrganizations[0].id);
+          return;
+        }
+        
+        // If on setup page but user has organizations, redirect to dashboard
+        if (currentPath === "/setup") {
+          console.log("OrganizationEnforcer: User has organizations but on setup page, redirecting to dashboard");
+          isNavigating = true;
+          navigate("/dashboard");
+          return;
+        }
+      } else {
+        // User has no organizations - should be on setup page
         if (currentPath !== "/setup") {
           console.log("OrganizationEnforcer: Authenticated but no organizations, redirecting to setup");
           isNavigating = true;
           navigate("/setup");
+          return;
         }
-        return;
-      } 
-
-      // If on setup page but user has organizations, redirect to dashboard
-      if (currentPath === "/setup" && userOrganizations.length > 0) {
-        console.log("OrganizationEnforcer: User has organizations but on setup page, redirecting to dashboard");
-        isNavigating = true;
-        navigate("/dashboard");
-        return;
       }
       
       console.log("OrganizationEnforcer: All checks passed, no action needed");
@@ -93,7 +98,7 @@ export const useOrganizationEnforcer = () => {
     checkAuthAndOrg();
   }, [currentOrganization, userOrganizations, loading, initialLoadComplete, navigate, switchOrganization]);
   
-  return { currentOrganization, loading };
+  return { currentOrganization, loading: loading || !initialLoadComplete };
 };
 
 // Public routes that don't require organization context

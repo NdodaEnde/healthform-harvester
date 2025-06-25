@@ -1,3 +1,4 @@
+
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useOrganizationEnforcer, isPublicRoute } from "@/utils/organizationContextEnforcer";
@@ -87,11 +88,22 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // We can only enforce organization requirements once data has loaded
+  // CRITICAL: Wait for organization data to be fully loaded before making any decisions
   if (!initialLoadComplete || loading) {
-    console.log("OrganizationProtectedRoute: Organization data still loading, showing loading fallback");
+    console.log("OrganizationProtectedRoute: Organization data still loading, showing loading fallback", {
+      initialLoadComplete,
+      loading,
+      userOrganizations: userOrganizations.length
+    });
     return <LoadingFallback />;
   }
+  
+  // Now we can safely make routing decisions based on complete data
+  console.log("OrganizationProtectedRoute: Organization data loaded, making routing decisions", {
+    currentOrganization: currentOrganization?.name || "None",
+    userOrganizationsCount: userOrganizations.length,
+    currentPath: location.pathname
+  });
   
   // Special handling for setup page - only allow when user has no organizations
   if (location.pathname === "/setup") {
@@ -105,16 +117,14 @@ const OrganizationProtectedRoute = ({ children }: OrganizationProtectedRouteProp
   }
   
   // For all other protected routes, enforce organization context
+  if (userOrganizations.length === 0) {
+    console.log("OrganizationProtectedRoute: No organizations found, redirecting to setup");
+    return <Navigate to="/setup" state={{ from: location }} replace />;
+  }
+  
   if (!currentOrganization) {
-    if (userOrganizations.length > 0) {
-      // This shouldn't happen as the enforcer should have selected an organization,
-      // but just in case, redirect to dashboard to let the enforcer handle it
-      console.log("OrganizationProtectedRoute: No current organization but has organizations, redirecting to dashboard");
-      return <Navigate to="/dashboard" state={{ from: location }} replace />;
-    } else {
-      console.log("OrganizationProtectedRoute: No organization context, redirecting to setup");
-      return <Navigate to="/setup" state={{ from: location }} replace />;
-    }
+    console.log("OrganizationProtectedRoute: No current organization selected, showing loading while enforcer handles selection");
+    return <LoadingFallback />;
   }
   
   // User is authenticated and has organization context
