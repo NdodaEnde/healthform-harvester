@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 
 interface FitnessStatusBarChartProps {
   data: {
@@ -58,27 +58,29 @@ const FitnessStatusBarChart: React.FC<FitnessStatusBarChartProps> = ({ data }) =
       <CardContent>
         <ChartContainer
           config={chartConfig}
-          className="min-h-[200px] w-full"
+          className="min-h-[300px] w-full"
         >
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name" 
-                fontSize={12}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-              />
-              <YAxis fontSize={12} />
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
+              </Pie>
               <ChartTooltip
                 content={<ChartTooltipContent />}
               />
-              <Bar 
-                dataKey="value" 
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
+              <Legend />
+            </PieChart>
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
