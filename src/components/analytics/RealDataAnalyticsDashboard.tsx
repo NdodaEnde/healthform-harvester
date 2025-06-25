@@ -326,9 +326,9 @@ const RealDataAnalyticsDashboard = () => {
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-purple-600 mb-2">
-                  {executiveSummary.total_tests_conducted || 0}
+                  {executiveSummary.total_examinations || 0}
                 </div>
-                <p className="text-sm text-muted-foreground">Total Tests Conducted</p>
+                <p className="text-sm text-muted-foreground">Total Examinations</p>
               </div>
             </div>
           </CardContent>

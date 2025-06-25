@@ -135,9 +135,9 @@ const BasicOverviewTab: React.FC = () => {
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
-                  {executiveSummary.total_tests_completed || 0}
+                  {executiveSummary.total_examinations || 0}
                 </div>
-                <div className="text-sm text-blue-700">Tests Completed</div>
+                <div className="text-sm text-blue-700">Total Examinations</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <div className="text-2xl font-bold text-purple-600">
