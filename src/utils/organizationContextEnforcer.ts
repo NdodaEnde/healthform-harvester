@@ -19,7 +19,7 @@ export const useOrganizationEnforcer = () => {
   useEffect(() => {
     // Skip if data hasn't loaded yet
     if (!initialLoadComplete) {
-      console.log("Organization data still initializing, waiting...");
+      console.log("OrganizationEnforcer: Organization data still initializing, waiting...");
       return;
     }
 
@@ -29,21 +29,21 @@ export const useOrganizationEnforcer = () => {
     const checkAuthAndOrg = async () => {
       // Skip if we're already navigating
       if (isNavigating) {
-        console.log("Navigation already in progress, skipping additional checks");
+        console.log("OrganizationEnforcer: Navigation already in progress, skipping additional checks");
         return;
       }
       
       // Skip enforcer if we're on setup or accept-invite pages
       const currentPath = window.location.pathname;
-      if (currentPath.startsWith("/accept-invite")) {
-        console.log("On accept-invite page, skipping enforcer");
+      if (currentPath.startsWith("/accept-invite") || currentPath === "/setup") {
+        console.log("OrganizationEnforcer: On special page, skipping enforcer:", currentPath);
         return;
       }
       
       // Check if we just accepted an invitation - if so, avoid redirection loops
       const justAcceptedInvitation = localStorage.getItem("invitation_just_accepted");
       if (justAcceptedInvitation === "true") {
-        console.log("Invitation was just accepted, skipping enforcer checks");
+        console.log("OrganizationEnforcer: Invitation was just accepted, skipping enforcer checks");
         localStorage.removeItem("invitation_just_accepted"); // Clear the flag
         return;
       }
@@ -52,15 +52,19 @@ export const useOrganizationEnforcer = () => {
       
       // If not authenticated, redirect to auth page
       if (!session) {
-        console.log("No session found, redirecting to auth");
+        console.log("OrganizationEnforcer: No session found, redirecting to auth");
         isNavigating = true;
         navigate("/auth");
         return;
       }
       
+      console.log("OrganizationEnforcer: Session exists, checking organization state");
+      console.log("OrganizationEnforcer: Current organization:", currentOrganization?.name || "None");
+      console.log("OrganizationEnforcer: User organizations count:", userOrganizations.length);
+      
       // If user has organizations but none is selected, select the first one
       if (!currentOrganization && userOrganizations.length > 0) {
-        console.log("User has organizations but none selected, selecting first one");
+        console.log("OrganizationEnforcer: User has organizations but none selected, selecting first one");
         switchOrganization(userOrganizations[0].id);
         return;
       }
@@ -68,7 +72,7 @@ export const useOrganizationEnforcer = () => {
       // If authenticated but no organization data (after loading is complete)
       if (!currentOrganization && userOrganizations.length === 0 && !loading) {
         if (currentPath !== "/setup") {
-          console.log("Authenticated but no organizations, redirecting to setup");
+          console.log("OrganizationEnforcer: Authenticated but no organizations, redirecting to setup");
           isNavigating = true;
           navigate("/setup");
         }
@@ -77,11 +81,13 @@ export const useOrganizationEnforcer = () => {
 
       // If on setup page but user has organizations, redirect to dashboard
       if (currentPath === "/setup" && userOrganizations.length > 0) {
-        console.log("User has organizations but on setup page, redirecting to dashboard");
+        console.log("OrganizationEnforcer: User has organizations but on setup page, redirecting to dashboard");
         isNavigating = true;
         navigate("/dashboard");
         return;
       }
+      
+      console.log("OrganizationEnforcer: All checks passed, no action needed");
     };
     
     checkAuthAndOrg();
