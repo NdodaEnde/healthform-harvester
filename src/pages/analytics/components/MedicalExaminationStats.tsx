@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import {
   Card,
@@ -51,21 +52,20 @@ export default function MedicalExaminationStats({
   >("volume");
   const [timeRange, setTimeRange] = useState("30d");
 
-  // Sample data for medical examinations with distinct colors
+  // Sample data for medical examinations with distinct colors - removed BMI Assessment
   const testVolumeData = [
     { name: "Vision Test", count: 1248, color: "hsl(var(--chart-1))" },
     { name: "Hearing Test", count: 1156, color: "hsl(var(--chart-2))" },
     { name: "Lung Function", count: 987, color: "hsl(var(--chart-3))" },
     { name: "Blood Pressure", count: 876, color: "hsl(var(--chart-4))" },
-    { name: "BMI Assessment", count: 754, color: "hsl(var(--chart-5))" },
   ];
 
+  // Removed BMI Assessment from distribution data
   const testDistributionData = [
-    { name: "Vision Test", value: 25, color: "hsl(var(--chart-1))" },
-    { name: "Hearing Test", value: 23, color: "hsl(var(--chart-2))" },
-    { name: "Lung Function", value: 19, color: "hsl(var(--chart-3))" },
-    { name: "Blood Pressure", value: 17, color: "hsl(var(--chart-4))" },
-    { name: "Other Tests", value: 16, color: "hsl(var(--chart-5))" },
+    { name: "Vision Test", value: 31, color: "hsl(var(--chart-1))" },
+    { name: "Hearing Test", value: 29, color: "hsl(var(--chart-2))" },
+    { name: "Lung Function", value: 24, color: "hsl(var(--chart-3))" },
+    { name: "Blood Pressure", value: 16, color: "hsl(var(--chart-4))" },
   ];
 
   // Add chart config for colors
@@ -89,12 +89,12 @@ export default function MedicalExaminationStats({
     { month: "Jun", vision: 310, hearing: 280, lung: 250 },
   ];
 
+  // Removed BMI Assessment from completion data
   const testCompletionData = [
     { name: "Vision Test", completed: 92, target: 100 },
     { name: "Hearing Test", completed: 88, target: 100 },
     { name: "Lung Function", completed: 85, target: 100 },
     { name: "Blood Pressure", completed: 95, target: 100 },
-    { name: "BMI Assessment", completed: 90, target: 100 },
   ];
 
   const renderVolumeView = () => (

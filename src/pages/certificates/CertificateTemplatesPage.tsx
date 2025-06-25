@@ -7,7 +7,7 @@ import EnhancedCertificateGenerator from "@/components/certificates/EnhancedCert
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { extractCertificateData } from "@/lib/utils";
 
-// Sample data for the enhanced certificate generator
+// Sample data for the enhanced certificate generator - removed BMI data
 const sampleDocument = {
   id: "sample-doc-id",
   file_name: "Sample Certificate.pdf",
@@ -49,6 +49,7 @@ const sampleDocument = {
           hearing_results: "Normal range",
           lung_function_done: true,
           lung_function_results: "85% capacity"
+          // Removed BMI-related fields
         }
       },
       certification: {

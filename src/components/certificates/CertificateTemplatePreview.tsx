@@ -1,4 +1,3 @@
-
 import { useRef, useEffect } from "react";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,7 @@ export default function CertificateTemplatePreview({
     id: "mock-patient-id"
   };
 
-  // Mock certificate data for preview if not provided
+  // Mock certificate data for preview if not provided - removed BMI
   const certificate = certificateData || {
     id: "mock-certificate-id",
     expiration_date: new Date(Date.now() + 31536000000).toISOString().split('T')[0],
@@ -70,7 +69,7 @@ export default function CertificateTemplatePreview({
       heartRate: "72",
       weight: "70kg",
       height: "175cm",
-      bmi: "22.9"
+      bmi: null // Changed from mock value to null
     },
     vision_tests: {
       leftEye: "20/20",
@@ -208,7 +207,7 @@ export default function CertificateTemplatePreview({
               </div>
             )}
 
-            {/* Medical Tests Section */}
+            {/* Medical Tests Section - Updated to handle null BMI */}
             {templateData.sections.find(s => s.title === "Medical Tests")?.enabled && certificate.medical_tests && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3"
@@ -232,10 +231,6 @@ export default function CertificateTemplatePreview({
                     <p className="font-medium">{certificate.medical_tests.heartRate} bpm</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">BMI</p>
-                    <p className="font-medium">{certificate.medical_tests.bmi}</p>
-                  </div>
-                  <div>
                     <p className="text-sm text-gray-500">Weight</p>
                     <p className="font-medium">{certificate.medical_tests.weight}</p>
                   </div>
@@ -243,6 +238,12 @@ export default function CertificateTemplatePreview({
                     <p className="text-sm text-gray-500">Height</p>
                     <p className="font-medium">{certificate.medical_tests.height}</p>
                   </div>
+                  {certificate.medical_tests.bmi && (
+                    <div>
+                      <p className="text-sm text-gray-500">BMI</p>
+                      <p className="font-medium">{certificate.medical_tests.bmi}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
