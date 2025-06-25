@@ -24,6 +24,7 @@ import AdvancedReportGenerator from './components/AdvancedReportGenerator';
 import CompanyBenchmarkingDashboard from './components/CompanyBenchmarkingDashboard';
 import PredictiveAnalyticsDashboard from './components/PredictiveAnalyticsDashboard';
 import InteractiveDataExploration from './components/InteractiveDataExploration';
+import TestTypeBreakdownCard from './components/TestTypeBreakdownCard';
 
 const IntegratedOccupationalHealthPage = () => {
   return (
@@ -156,6 +157,18 @@ const IntegratedOccupationalHealthPage = () => {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+
+            {/* Medical Tests Overview - Basic tier */}
+            <div className="space-y-6">
+              <div className="border-b pb-3">
+                <h2 className="text-2xl font-semibold text-gray-900">Medical Examination Conducted Includes The Following Tests</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Overview of medical tests included in examinations
+                </p>
+              </div>
+              
+              <TestTypeBreakdownCard className="w-full" />
             </div>
 
             {/* Distribution Analysis - Premium Feature */}
