@@ -391,9 +391,6 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions - Full Width */}
-      <QuickActions />
-
       {/* Dashboard Sections Grid - Now 2x2 without QuickActions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DocumentProcessingTrends />
@@ -401,6 +398,9 @@ export default function Dashboard() {
         <RecentActivity />
         <RecentDocuments />
       </div>
+
+      {/* Quick Actions - Full Width at Bottom */}
+      <QuickActions />
 
       {/* Footer */}
       <div className="text-xs text-muted-foreground">
