@@ -38,90 +38,55 @@ export function useExaminationAnalytics() {
         throw new Error('No organization ID available');
       }
 
-      // Fetch medical examinations
-      const { data: examinations, error: examinationsError } = await supabase
-        .from('medical_examinations')
-        .select('*')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      const { data, error } = await supabase
+        .rpc('get_examination_analytics', { org_id: organizationId });
 
-      if (examinationsError) throw examinationsError;
+      if (error) throw error;
 
-      // Fetch patients count
-      const { data: patients, error: patientsError } = await supabase
-        .from('patients')
-        .select('id')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      // The RPC function returns an array with one row
+      const result = data[0];
 
-      if (patientsError) throw patientsError;
-
-      const examinationData = examinations || [];
-      const totalPatients = patients?.length || 0;
-
-      // Calculate examination types
-      const examinationTypes: ExaminationTypeData = {
-        preEmployment: examinationData.filter(exam => 
-          exam.examination_type?.toLowerCase().includes('pre-employment') ||
-          exam.examination_type?.toLowerCase().includes('preemployment') ||
-          exam.examination_type?.toLowerCase().includes('pre employment')
-        ).length,
-        periodical: examinationData.filter(exam => 
-          exam.examination_type?.toLowerCase().includes('periodical') ||
-          exam.examination_type?.toLowerCase().includes('periodic') ||
-          exam.examination_type?.toLowerCase().includes('annual')
-        ).length,
-        exit: examinationData.filter(exam => 
-          exam.examination_type?.toLowerCase().includes('exit') ||
-          exam.examination_type?.toLowerCase().includes('termination')
-        ).length
-      };
-
-      // Calculate fitness status
-      const fitnessStatus: FitnessStatusData = {
-        fit: examinationData.filter(exam => 
-          exam.fitness_status?.toLowerCase() === 'fit' && 
-          !exam.fitness_status?.toLowerCase().includes('restriction') &&
-          !exam.fitness_status?.toLowerCase().includes('condition')
-        ).length,
-        fitWithRestriction: examinationData.filter(exam => 
-          exam.fitness_status?.toLowerCase().includes('restriction')
-        ).length,
-        fitWithCondition: examinationData.filter(exam => 
-          exam.fitness_status?.toLowerCase().includes('condition')
-        ).length,
-        temporaryUnfit: examinationData.filter(exam => 
-          exam.fitness_status?.toLowerCase().includes('temporary') && 
-          exam.fitness_status?.toLowerCase().includes('unfit')
-        ).length,
-        unfit: examinationData.filter(exam => 
-          exam.fitness_status?.toLowerCase() === 'unfit' &&
-          !exam.fitness_status?.toLowerCase().includes('temporary')
-        ).length,
-        total: examinationData.length
-      };
-
-      // Calculate this month examinations
-      const currentDate = new Date();
-      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const thisMonthExaminations = examinationData.filter(exam => 
-        exam.examination_date && new Date(exam.examination_date) >= firstDayOfMonth
-      ).length;
-
-      // Calculate expiring certificates (next 30 days)
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      const expiringCertificates = examinationData.filter(exam => 
-        exam.expiry_date && 
-        new Date(exam.expiry_date) <= thirtyDaysFromNow &&
-        new Date(exam.expiry_date) >= new Date()
-      ).length;
+      if (!result) {
+        // Return empty data structure if no results
+        return {
+          examinationTypes: {
+            preEmployment: 0,
+            periodical: 0,
+            exit: 0
+          },
+          fitnessStatus: {
+            fit: 0,
+            fitWithRestriction: 0,
+            fitWithCondition: 0,
+            temporaryUnfit: 0,
+            unfit: 0,
+            total: 0
+          },
+          totalExaminations: 0,
+          thisMonthExaminations: 0,
+          expiringCertificates: 0,
+          totalPatients: 0
+        };
+      }
 
       return {
-        examinationTypes,
-        fitnessStatus,
-        totalExaminations: examinationData.length,
-        thisMonthExaminations,
-        expiringCertificates,
-        totalPatients
+        examinationTypes: {
+          preEmployment: Number(result.pre_employment_count) || 0,
+          periodical: Number(result.periodical_count) || 0,
+          exit: Number(result.exit_count) || 0
+        },
+        fitnessStatus: {
+          fit: Number(result.fit_count) || 0,
+          fitWithRestriction: Number(result.fit_with_restriction_count) || 0,
+          fitWithCondition: Number(result.fit_with_condition_count) || 0,
+          temporaryUnfit: Number(result.temporary_unfit_count) || 0,
+          unfit: Number(result.unfit_count) || 0,
+          total: Number(result.total_examinations) || 0
+        },
+        totalExaminations: Number(result.total_examinations) || 0,
+        thisMonthExaminations: Number(result.this_month_examinations) || 0,
+        expiringCertificates: Number(result.expiring_certificates) || 0,
+        totalPatients: Number(result.total_patients) || 0
       };
     },
     enabled: !!organizationId,

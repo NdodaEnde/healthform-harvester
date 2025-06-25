@@ -2059,6 +2059,38 @@ export type Database = {
           missing_compliance_records: number
         }[]
       }
+      get_examination_analytics: {
+        Args: { org_id: string }
+        Returns: {
+          pre_employment_count: number
+          periodical_count: number
+          exit_count: number
+          fit_count: number
+          fit_with_restriction_count: number
+          fit_with_condition_count: number
+          temporary_unfit_count: number
+          unfit_count: number
+          total_examinations: number
+          this_month_examinations: number
+          expiring_certificates: number
+          total_patients: number
+        }[]
+      }
+      get_risk_compliance_analytics: {
+        Args: { org_id: string }
+        Returns: {
+          high_risk_count: number
+          medium_risk_count: number
+          low_risk_count: number
+          compliant_count: number
+          non_compliant_count: number
+          overdue_count: number
+          expiring_in_30_days_count: number
+          total_examinations: number
+          total_with_restrictions: number
+          restriction_types: Json
+        }[]
+      }
       get_service_provider_organizations: {
         Args: Record<PropertyKey, never>
         Returns: Json

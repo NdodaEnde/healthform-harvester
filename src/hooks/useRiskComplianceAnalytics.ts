@@ -42,96 +42,61 @@ export function useRiskComplianceAnalytics() {
         throw new Error('No organization ID available');
       }
 
-      // Fetch medical examinations with test results
-      const { data: examinations, error: examinationsError } = await supabase
-        .from('medical_examinations')
-        .select(`
-          *,
-          medical_test_results (*)
-        `)
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`);
+      const { data, error } = await supabase
+        .rpc('get_risk_compliance_analytics', { org_id: organizationId });
 
-      if (examinationsError) throw examinationsError;
+      if (error) throw error;
 
-      const examinationData = examinations || [];
-      const currentDate = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+      // The RPC function returns an array with one row
+      const result = data[0];
 
-      // Calculate risk levels based on test results and fitness status
-      let highRisk = 0;
-      let mediumRisk = 0;
-      let lowRisk = 0;
+      if (!result) {
+        // Return empty data structure if no results
+        return {
+          riskLevels: {
+            high: 0,
+            medium: 0,
+            low: 0
+          },
+          compliance: {
+            compliant: 0,
+            nonCompliant: 0,
+            overdue: 0,
+            expiringIn30Days: 0,
+            total: 0
+          },
+          restrictions: {
+            totalWithRestrictions: 0,
+            commonRestrictions: []
+          }
+        };
+      }
 
-      examinationData.forEach(exam => {
-        const hasAbnormalResults = exam.medical_test_results?.some((test: any) => 
-          test.test_result?.toLowerCase().includes('abnormal') ||
-          test.test_result?.toLowerCase().includes('fail') ||
-          test.test_result?.toLowerCase().includes('positive')
-        );
-        
-        if (exam.fitness_status?.toLowerCase().includes('unfit') || hasAbnormalResults) {
-          highRisk++;
-        } else if (exam.fitness_status?.toLowerCase().includes('restriction') || 
-                   exam.fitness_status?.toLowerCase().includes('condition')) {
-          mediumRisk++;
-        } else {
-          lowRisk++;
-        }
-      });
-
-      // Calculate compliance data
-      const compliance: ComplianceData = {
-        compliant: examinationData.filter(exam => 
-          exam.expiry_date && new Date(exam.expiry_date) > currentDate
-        ).length,
-        nonCompliant: examinationData.filter(exam => 
-          !exam.expiry_date || new Date(exam.expiry_date) <= currentDate
-        ).length,
-        overdue: examinationData.filter(exam => 
-          exam.expiry_date && new Date(exam.expiry_date) < currentDate
-        ).length,
-        expiringIn30Days: examinationData.filter(exam => 
-          exam.expiry_date && 
-          new Date(exam.expiry_date) <= thirtyDaysFromNow &&
-          new Date(exam.expiry_date) > currentDate
-        ).length,
-        total: examinationData.length
-      };
-
-      // Calculate restrictions data
-      const restrictionCounts: { [key: string]: number } = {};
-      const examsWithRestrictions = examinationData.filter(exam => 
-        exam.restrictions && Array.isArray(exam.restrictions) && exam.restrictions.length > 0
-      );
-
-      examsWithRestrictions.forEach(exam => {
-        if (exam.restrictions) {
-          exam.restrictions.forEach((restriction: string) => {
-            const normalizedRestriction = restriction.toLowerCase().trim();
-            restrictionCounts[normalizedRestriction] = (restrictionCounts[normalizedRestriction] || 0) + 1;
-          });
-        }
-      });
-
-      const commonRestrictions = Object.entries(restrictionCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([type, count]) => ({
-          type: type.charAt(0).toUpperCase() + type.slice(1),
-          count
-        }));
+      // Parse restriction types from JSONB
+      const restrictionTypes = result.restriction_types || [];
+      const commonRestrictions = Array.isArray(restrictionTypes) 
+        ? restrictionTypes.map((item: any) => ({
+            type: item.type || 'Unknown',
+            count: Number(item.count) || 0
+          }))
+        : [];
 
       return {
         riskLevels: {
-          high: highRisk,
-          medium: mediumRisk,
-          low: lowRisk
+          high: Number(result.high_risk_count) || 0,
+          medium: Number(result.medium_risk_count) || 0,
+          low: Number(result.low_risk_count) || 0
         },
-        compliance,
+        compliance: {
+          compliant: Number(result.compliant_count) || 0,
+          nonCompliant: Number(result.non_compliant_count) || 0,
+          overdue: Number(result.overdue_count) || 0,
+          expiringIn30Days: Number(result.expiring_in_30_days_count) || 0,
+          total: Number(result.total_examinations) || 0
+        },
         restrictions: {
-          totalWithRestrictions: examsWithRestrictions.length,
-          commonRestrictions
+          totalWithRestrictions: Number(result.total_with_restrictions) || 0,
+          commonRestrictions: commonRestrictions
         }
       };
     },
