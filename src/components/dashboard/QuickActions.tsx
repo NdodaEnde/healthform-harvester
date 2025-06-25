@@ -32,9 +32,9 @@ export function QuickActions() {
         <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Button 
-            className="flex-1 justify-start gap-3 h-12 bg-blue-600 hover:bg-blue-700"
+            className="justify-start gap-3 h-12 bg-blue-600 hover:bg-blue-700"
             onClick={() => handleAction('upload')}
           >
             <Upload className="h-5 w-5" />
@@ -43,7 +43,7 @@ export function QuickActions() {
           
           <Button 
             variant="outline" 
-            className="flex-1 justify-start gap-3 h-12"
+            className="justify-start gap-3 h-12"
             onClick={() => handleAction('view-employees')}
           >
             <Users className="h-5 w-5" />
@@ -52,7 +52,7 @@ export function QuickActions() {
           
           <Button 
             variant="outline" 
-            className="flex-1 justify-start gap-3 h-12"
+            className="justify-start gap-3 h-12"
             onClick={() => handleAction('generate-report')}
           >
             <FileText className="h-5 w-5" />
