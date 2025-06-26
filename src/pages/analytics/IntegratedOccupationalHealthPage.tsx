@@ -33,6 +33,7 @@ import FitnessCertificateStats from './components/FitnessCertificateStats';
 import FitnessStatusBarChart from '@/components/analytics/FitnessStatusBarChart';
 import ExaminationTypeBarChart from '@/components/analytics/ExaminationTypeBarChart';
 import NaturalLanguageQuery from '@/components/analytics/NaturalLanguageQuery';
+import MedicalDocumentChatInterface from '@/components/analytics/MedicalDocumentChatInterface';
 
 const IntegratedOccupationalHealthPage = () => {
   const { data: examinationData, isLoading: examinationLoading } = useExaminationAnalytics();
@@ -61,12 +62,15 @@ const IntegratedOccupationalHealthPage = () => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex lg:h-auto">
+        <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-flex lg:h-auto">
           <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             Overview
           </TabsTrigger>
           <TabsTrigger value="query" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
             AI Query
+          </TabsTrigger>
+          <TabsTrigger value="medical-chat" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+            Medical Chat
           </TabsTrigger>
           <TabsTrigger value="analytics" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
             Analytics
@@ -90,6 +94,11 @@ const IntegratedOccupationalHealthPage = () => {
         {/* Natural Language Query Tab */}
         <TabsContent value="query" className="space-y-6">
           <NaturalLanguageQuery />
+        </TabsContent>
+        
+        {/* Medical Document Chat Tab */}
+        <TabsContent value="medical-chat" className="space-y-6">
+          <MedicalDocumentChatInterface />
         </TabsContent>
         
         {/* Analytics Tab - Now with live data */}
