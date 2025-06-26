@@ -1,4 +1,5 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -20,118 +21,78 @@ interface QueryRequest {
   maxResults?: number;
 }
 
-interface MedicalQueryTemplate {
-  pattern: RegExp;
-  sqlTemplate: string;
-  description: string;
-  securityFields: string[];
-}
-
-class MedicalQueryProcessor {
+class ChatGPTQueryProcessor {
   private supabase;
-  private medicalTemplates: MedicalQueryTemplate[];
+  private openAIApiKey: string;
 
   constructor() {
     this.supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    this.openAIApiKey = Deno.env.get('OPENAI_API_KEY') ?? '';
+  }
 
-    // Define medical query patterns with improved SQL templates
-    this.medicalTemplates = [
-      {
-        pattern: /(?:show|find|list|get).*patients.*(?:expired|expiring).*certificates?/i,
-        sqlTemplate: `
-          SELECT p.first_name, p.last_name, p.id_number, cc.current_expiry_date, 
-                 cc.days_until_expiry, COALESCE(o.name, 'Unknown Organization') as organization_name
-          FROM patients p
-          JOIN certificate_compliance cc ON p.id = cc.patient_id
-          LEFT JOIN organizations o ON COALESCE(p.client_organization_id, p.organization_id) = o.id
-          WHERE cc.days_until_expiry <= {expiry_days}
-          AND (p.organization_id = '{organization_id}' 
-               OR ('{client_organization_ids}' != '' AND p.client_organization_id = ANY(string_to_array('{client_organization_ids}', ','))))
-        `,
-        description: "Finding patients with expired or expiring certificates",
-        securityFields: ['organization_id', 'client_organization_ids']
-      },
-      {
-        pattern: /(?:show|find|list).*(?:medical|examination|exam).*(?:unfit|failed|fail)/i,
-        sqlTemplate: `
-          SELECT p.first_name, p.last_name, me.examination_date, me.fitness_status, 
-                 me.examination_type, COALESCE(o.name, 'Unknown Organization') as organization_name
-          FROM patients p
-          JOIN medical_examinations me ON p.id = me.patient_id
-          LEFT JOIN organizations o ON COALESCE(p.client_organization_id, p.organization_id) = o.id
-          WHERE me.fitness_status IN ('unfit', 'fit_with_restriction', 'temporary_unfit')
-          AND (me.organization_id = '{organization_id}' 
-               OR ('{client_organization_ids}' != '' AND me.client_organization_id = ANY(string_to_array('{client_organization_ids}', ','))))
-          ORDER BY me.examination_date DESC
-        `,
-        description: "Finding unfit or restricted medical examinations",
-        securityFields: ['organization_id', 'client_organization_ids']
-      },
-      {
-        pattern: /(?:show|find|list).*(?:vision|hearing|drug|medical).*(?:test|screen).*(?:fail|failed|failure)/i,
-        sqlTemplate: `
-          SELECT p.first_name, p.last_name, mtr.test_type, mtr.test_result, 
-                 me.examination_date, COALESCE(o.name, 'Unknown Organization') as organization_name
-          FROM patients p
-          JOIN medical_examinations me ON p.id = me.patient_id
-          JOIN medical_test_results mtr ON me.id = mtr.examination_id
-          LEFT JOIN organizations o ON COALESCE(p.client_organization_id, p.organization_id) = o.id
-          WHERE (mtr.test_result ILIKE '%fail%' OR mtr.test_result ILIKE '%abnormal%' OR mtr.test_result ILIKE '%positive%')
-          AND (me.organization_id = '{organization_id}' 
-               OR ('{client_organization_ids}' != '' AND me.client_organization_id = ANY(string_to_array('{client_organization_ids}', ','))))
-          ORDER BY me.examination_date DESC
-        `,
-        description: "Finding failed medical tests",
-        securityFields: ['organization_id', 'client_organization_ids']
-      },
-      {
-        pattern: /(?:show|find|list).*documents.*(?:pending|validation|unvalidated)/i,
-        sqlTemplate: `
-          SELECT d.file_name, d.created_at, COALESCE(p.first_name, 'Unknown') as first_name, 
-                 COALESCE(p.last_name, 'Patient') as last_name, d.validation_status, 
-                 COALESCE(o.name, 'Unknown Organization') as organization_name
-          FROM documents d
-          LEFT JOIN patients p ON d.owner_id = p.id
-          LEFT JOIN organizations o ON COALESCE(d.client_organization_id, d.organization_id) = o.id
-          WHERE COALESCE(d.validation_status, 'pending') = 'pending'
-          AND (d.organization_id = '{organization_id}' 
-               OR ('{client_organization_ids}' != '' AND d.client_organization_id = ANY(string_to_array('{client_organization_ids}', ','))))
-          ORDER BY d.created_at DESC
-        `,
-        description: "Finding documents pending validation",
-        securityFields: ['organization_id', 'client_organization_ids']
-      },
-      {
-        pattern: /(?:show|find|list).*(?:analytics|summary|overview)/i,
-        sqlTemplate: `
-          SELECT 
-            COUNT(DISTINCT p.id) as total_patients,
-            COUNT(DISTINCT me.id) as total_examinations,
-            COUNT(CASE WHEN me.fitness_status = 'fit' THEN 1 END) as fit_count,
-            COUNT(CASE WHEN me.fitness_status ILIKE '%unfit%' THEN 1 END) as unfit_count,
-            COUNT(CASE WHEN me.fitness_status ILIKE '%restriction%' THEN 1 END) as restricted_count
-          FROM patients p
-          LEFT JOIN medical_examinations me ON p.id = me.patient_id
-          WHERE p.organization_id = '{organization_id}' 
-          OR ('{client_organization_ids}' != '' AND p.client_organization_id = ANY(string_to_array('{client_organization_ids}', ',')))
-        `,
-        description: "Getting examination analytics overview",
-        securityFields: ['organization_id', 'client_organization_ids']
-      }
-    ];
+  private getSchemaContext(): string {
+    return `
+Database Schema for Medical/Occupational Health System:
+
+TABLES:
+1. patients - Worker/patient records
+   - id (uuid), first_name, last_name, id_number, date_of_birth, gender
+   - organization_id, client_organization_id (for service provider model)
+   - medical_history (jsonb), contact_info (jsonb)
+
+2. medical_examinations - Medical examination records
+   - id (uuid), patient_id, examination_type, examination_date, expiry_date
+   - fitness_status (fit, unfit, fit_with_restriction, fit_with_condition, temporary_unfit)
+   - organization_id, client_organization_id, company_name, job_title
+   - restrictions (array), follow_up_actions, comments
+
+3. medical_test_results - Individual test results within examinations
+   - id (uuid), examination_id, test_type, test_result, test_done, notes
+   - Common test_types: vision, hearing, drug_screen, lung_function, heights
+
+4. certificate_compliance - Compliance tracking
+   - id (uuid), patient_id, current_fitness_status, current_expiry_date
+   - days_until_expiry, is_compliant, organization_id, client_organization_id
+
+5. documents - Document management
+   - id (uuid), file_name, document_type, status, validation_status
+   - organization_id, client_organization_id, owner_id (patient)
+
+6. organizations - Organization/company records
+   - id (uuid), name, organization_type (service_provider or client)
+   - industry, contact_email, contact_phone
+
+7. organization_relationships - Service provider to client relationships
+   - service_provider_id, client_id, is_active
+
+IMPORTANT SECURITY RULES:
+- ALWAYS filter by organization context using: organization_id = '{organization_id}' OR client_organization_id IN ({client_organization_ids})
+- For service providers: include ALL their client organization IDs
+- For client organizations: include only their own ID
+- NEVER expose data from other organizations
+
+COMMON QUERY PATTERNS:
+- Certificate expiry: JOIN patients p with certificate_compliance cc
+- Test results: JOIN medical_examinations me with medical_test_results mtr
+- Organization filtering: Use provided organization_id and client_organization_ids
+- Date ranges: Use examination_date, expiry_date, created_at fields
+`;
   }
 
   async processQuery(queryRequest: QueryRequest): Promise<any> {
     const { query, userContext, maxResults = 100 } = queryRequest;
 
     try {
-      console.log('Processing natural language query:', query);
+      console.log('Processing ChatGPT-powered query:', query);
       console.log('User context:', JSON.stringify(userContext, null, 2));
       
-      // Validate required fields
+      if (!this.openAIApiKey) {
+        throw new Error('OpenAI API key not configured');
+      }
+
       if (!userContext.organizationId) {
         throw new Error('Organization ID is required');
       }
@@ -139,29 +100,14 @@ class MedicalQueryProcessor {
       if (!query || query.trim() === '') {
         throw new Error('Query cannot be empty');
       }
-      
-      // Find matching template
-      const template = this.findMatchingTemplate(query);
-      if (!template) {
-        console.log('No matching template found for query:', query);
-        return {
-          success: false,
-          error: "Query pattern not recognized",
-          suggestedQueries: this.getSuggestedQueries(),
-          hint: "Try queries like 'show patients with expired certificates' or 'find failed vision tests'"
-        };
-      }
 
-      console.log('Matched template:', template.description);
+      // Generate SQL using ChatGPT
+      const sqlQuery = await this.generateSQLWithChatGPT(query, userContext);
+      console.log('Generated SQL:', sqlQuery);
 
-      // Apply security context and parameters
-      const secureSQL = this.buildSecureQuery(template, userContext, query);
-      
-      console.log('Executing SQL (first 300 chars):', secureSQL.substring(0, 300) + '...');
-
-      // Execute query using the secure function
+      // Execute the generated SQL
       const { data, error } = await this.supabase.rpc('execute_secure_query', {
-        query_sql: secureSQL,
+        query_sql: sqlQuery,
         max_results: maxResults
       });
 
@@ -176,109 +122,91 @@ class MedicalQueryProcessor {
         success: true,
         data: data?.data || [],
         rowCount: data?.row_count || 0,
-        queryExplanation: template.description,
-        executedSQL: data?.query_executed || secureSQL,
+        queryExplanation: `AI-generated query for: "${query}"`,
+        executedSQL: sqlQuery,
         suggestedQueries: this.getSuggestedQueries()
       };
 
     } catch (error) {
       console.error('Query processing error:', error);
-      console.error('Error stack:', error.stack);
       
       return {
         success: false,
         error: error.message || 'Unknown error occurred during query processing',
         suggestedQueries: this.getSuggestedQueries(),
-        hint: "Please check your query syntax and try again"
+        hint: "Try rephrasing your query or use one of the suggested examples"
       };
     }
   }
 
-  private findMatchingTemplate(query: string): MedicalQueryTemplate | null {
-    const template = this.medicalTemplates.find(template => 
-      template.pattern.test(query)
-    );
-    
-    console.log('Query matching result:', template ? template.description : 'No match');
-    return template || null;
-  }
-
-  private buildSecureQuery(template: MedicalQueryTemplate, userContext: UserContext, originalQuery: string): string {
-    let sql = template.sqlTemplate;
-    
-    // Apply security context
-    sql = sql.replace(/{organization_id}/g, userContext.organizationId);
-    
-    // Handle client organization IDs - convert array to comma-separated string
+  private async generateSQLWithChatGPT(userQuery: string, userContext: UserContext): Promise<string> {
     const clientIds = (userContext.clientOrganizationIds || [])
       .filter(id => id && id.trim() !== '')
+      .map(id => `'${id}'`)
       .join(',');
-    
-    sql = sql.replace(/{client_organization_ids}/g, clientIds);
-    
-    // Extract and apply parameters from the query
-    const parameters = this.extractParameters(originalQuery);
-    
-    // Apply expiry days parameter
-    if (parameters.expiry_days !== undefined) {
-      sql = sql.replace(/{expiry_days}/g, parameters.expiry_days.toString());
-    } else {
-      sql = sql.replace(/{expiry_days}/g, '30'); // Default to 30 days
-    }
-    
-    // Add date filters if specified
-    if (parameters.days_back !== undefined) {
-      const dateCondition = ` AND me.examination_date >= CURRENT_DATE - INTERVAL '${parameters.days_back} days'`;
-      if (sql.includes('ORDER BY')) {
-        sql = sql.replace('ORDER BY', dateCondition + ' ORDER BY');
-      } else {
-        sql += dateCondition;
-      }
-    }
-    
-    return sql;
-  }
 
-  private extractParameters(query: string): Record<string, any> {
-    const parameters: Record<string, any> = {};
+    const systemPrompt = `You are a SQL expert for a medical/occupational health database. Generate ONLY the SQL query, no explanations.
 
-    // Extract expiry parameters
-    if (query.includes('expired')) {
-      parameters.expiry_days = 0;
-    } else if (query.includes('expiring')) {
-      if (query.includes('next month')) {
-        parameters.expiry_days = 30;
-      } else if (query.includes('next week')) {
-        parameters.expiry_days = 7;
-      } else {
-        parameters.expiry_days = 30; // Default to 30 days
-      }
-    }
+${this.getSchemaContext()}
 
-    // Extract date ranges
-    const dateMatches = query.match(/(?:last|past)\s+(\d+)\s+(day|week|month|year)s?/i);
-    if (dateMatches) {
-      const [, amount, unit] = dateMatches;
-      const multiplier = { day: 1, week: 7, month: 30, year: 365 }[unit] || 1;
-      parameters.days_back = parseInt(amount) * multiplier;
-    } else if (query.includes('last month')) {
-      parameters.days_back = 30;
-    } else if (query.includes('last week')) {
-      parameters.days_back = 7;
+SECURITY REQUIREMENTS (CRITICAL):
+- Organization ID: ${userContext.organizationId}
+- Client Organization IDs: [${clientIds}]
+- ALWAYS include this WHERE clause for security: (organization_id = '${userContext.organizationId}' OR client_organization_id IN (${clientIds || `'${userContext.organizationId}'`}))
+
+RULES:
+1. Generate ONLY SELECT statements
+2. Always include the security WHERE clause
+3. Use proper JOINs for related data
+4. Limit results to reasonable numbers
+5. Handle dates properly
+6. Use COALESCE for nullable fields
+7. Order results logically
+
+Return ONLY the SQL query, nothing else.`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userQuery }
+        ],
+        temperature: 0.1,
+        max_tokens: 1000
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('OpenAI API error:', errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    return parameters;
+    const data = await response.json();
+    const generatedSQL = data.choices[0].message.content.trim();
+    
+    // Clean up the SQL (remove markdown formatting if present)
+    return generatedSQL.replace(/```sql\n?|\n?```/g, '').trim();
   }
 
   private getSuggestedQueries(): string[] {
     return [
       "Show me patients with expired certificates",
-      "Find all unfit medical examinations from last month", 
-      "List vision test failures from this year",
+      "Find all unfit medical examinations from last month",
+      "List workers with vision test failures",
       "Show documents pending validation",
       "Find workers with hearing test failures",
-      "Show analytics overview",
-      "List patients with expiring certificates next month"
+      "Show analytics overview for this year",
+      "List patients with expiring certificates next month",
+      "Find workers with drug test failures",
+      "Show compliance rate by company",
+      "List workers needing follow-up actions"
     ];
   }
 }
@@ -302,7 +230,7 @@ serve(async (req) => {
   try {
     const queryRequest: QueryRequest = await req.json();
     
-    console.log('Natural language query request received');
+    console.log('ChatGPT natural language query request received');
     console.log('Organization ID:', queryRequest.userContext?.organizationId);
     console.log('Query:', queryRequest.query);
     
@@ -327,7 +255,7 @@ serve(async (req) => {
       });
     }
 
-    const processor = new MedicalQueryProcessor();
+    const processor = new ChatGPTQueryProcessor();
     const result = await processor.processQuery(queryRequest);
 
     return new Response(JSON.stringify(result), {
@@ -337,8 +265,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Request processing error:', error);
-    console.error('Error details:', error.message);
-    console.error('Error stack:', error.stack);
     
     return new Response(JSON.stringify({
       success: false,

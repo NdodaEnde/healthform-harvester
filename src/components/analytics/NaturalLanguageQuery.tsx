@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Lightbulb, Database } from "lucide-react";
+import { Loader2, Search, Lightbulb, Database, Sparkles } from "lucide-react";
 import { useNaturalLanguageQuery } from '@/hooks/useNaturalLanguageQuery';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -30,11 +30,11 @@ const NaturalLanguageQuery: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Natural Language Query
+            <Sparkles className="h-5 w-5 text-blue-500" />
+            AI-Powered Natural Language Query
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Ask questions about your medical data in plain English
+            Ask questions about your medical data in plain English. Powered by ChatGPT for intelligent understanding.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -42,7 +42,7 @@ const NaturalLanguageQuery: React.FC = () => {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g., Show me patients with expired certificates"
+              placeholder="e.g., Show me workers with vision problems at ABC Company"
               className="flex-1"
               disabled={isLoading}
             />
@@ -55,23 +55,33 @@ const NaturalLanguageQuery: React.FC = () => {
             </Button>
           </form>
 
-          {/* Suggested Queries */}
+          {/* Enhanced Suggested Queries */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Lightbulb className="h-4 w-4" />
-              Try these examples:
+              Try these AI-powered examples:
             </div>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQueries.slice(0, 4).map((suggestion, index) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {suggestedQueries.slice(0, 6).map((suggestion, index) => (
                 <Badge
                   key={index}
                   variant="outline"
-                  className="cursor-pointer hover:bg-muted"
+                  className="cursor-pointer hover:bg-muted justify-start p-2 h-auto text-left"
                   onClick={() => handleSuggestedQuery(suggestion)}
                 >
                   {suggestion}
                 </Badge>
               ))}
+            </div>
+          </div>
+
+          {/* AI Capabilities Notice */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
+              <div className="text-sm text-blue-700">
+                <strong>Enhanced with AI:</strong> This system now understands complex queries, handles multiple table relationships, and generates secure SQL automatically.
+              </div>
             </div>
           </div>
         </CardContent>
@@ -135,7 +145,7 @@ const NaturalLanguageQuery: React.FC = () => {
                 ) : (
                   <Alert>
                     <AlertDescription>
-                      No results found for your query.
+                      No results found for your query. Try rephrasing or use a different approach.
                     </AlertDescription>
                   </Alert>
                 )}
