@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -108,46 +107,93 @@ class MedicalDocumentChatbot {
     console.log('=== FINDING RELEVANT DOCUMENTS ===');
 
     try {
-      // Build organization filter
-      const clientIds = userContext.clientOrganizationIds.join(',');
-      const orgFilter = clientIds 
-        ? `organization_id.eq.${userContext.organizationId},client_organization_id.in.(${clientIds})`
-        : `organization_id.eq.${userContext.organizationId}`;
-
+      // Build organization filter conditions
+      const orgConditions = [];
+      
+      // Add primary organization condition
+      orgConditions.push(`organization_id.eq.${userContext.organizationId}`);
+      
+      // Add client organization conditions if available
+      if (userContext.clientOrganizationIds && userContext.clientOrganizationIds.length > 0) {
+        const clientIds = userContext.clientOrganizationIds.join(',');
+        orgConditions.push(`client_organization_id.in.(${clientIds})`);
+      }
+      
+      const orgFilter = orgConditions.join(',');
       console.log('Organization filter:', orgFilter);
 
       // Extract medical search terms
       const searchTerms = this.extractMedicalSearchTerms(query);
       console.log('Medical search terms:', searchTerms);
 
-      // Query documents with extracted data
-      console.log('=== QUERYING DOCUMENTS ===');
-      const { data: documents, error } = await this.supabase
+      // Query documents with extracted data using explicit query structure
+      console.log('=== QUERYING DOCUMENTS WITH EXPLICIT JOIN ===');
+      
+      // First get documents that match organization criteria
+      const { data: documents, error: docError } = await this.supabase
         .from('documents')
         .select(`
-          id, file_name, document_type, extracted_data, created_at, validation_status,
-          patients(first_name, last_name, id_number, date_of_birth)
+          id, 
+          file_name, 
+          document_type, 
+          extracted_data, 
+          created_at, 
+          validation_status,
+          owner_id
         `)
         .or(orgFilter)
         .not('extracted_data', 'is', null)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (error) {
-        console.error('Error querying documents:', error);
-        throw error;
+      if (docError) {
+        console.error('Error querying documents:', docError);
+        throw docError;
       }
 
-      console.log(`Queried ${documents?.length || 0} documents with extracted data`);
+      console.log(`Found ${documents?.length || 0} documents with extracted data`);
 
       if (!documents || documents.length === 0) {
         console.log('No documents found with extracted data');
         return [];
       }
 
+      // Now get patient information for documents that have owner_id
+      const documentsWithPatients = [];
+      
+      for (const doc of documents) {
+        let patientInfo = null;
+        
+        if (doc.owner_id) {
+          // Try to get patient info using owner_id
+          console.log(`Getting patient info for document ${doc.id} with owner_id ${doc.owner_id}`);
+          
+          const { data: patient, error: patientError } = await this.supabase
+            .from('patients')
+            .select('first_name, last_name, id_number, date_of_birth')
+            .eq('id', doc.owner_id)
+            .maybeSingle();
+          
+          if (patientError) {
+            console.warn(`Error getting patient for document ${doc.id}:`, patientError);
+          } else if (patient) {
+            patientInfo = patient;
+            console.log(`Found patient info for document ${doc.id}:`, patient.first_name, patient.last_name);
+          }
+        }
+        
+        // Add document with patient info (even if null)
+        documentsWithPatients.push({
+          ...doc,
+          patients: patientInfo
+        });
+      }
+
+      console.log(`Processed ${documentsWithPatients.length} documents with patient linking`);
+
       // Filter documents by medical relevance
       console.log('=== FILTERING BY RELEVANCE ===');
-      const relevantDocs = this.filterByMedicalRelevance(documents, searchTerms, query);
+      const relevantDocs = this.filterByMedicalRelevance(documentsWithPatients, searchTerms, query);
       console.log(`Filtered to ${relevantDocs.length} relevant documents`);
 
       // Return top matches, prioritizing validated documents
