@@ -9,9 +9,26 @@ interface QueryResult {
   rowCount?: number;
   queryExplanation?: string;
   executedSQL?: string;
+  searchType?: 'structured' | 'semantic';
   suggestedQueries?: string[];
   error?: string;
   hint?: string;
+  dataQuality?: {
+    validatedResults: number;
+    unvalidatedResults: number;
+    qualityScore: number;
+    warning?: string;
+  };
+  dataProfile?: {
+    validation_rate: number;
+    total_documents: number;
+    available_data?: {
+      fitness_statuses: string[];
+      test_types: string[];
+      examination_types: string[];
+    };
+  };
+  recommendation?: string;
 }
 
 interface UserContext {
@@ -36,27 +53,22 @@ export function useNaturalLanguageQuery() {
         throw new Error('No organization selected');
       }
 
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Build client organization IDs
       let clientOrganizationIds: string[] = [];
       
       if (currentOrganization?.organization_type === 'service_provider') {
-        // For service providers, include all client organization IDs
         clientOrganizationIds = clientOrganizations.map(client => client.id);
         console.log('Service provider - client org IDs:', clientOrganizationIds);
       } else {
-        // For client organizations, include their own ID
         clientOrganizationIds = [organizationId];
         console.log('Client organization - using own ID:', clientOrganizationIds);
       }
 
-      // Build user context
       const userContext: UserContext = {
         userId: user.id,
         organizationId: organizationId,
@@ -64,10 +76,9 @@ export function useNaturalLanguageQuery() {
         role: 'user'
       };
 
-      console.log('Executing ChatGPT-powered natural language query:', query);
+      console.log('Executing enhanced ChatGPT-powered natural language query:', query);
       console.log('User context:', userContext);
 
-      // Call the upgraded edge function
       const { data, error } = await supabase.functions.invoke('natural-language-query', {
         body: {
           query: query.trim(),
@@ -77,31 +88,31 @@ export function useNaturalLanguageQuery() {
       });
 
       if (error) {
-        console.error('ChatGPT edge function error:', error);
+        console.error('Enhanced ChatGPT edge function error:', error);
         throw error;
       }
 
-      console.log('ChatGPT query result:', data);
+      console.log('Enhanced ChatGPT query result:', data);
       
       setLastResult(data);
       return data;
       
     } catch (error) {
-      console.error('ChatGPT natural language query error:', error);
+      console.error('Enhanced natural language query error:', error);
       const errorResult: QueryResult = {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
         suggestedQueries: [
           "Show me patients with expired certificates",
-          "Find all unfit medical examinations from last month",
-          "List workers with vision test failures",
+          "Find all medical examinations from last month",
+          "List workers with vision test results",
           "Show documents pending validation",
-          "Find workers with hearing test failures",
-          "Show analytics overview for this year",
+          "Find workers with hearing test results",
+          "Show compliance overview for this year",
           "List patients with expiring certificates next month",
-          "Find workers with drug test failures",
-          "Show compliance rate by company",
-          "List workers needing follow-up actions"
+          "Find workers needing follow-up actions",
+          "Show validation statistics",
+          "List recent examination trends"
         ]
       };
       
@@ -115,17 +126,17 @@ export function useNaturalLanguageQuery() {
   const getSuggestedQueries = useCallback(() => {
     return [
       "Show me patients with expired certificates",
-      "Find all unfit medical examinations from last month",
-      "List workers with vision test failures",
-      "Show documents pending validation", 
-      "Find workers with hearing test failures",
-      "Show analytics overview for this year",
+      "Find all medical examinations from last month", 
+      "List workers with vision test results",
+      "Show documents pending validation",
+      "Find workers with hearing test results",
+      "Show compliance overview for this year",
       "List patients with expiring certificates next month",
-      "Find workers with drug test failures",
-      "Show compliance rate by company",
-      "List workers needing follow-up actions",
+      "Find workers needing follow-up actions",
+      "Show validation statistics by document type",
+      "List recent examination trends",
       "What's our overall fitness rate?",
-      "Show me recent examination trends"
+      "Show me unvalidated documents needing review"
     ];
   }, []);
 

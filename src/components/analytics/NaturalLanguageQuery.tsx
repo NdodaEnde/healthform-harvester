@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Lightbulb, Database, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";  
+import { Loader2, Search, Lightbulb, Database, Sparkles, CheckCircle, AlertCircle, TrendingUp } from "lucide-react";
 import { useNaturalLanguageQuery } from '@/hooks/useNaturalLanguageQuery';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -25,16 +25,65 @@ const NaturalLanguageQuery: React.FC = () => {
 
   const suggestedQueries = getSuggestedQueries();
 
+  const renderDataQualityBadge = (result: any) => {
+    if (!result.dataQuality) return null;
+
+    const { validatedResults, unvalidatedResults, qualityScore } = result.dataQuality;
+    const total = validatedResults + unvalidatedResults;
+
+    return (
+      <div className="flex items-center gap-2 mt-2">
+        <Badge variant={qualityScore >= 70 ? "default" : "secondary"} className="text-xs">
+          {qualityScore >= 70 ? (
+            <CheckCircle className="h-3 w-3 mr-1" />
+          ) : (
+            <AlertCircle className="h-3 w-3 mr-1" />
+          )}
+          Quality: {qualityScore}%
+        </Badge>
+        <span className="text-xs text-muted-foreground">
+          ({validatedResults} validated, {unvalidatedResults} unvalidated)
+        </span>
+      </div>
+    );
+  };
+
+  const renderDataProfileInsights = (result: any) => {
+    if (!result.dataProfile) return null;
+
+    const { validation_rate, total_documents, available_data } = result.dataProfile;
+
+    return (
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-800">Data Insights</span>
+        </div>
+        <div className="text-xs text-blue-700 space-y-1">
+          <div>📊 Document validation rate: {validation_rate}%</div>
+          <div>📁 Total documents: {total_documents}</div>
+          {available_data && (
+            <>
+              <div>🏥 Available fitness statuses: {available_data.fitness_statuses.join(', ')}</div>
+              <div>🔬 Available test types: {available_data.test_types.join(', ')}</div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-500" />
-            AI-Powered Natural Language Query
+            Enhanced AI-Powered Natural Language Query
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Ask questions about your medical data in plain English. Powered by ChatGPT for intelligent understanding.
+            Advanced query system with data profiling, semantic search, and validation-aware results. 
+            Powered by ChatGPT with real-time data intelligence.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -42,7 +91,7 @@ const NaturalLanguageQuery: React.FC = () => {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g., Show me workers with vision problems at ABC Company"
+              placeholder="e.g., Show me workers with expired certificates or Find unvalidated documents"
               className="flex-1"
               disabled={isLoading}
             />
@@ -59,10 +108,10 @@ const NaturalLanguageQuery: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Lightbulb className="h-4 w-4" />
-              Try these AI-powered examples:
+              Try these intelligent suggestions:
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {suggestedQueries.slice(0, 6).map((suggestion, index) => (
+              {suggestedQueries.slice(0, 8).map((suggestion, index) => (
                 <Badge
                   key={index}
                   variant="outline"
@@ -75,19 +124,25 @@ const NaturalLanguageQuery: React.FC = () => {
             </div>
           </div>
 
-          {/* AI Capabilities Notice */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          {/* Enhanced AI Capabilities Notice */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
               <div className="text-sm text-blue-700">
-                <strong>Enhanced with AI:</strong> This system now understands complex queries, handles multiple table relationships, and generates secure SQL automatically.
+                <strong>Enhanced AI Features:</strong>
+                <ul className="mt-1 text-xs space-y-1">
+                  <li>• Real-time data profiling and intelligent query mapping</li>
+                  <li>• Semantic search across document content and extracted data</li>
+                  <li>• Validation-aware results with quality indicators</li>
+                  <li>• Automatic fallback between structured and semantic search</li>
+                </ul>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Results */}
+      {/* Enhanced Results Display */}
       {lastResult && (
         <Card>
           <CardHeader>
@@ -95,15 +150,37 @@ const NaturalLanguageQuery: React.FC = () => {
               <Database className="h-5 w-5" />
               Query Results
               {lastResult.success && (
-                <Badge variant="secondary">
-                  {lastResult.rowCount} {lastResult.rowCount === 1 ? 'row' : 'rows'}
-                </Badge>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Badge variant="secondary">
+                    {lastResult.rowCount || lastResult.data?.length || 0} {(lastResult.rowCount || lastResult.data?.length || 0) === 1 ? 'result' : 'results'}
+                  </Badge>
+                  {lastResult.searchType && (
+                    <Badge variant={lastResult.searchType === 'semantic' ? "outline" : "default"}>
+                      {lastResult.searchType === 'semantic' ? 'Document Search' : 'Database Query'}
+                    </Badge>
+                  )}
+                </div>
               )}
             </CardTitle>
             {lastResult.queryExplanation && (
               <p className="text-sm text-muted-foreground">
                 {lastResult.queryExplanation}
               </p>
+            )}
+            
+            {/* Data Quality Information */}
+            {lastResult.success && lastResult.dataQuality && (
+              <div className="mt-2">
+                {renderDataQualityBadge(lastResult)}
+                {lastResult.dataQuality.warning && (
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      {lastResult.dataQuality.warning}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             )}
           </CardHeader>
           <CardContent>
@@ -124,9 +201,18 @@ const NaturalLanguageQuery: React.FC = () => {
                       <tbody>
                         {lastResult.data.map((row, index) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            {Object.values(row).map((value, cellIndex) => (
+                            {Object.entries(row).map(([key, value], cellIndex) => (
                               <td key={cellIndex} className="border border-gray-200 px-3 py-2">
-                                {value === null ? (
+                                {key === 'data_quality' ? (
+                                  <Badge variant={value === 'validated' ? "default" : "destructive"} className="text-xs">
+                                    {value === 'validated' ? '✅ Validated' : '⚠️ Unvalidated'}
+                                  </Badge>
+                                ) : key === 'warning' && value ? (
+                                  <span className="text-xs text-yellow-600 flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    {String(value)}
+                                  </span>
+                                ) : value === null ? (
                                   <span className="text-gray-400">-</span>
                                 ) : typeof value === 'boolean' ? (
                                   <Badge variant={value ? "default" : "secondary"}>
@@ -149,18 +235,58 @@ const NaturalLanguageQuery: React.FC = () => {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {/* Recommendation */}
+                {lastResult.recommendation && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div className="text-sm text-green-800">
+                      <strong>💡 Recommendation:</strong> {lastResult.recommendation}
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Profile Insights */}
+                {renderDataProfileInsights(lastResult)}
               </div>
             ) : (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {lastResult.error}
-                  {lastResult.hint && (
-                    <div className="mt-2 text-sm">
-                      <strong>Hint:</strong> {lastResult.hint}
-                    </div>
-                  )}
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-4">
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    {lastResult.error}
+                    {lastResult.hint && (
+                      <div className="mt-2 text-sm">
+                        <strong>Hint:</strong> {lastResult.hint}
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+
+                {/* Data Profile for Failed Queries */}
+                {renderDataProfileInsights(lastResult)}
+              </div>
+            )}
+
+            {/* Enhanced Suggested Follow-up Queries */}
+            {lastResult.suggestedQueries && lastResult.suggestedQueries.length > 0 && (
+              <div className="mt-6 pt-4 border-t">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4" />
+                  Try these related queries:
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {lastResult.suggestedQueries.slice(0, 6).map((suggestion, index) => (
+                    <Button
+                      key={index}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSuggestedQuery(suggestion)}
+                      className="justify-start text-left h-auto py-2 px-3 whitespace-normal text-xs"
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
