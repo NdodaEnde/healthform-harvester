@@ -10,13 +10,14 @@ export function RecentDocuments() {
   const { getEffectiveOrganizationId } = useOrganization();
   const organizationId = getEffectiveOrganizationId();
 
-  // Fetch recent documents with patient information
+  // Fetch recent documents without joining to patients table directly
   const { data: documents, isLoading } = useQuery({
     queryKey: ['recent-documents', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
 
-      const { data, error } = await supabase
+      // First get the documents
+      const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select(`
           id,
@@ -25,29 +26,51 @@ export function RecentDocuments() {
           status,
           created_at,
           processed_at,
-          owner_id,
-          patients(
-            first_name,
-            last_name
-          )
+          owner_id
         `)
         .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (error) throw error;
+      if (documentsError) throw documentsError;
 
-      return data?.map(doc => ({
-        id: doc.id,
-        document: formatDocumentType(doc.document_type || 'Document'),
-        patient: doc.patients?.length > 0 
-          ? `${doc.patients[0]?.first_name || ''} ${doc.patients[0]?.last_name || ''}`.trim() || 'Unknown Patient'
-          : 'Unassigned',
-        status: formatStatus(doc.status),
-        date: formatTimeAgo(new Date(doc.created_at)),
-        statusColor: getStatusColor(doc.status),
-        fileName: doc.file_name
-      })) || [];
+      if (!documentsData || documentsData.length === 0) return [];
+
+      // Get patient information for documents that have an owner_id
+      const ownerIds = documentsData
+        .filter(doc => doc.owner_id)
+        .map(doc => doc.owner_id);
+
+      let patientsData = [];
+      if (ownerIds.length > 0) {
+        const { data: patients, error: patientsError } = await supabase
+          .from('patients')
+          .select('id, first_name, last_name')
+          .in('id', ownerIds);
+
+        if (patientsError) {
+          console.error('Error fetching patient data:', patientsError);
+        } else {
+          patientsData = patients || [];
+        }
+      }
+
+      // Map documents with patient information
+      return documentsData.map(doc => {
+        const patient = patientsData.find(p => p.id === doc.owner_id);
+        
+        return {
+          id: doc.id,
+          document: formatDocumentType(doc.document_type || 'Document'),
+          patient: patient 
+            ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'Unknown Patient'
+            : 'Unassigned',
+          status: formatStatus(doc.status),
+          date: formatTimeAgo(new Date(doc.created_at)),
+          statusColor: getStatusColor(doc.status),
+          fileName: doc.file_name
+        };
+      });
     },
     enabled: !!organizationId,
   });
