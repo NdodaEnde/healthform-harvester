@@ -178,15 +178,18 @@ export const useMedicalQuerySuggestions = () => {
 
       documents?.forEach(doc => {
         // Extract medical terms from structured data with proper type checking
-        if (isJsonObject(doc.extracted_data) && isJsonObject(doc.extracted_data.structured_data)) {
-          const content = JSON.stringify(doc.extracted_data.structured_data).toLowerCase();
-          
-          // Look for common medical test types
-          if (content.includes('vision')) medicalTerms.add('vision');
-          if (content.includes('hearing')) medicalTerms.add('hearing');
-          if (content.includes('drug') || content.includes('screen')) medicalTerms.add('drug screening');
-          if (content.includes('blood')) medicalTerms.add('blood tests');
-          if (content.includes('pressure')) medicalTerms.add('blood pressure');
+        if (isJsonObject(doc.extracted_data)) {
+          const extractedData = doc.extracted_data as Record<string, any>;
+          if (isJsonObject(extractedData.structured_data)) {
+            const content = JSON.stringify(extractedData.structured_data).toLowerCase();
+            
+            // Look for common medical test types
+            if (content.includes('vision')) medicalTerms.add('vision');
+            if (content.includes('hearing')) medicalTerms.add('hearing');
+            if (content.includes('drug') || content.includes('screen')) medicalTerms.add('drug screening');
+            if (content.includes('blood')) medicalTerms.add('blood tests');
+            if (content.includes('pressure')) medicalTerms.add('blood pressure');
+          }
         }
       });
 
