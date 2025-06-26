@@ -1996,6 +1996,10 @@ export type Database = {
         Args: { p_id: string; p_email: string; p_full_name?: string }
         Returns: undefined
       }
+      execute_secure_query: {
+        Args: { query_sql: string; max_results?: number }
+        Returns: Json
+      }
       extract_medical_test_results: {
         Args: { p_examination_id: string; p_extracted_data: Json }
         Returns: number
