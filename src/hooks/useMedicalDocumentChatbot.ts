@@ -31,6 +31,11 @@ interface MedicalChatResponse {
   hint?: string;
 }
 
+// Helper function to safely check if a Json value is an object
+const isJsonObject = (value: any): value is Record<string, any> => {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+};
+
 export const useMedicalDocumentChatbot = () => {
   const { getEffectiveOrganizationId, currentOrganization, clientOrganizations } = useOrganization();
 
@@ -172,8 +177,8 @@ export const useMedicalQuerySuggestions = () => {
       const medicalTerms = new Set();
 
       documents?.forEach(doc => {
-        // Extract medical terms from structured data
-        if (doc.extracted_data?.structured_data) {
+        // Extract medical terms from structured data with proper type checking
+        if (isJsonObject(doc.extracted_data) && isJsonObject(doc.extracted_data.structured_data)) {
           const content = JSON.stringify(doc.extracted_data.structured_data).toLowerCase();
           
           // Look for common medical test types
