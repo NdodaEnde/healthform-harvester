@@ -24,7 +24,7 @@ interface UserContext {
 export function useNaturalLanguageQuery() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastResult, setLastResult] = useState<QueryResult | null>(null);
-  const { getEffectiveOrganizationId, currentOrganization } = useOrganization();
+  const { getEffectiveOrganizationId, currentOrganization, clientOrganizations } = useOrganization();
 
   const executeQuery = useCallback(async (query: string): Promise<QueryResult> => {
     setIsLoading(true);
@@ -43,13 +43,24 @@ export function useNaturalLanguageQuery() {
         throw new Error('User not authenticated');
       }
 
+      // Build client organization IDs
+      let clientOrganizationIds: string[] = [];
+      
+      if (currentOrganization?.organization_type === 'service_provider') {
+        // For service providers, include all client organization IDs
+        clientOrganizationIds = clientOrganizations.map(client => client.id);
+        console.log('Service provider - client org IDs:', clientOrganizationIds);
+      } else {
+        // For client organizations, include their own ID
+        clientOrganizationIds = [organizationId];
+        console.log('Client organization - using own ID:', clientOrganizationIds);
+      }
+
       // Build user context
       const userContext: UserContext = {
         userId: user.id,
         organizationId: organizationId,
-        clientOrganizationIds: currentOrganization?.organization_type === 'service_provider' 
-          ? [] // Will be populated by client relationships
-          : [organizationId],
+        clientOrganizationIds: clientOrganizationIds,
         role: 'user' // This could be enhanced to get actual user role
       };
 
@@ -92,7 +103,7 @@ export function useNaturalLanguageQuery() {
     } finally {
       setIsLoading(false);
     }
-  }, [getEffectiveOrganizationId, currentOrganization]);
+  }, [getEffectiveOrganizationId, currentOrganization, clientOrganizations]);
 
   const getSuggestedQueries = useCallback(() => {
     return [
