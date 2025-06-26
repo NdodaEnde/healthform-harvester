@@ -52,6 +52,22 @@ class MedicalDocumentChatbot {
         throw new Error('Organization ID is required');
       }
 
+      // First, let's check what documents exist in the database
+      console.log('=== CHECKING ALL DOCUMENTS IN DATABASE ===');
+      const { data: allDocs, error: allDocsError } = await this.supabase
+        .from('documents')
+        .select('id, file_name, organization_id, client_organization_id, extracted_data, document_type')
+        .limit(10);
+      
+      if (allDocsError) {
+        console.error('Error checking all documents:', allDocsError);
+      } else {
+        console.log(`Total documents in database: ${allDocs?.length || 0}`);
+        allDocs?.forEach(doc => {
+          console.log(`Doc ${doc.id}: ${doc.file_name}, org: ${doc.organization_id}, client: ${doc.client_organization_id}, has_data: ${!!doc.extracted_data}`);
+        });
+      }
+
       // Step 1: Find relevant medical documents
       console.log('=== SEARCHING FOR DOCUMENTS ===');
       const relevantDocuments = await this.findRelevantMedicalDocuments(query, userContext, maxResults);
@@ -121,6 +137,22 @@ class MedicalDocumentChatbot {
       
       const orgFilter = orgConditions.join(',');
       console.log('Organization filter:', orgFilter);
+
+      // Let's also check what documents exist for this organization
+      console.log('=== CHECKING ORGANIZATION DOCUMENTS ===');
+      const { data: orgDocs, error: orgDocsError } = await this.supabase
+        .from('documents')
+        .select('id, file_name, organization_id, client_organization_id, extracted_data, document_type, validation_status')
+        .or(orgFilter);
+      
+      if (orgDocsError) {
+        console.error('Error checking organization documents:', orgDocsError);
+      } else {
+        console.log(`Organization documents found: ${orgDocs?.length || 0}`);
+        orgDocs?.forEach(doc => {
+          console.log(`Org Doc ${doc.id}: ${doc.file_name}, org: ${doc.organization_id}, client: ${doc.client_organization_id}, has_data: ${!!doc.extracted_data}, validation: ${doc.validation_status}`);
+        });
+      }
 
       // Extract medical search terms
       const searchTerms = this.extractMedicalSearchTerms(query);
@@ -216,6 +248,7 @@ class MedicalDocumentChatbot {
     }
   }
 
+  
   private extractMedicalSearchTerms(query: string): string[] {
     const lowercaseQuery = query.toLowerCase();
     const medicalTerms = new Set<string>();
