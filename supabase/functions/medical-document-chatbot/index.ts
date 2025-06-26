@@ -26,33 +26,43 @@ class MedicalDocumentChatbot {
   private openAIApiKey: string;
 
   constructor() {
+    console.log('=== INITIALIZING CHATBOT ===');
     this.supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '', 
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     this.openAIApiKey = Deno.env.get('OPENAI_API_KEY') ?? '';
+    console.log('OpenAI API Key configured:', !!this.openAIApiKey);
+    console.log('Supabase URL configured:', !!Deno.env.get('SUPABASE_URL'));
   }
 
   async processQuery(queryRequest: QueryRequest) {
     const { query, userContext, maxResults = 20 } = queryRequest;
 
     try {
-      console.log('Processing medical document query:', query);
+      console.log('=== PROCESSING QUERY ===');
+      console.log('Query:', query);
+      console.log('User Context:', JSON.stringify(userContext, null, 2));
 
       if (!this.openAIApiKey) {
+        console.error('OpenAI API key not configured');
         throw new Error('OpenAI API key not configured');
       }
       if (!userContext.organizationId) {
+        console.error('Organization ID is required');
         throw new Error('Organization ID is required');
       }
 
       // Step 1: Find relevant medical documents
+      console.log('=== SEARCHING FOR DOCUMENTS ===');
       const relevantDocuments = await this.findRelevantMedicalDocuments(query, userContext, maxResults);
+      console.log(`Found ${relevantDocuments.length} relevant documents`);
       
       if (relevantDocuments.length === 0) {
+        console.log('No documents found, returning empty result');
         return {
           success: true,
-          answer: "I couldn't find any medical documents containing information relevant to your query. Try asking about specific medical tests, patient names, or health conditions.",
+          answer: "I couldn't find any medical documents containing information relevant to your query. Please make sure you have uploaded medical documents with extracted data, or try asking about different medical topics.",
           reasoning: "No documents matched the search terms in your question.",
           supporting_documents: [],
           documentCount: 0,
@@ -63,10 +73,14 @@ class MedicalDocumentChatbot {
       }
 
       // Step 2: Prepare evidence for ChatGPT analysis
+      console.log('=== PREPARING EVIDENCE ===');
       const medicalEvidence = this.prepareMedicalEvidence(relevantDocuments);
+      console.log('Evidence prepared for', Object.keys(medicalEvidence).length, 'documents');
 
       // Step 3: Get intelligent analysis from ChatGPT
+      console.log('=== CALLING OPENAI ===');
       const result = await this.getMedicalAnswerFromChatGPT(query, medicalEvidence);
+      console.log('OpenAI response received');
 
       return {
         success: true,
@@ -77,7 +91,10 @@ class MedicalDocumentChatbot {
       };
 
     } catch (error) {
-      console.error('Medical document query error:', error);
+      console.error('=== ERROR IN PROCESS QUERY ===');
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       return {
         success: false,
         error: error.message,
@@ -88,7 +105,7 @@ class MedicalDocumentChatbot {
   }
 
   private async findRelevantMedicalDocuments(query: string, userContext: UserContext, maxResults: number) {
-    console.log('Searching for relevant medical documents...');
+    console.log('=== FINDING RELEVANT DOCUMENTS ===');
 
     try {
       // Build organization filter
@@ -97,11 +114,14 @@ class MedicalDocumentChatbot {
         ? `organization_id.eq.${userContext.organizationId},client_organization_id.in.(${clientIds})`
         : `organization_id.eq.${userContext.organizationId}`;
 
+      console.log('Organization filter:', orgFilter);
+
       // Extract medical search terms
       const searchTerms = this.extractMedicalSearchTerms(query);
       console.log('Medical search terms:', searchTerms);
 
       // Query documents with extracted data
+      console.log('=== QUERYING DOCUMENTS ===');
       const { data: documents, error } = await this.supabase
         .from('documents')
         .select(`
@@ -118,8 +138,17 @@ class MedicalDocumentChatbot {
         throw error;
       }
 
+      console.log(`Queried ${documents?.length || 0} documents with extracted data`);
+
+      if (!documents || documents.length === 0) {
+        console.log('No documents found with extracted data');
+        return [];
+      }
+
       // Filter documents by medical relevance
-      const relevantDocs = this.filterByMedicalRelevance(documents || [], searchTerms, query);
+      console.log('=== FILTERING BY RELEVANCE ===');
+      const relevantDocs = this.filterByMedicalRelevance(documents, searchTerms, query);
+      console.log(`Filtered to ${relevantDocs.length} relevant documents`);
 
       // Return top matches, prioritizing validated documents
       const sortedDocs = relevantDocs
@@ -132,7 +161,7 @@ class MedicalDocumentChatbot {
         })
         .slice(0, maxResults);
 
-      console.log(`Found ${sortedDocs.length} relevant medical documents`);
+      console.log(`Returning ${sortedDocs.length} top documents`);
       return sortedDocs;
 
     } catch (error) {
@@ -255,6 +284,8 @@ class MedicalDocumentChatbot {
   }
 
   private async getMedicalAnswerFromChatGPT(query: string, evidence: any) {
+    console.log('=== CALLING OPENAI API ===');
+    
     const prompt = `You are a medical document analysis expert specializing in occupational health records. Analyze the provided medical documents and answer the user's question.
 
 IMPORTANT INSTRUCTIONS:
@@ -290,6 +321,7 @@ ${JSON.stringify(evidence, null, 2)}
 Remember: Only reference information that actually appears in the provided evidence.`;
 
     try {
+      console.log('Making OpenAI API request...');
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -313,11 +345,18 @@ Remember: Only reference information that actually appears in the provided evide
         })
       });
 
+      console.log('OpenAI API response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        console.error('OpenAI API error status:', response.status);
+        const errorText = await response.text();
+        console.error('OpenAI API error response:', errorText);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('OpenAI API response received successfully');
+      
       let rawResponse = data.choices[0].message.content.trim();
 
       // Clean up JSON formatting
@@ -326,9 +365,11 @@ Remember: Only reference information that actually appears in the provided evide
       }
 
       const parsedResponse = JSON.parse(rawResponse);
+      console.log('OpenAI response parsed successfully');
       return parsedResponse;
 
     } catch (error) {
+      console.error('=== ERROR IN OPENAI CALL ===');
       console.error('Error getting medical answer from ChatGPT:', error);
       return {
         answer: "I encountered an error while analyzing the medical documents. Please try rephrasing your question.",
@@ -357,11 +398,18 @@ Remember: Only reference information that actually appears in the provided evide
 }
 
 serve(async (req) => {
+  console.log('=== FUNCTION INVOKED ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight');
     return new Response(null, { headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
+    console.error('Method not allowed:', req.method);
     return new Response(JSON.stringify({
       success: false,
       error: 'Method not allowed'
@@ -372,12 +420,16 @@ serve(async (req) => {
   }
 
   try {
-    const queryRequest: QueryRequest = await req.json();
-    console.log('Medical document chatbot request received');
-    console.log('Query:', queryRequest.query);
-    console.log('Organization:', queryRequest.userContext?.organizationId);
-
+    console.log('=== PARSING REQUEST BODY ===');
+    const bodyText = await req.text();
+    console.log('Raw request body:', bodyText);
+    
+    const queryRequest: QueryRequest = JSON.parse(bodyText);
+    console.log('Parsed request:', JSON.stringify(queryRequest, null, 2));
+    
+    console.log('=== VALIDATING REQUEST ===');
     if (!queryRequest.userContext?.organizationId) {
+      console.error('Organization ID missing from request');
       return new Response(JSON.stringify({
         success: false,
         error: 'Organization ID required'
@@ -388,6 +440,7 @@ serve(async (req) => {
     }
 
     if (!queryRequest.query?.trim()) {
+      console.error('Query is empty');
       return new Response(JSON.stringify({
         success: false,
         error: 'Query cannot be empty'
@@ -397,8 +450,14 @@ serve(async (req) => {
       });
     }
 
+    console.log('=== CREATING CHATBOT INSTANCE ===');
     const chatbot = new MedicalDocumentChatbot();
+    
+    console.log('=== PROCESSING QUERY ===');
     const result = await chatbot.processQuery(queryRequest);
+    
+    console.log('=== QUERY PROCESSED SUCCESSFULLY ===');
+    console.log('Result:', JSON.stringify(result, null, 2));
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -406,7 +465,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error('=== FUNCTION ERROR ===');
     console.error('Medical document chatbot error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
