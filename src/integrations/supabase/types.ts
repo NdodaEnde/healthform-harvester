@@ -386,6 +386,181 @@ export type Database = {
           },
         ]
       }
+      compound_document_sections: {
+        Row: {
+          compound_document_id: string
+          created_at: string
+          extracted_data: Json | null
+          id: string
+          page_range: string | null
+          processing_confidence: number | null
+          requires_review: boolean | null
+          review_notes: string | null
+          section_name: string
+          section_type: string
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+          validation_status: string | null
+        }
+        Insert: {
+          compound_document_id: string
+          created_at?: string
+          extracted_data?: Json | null
+          id?: string
+          page_range?: string | null
+          processing_confidence?: number | null
+          requires_review?: boolean | null
+          review_notes?: string | null
+          section_name: string
+          section_type: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_status?: string | null
+        }
+        Update: {
+          compound_document_id?: string
+          created_at?: string
+          extracted_data?: Json | null
+          id?: string
+          page_range?: string | null
+          processing_confidence?: number | null
+          requires_review?: boolean | null
+          review_notes?: string | null
+          section_name?: string
+          section_type?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compound_document_sections_compound_document_id_fkey"
+            columns: ["compound_document_id"]
+            isOneToOne: false
+            referencedRelation: "compound_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compound_document_workflow: {
+        Row: {
+          assigned_at: string | null
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          compound_document_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          rejection_reason: string | null
+          status: string | null
+          updated_at: string
+          workflow_step: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          compound_document_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          rejection_reason?: string | null
+          status?: string | null
+          updated_at?: string
+          workflow_step: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          compound_document_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          rejection_reason?: string | null
+          status?: string | null
+          updated_at?: string
+          workflow_step?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compound_document_workflow_compound_document_id_fkey"
+            columns: ["compound_document_id"]
+            isOneToOne: false
+            referencedRelation: "compound_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compound_documents: {
+        Row: {
+          client_organization_id: string | null
+          created_at: string
+          detected_sections: Json | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string
+          organization_id: string | null
+          owner_id: string | null
+          processing_metadata: Json | null
+          public_url: string | null
+          status: string
+          total_pages: number | null
+          updated_at: string
+          user_id: string | null
+          workflow_assignments: Json | null
+          workflow_status: string | null
+        }
+        Insert: {
+          client_organization_id?: string | null
+          created_at?: string
+          detected_sections?: Json | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type: string
+          organization_id?: string | null
+          owner_id?: string | null
+          processing_metadata?: Json | null
+          public_url?: string | null
+          status?: string
+          total_pages?: number | null
+          updated_at?: string
+          user_id?: string | null
+          workflow_assignments?: Json | null
+          workflow_status?: string | null
+        }
+        Update: {
+          client_organization_id?: string | null
+          created_at?: string
+          detected_sections?: Json | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string
+          organization_id?: string | null
+          owner_id?: string | null
+          processing_metadata?: Json | null
+          public_url?: string | null
+          status?: string
+          total_pages?: number | null
+          updated_at?: string
+          user_id?: string | null
+          workflow_assignments?: Json | null
+          workflow_status?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           client_organization_id: string | null
@@ -544,6 +719,39 @@ export type Database = {
           user_id?: string | null
           validated_by?: string | null
           validation_status?: string | null
+        }
+        Relationships: []
+      }
+      feature_flags: {
+        Row: {
+          created_at: string
+          description: string | null
+          flag_name: string
+          id: string
+          is_enabled: boolean | null
+          organization_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          flag_name: string
+          id?: string
+          is_enabled?: boolean | null
+          organization_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          flag_name?: string
+          id?: string
+          is_enabled?: boolean | null
+          organization_id?: string | null
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -2140,6 +2348,10 @@ export type Database = {
       get_user_organizations: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      is_feature_enabled: {
+        Args: { flag_name: string; org_id?: string; user_id_param?: string }
+        Returns: boolean
       }
       is_org_admin: {
         Args: { org_id: string }
