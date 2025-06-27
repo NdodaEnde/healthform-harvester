@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,15 +15,15 @@ import {
 } from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
-import RecentDocuments from "@/components/dashboard/RecentDocuments";
-import QuickActions from "@/components/dashboard/QuickActions";
-import DocumentProcessingTrends from "@/components/dashboard/DocumentProcessingTrends";
-import RecentActivity from "@/components/dashboard/RecentActivity";
+import { RecentDocuments } from "@/components/dashboard/RecentDocuments";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { DocumentProcessingTrends } from "@/components/dashboard/DocumentProcessingTrends";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { FeatureFlagBanner, CompoundDocumentsList } from "@/components/compound-documents";
 
 const Dashboard = () => {
   const { currentOrganization, currentClient, isServiceProvider } = useOrganization();
-  const { data: metrics, isLoading } = useDashboardMetrics();
+  const metrics = useDashboardMetrics();
 
   const getDisplayName = () => {
     if (isServiceProvider()) {
@@ -31,7 +32,7 @@ const Dashboard = () => {
     return currentOrganization?.name || "Your Organization";
   };
 
-  if (isLoading) {
+  if (metrics.loading) {
     return (
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
@@ -84,7 +85,7 @@ const Dashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.totalActiveEmployees || 0}</div>
+            <div className="text-2xl font-bold">{metrics.totalActiveEmployees || 0}</div>
             <p className="text-xs text-muted-foreground">
               Total registered employees
             </p>
@@ -98,7 +99,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {metrics?.complianceRate ? `${Math.round(metrics.complianceRate)}%` : '0%'}
+              {metrics.complianceRate ? `${Math.round(metrics.complianceRate)}%` : '0%'}
             </div>
             <p className="text-xs text-muted-foreground">
               Current compliance status
@@ -112,7 +113,7 @@ const Dashboard = () => {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.certificatesExpiring || 0}</div>
+            <div className="text-2xl font-bold">{metrics.certificatesExpiring || 0}</div>
             <p className="text-xs text-muted-foreground">
               Certificates expiring in 30 days
             </p>
@@ -125,7 +126,7 @@ const Dashboard = () => {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.testsThisMonth || 0}</div>
+            <div className="text-2xl font-bold">{metrics.testsThisMonth || 0}</div>
             <p className="text-xs text-muted-foreground">
               Tests completed this month
             </p>
