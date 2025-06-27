@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -97,6 +96,131 @@ function detectSignatureAndStamp(result: any): { signature: boolean; stamp: bool
   console.log('=== END SIGNATURE/STAMP DETECTION ===');
   
   return signatureDetection;
+}
+
+/**
+ * Detects compound document sections based on content analysis
+ */
+function detectCompoundSections(result: any, documentType: string): any[] {
+  console.log('=== COMPOUND SECTION DETECTION ===');
+  
+  const detectedSections = [];
+  const chunks = result?.chunks || [];
+  const markdown = result?.markdown || '';
+  
+  // Define section patterns for medical documents
+  const sectionPatterns = [
+    {
+      section_type: 'medical_questionnaire',
+      section_name: 'Medical Questionnaire',
+      keywords: ['medical history', 'questionnaire', 'health questionnaire', 'medical form'],
+      confidence_threshold: 0.7
+    },
+    {
+      section_type: 'vision_test',
+      section_name: 'Vision Test Results',
+      keywords: ['vision', 'visual', 'eye test', 'sight', 'optical'],
+      confidence_threshold: 0.8
+    },
+    {
+      section_type: 'hearing_test',
+      section_name: 'Hearing Assessment',
+      keywords: ['hearing', 'audiometry', 'audio', 'ear test', 'acoustic'],
+      confidence_threshold: 0.8
+    },
+    {
+      section_type: 'lung_function',
+      section_name: 'Lung Function Test',
+      keywords: ['lung', 'spirometry', 'respiratory', 'breathing', 'pulmonary'],
+      confidence_threshold: 0.8
+    },
+    {
+      section_type: 'physical_examination',
+      section_name: 'Physical Examination',
+      keywords: ['physical exam', 'clinical examination', 'medical examination', 'fitness exam'],
+      confidence_threshold: 0.7
+    },
+    {
+      section_type: 'drug_screen',
+      section_name: 'Drug Screening',
+      keywords: ['drug screen', 'substance test', 'toxicology', 'urine test'],
+      confidence_threshold: 0.9
+    },
+    {
+      section_type: 'x_ray_report',
+      section_name: 'X-Ray Report',
+      keywords: ['x-ray', 'xray', 'radiograph', 'chest x-ray', 'imaging'],
+      confidence_threshold: 0.9
+    },
+    {
+      section_type: 'fitness_declaration',
+      section_name: 'Fitness Declaration',
+      keywords: ['fitness', 'fit for work', 'work fitness', 'medical fitness', 'declaration'],
+      confidence_threshold: 0.8
+    }
+  ];
+
+  // Analyze content for each potential section
+  sectionPatterns.forEach(pattern => {
+    let sectionFound = false;
+    let maxConfidence = 0;
+    let pageRange = '1';
+    
+    // Check in markdown content
+    const markdownLower = markdown.toLowerCase();
+    const keywordMatches = pattern.keywords.filter(keyword => 
+      markdownLower.includes(keyword.toLowerCase())
+    );
+    
+    if (keywordMatches.length > 0) {
+      const confidence = Math.min(0.95, keywordMatches.length / pattern.keywords.length + 0.3);
+      if (confidence >= pattern.confidence_threshold) {
+        maxConfidence = Math.max(maxConfidence, confidence);
+        sectionFound = true;
+      }
+    }
+    
+    // Check in chunks for more precise detection
+    chunks.forEach((chunk: any, index: number) => {
+      const chunkText = (chunk.text || '').toLowerCase();
+      const matches = pattern.keywords.filter(keyword => 
+        chunkText.includes(keyword.toLowerCase())
+      );
+      
+      if (matches.length > 0) {
+        const confidence = Math.min(0.95, matches.length / pattern.keywords.length + 0.4);
+        if (confidence >= pattern.confidence_threshold) {
+          maxConfidence = Math.max(maxConfidence, confidence);
+          sectionFound = true;
+          
+          // Try to determine page range from chunk metadata
+          if (chunk.grounding && chunk.grounding.length > 0) {
+            const pages = chunk.grounding.map((g: any) => g.page_number || 1);
+            const minPage = Math.min(...pages);
+            const maxPage = Math.max(...pages);
+            pageRange = minPage === maxPage ? `${minPage}` : `${minPage}-${maxPage}`;
+          }
+        }
+      }
+    });
+    
+    if (sectionFound) {
+      detectedSections.push({
+        section_type: pattern.section_type,
+        section_name: pattern.section_name,
+        page_range: pageRange,
+        confidence: maxConfidence,
+        extracted_content: keywordMatches.length > 0 ? `Found keywords: ${keywordMatches.join(', ')}` : undefined
+      });
+      
+      console.log(`✅ Detected section: ${pattern.section_name} (confidence: ${maxConfidence.toFixed(2)})`);
+    }
+  });
+  
+  console.log(`Total sections detected: ${detectedSections.length}`);
+  console.log('=== END COMPOUND SECTION DETECTION ===');
+  
+  return detectedSections;
 }
 
 /**
@@ -308,6 +432,7 @@ serve(async (req) => {
     const userId = formData.get('userId');
     const filePath = formData.get('filePath') || '';
     const patientId = formData.get('patientId');
+    const isCompoundDocument = formData.get('isCompoundDocument') === 'true';
 
     if (!file || !(file instanceof File)) {
       throw new Error('No file provided');
@@ -320,6 +445,7 @@ serve(async (req) => {
     console.log(`Processing document of type: ${documentType}`);
     console.log(`File name: ${file.name}, size: ${file.size} bytes`);
     console.log(`Using file path: ${filePath}`);
+    console.log(`Is compound document: ${isCompoundDocument}`);
     if (patientId) {
       console.log(`Linking to patient ID: ${patientId}`);
     }
@@ -334,6 +460,7 @@ serve(async (req) => {
     let documentResult = null;
     let rawContent = "";
     let chunks = [];
+    let detectedSections = [];
     
     try {
       // Step 1: Send the file to the microservice
@@ -375,6 +502,11 @@ serve(async (req) => {
       rawContent = documentResult.markdown || "";
       chunks = documentResult.chunks || [];
       
+      // For compound documents, detect sections
+      if (isCompoundDocument) {
+        detectedSections = detectCompoundSections(documentResult, documentType);
+      }
+      
       // Cleanup on the microservice side (in background)
       fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
         method: 'DELETE'
@@ -389,6 +521,7 @@ serve(async (req) => {
       // Fallback: Create a basic document record without processing
       rawContent = `Document uploaded: ${file.name}`;
       chunks = [];
+      detectedSections = [];
       documentResult = {
         markdown: rawContent,
         chunks: chunks,
@@ -461,6 +594,7 @@ serve(async (req) => {
     console.log("Raw content first 200 chars:", rawContent.substring(0, 200));
     console.log("Document type:", documentType);
     console.log("Chunks count:", chunks.length);
+    console.log("Detected sections count:", detectedSections.length);
     
     // Process chunks to create structured data
     const structuredData: any = {};
@@ -530,6 +664,7 @@ serve(async (req) => {
     const hasStructuredData = Object.keys(structuredData).length > 0;
     const hasValidContent = rawContent && rawContent.length > 50;
     const hasChunks = chunks && chunks.length > 0;
+    const hasSections = detectedSections && detectedSections.length > 0;
     const isFallback = documentResult?.metadata?.fallback;
     
     let documentStatus = 'pending';
@@ -537,7 +672,7 @@ serve(async (req) => {
     if (isFallback) {
       documentStatus = 'uploaded'; // New status for fallback documents
       console.log("Document uploaded without processing due to microservice unavailability");
-    } else if (hasStructuredData && hasValidContent) {
+    } else if (hasStructuredData && hasValidContent && (hasSections || !isCompoundDocument)) {
       documentStatus = 'processed';
       console.log("Document has structured data and content, marking as 'processed'");
     } else if (hasValidContent && hasChunks) {
@@ -552,7 +687,7 @@ serve(async (req) => {
     }
     
     // Create document record in database
-    const documentRecord = {
+    let documentRecord: any = {
       user_id: userId,
       file_path: storagePath,
       file_name: file.name,
@@ -574,53 +709,118 @@ serve(async (req) => {
         }
       }
     };
-    
-    console.log(`Creating document record in database with status '${documentStatus}'`);
-    if (patientId) {
-      console.log(`Document will be linked to patient ${patientId}`);
-    }
-    
-    const { data: insertedDoc, error: insertError } = await supabase
-      .from('documents')
-      .insert(documentRecord)
-      .select()
-      .single();
+
+    // If it's a compound document, create in compound_documents table instead
+    if (isCompoundDocument) {
+      documentRecord = {
+        file_name: file.name,
+        file_path: storagePath,
+        file_size: file.size,
+        mime_type: file.type,
+        status: documentStatus,
+        user_id: userId,
+        owner_id: patientId || null,
+        public_url: publicUrl,
+        total_pages: documentResult?.metadata?.total_pages || 0,
+        detected_sections: detectedSections,
+        processing_metadata: documentResult?.metadata || {},
+        workflow_status: 'receptionist_review',
+        workflow_assignments: {}
+      };
+
+      console.log(`Creating compound document record in database with status '${documentStatus}'`);
       
-    if (insertError) {
-      console.error("Database insert error:", insertError);
-      throw new Error(`Database error: ${insertError.message}`);
-    }
-    
-    console.log("Document processed and stored successfully:", insertedDoc.id);
-    
-    // Return the expected JSON format with documentId at the top level
-    return new Response(
-      JSON.stringify({
-        success: true,
-        documentId: insertedDoc.id,
-        document: {
-          id: insertedDoc.id,
-          status: documentStatus,
-          file_name: file.name,
-          file_size: file.size,
-          document_type: documentType,
-          public_url: publicUrl,
-          owner_id: patientId || null,
-          extracted_data: {
-            markdown: rawContent,
-            chunks: chunks,
-            structured_data: structuredData
-          }
-        },
-        message: `Document ${documentStatus} successfully`
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        }
+      const { data: insertedDoc, error: insertError } = await supabase
+        .from('compound_documents')
+        .insert(documentRecord)
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error("Database insert error:", insertError);
+        throw new Error(`Database error: ${insertError.message}`);
       }
-    );
+      
+      console.log("Compound document processed and stored successfully:", insertedDoc.id);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          documentId: insertedDoc.id,
+          document: {
+            id: insertedDoc.id,
+            status: documentStatus,
+            file_name: file.name,
+            file_size: file.size,
+            document_type: 'compound',
+            public_url: publicUrl,
+            owner_id: patientId || null,
+            detected_sections: detectedSections,
+            workflow_status: insertedDoc.workflow_status,
+            extracted_data: {
+              markdown: rawContent,
+              chunks: chunks,
+              structured_data: structuredData
+            }
+          },
+          message: `Compound document ${documentStatus} successfully`
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+    } else {
+      // Regular document processing
+      console.log(`Creating document record in database with status '${documentStatus}'`);
+      if (patientId) {
+        console.log(`Document will be linked to patient ${patientId}`);
+      }
+      
+      const { data: insertedDoc, error: insertError } = await supabase
+        .from('documents')
+        .insert(documentRecord)
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error("Database insert error:", insertError);
+        throw new Error(`Database error: ${insertError.message}`);
+      }
+      
+      console.log("Document processed and stored successfully:", insertedDoc.id);
+      
+      // Return the expected JSON format with documentId at the top level
+      return new Response(
+        JSON.stringify({
+          success: true,
+          documentId: insertedDoc.id,
+          document: {
+            id: insertedDoc.id,
+            status: documentStatus,
+            file_name: file.name,
+            file_size: file.size,
+            document_type: documentType,
+            public_url: publicUrl,
+            owner_id: patientId || null,
+            extracted_data: {
+              markdown: rawContent,
+              chunks: chunks,
+              structured_data: structuredData
+            }
+          },
+          message: `Document ${documentStatus} successfully`
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+    }
   } catch (error: any) {
     console.error("Error processing document:", error);
     
