@@ -34,11 +34,13 @@ export function useCompoundDocuments() {
       // Transform the data to match our TypeScript interface
       const transformedDocuments: CompoundDocument[] = (data || []).map(doc => ({
         ...doc,
+        status: doc.status as CompoundDocument['status'],
+        workflow_status: doc.workflow_status as CompoundDocument['workflow_status'],
         detected_sections: Array.isArray(doc.detected_sections) 
-          ? doc.detected_sections as DetectedSection[]
+          ? (doc.detected_sections as unknown as DetectedSection[])
           : [],
-        processing_metadata: doc.processing_metadata || {},
-        workflow_assignments: doc.workflow_assignments || {}
+        processing_metadata: (doc.processing_metadata as Record<string, any>) || {},
+        workflow_assignments: (doc.workflow_assignments as Record<string, any>) || {}
       }));
 
       setDocuments(transformedDocuments);
@@ -91,10 +93,10 @@ export function useCompoundDocuments() {
         user_id: user.id,
         public_url: documentData.public_url,
         total_pages: documentData.total_pages || 0,
-        detected_sections: documentData.detected_sections || [],
-        processing_metadata: documentData.processing_metadata || {},
+        detected_sections: (documentData.detected_sections || []) as any,
+        processing_metadata: (documentData.processing_metadata || {}) as any,
         workflow_status: documentData.workflow_status || 'receptionist_review',
-        workflow_assignments: documentData.workflow_assignments || {}
+        workflow_assignments: (documentData.workflow_assignments || {}) as any
       })
       .select()
       .single();
@@ -111,7 +113,12 @@ export function useCompoundDocuments() {
   const updateCompoundDocument = async (id: string, updates: Partial<CompoundDocument>) => {
     const { data, error } = await supabase
       .from('compound_documents')
-      .update(updates)
+      .update({
+        ...updates,
+        detected_sections: updates.detected_sections as any,
+        processing_metadata: updates.processing_metadata as any,
+        workflow_assignments: updates.workflow_assignments as any
+      })
       .eq('id', id)
       .select()
       .single();
@@ -179,7 +186,9 @@ export function useCompoundDocumentSections(compoundDocumentId: string | null) {
       // Transform the data to match our TypeScript interface
       const transformedSections: CompoundDocumentSection[] = (data || []).map(section => ({
         ...section,
-        extracted_data: section.extracted_data || null
+        section_type: section.section_type as CompoundDocumentSection['section_type'],
+        validation_status: section.validation_status as CompoundDocumentSection['validation_status'],
+        extracted_data: section.extracted_data as Record<string, any> | null
       }));
 
       setSections(transformedSections);
