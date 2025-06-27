@@ -2,44 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
-
-interface CompoundDocument {
-  id: string;
-  file_name: string;
-  file_path: string;
-  file_size: number | null;
-  mime_type: string;
-  status: string;
-  organization_id: string | null;
-  client_organization_id: string | null;
-  owner_id: string | null;
-  user_id: string | null;
-  public_url: string | null;
-  total_pages: number;
-  detected_sections: any[];
-  processing_metadata: any;
-  workflow_status: string;
-  workflow_assignments: any;
-  created_at: string;
-  updated_at: string;
-}
-
-interface CompoundDocumentSection {
-  id: string;
-  compound_document_id: string;
-  section_type: string;
-  section_name: string;
-  page_range: string | null;
-  extracted_data: any;
-  validation_status: string;
-  validated_by: string | null;
-  validated_at: string | null;
-  processing_confidence: number | null;
-  requires_review: boolean;
-  review_notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { CompoundDocument, CompoundDocumentSection, DetectedSection } from '@/types/compound-document';
 
 export function useCompoundDocuments() {
   const { getEffectiveOrganizationId } = useOrganization();
@@ -68,7 +31,17 @@ export function useCompoundDocuments() {
         return;
       }
 
-      setDocuments(data || []);
+      // Transform the data to match our TypeScript interface
+      const transformedDocuments: CompoundDocument[] = (data || []).map(doc => ({
+        ...doc,
+        detected_sections: Array.isArray(doc.detected_sections) 
+          ? doc.detected_sections as DetectedSection[]
+          : [],
+        processing_metadata: doc.processing_metadata || {},
+        workflow_assignments: doc.workflow_assignments || {}
+      }));
+
+      setDocuments(transformedDocuments);
       setError(null);
     } catch (err) {
       console.error('Error in fetchDocuments:', err);
@@ -82,7 +55,21 @@ export function useCompoundDocuments() {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  const createCompoundDocument = async (documentData: Partial<CompoundDocument>) => {
+  const createCompoundDocument = async (documentData: {
+    file_name: string;
+    file_path: string;
+    file_size?: number | null;
+    mime_type: string;
+    status?: string;
+    client_organization_id?: string | null;
+    owner_id?: string | null;
+    public_url?: string | null;
+    total_pages?: number;
+    detected_sections?: DetectedSection[];
+    processing_metadata?: Record<string, any>;
+    workflow_status?: string;
+    workflow_assignments?: Record<string, any>;
+  }) => {
     const organizationId = getEffectiveOrganizationId();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -93,9 +80,21 @@ export function useCompoundDocuments() {
     const { data, error } = await supabase
       .from('compound_documents')
       .insert({
-        ...documentData,
+        file_name: documentData.file_name,
+        file_path: documentData.file_path,
+        file_size: documentData.file_size,
+        mime_type: documentData.mime_type,
+        status: documentData.status || 'pending',
         organization_id: organizationId,
+        client_organization_id: documentData.client_organization_id,
+        owner_id: documentData.owner_id,
         user_id: user.id,
+        public_url: documentData.public_url,
+        total_pages: documentData.total_pages || 0,
+        detected_sections: documentData.detected_sections || [],
+        processing_metadata: documentData.processing_metadata || {},
+        workflow_status: documentData.workflow_status || 'receptionist_review',
+        workflow_assignments: documentData.workflow_assignments || {}
       })
       .select()
       .single();
@@ -177,7 +176,13 @@ export function useCompoundDocumentSections(compoundDocumentId: string | null) {
         return;
       }
 
-      setSections(data || []);
+      // Transform the data to match our TypeScript interface
+      const transformedSections: CompoundDocumentSection[] = (data || []).map(section => ({
+        ...section,
+        extracted_data: section.extracted_data || null
+      }));
+
+      setSections(transformedSections);
       setError(null);
     } catch (err) {
       console.error('Error in fetchSections:', err);
