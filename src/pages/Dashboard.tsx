@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,9 +17,10 @@ import {
   Brain,
   Shield,
   Building2,
-  Target
+  Target,
+  Bug
 } from 'lucide-react';
-import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useEnhancedDashboardMetrics } from '@/hooks/useEnhancedDashboardMetrics';
 import { usePremiumDashboardMetrics } from '@/hooks/usePremiumDashboardMetrics';
 import { usePackage } from '@/contexts/PackageContext';
 import { DocumentProcessingTrends } from '@/components/dashboard/DocumentProcessingTrends';
@@ -40,8 +42,10 @@ export default function Dashboard() {
     missingRecords,
     loading,
     error,
-    refreshMetrics
-  } = useDashboardMetrics();
+    refreshMetrics,
+    organizationId,
+    debugInfo
+  } = useEnhancedDashboardMetrics();
 
   const {
     healthIntelligenceScore,
@@ -98,6 +102,23 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Debug Info Alert (only show if there are issues) */}
+      {(error || !organizationId) && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Bug className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Debug Info:</strong> Organization ID: {debugInfo.queriedOrgId || 'null'} | 
+            Service Provider: {debugInfo.isServiceProvider ? 'Yes' : 'No'} | 
+            Clients: {debugInfo.clientOrganizations.length}
+            {error && (
+              <div className="mt-2 text-red-600">
+                <strong>Error:</strong> {error}
+              </div>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Data Quality Alert */}
       {missingRecords > 0 && (
@@ -405,7 +426,8 @@ export default function Dashboard() {
       {/* Footer */}
       <div className="text-xs text-muted-foreground">
         Last updated: {new Date().toLocaleTimeString()} • 
-        Data source: Real-time database queries
+        Data source: Real-time database queries • 
+        Org ID: {organizationId || 'None'}
         {error && (
           <span className="text-red-600 ml-2">
             (Some data may be unavailable due to errors)
