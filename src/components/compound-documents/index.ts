@@ -14,6 +14,7 @@ export { default as SmartWorkflowSuggestions } from './SmartWorkflowSuggestions'
 
 // Phase 4 components
 export { default as FeatureFlagManager } from './FeatureFlagManager';
+export { default as FeatureFlagTestingPanel } from './FeatureFlagTestingPanel';
 
 // Re-export hooks for convenience
 export { useCompoundDocuments, useCompoundDocumentSections } from '@/hooks/useCompoundDocuments';

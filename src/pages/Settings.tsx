@@ -8,10 +8,12 @@ import {
   Building, 
   Bell,
   Shield,
-  Zap
+  Zap,
+  TestTube
 } from "lucide-react";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { FeatureFlagManager } from "@/components/compound-documents";
+import FeatureFlagTestingPanel from "@/components/compound-documents/FeatureFlagTestingPanel";
 
 const Settings = () => {
   const { isFeatureEnabled } = useFeatureFlags();
@@ -26,7 +28,7 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <SettingsIcon className="h-4 w-4" />
             General
@@ -47,6 +49,11 @@ const Settings = () => {
             <Zap className="h-4 w-4" />
             Features
             <Badge variant="outline" className="ml-1">Beta</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="testing" className="flex items-center gap-2">
+            <TestTube className="h-4 w-4" />
+            Testing
+            <Badge variant="outline" className="ml-1">Dev</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -123,6 +130,26 @@ const Settings = () => {
                 <p className="text-gray-600">
                   Some features may require specific subscription tiers or organizational permissions. 
                   Contact your administrator for access to premium features.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="testing">
+          <div className="space-y-6">
+            <FeatureFlagTestingPanel />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TestTube className="h-5 w-5" />
+                  Development Tools
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  This section contains development and testing tools. Use with caution in production environments.
                 </p>
               </CardContent>
             </Card>

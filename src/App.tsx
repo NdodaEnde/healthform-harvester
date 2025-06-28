@@ -19,7 +19,7 @@ import IntegratedOccupationalHealthPage from "./pages/analytics/IntegratedOccupa
 import ReportsPage from "./pages/ReportsPage";
 import CertificateTemplatesPage from "./pages/certificates/CertificateTemplatesPage";
 import OrganizationsPage from "./pages/admin/OrganizationsPage";
-import UsersPage from "./pages/admin/UsersPage";
+import OrganizationUsersPage from "./pages/admin/OrganizationUsersPage";
 import OrganizationClientsPage from "./pages/admin/OrganizationClientsPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -57,7 +57,7 @@ function App() {
                     <Route path="/reports" element={<ReportsPage />} />
                     <Route path="/certificates/templates" element={<CertificateTemplatesPage />} />
                     <Route path="/admin/organizations" element={<OrganizationsPage />} />
-                    <Route path="/admin/users" element={<UsersPage />} />
+                    <Route path="/admin/users" element={<OrganizationUsersPage />} />
                     <Route path="/admin/organizations/:organizationId/clients" element={<OrganizationClientsPage />} />
                     <Route path="/settings" element={<Settings />} />
                     
