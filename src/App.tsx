@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { PackageProvider } from "@/contexts/PackageContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -40,37 +41,39 @@ function App() {
           <BrowserRouter>
             <AuthProvider>
               <OrganizationProvider>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/accept-invite" element={<AcceptInvitePage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/update-password" element={<UpdatePasswordPage />} />
-                  
-                  <Route element={<OrganizationProtectedRoute><DashboardLayout /></OrganizationProtectedRoute>}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/documents" element={<DocumentsPage />} />
-                    <Route path="/patients" element={<PatientsPage />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
-                    <Route path="/clinical-analytics" element={<ClinicalAnalyticsPage />} />
-                    <Route path="/integrated-occupational-health" element={<IntegratedOccupationalHealthPage />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/certificates/templates" element={<CertificateTemplatesPage />} />
-                    <Route path="/admin/organizations" element={<OrganizationsPage />} />
-                    <Route path="/admin/users" element={<OrganizationUsersPage />} />
-                    <Route path="/admin/organizations/:organizationId/clients" element={<OrganizationClientsPage />} />
-                    <Route path="/settings" element={<Settings />} />
+                <PackageProvider>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/update-password" element={<UpdatePasswordPage />} />
                     
-                    {/* Compound Documents Routes */}
-                    <Route path="/compound-documents" element={<CompoundDocumentsPage />} />
-                    <Route path="/compound-documents/:id" element={<CompoundDocumentDetailPage />} />
-                    <Route path="/analytics/compound-documents" element={<CompoundDocumentAnalyticsPage />} />
-                  </Route>
-                  
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-                <Toaster />
-                <Sonner />
+                    <Route element={<OrganizationProtectedRoute><DashboardLayout /></OrganizationProtectedRoute>}>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/documents" element={<DocumentsPage />} />
+                      <Route path="/patients" element={<PatientsPage />} />
+                      <Route path="/analytics" element={<AnalyticsPage />} />
+                      <Route path="/clinical-analytics" element={<ClinicalAnalyticsPage />} />
+                      <Route path="/integrated-occupational-health" element={<IntegratedOccupationalHealthPage />} />
+                      <Route path="/reports" element={<ReportsPage />} />
+                      <Route path="/certificates/templates" element={<CertificateTemplatesPage />} />
+                      <Route path="/admin/organizations" element={<OrganizationsPage />} />
+                      <Route path="/admin/users" element={<OrganizationUsersPage />} />
+                      <Route path="/admin/organizations/:organizationId/clients" element={<OrganizationClientsPage />} />
+                      <Route path="/settings" element={<Settings />} />
+                      
+                      {/* Compound Documents Routes */}
+                      <Route path="/compound-documents" element={<CompoundDocumentsPage />} />
+                      <Route path="/compound-documents/:id" element={<CompoundDocumentDetailPage />} />
+                      <Route path="/analytics/compound-documents" element={<CompoundDocumentAnalyticsPage />} />
+                    </Route>
+                    
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                  <Toaster />
+                  <Sonner />
+                </PackageProvider>
               </OrganizationProvider>
             </AuthProvider>
           </BrowserRouter>
