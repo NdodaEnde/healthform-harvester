@@ -47,7 +47,7 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
 
     const existingFlagNames = existingFlags?.map(f => f.flag_name) || [];
     
-    // Create organization-specific flags that don't exist yet (enabled by default)
+    // Create organization-specific flags that don't exist yet
     const flagsToCreate = COMPOUND_DOCUMENT_FLAGS.filter(
       flag => !existingFlagNames.includes(flag.flag_name)
     );
@@ -59,13 +59,13 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
           flagsToCreate.map(flag => ({
             flag_name: flag.flag_name,
             description: flag.description,
-            is_enabled: true, // Create as enabled by default
+            is_enabled: true,
             organization_id: organizationId
           }))
         );
 
       if (error) {
-        console.error('Error creating feature flags:', error);
+        console.error('Error creating organization-specific feature flags:', error);
         throw error;
       }
 
@@ -85,39 +85,8 @@ export const enableAllCompoundDocumentFeatures = async (organizationId: string) 
   console.log('Enabling all compound document features for organization:', organizationId);
   
   try {
-    // First, check if organization-specific flags exist
-    const { data: existingFlags } = await supabase
-      .from('feature_flags')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .in('flag_name', COMPOUND_DOCUMENT_FLAGS.map(f => f.flag_name));
-
-    const existingFlagNames = existingFlags?.map(f => f.flag_name) || [];
-    
-    // If some flags don't exist, create them first
-    const flagsToCreate = COMPOUND_DOCUMENT_FLAGS.filter(
-      flag => !existingFlagNames.includes(flag.flag_name)
-    );
-
-    if (flagsToCreate.length > 0) {
-      const { error: createError } = await supabase
-        .from('feature_flags')
-        .insert(
-          flagsToCreate.map(flag => ({
-            flag_name: flag.flag_name,
-            description: flag.description,
-            is_enabled: true,
-            organization_id: organizationId
-          }))
-        );
-
-      if (createError) {
-        console.error('Error creating missing feature flags:', createError);
-        throw createError;
-      }
-      
-      console.log(`Created ${flagsToCreate.length} missing organization-specific flags`);
-    }
+    // First, ensure all organization-specific flags exist
+    await initializeCompoundDocumentFlags(organizationId);
 
     // Now enable all organization-specific flags
     const { error: updateError } = await supabase

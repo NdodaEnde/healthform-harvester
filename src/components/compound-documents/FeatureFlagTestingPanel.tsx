@@ -10,7 +10,6 @@ import {
   CheckCircle, 
   AlertTriangle,
   PlayCircle,
-  StopCircle,
   RefreshCw
 } from 'lucide-react';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
@@ -56,14 +55,14 @@ const FeatureFlagTestingPanel = () => {
       toast({
         title: "Success",
         description: result.created > 0 
-          ? `Created ${result.created} organization-specific feature flags (enabled by default).`
+          ? `Successfully created ${result.created} organization-specific feature flags.`
           : "All feature flags already exist for your organization.",
       });
       await refreshFlags();
     } else {
       toast({
         title: "Error",
-        description: "Failed to initialize feature flags. Check console for details.",
+        description: "Failed to initialize feature flags. Please check your permissions.",
         variant: "destructive"
       });
     }
@@ -96,7 +95,7 @@ const FeatureFlagTestingPanel = () => {
     } else {
       toast({
         title: "Error",
-        description: "Failed to enable features. Check console for details.",
+        description: "Failed to enable features. Please check your permissions.",
         variant: "destructive"
       });
     }
@@ -158,12 +157,12 @@ const FeatureFlagTestingPanel = () => {
           <h4 className="font-medium">Feature Status (Organization-Specific)</h4>
           {compoundFeatures.map(feature => (
             <div key={feature} className="flex items-center justify-between p-2 border rounded">
-              <span className="text-sm">{feature.replace(/_/g, ' ').toLowerCase()}</span>
+              <span className="text-sm capitalize">{feature.replace(/_/g, ' ')}</span>
               <div className="flex items-center gap-2">
                 {flags[feature] ? (
                   <Zap className="h-3 w-3 text-green-600" />
                 ) : (
-                  <StopCircle className="h-3 w-3 text-gray-400" />
+                  <div className="h-3 w-3 rounded-full bg-gray-300" />
                 )}
                 <Badge variant={flags[feature] ? "default" : "secondary"}>
                   {flags[feature] ? "Enabled" : "Disabled"}
@@ -173,7 +172,7 @@ const FeatureFlagTestingPanel = () => {
           ))}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <Button 
             onClick={handleInitializeFlags}
             disabled={initializing}
