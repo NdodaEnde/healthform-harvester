@@ -8,26 +8,26 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
-import Login from "./pages/Login";
+import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Documents from "./pages/Documents";
-import Patients from "./pages/Patients";
+import DocumentsPage from "./pages/DocumentsPage";
+import PatientsPage from "./pages/PatientsPage";
 import Settings from "./pages/Settings";
-import Analytics from "./pages/Analytics";
-import ClinicalAnalytics from "./pages/ClinicalAnalytics";
-import IntegratedOccupationalHealth from "./pages/IntegratedOccupationalHealth";
-import Reports from "./pages/Reports";
-import CertificateTemplates from "./pages/CertificateTemplates";
-import Organizations from "./pages/admin/Organizations";
-import Users from "./pages/admin/Users";
-import ClientOrganizations from "./pages/admin/ClientOrganizations";
-import AcceptInvite from "./pages/AcceptInvite";
-import ResetPassword from "./pages/ResetPassword";
-import UpdatePassword from "./pages/UpdatePassword";
+import AnalyticsPage from "./pages/analytics/AnalyticsPage";
+import ClinicalAnalyticsPage from "./pages/analytics/ClinicalAnalyticsPage";
+import IntegratedOccupationalHealthPage from "./pages/analytics/IntegratedOccupationalHealthPage";
+import ReportsPage from "./pages/ReportsPage";
+import CertificateTemplatesPage from "./pages/certificates/CertificateTemplatesPage";
+import OrganizationsPage from "./pages/admin/OrganizationsPage";
+import UsersPage from "./pages/admin/UsersPage";
+import OrganizationClientsPage from "./pages/admin/OrganizationClientsPage";
+import AcceptInvitePage from "./pages/AcceptInvitePage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import UpdatePasswordPage from "./pages/UpdatePasswordPage";
 import CompoundDocumentAnalyticsPage from "./pages/analytics/CompoundDocumentAnalyticsPage";
 import CompoundDocumentsPage from "./pages/CompoundDocumentsPage";
 import CompoundDocumentDetailPage from "./pages/CompoundDocumentDetailPage";
-import ProtectedRoute from "./components/ProtectedRoute";
+import OrganizationProtectedRoute from "./components/OrganizationProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
 
 const queryClient = new QueryClient();
@@ -42,23 +42,23 @@ function App() {
               <OrganizationProvider>
                 <Routes>
                   <Route path="/" element={<Index />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/accept-invite" element={<AcceptInvite />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/update-password" element={<UpdatePassword />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/update-password" element={<UpdatePasswordPage />} />
                   
-                  <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+                  <Route element={<OrganizationProtectedRoute><DashboardLayout /></OrganizationProtectedRoute>}>
                     <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/documents" element={<Documents />} />
-                    <Route path="/patients" element={<Patients />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/clinical-analytics" element={<ClinicalAnalytics />} />
-                    <Route path="/integrated-occupational-health" element={<IntegratedOccupationalHealth />} />
-                    <Route path="/reports" element={<Reports />} />
-                    <Route path="/certificates/templates" element={<CertificateTemplates />} />
-                    <Route path="/admin/organizations" element={<Organizations />} />
-                    <Route path="/admin/users" element={<Users />} />
-                    <Route path="/admin/organizations/:organizationId/clients" element={<ClientOrganizations />} />
+                    <Route path="/documents" element={<DocumentsPage />} />
+                    <Route path="/patients" element={<PatientsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/clinical-analytics" element={<ClinicalAnalyticsPage />} />
+                    <Route path="/integrated-occupational-health" element={<IntegratedOccupationalHealthPage />} />
+                    <Route path="/reports" element={<ReportsPage />} />
+                    <Route path="/certificates/templates" element={<CertificateTemplatesPage />} />
+                    <Route path="/admin/organizations" element={<OrganizationsPage />} />
+                    <Route path="/admin/users" element={<UsersPage />} />
+                    <Route path="/admin/organizations/:organizationId/clients" element={<OrganizationClientsPage />} />
                     <Route path="/settings" element={<Settings />} />
                     
                     {/* Compound Documents Routes */}
