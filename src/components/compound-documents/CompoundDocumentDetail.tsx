@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,8 @@ import {
 import { CompoundDocument } from '@/types/compound-document';
 import SectionEditor from './SectionEditor';
 import WorkflowAssignmentPanel from './WorkflowAssignmentPanel';
+import AIProcessingIndicator from './AIProcessingIndicator';
+import SmartWorkflowSuggestions from './SmartWorkflowSuggestions';
 
 interface CompoundDocumentDetailProps {
   document: CompoundDocument;
@@ -192,17 +193,66 @@ const CompoundDocumentDetail: React.FC<CompoundDocumentDetailProps> = ({
         </TabsContent>
 
         <TabsContent value="sections">
-          <SectionEditor 
-            document={document} 
-            onSectionUpdate={onUpdate} 
-          />
+          <div className="space-y-6">
+            <SectionEditor 
+              document={document} 
+              onSectionUpdate={onUpdate} 
+            />
+            
+            {/* AI Processing Indicator */}
+            <AIProcessingIndicator 
+              documentId={document.id}
+              steps={[
+                {
+                  id: 'section-detection',
+                  name: 'AI Section Detection',
+                  status: document.detected_sections.length > 0 ? 'completed' : 'pending',
+                  progress: 100,
+                  result: `${document.detected_sections.length} sections detected`
+                },
+                {
+                  id: 'data-extraction',
+                  name: 'Data Extraction',
+                  status: 'completed',
+                  progress: 100
+                },
+                {
+                  id: 'validation',
+                  name: 'Quality Validation',
+                  status: 'processing',
+                  progress: 75
+                }
+              ]}
+              onRetry={(stepId) => console.log('Retrying step:', stepId)}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="workflow">
-          <WorkflowAssignmentPanel 
-            document={document} 
-            onWorkflowUpdate={onUpdate} 
-          />
+          <div className="space-y-6">
+            <WorkflowAssignmentPanel 
+              document={document} 
+              onWorkflowUpdate={onUpdate} 
+            />
+            
+            {/* Smart Workflow Suggestions */}
+            <SmartWorkflowSuggestions 
+              document={document}
+              suggestions={[
+                {
+                  id: 'priority-medical',
+                  type: 'priority',
+                  title: 'Expedite Medical Review',
+                  description: 'Document contains urgent medical findings that require immediate attention.',
+                  impact: 'high',
+                  confidence: 0.92,
+                  action: { type: 'set_priority', data: { priority: 'urgent' } }
+                }
+              ]}
+              onApplySuggestion={(suggestion) => console.log('Applied:', suggestion)}
+              onDismissSuggestion={(id) => console.log('Dismissed:', id)}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
