@@ -43,7 +43,8 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
     const { data: existingFlags } = await supabase
       .from('feature_flags')
       .select('flag_name')
-      .eq('organization_id', organizationId);
+      .eq('organization_id', organizationId)
+      .in('flag_name', COMPOUND_DOCUMENT_FLAGS.map(f => f.flag_name));
 
     const existingFlagNames = existingFlags?.map(f => f.flag_name) || [];
     
@@ -105,5 +106,45 @@ export const enableAllCompoundDocumentFeatures = async (organizationId: string) 
   } catch (error) {
     console.error('Error enabling compound document features:', error);
     return { success: false, error };
+  }
+};
+
+// Helper function to get all feature flags for an organization with hierarchy
+export const getOrganizationFeatureFlags = async (organizationId: string) => {
+  try {
+    // Get all organization-specific flags
+    const { data: orgFlags, error: orgError } = await supabase
+      .from('feature_flags')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    if (orgError) throw orgError;
+
+    // Get all global flags
+    const { data: globalFlags, error: globalError } = await supabase
+      .from('feature_flags')
+      .select('*')
+      .is('organization_id', null);
+
+    if (globalError) throw globalError;
+
+    // Create a map with organization flags taking precedence over global flags
+    const flagMap = new Map();
+    
+    // First add global flags
+    globalFlags?.forEach(flag => {
+      flagMap.set(flag.flag_name, { ...flag, source: 'global' });
+    });
+    
+    // Then override with organization-specific flags
+    orgFlags?.forEach(flag => {
+      flagMap.set(flag.flag_name, { ...flag, source: 'organization' });
+    });
+
+    return Array.from(flagMap.values());
+
+  } catch (error) {
+    console.error('Error getting organization feature flags:', error);
+    throw error;
   }
 };

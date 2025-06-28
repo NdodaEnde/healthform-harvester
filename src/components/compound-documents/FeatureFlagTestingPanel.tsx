@@ -10,7 +10,9 @@ import {
   CheckCircle, 
   AlertTriangle,
   PlayCircle,
-  RefreshCw
+  RefreshCw,
+  Globe,
+  Building
 } from 'lucide-react';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -49,17 +51,22 @@ const FeatureFlagTestingPanel = () => {
       return;
     }
 
-    const result = await initializeCompoundDocumentFlags(organizationId);
-    
-    if (result.success) {
-      toast({
-        title: "Success",
-        description: result.created > 0 
-          ? `Successfully created ${result.created} organization-specific feature flags.`
-          : "All feature flags already exist for your organization.",
-      });
-      await refreshFlags();
-    } else {
+    try {
+      const result = await initializeCompoundDocumentFlags(organizationId);
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.created > 0 
+            ? `Successfully created ${result.created} organization-specific feature flags.`
+            : "All feature flags already exist for your organization.",
+        });
+        await refreshFlags();
+      } else {
+        throw result.error;
+      }
+    } catch (error) {
+      console.error('Error initializing flags:', error);
       toast({
         title: "Error",
         description: "Failed to initialize feature flags. Please check your permissions.",
@@ -84,15 +91,20 @@ const FeatureFlagTestingPanel = () => {
       return;
     }
 
-    const result = await enableAllCompoundDocumentFeatures(organizationId);
-    
-    if (result.success) {
-      toast({
-        title: "Success",
-        description: "All compound document features enabled for your organization!",
-      });
-      await refreshFlags();
-    } else {
+    try {
+      const result = await enableAllCompoundDocumentFeatures(organizationId);
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "All compound document features enabled for your organization!",
+        });
+        await refreshFlags();
+      } else {
+        throw result.error;
+      }
+    } catch (error) {
+      console.error('Error enabling features:', error);
       toast({
         title: "Error",
         description: "Failed to enable features. Please check your permissions.",
@@ -147,23 +159,39 @@ const FeatureFlagTestingPanel = () => {
           </div>
           <AlertDescription className={allEnabled ? 'text-green-700' : 'text-yellow-700'}>
             {allEnabled 
-              ? 'All compound document features are enabled for your organization. You can now test the full workflow.'
-              : 'Initialize and enable compound document features for your organization to start testing.'
+              ? 'All compound document features are enabled. You can now test the full workflow.'
+              : 'Initialize and enable compound document features to start testing.'
             }
           </AlertDescription>
         </Alert>
 
         <div className="space-y-3">
-          <h4 className="font-medium">Feature Status (Organization-Specific)</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium">Feature Status</h4>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Globe className="h-3 w-3" />
+              <span>Global</span>
+              <Building className="h-3 w-3 ml-2" />
+              <span>Organization</span>
+            </div>
+          </div>
+          
           {compoundFeatures.map(feature => (
-            <div key={feature} className="flex items-center justify-between p-2 border rounded">
-              <span className="text-sm capitalize">{feature.replace(/_/g, ' ')}</span>
+            <div key={feature} className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  {flags[feature] ? (
+                    <Zap className="h-3 w-3 text-green-600" />
+                  ) : (
+                    <div className="h-3 w-3 rounded-full bg-gray-300" />
+                  )}
+                </div>
+                <span className="text-sm font-medium capitalize">
+                  {feature.replace(/_/g, ' ')}
+                </span>
+              </div>
+              
               <div className="flex items-center gap-2">
-                {flags[feature] ? (
-                  <Zap className="h-3 w-3 text-green-600" />
-                ) : (
-                  <div className="h-3 w-3 rounded-full bg-gray-300" />
-                )}
                 <Badge variant={flags[feature] ? "default" : "secondary"}>
                   {flags[feature] ? "Enabled" : "Disabled"}
                 </Badge>

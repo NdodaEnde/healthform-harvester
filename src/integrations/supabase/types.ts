@@ -755,6 +755,39 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_flags_backup_migration: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          flag_name: string | null
+          id: string | null
+          is_enabled: boolean | null
+          organization_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          flag_name?: string | null
+          id?: string | null
+          is_enabled?: boolean | null
+          organization_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          flag_name?: string | null
+          id?: string | null
+          is_enabled?: boolean | null
+          organization_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       form_templates: {
         Row: {
           category: string | null

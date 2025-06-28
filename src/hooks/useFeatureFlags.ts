@@ -10,6 +10,7 @@ interface FeatureFlag {
   description: string;
   organization_id: string | null;
   user_id: string | null;
+  source?: 'global' | 'organization' | 'user';
 }
 
 export function useFeatureFlags() {
@@ -28,7 +29,7 @@ export function useFeatureFlags() {
 
       const organizationId = getEffectiveOrganizationId();
 
-      // Fetch all relevant feature flags
+      // Fetch all relevant feature flags with proper hierarchy
       const { data, error } = await supabase
         .from('feature_flags')
         .select('*')
@@ -80,5 +81,87 @@ export function useFeatureFlags() {
     loading,
     isFeatureEnabled,
     refreshFlags: fetchFeatureFlags
+  };
+}
+
+// Enhanced hook for individual feature flag checking with hierarchy
+export function useFeatureFlag(flagName: string) {
+  const { getEffectiveOrganizationId } = useOrganization();
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<'organization' | 'global' | null>(null);
+
+  useEffect(() => {
+    const checkFeatureFlag = async () => {
+      const organizationId = getEffectiveOrganizationId();
+      if (!organizationId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Step 1: Check for organization-specific flag first
+        const { data: orgFlag, error: orgError } = await supabase
+          .from('feature_flags')
+          .select('is_enabled, flag_name')
+          .eq('flag_name', flagName)
+          .eq('organization_id', organizationId)
+          .maybeSingle();
+
+        if (orgError) throw orgError;
+
+        // If organization-specific flag exists, use it
+        if (orgFlag) {
+          setIsEnabled(orgFlag.is_enabled);
+          setSource('organization');
+          return;
+        }
+
+        // Step 2: Fallback to global flag
+        const { data: globalFlag, error: globalError } = await supabase
+          .from('feature_flags')
+          .select('is_enabled, flag_name')
+          .eq('flag_name', flagName)
+          .is('organization_id', null)
+          .maybeSingle();
+
+        if (globalError) throw globalError;
+
+        if (globalFlag) {
+          setIsEnabled(globalFlag.is_enabled);
+          setSource('global');
+          return;
+        }
+
+        // Step 3: Flag doesn't exist anywhere
+        setIsEnabled(false);
+        setSource(null);
+
+      } catch (error) {
+        console.error(`Error checking feature flag '${flagName}':`, error);
+        setIsEnabled(false);
+        setSource(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkFeatureFlag();
+  }, [flagName, getEffectiveOrganizationId]);
+
+  return { isEnabled, loading, source };
+}
+
+// Utility hook specifically for compound documents
+export function useCompoundDocumentsEnabled() {
+  const { isEnabled, loading, source } = useFeatureFlag('compound_documents_enabled');
+  
+  return {
+    isEnabled,
+    loading,
+    source,
+    isEnabledGlobally: source === 'global' && isEnabled,
+    isEnabledForOrganization: source === 'organization' && isEnabled,
+    isDisabled: !loading && !isEnabled
   };
 }
