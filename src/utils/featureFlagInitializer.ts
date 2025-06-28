@@ -39,7 +39,7 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
   console.log('Initializing compound document feature flags for organization:', organizationId);
   
   try {
-    // Check which flags already exist
+    // Check which organization-specific flags already exist
     const { data: existingFlags } = await supabase
       .from('feature_flags')
       .select('flag_name')
@@ -47,7 +47,7 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
 
     const existingFlagNames = existingFlags?.map(f => f.flag_name) || [];
     
-    // Create flags that don't exist yet
+    // Create organization-specific flags that don't exist yet (enabled by default)
     const flagsToCreate = COMPOUND_DOCUMENT_FLAGS.filter(
       flag => !existingFlagNames.includes(flag.flag_name)
     );
@@ -57,7 +57,9 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
         .from('feature_flags')
         .insert(
           flagsToCreate.map(flag => ({
-            ...flag,
+            flag_name: flag.flag_name,
+            description: flag.description,
+            is_enabled: true, // Create as enabled by default
             organization_id: organizationId
           }))
         );
@@ -67,10 +69,10 @@ export const initializeCompoundDocumentFlags = async (organizationId: string) =>
         throw error;
       }
 
-      console.log(`Created ${flagsToCreate.length} feature flags:`, flagsToCreate.map(f => f.flag_name));
+      console.log(`Created ${flagsToCreate.length} organization-specific feature flags:`, flagsToCreate.map(f => f.flag_name));
       return { success: true, created: flagsToCreate.length };
     } else {
-      console.log('All compound document feature flags already exist');
+      console.log('All compound document feature flags already exist for this organization');
       return { success: true, created: 0 };
     }
   } catch (error) {
@@ -83,18 +85,53 @@ export const enableAllCompoundDocumentFeatures = async (organizationId: string) 
   console.log('Enabling all compound document features for organization:', organizationId);
   
   try {
-    const { error } = await supabase
+    // First, check if organization-specific flags exist
+    const { data: existingFlags } = await supabase
+      .from('feature_flags')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .in('flag_name', COMPOUND_DOCUMENT_FLAGS.map(f => f.flag_name));
+
+    const existingFlagNames = existingFlags?.map(f => f.flag_name) || [];
+    
+    // If some flags don't exist, create them first
+    const flagsToCreate = COMPOUND_DOCUMENT_FLAGS.filter(
+      flag => !existingFlagNames.includes(flag.flag_name)
+    );
+
+    if (flagsToCreate.length > 0) {
+      const { error: createError } = await supabase
+        .from('feature_flags')
+        .insert(
+          flagsToCreate.map(flag => ({
+            flag_name: flag.flag_name,
+            description: flag.description,
+            is_enabled: true,
+            organization_id: organizationId
+          }))
+        );
+
+      if (createError) {
+        console.error('Error creating missing feature flags:', createError);
+        throw createError;
+      }
+      
+      console.log(`Created ${flagsToCreate.length} missing organization-specific flags`);
+    }
+
+    // Now enable all organization-specific flags
+    const { error: updateError } = await supabase
       .from('feature_flags')
       .update({ is_enabled: true })
       .eq('organization_id', organizationId)
       .in('flag_name', COMPOUND_DOCUMENT_FLAGS.map(f => f.flag_name));
 
-    if (error) {
-      console.error('Error enabling feature flags:', error);
-      throw error;
+    if (updateError) {
+      console.error('Error enabling feature flags:', updateError);
+      throw updateError;
     }
 
-    console.log('Successfully enabled all compound document features');
+    console.log('Successfully enabled all compound document features for organization');
     return { success: true };
   } catch (error) {
     console.error('Error enabling compound document features:', error);

@@ -10,7 +10,8 @@ import {
   CheckCircle, 
   AlertTriangle,
   PlayCircle,
-  StopCircle
+  StopCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -54,7 +55,9 @@ const FeatureFlagTestingPanel = () => {
     if (result.success) {
       toast({
         title: "Success",
-        description: `Feature flags initialized. ${result.created} new flags created.`,
+        description: result.created > 0 
+          ? `Created ${result.created} organization-specific feature flags (enabled by default).`
+          : "All feature flags already exist for your organization.",
       });
       await refreshFlags();
     } else {
@@ -87,7 +90,7 @@ const FeatureFlagTestingPanel = () => {
     if (result.success) {
       toast({
         title: "Success",
-        description: "All compound document features enabled!",
+        description: "All compound document features enabled for your organization!",
       });
       await refreshFlags();
     } else {
@@ -145,14 +148,14 @@ const FeatureFlagTestingPanel = () => {
           </div>
           <AlertDescription className={allEnabled ? 'text-green-700' : 'text-yellow-700'}>
             {allEnabled 
-              ? 'All compound document features are enabled. You can now test the full workflow.'
-              : 'Initialize and enable compound document features to start testing.'
+              ? 'All compound document features are enabled for your organization. You can now test the full workflow.'
+              : 'Initialize and enable compound document features for your organization to start testing.'
             }
           </AlertDescription>
         </Alert>
 
         <div className="space-y-3">
-          <h4 className="font-medium">Feature Status</h4>
+          <h4 className="font-medium">Feature Status (Organization-Specific)</h4>
           {compoundFeatures.map(feature => (
             <div key={feature} className="flex items-center justify-between p-2 border rounded">
               <span className="text-sm">{feature.replace(/_/g, ' ').toLowerCase()}</span>
@@ -173,18 +176,27 @@ const FeatureFlagTestingPanel = () => {
         <div className="flex gap-3">
           <Button 
             onClick={handleInitializeFlags}
-            disabled={initializing || allEnabled}
+            disabled={initializing}
             variant="outline"
           >
-            {initializing ? "Initializing..." : "Initialize Flags"}
+            {initializing ? "Initializing..." : "Initialize Organization Flags"}
           </Button>
           
           <Button 
             onClick={handleEnableAll}
-            disabled={enabling || allEnabled}
+            disabled={enabling}
           >
             <PlayCircle className="h-4 w-4 mr-2" />
             {enabling ? "Enabling..." : "Enable All Features"}
+          </Button>
+
+          <Button 
+            onClick={refreshFlags}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
 
