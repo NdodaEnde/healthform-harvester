@@ -20,6 +20,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { DocumentProcessingTrends } from "@/components/dashboard/DocumentProcessingTrends";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { FeatureFlagBanner, CompoundDocumentsList } from "@/components/compound-documents";
+import CompoundDocumentWidget from "@/components/dashboard/CompoundDocumentWidget";
 
 const Dashboard = () => {
   const { currentOrganization, currentClient, isServiceProvider } = useOrganization();
@@ -144,8 +145,11 @@ const Dashboard = () => {
           <RecentDocuments />
         </div>
 
-        {/* Quick Actions */}
-        <QuickActions />
+        {/* Quick Actions and Widget */}
+        <div className="space-y-6">
+          <QuickActions />
+          <CompoundDocumentWidget />
+        </div>
       </div>
 
       {/* Secondary Content Grid */}

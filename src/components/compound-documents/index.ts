@@ -1,3 +1,4 @@
+
 // Compound Documents Module Exports
 export { default as CompoundDocumentsList } from './CompoundDocumentsList';
 export { default as FeatureFlagBanner } from './FeatureFlagBanner';
@@ -10,6 +11,9 @@ export { default as CompoundDocumentDetail } from './CompoundDocumentDetail';
 export { default as AIProcessingIndicator } from './AIProcessingIndicator';
 export { default as CompoundDocumentAnalytics } from './CompoundDocumentAnalytics';
 export { default as SmartWorkflowSuggestions } from './SmartWorkflowSuggestions';
+
+// Phase 4 components
+export { default as FeatureFlagManager } from './FeatureFlagManager';
 
 // Re-export hooks for convenience
 export { useCompoundDocuments, useCompoundDocumentSections } from '@/hooks/useCompoundDocuments';

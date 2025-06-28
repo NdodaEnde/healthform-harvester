@@ -17,12 +17,14 @@ import {
   ActivitySquare,
   HardHat,
   Crown,
-  Zap
+  Zap,
+  FolderOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import OrganizationSwitcher from "@/components/OrganizationSwitcher";
 import PackageBadge from "@/components/PackageBadge";
 import FeatureDiscoveryTooltip from "@/components/FeatureDiscoveryTooltip";
@@ -33,6 +35,7 @@ export function DashboardSidebar() {
   const [isLoading, setIsLoading] = useState(true);
   const { currentOrganization, isServiceProvider } = useOrganization();
   const { currentTier, hasFeature } = useSubscription();
+  const { isFeatureEnabled } = useFeatureFlags();
   
   // Simulate loading state
   React.useEffect(() => {
@@ -54,6 +57,13 @@ export function DashboardSidebar() {
       icon: FileText,
       tier: "basic"
     },
+    ...(isFeatureEnabled('compound_documents_enabled') ? [{
+      name: "Compound Documents",
+      href: "/compound-documents", 
+      icon: FolderOpen,
+      tier: "premium",
+      feature: "compound_documents_enabled"
+    }] : []),
     {
       name: "Patients",
       href: "/patients",
@@ -66,6 +76,13 @@ export function DashboardSidebar() {
       icon: BarChart,
       tier: "basic"
     },
+    ...(isFeatureEnabled('compound_documents_enabled') ? [{
+      name: "Document Analytics",
+      href: "/analytics/compound-documents",
+      icon: LineChart,
+      tier: "premium",
+      feature: "compound_documents_enabled"
+    }] : []),
     {
       name: "Clinical Analytics",
       href: "/clinical-analytics",
@@ -266,7 +283,8 @@ export function DashboardSidebar() {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     collapsed && "justify-center px-0",
                     item.name === "Patients" && isActive && "bg-purple-100 text-purple-800",
-                    item.name === "Occupational Health" && isActive && "bg-blue-100 text-blue-800"
+                    item.name === "Occupational Health" && isActive && "bg-blue-100 text-blue-800",
+                    item.name === "Compound Documents" && isActive && "bg-green-100 text-green-800"
                   )
                 }
                 style={{ animationDelay: `${index * 0.1}s` }}
