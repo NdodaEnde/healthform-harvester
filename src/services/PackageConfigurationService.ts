@@ -4,11 +4,9 @@ import { PackageTier, FeatureKey } from '@/types/subscription';
 export interface MetricConfig {
   id: string;
   title: string;
+  description: string;
   icon: string;
   color: string;
-  description: string;
-  isPremium?: boolean;
-  isEnterprise?: boolean;
 }
 
 export interface LanguageConfig {
@@ -34,228 +32,158 @@ export interface PackageConfiguration {
   metrics: MetricConfig[];
   language: LanguageConfig;
   colors: ColorConfig;
-  maxUsers?: number;
-  maxClients?: number;
   features: FeatureKey[];
-  upgradeTarget?: PackageTier;
 }
 
-// Metric configurations
-const basicMetrics: MetricConfig[] = [
-  {
-    id: 'active_employees',
-    title: 'Active Employees',
-    icon: 'Users',
-    color: 'text-blue-600',
-    description: 'Total active workforce'
-  },
-  {
-    id: 'compliance_rate',
-    title: 'Compliance Rate',
-    icon: 'CheckCircle',
-    color: 'text-green-600',
-    description: 'Overall compliance percentage'
-  },
-  {
-    id: 'expiring_certificates',
-    title: 'Expiring Soon',
-    icon: 'Clock',
-    color: 'text-yellow-600',
-    description: 'Certificates expiring in 30 days'
-  },
-  {
-    id: 'monthly_tests',
-    title: 'Monthly Tests',
-    icon: 'FileText',
-    color: 'text-gray-600',
-    description: 'Tests completed this month'
-  }
-];
-
-const premiumMetrics: MetricConfig[] = [
-  {
-    id: 'health_intelligence_score',
-    title: 'Health Intelligence Score',
-    icon: 'Target',
-    color: 'text-purple-600',
-    description: 'AI-powered health scoring',
-    isPremium: true
-  },
-  {
-    id: 'risk_predictions',
-    title: 'Risk Predictions',
-    icon: 'AlertTriangle',
-    color: 'text-red-600',
-    description: 'ML-powered risk detection',
-    isPremium: true
-  },
-  {
-    id: 'department_analytics',
-    title: 'Department Analytics',
-    icon: 'Building2',
-    color: 'text-blue-600',
-    description: 'Granular department insights',
-    isPremium: true
-  },
-  {
-    id: 'trend_accuracy',
-    title: 'Trend Accuracy',
-    icon: 'BarChart3',
-    color: 'text-green-600',
-    description: 'Predictive model accuracy',
-    isPremium: true
-  }
-];
-
-const enterpriseMetrics: MetricConfig[] = [
-  {
-    id: 'competitive_benchmarking',
-    title: 'Market Benchmarking',
-    icon: 'TrendingUp',
-    color: 'text-purple-600',
-    description: 'Industry performance comparison',
-    isEnterprise: true
-  },
-  {
-    id: 'roi_health_investments',
-    title: 'Health ROI',
-    icon: 'DollarSign',
-    color: 'text-green-600',
-    description: 'Return on health investments',
-    isEnterprise: true
-  },
-  {
-    id: 'regulatory_risk_score',
-    title: 'Regulatory Risk',
-    icon: 'Shield',
-    color: 'text-red-600',
-    description: 'Compliance risk assessment',
-    isEnterprise: true
-  },
-  {
-    id: 'custom_business_kpis',
-    title: 'Custom KPIs',
-    icon: 'Settings',
-    color: 'text-gray-600',
-    description: 'Tailored business metrics',
-    isEnterprise: true
-  }
-];
-
-// Package configurations
-export const PACKAGE_CONFIGURATIONS: Record<PackageTier, PackageConfiguration> = {
-  basic: {
-    tier: 'basic',
-    displayName: 'Essential Health Management',
-    metrics: basicMetrics,
-    language: {
-      dashboardTitle: 'Health Overview',
-      executiveSummaryTitle: 'Current Health Status',
-      executiveSummaryDescription: 'Essential insights into your workforce health and compliance status.',
-      upgradePromptTitle: 'Unlock Advanced Features',
-      upgradePromptDescription: 'Upgrade to Premium for AI-powered insights and predictive analytics.',
-      featuresTitle: 'Essential Features'
-    },
-    colors: {
-      primary: 'bg-blue-600',
-      accent: 'text-blue-600',
-      background: 'bg-blue-50',
-      border: 'border-blue-200',
-      text: 'text-blue-800'
-    },
-    maxUsers: 5,
-    maxClients: 10,
-    features: [
-      'employee_status_overview',
-      'compliance_tracking',
-      'basic_reporting',
-      'certificate_alerts',
-      'simple_charts'
-    ],
-    upgradeTarget: 'premium'
-  },
-  
-  premium: {
-    tier: 'premium',
-    displayName: 'Intelligent Health Analytics',
-    metrics: [...basicMetrics, ...premiumMetrics],
-    language: {
-      dashboardTitle: 'Executive Health Intelligence',
-      executiveSummaryTitle: 'AI-Powered Health Intelligence',
-      executiveSummaryDescription: 'Advanced insights with trend analysis, risk intelligence, and predictive analytics.',
-      upgradePromptTitle: 'Unlock Enterprise Features',
-      upgradePromptDescription: 'Upgrade to Enterprise for competitive benchmarking and strategic insights.',
-      featuresTitle: 'Premium Intelligence Features'
-    },
-    colors: {
-      primary: 'bg-yellow-600',
-      accent: 'text-yellow-600',
-      background: 'bg-yellow-50',
-      border: 'border-yellow-200',
-      text: 'text-yellow-800'
-    },
-    maxUsers: 25,
-    maxClients: 50,
-    features: [
-      'employee_status_overview',
-      'compliance_tracking',
-      'basic_reporting',
-      'certificate_alerts',
-      'simple_charts',
-      'trend_analysis',
-      'risk_intelligence',
-      'advanced_reporting',
-      'department_breakdowns',
-      'custom_branding',
-      'automated_scheduling'
-    ],
-    upgradeTarget: 'enterprise'
-  },
-  
-  enterprise: {
-    tier: 'enterprise',
-    displayName: 'Strategic Health Command Center',
-    metrics: [...basicMetrics, ...premiumMetrics, ...enterpriseMetrics],
-    language: {
-      dashboardTitle: 'Strategic Health Command Center',
-      executiveSummaryTitle: 'Executive Strategic Intelligence',
-      executiveSummaryDescription: 'Comprehensive strategic insights with competitive benchmarking and board-ready analytics.',
-      upgradePromptTitle: 'Full Platform Access',
-      upgradePromptDescription: 'You have access to all enterprise features and capabilities.',
-      featuresTitle: 'Enterprise Strategic Features'
-    },
-    colors: {
-      primary: 'bg-purple-600',
-      accent: 'text-purple-600',
-      background: 'bg-purple-50',
-      border: 'border-purple-200',
-      text: 'text-purple-800'
-    },
-    features: [
-      'employee_status_overview',
-      'compliance_tracking',
-      'basic_reporting',
-      'certificate_alerts',
-      'simple_charts',
-      'trend_analysis',
-      'risk_intelligence',
-      'advanced_reporting',
-      'department_breakdowns',
-      'custom_branding',
-      'automated_scheduling',
-      'predictive_analytics',
-      'competitive_benchmarking',
-      'api_access',
-      'custom_integrations',
-      'white_label_reports',
-      'dedicated_support'
-    ]
-  }
-};
-
 export class PackageConfigurationService {
+  private static readonly PACKAGE_CONFIGS: Record<PackageTier, PackageConfiguration> = {
+    basic: {
+      tier: 'basic',
+      displayName: 'Basic',
+      metrics: [
+        {
+          id: 'document_processing',
+          title: 'Document Processing',
+          description: 'Track document upload and processing rates',
+          icon: 'FileText',
+          color: 'blue'
+        },
+        {
+          id: 'extraction_accuracy',
+          title: 'Extraction Accuracy',
+          description: 'Monitor AI extraction confidence and success rates',
+          icon: 'Target',
+          color: 'green'
+        }
+      ],
+      language: {
+        dashboardTitle: 'Document Processing Dashboard',
+        executiveSummaryTitle: 'Processing Overview',
+        executiveSummaryDescription: 'Monitor your document processing and extraction performance',
+        upgradePromptTitle: 'Upgrade for Advanced Features',
+        upgradePromptDescription: 'Get enhanced analytics and premium features',
+        featuresTitle: 'Basic Features'
+      },
+      colors: {
+        primary: 'bg-blue-600',
+        accent: 'text-blue-600',
+        background: 'bg-blue-50',
+        border: 'border-blue-200',
+        text: 'text-blue-800'
+      },
+      features: [
+        'basic_analytics',
+        'document_upload',
+        'text_extraction',
+        'basic_reporting',
+        'structured_extraction_v2',
+        'extraction_comparison_tools',
+        'structured_extraction_rollout'
+      ]
+    },
+    premium: {
+      tier: 'premium',
+      displayName: 'Premium',
+      metrics: [
+        {
+          id: 'advanced_analytics',
+          title: 'Advanced Analytics',
+          description: 'Deep insights into document processing patterns',
+          icon: 'BarChart3',
+          color: 'yellow'
+        },
+        {
+          id: 'ai_insights',
+          title: 'AI Insights',
+          description: 'Machine learning powered recommendations',
+          icon: 'Brain',
+          color: 'purple'
+        }
+      ],
+      language: {
+        dashboardTitle: 'Premium Analytics Dashboard',
+        executiveSummaryTitle: 'Executive Summary',
+        executiveSummaryDescription: 'Comprehensive analytics and performance insights',
+        upgradePromptTitle: 'Unlock Enterprise Features',
+        upgradePromptDescription: 'Access strategic insights and competitive benchmarking',
+        featuresTitle: 'Premium Features'
+      },
+      colors: {
+        primary: 'bg-yellow-500',
+        accent: 'text-yellow-600',
+        background: 'bg-yellow-50',
+        border: 'border-yellow-200',
+        text: 'text-yellow-800'
+      },
+      features: [
+        'basic_analytics',
+        'document_upload',
+        'text_extraction',
+        'basic_reporting',
+        'structured_extraction_v2',
+        'extraction_comparison_tools',
+        'structured_extraction_rollout',
+        'advanced_analytics',
+        'custom_branding',
+        'priority_support',
+        'department_breakdowns'
+      ]
+    },
+    enterprise: {
+      tier: 'enterprise',
+      displayName: 'Enterprise',
+      metrics: [
+        {
+          id: 'strategic_insights',
+          title: 'Strategic Insights',
+          description: 'Enterprise-level strategic analysis and forecasting',
+          icon: 'TrendingUp',
+          color: 'purple'
+        },
+        {
+          id: 'competitive_analysis',
+          title: 'Competitive Analysis',
+          description: 'Industry benchmarking and competitive positioning',
+          icon: 'Target',
+          color: 'red'
+        }
+      ],
+      language: {
+        dashboardTitle: 'Enterprise Strategic Dashboard',
+        executiveSummaryTitle: 'Strategic Overview',
+        executiveSummaryDescription: 'Strategic insights and competitive intelligence',
+        upgradePromptTitle: 'Maximum Enterprise Value',
+        upgradePromptDescription: 'You have access to all premium features',
+        featuresTitle: 'Enterprise Features'
+      },
+      colors: {
+        primary: 'bg-purple-600',
+        accent: 'text-purple-600',
+        background: 'bg-purple-50',
+        border: 'border-purple-200',
+        text: 'text-purple-800'
+      },
+      features: [
+        'basic_analytics',
+        'document_upload',
+        'text_extraction',
+        'basic_reporting',
+        'structured_extraction_v2',
+        'extraction_comparison_tools',
+        'structured_extraction_rollout',
+        'advanced_analytics',
+        'custom_branding',
+        'priority_support',
+        'department_breakdowns',
+        'competitive_benchmarking',
+        'api_access',
+        'white_label'
+      ]
+    }
+  };
+
   static getConfig(tier: PackageTier): PackageConfiguration {
-    return PACKAGE_CONFIGURATIONS[tier];
+    return this.PACKAGE_CONFIGS[tier];
   }
 
   static getMetrics(tier: PackageTier): MetricConfig[] {
@@ -278,25 +206,37 @@ export class PackageConfigurationService {
     return this.getConfig(tier).features.includes(feature);
   }
 
-  static getUpgradeTarget(tier: PackageTier): PackageTier | undefined {
-    return this.getConfig(tier).upgradeTarget;
-  }
-
-  static getFeatureGateConfig(currentTier: PackageTier, requiredFeature: FeatureKey) {
-    // Find the minimum tier that has this feature
-    const tiers: PackageTier[] = ['basic', 'premium', 'enterprise'];
-    const requiredTier = tiers.find(tier => this.hasFeature(tier, requiredFeature));
+  static getFeatureGateConfig(tier: PackageTier, feature: FeatureKey) {
+    const hasAccess = this.hasFeature(tier, feature);
     
-    if (!requiredTier) {
-      return null;
+    if (hasAccess) {
+      return { hasAccess: true };
     }
 
-    const hasAccess = this.hasFeature(currentTier, requiredFeature);
-    
-    return {
-      hasAccess,
-      requiredTier,
-      upgradeConfig: hasAccess ? null : this.getConfig(requiredTier)
-    };
+    // Determine required tier for feature
+    for (const [tierName, config] of Object.entries(this.PACKAGE_CONFIGS)) {
+      if (config.features.includes(feature)) {
+        return {
+          hasAccess: false,
+          requiredTier: tierName as PackageTier,
+          upgradeConfig: config
+        };
+      }
+    }
+
+    return { hasAccess: false };
+  }
+
+  static getUpgradeTarget(currentTier: PackageTier): PackageTier | undefined {
+    switch (currentTier) {
+      case 'basic':
+        return 'premium';
+      case 'premium':
+        return 'enterprise';
+      case 'enterprise':
+        return undefined;
+      default:
+        return 'premium';
+    }
   }
 }

@@ -40,9 +40,8 @@ export function useStructuredExtractionRollout() {
   const rolloutPercentage = 25; // Start with 25% rollout
   const userPercentage = getUserRolloutPercentage();
   
-  const shouldUseV2 = v2Enabled && 
-                      rolloutEnabled && 
-                      userPercentage < rolloutPercentage;
+  const shouldUseV2 = v2Enabled || 
+                      (rolloutEnabled && userPercentage < rolloutPercentage);
   
   return {
     shouldUseV2,

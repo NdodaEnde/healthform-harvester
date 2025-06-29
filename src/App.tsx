@@ -1,85 +1,92 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { OrganizationProvider } from "@/contexts/OrganizationContext";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { PackageProvider } from "@/contexts/PackageContext";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import DocumentsPage from "./pages/DocumentsPage";
-import PatientsPage from "./pages/PatientsPage";
-import Settings from "./pages/Settings";
-import AnalyticsPage from "./pages/analytics/AnalyticsPage";
-import ClinicalAnalyticsPage from "./pages/analytics/ClinicalAnalyticsPage";
-import IntegratedOccupationalHealthPage from "./pages/analytics/IntegratedOccupationalHealthPage";
-import ReportsPage from "./pages/ReportsPage";
-import CertificateTemplatesPage from "./pages/certificates/CertificateTemplatesPage";
-import OrganizationsPage from "./pages/admin/OrganizationsPage";
-import OrganizationUsersPage from "./pages/admin/OrganizationUsersPage";
-import OrganizationClientsPage from "./pages/admin/OrganizationClientsPage";
-import AcceptInvitePage from "./pages/AcceptInvitePage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import UpdatePasswordPage from "./pages/UpdatePasswordPage";
-import CompoundDocumentAnalyticsPage from "./pages/analytics/CompoundDocumentAnalyticsPage";
-import CompoundDocumentsPage from "./pages/CompoundDocumentsPage";
-import CompoundDocumentDetailPage from "./pages/CompoundDocumentDetailPage";
-import OrganizationProtectedRoute from "./components/OrganizationProtectedRoute";
-import DashboardLayout from "./components/DashboardLayout";
-
-const queryClient = new QueryClient();
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from '@/components/ui/toaster';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { OrganizationProvider } from '@/contexts/OrganizationContext';
+import { PackageProvider } from '@/contexts/PackageContext';
+import Layout from '@/components/Layout';
+import HomePage from '@/pages/HomePage';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import DashboardPage from '@/pages/DashboardPage';
+import OrganizationsPage from '@/pages/OrganizationsPage';
+import DocumentsPage from '@/pages/DocumentsPage';
+import PatientsPage from '@/pages/PatientsPage';
+import SettingsPage from '@/pages/settings/SettingsPage';
+import StructuredExtractionPage from '@/pages/StructuredExtractionPage';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <BrowserRouter>
-            <AuthProvider>
-              <OrganizationProvider>
-                <PackageProvider>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/accept-invite" element={<AcceptInvitePage />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
-                    <Route path="/update-password" element={<UpdatePasswordPage />} />
-                    
-                    <Route element={<OrganizationProtectedRoute><DashboardLayout /></OrganizationProtectedRoute>}>
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/documents" element={<DocumentsPage />} />
-                      <Route path="/patients" element={<PatientsPage />} />
-                      <Route path="/analytics" element={<AnalyticsPage />} />
-                      <Route path="/clinical-analytics" element={<ClinicalAnalyticsPage />} />
-                      <Route path="/integrated-occupational-health" element={<IntegratedOccupationalHealthPage />} />
-                      <Route path="/reports" element={<ReportsPage />} />
-                      <Route path="/certificates/templates" element={<CertificateTemplatesPage />} />
-                      <Route path="/admin/organizations" element={<OrganizationsPage />} />
-                      <Route path="/admin/users" element={<OrganizationUsersPage />} />
-                      <Route path="/admin/organizations/:organizationId/clients" element={<OrganizationClientsPage />} />
-                      <Route path="/settings" element={<Settings />} />
-                      
-                      {/* Compound Documents Routes */}
-                      <Route path="/compound-documents" element={<CompoundDocumentsPage />} />
-                      <Route path="/compound-documents/:id" element={<CompoundDocumentDetailPage />} />
-                      <Route path="/analytics/compound-documents" element={<CompoundDocumentAnalyticsPage />} />
-                    </Route>
-                    
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
-                  <Toaster />
-                  <Sonner />
-                </PackageProvider>
-              </OrganizationProvider>
-            </AuthProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <Router>
+      <AuthProvider>
+        <OrganizationProvider>
+          <PackageProvider>
+            <div className="min-h-screen bg-background">
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                
+                {/* Protected routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <DashboardPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/organizations" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <OrganizationsPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/documents" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <DocumentsPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/patients" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <PatientsPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/structured-extraction" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <StructuredExtractionPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <SettingsPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+                
+                {/* Redirect unknown routes to dashboard */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </div>
+            <Toaster />
+          </PackageProvider>
+        </OrganizationProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
