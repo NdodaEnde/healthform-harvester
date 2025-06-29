@@ -418,12 +418,13 @@ function classifyDocument(rawContent: string, suggestedType: string): string {
 function extractEmployeeInfo(rawContent: string) {
   const employeeInfo: any = {};
   
-  // Enhanced name extraction
+  // Enhanced name extraction with more patterns
   const namePatterns = [
     /Initials\s*&?\s*Surname:\s*([^\n\r]+?)(?:\s+ID\s+NO|$)/i,
     /Employee.*?:\s*([A-Z][A-Z\.\s]+[A-Z])/i,
     /PA\.\s+([A-Z][a-z]+)/i,
-    /Name:\s*([A-Z][a-zA-Z\s\.]+)/i
+    /Name:\s*([A-Z][a-zA-Z\s\.]+)/i,
+    /([A-Z]{1,3}\.\s+[A-Z][a-z]+)/i // Pattern like "ET. Mukhola"
   ];
   
   for (const pattern of namePatterns) {
@@ -434,12 +435,13 @@ function extractEmployeeInfo(rawContent: string) {
     }
   }
   
-  // Enhanced ID number extraction
+  // Enhanced ID number extraction with more flexible patterns
   const idPatterns = [
-    /ID\s*NO:\s*([0-9\s]+[0-9])/i,
-    /ID\s*Number:\s*([0-9\s]+[0-9])/i,
+    /ID\s*NO[:\s]*([0-9\s]{11,15})/i,
+    /ID\s*Number[:\s]*([0-9\s]{11,15})/i,
     /(\d{6}\s*\d{4}\s*\d{3})/i,
-    /(\d{13})/i
+    /(\d{13})/i,
+    /(\d{2}\d{2}\d{2}\s*\d{4}\s*\d{3})/i // Format like "880303 6591 087"
   ];
   
   for (const pattern of idPatterns) {
@@ -450,11 +452,13 @@ function extractEmployeeInfo(rawContent: string) {
     }
   }
   
-  // Company name extraction
+  // Enhanced company name extraction
   const companyPatterns = [
-    /Company\s*Name:\s*([A-Z][A-Z\s]+?)(?:\s+Date|$)/i,
+    /Company\s*Name:\s*([A-Z][A-Z\s&]+?)(?:\s+Date|Pre-Employment|$)/i,
+    /(Wolf\s+Wasser)/i,
     /(APE\s+Pumps?)/i,
-    /Company.*?:\s*([A-Z][A-Za-z\s&]+)/i
+    /Company.*?:\s*([A-Z][A-Za-z\s&]+)/i,
+    /([A-Z][a-z]+\s+[A-Z][a-z]+)(?=\s+Pre-Employment|\s+PRE-)/i
   ];
   
   for (const pattern of companyPatterns) {
@@ -465,7 +469,7 @@ function extractEmployeeInfo(rawContent: string) {
     }
   }
   
-  // Job title extraction
+  // Enhanced job title extraction
   const jobPatterns = [
     /Job\s*Title:\s*([A-Z][A-Za-z\s]+?)(?:\s+PRE-|$)/i,
     /(Artisan)/i,
@@ -486,11 +490,12 @@ function extractEmployeeInfo(rawContent: string) {
 function extractMedicalExamination(rawContent: string) {
   const examination: any = {};
   
-  // Date extraction
+  // Enhanced date extraction with multiple formats
   const datePatterns = [
-    /Date\s*of\s*Examination:\s*(\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4})/i,
-    /Examination.*?Date:\s*(\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4})/i,
-    /(\d{2}[\.\/]\d{2}[\.\/]\d{4})/g
+    /Date\s*of\s*Examination:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    /Examination.*?Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    /(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/g,
+    /(\d{4}[\.\/\-]\d{1,2}[\.\/\-]\d{1,2})/g
   ];
   
   for (const pattern of datePatterns) {
@@ -501,33 +506,81 @@ function extractMedicalExamination(rawContent: string) {
     }
   }
   
-  // Examination type detection
-  if (/PRE-?EMPLOYMENT\s*[✓x]/i.test(rawContent)) {
-    examination.examination_type = 'initial';
-  } else if (/PERIODICAL\s*[✓x]/i.test(rawContent)) {
-    examination.examination_type = 'periodical';
-  } else if (/EXIT\s*[✓x]/i.test(rawContent)) {
-    examination.examination_type = 'exit';
+  // Enhanced examination type detection with checkbox symbols
+  const examinationTypePatterns = [
+    { type: 'initial', patterns: [
+      /PRE-?EMPLOYMENT\s*[☒✓x✗]/i,
+      /PRE-?EMPLOYMENT\s*\[[x✓]\]/i,
+      /PRE-?EMPLOYMENT.*?☒/i
+    ]},
+    { type: 'periodical', patterns: [
+      /PERIODICAL\s*[☒✓x✗]/i,
+      /PERIODICAL\s*\[[x✓]\]/i,
+      /PERIODICAL.*?☒/i
+    ]},
+    { type: 'exit', patterns: [
+      /EXIT\s*[☒✓x✗]/i,
+      /EXIT\s*\[[x✓]\]/i,
+      /EXIT.*?☒/i
+    ]}
+  ];
+  
+  for (const examType of examinationTypePatterns) {
+    for (const pattern of examType.patterns) {
+      if (pattern.test(rawContent)) {
+        examination.examination_type = examType.type;
+        break;
+      }
+    }
+    if (examination.examination_type) break;
   }
   
-  // Fitness status extraction
-  if (/FIT:\s*\[[x✓]\]/i.test(rawContent)) {
-    examination.fitness_status = 'FIT';
-  } else if (/Fit with Restriction.*?\[[x✓]\]/i.test(rawContent)) {
-    examination.fitness_status = 'FIT_WITH_RESTRICTIONS';
-  } else if (/Fit with Condition.*?\[[x✓]\]/i.test(rawContent)) {
-    examination.fitness_status = 'FIT_WITH_CONDITIONS';
-  } else if (/Temporary.*?Unfit.*?\[[x✓]\]/i.test(rawContent)) {
-    examination.fitness_status = 'TEMPORARILY_UNFIT';
-  } else if (/UNFIT.*?\[[x✓]\]/i.test(rawContent)) {
-    examination.fitness_status = 'UNFIT';
+  // Enhanced fitness status extraction with multiple patterns
+  const fitnessPatterns = [
+    { status: 'FIT', patterns: [
+      /Medical\s+Fitness\s+Declaration\s*\[x\]\s*FIT/i,
+      /\[x\]\s*FIT(?:\s|$)/i,
+      /☒\s*FIT(?:\s|$)/i,
+      /FIT\s*[☒✓x]/i
+    ]},
+    { status: 'FIT_WITH_RESTRICTIONS', patterns: [
+      /\[x\]\s*Fit\s+with\s+Restriction/i,
+      /☒\s*Fit\s+with\s+Restriction/i,
+      /Fit\s+with\s+Restriction\s*[☒✓x]/i
+    ]},
+    { status: 'FIT_WITH_CONDITIONS', patterns: [
+      /\[x\]\s*Fit\s+with\s+Condition/i,
+      /☒\s*Fit\s+with\s+Condition/i,
+      /Fit\s+with\s+Condition\s*[☒✓x]/i
+    ]},
+    { status: 'TEMPORARILY_UNFIT', patterns: [
+      /\[x\]\s*Temporary.*?Unfit/i,
+      /☒\s*Temporary.*?Unfit/i,
+      /Temporary.*?Unfit\s*[☒✓x]/i
+    ]},
+    { status: 'UNFIT', patterns: [
+      /\[x\]\s*UNFIT/i,
+      /☒\s*UNFIT/i,
+      /UNFIT\s*[☒✓x]/i
+    ]}
+  ];
+  
+  for (const fitness of fitnessPatterns) {
+    for (const pattern of fitness.patterns) {
+      if (pattern.test(rawContent)) {
+        examination.fitness_status = fitness.status;
+        break;
+      }
+    }
+    if (examination.fitness_status) break;
   }
   
-  // Expiry date extraction
+  // Enhanced expiry date extraction
   const expiryPatterns = [
-    /Expiry\s*Date:\s*(\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4})/i,
-    /Valid\s*Until:\s*(\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4})/i,
-    /Expires?:\s*(\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4})/i
+    /Expiry\s*Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    /Valid\s*Until:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    /Expires?:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    /Review\s*Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i
   ];
   
   for (const pattern of expiryPatterns) {
@@ -538,39 +591,174 @@ function extractMedicalExamination(rawContent: string) {
     }
   }
   
+  // Extract restrictions
+  examination.restrictions = extractRestrictions(rawContent);
+  
   // Follow-up detection
   examination.follow_up_required = /follow.*?up.*?required/i.test(rawContent) || 
-                                   /review.*?required/i.test(rawContent);
+                                   /review.*?required/i.test(rawContent) ||
+                                   examination.restrictions.length > 0;
   
   return examination;
+}
+
+function extractRestrictions(rawContent: string): string[] {
+  const restrictions: string[] = [];
+  
+  // Enhanced restriction patterns
+  const restrictionPatterns = [
+    /Restrictions?:\s*([^:]+?)(?:Comments|Medical\s+Fitness|$)/is,
+    /Confined\s+Spaces/i,
+    /Chemical\s+Exposure/i,
+    /Wear\s+Spectacles/i,
+    /Heights?\s+Work/i,
+    /Hearing\s+Protection/i,
+    /Remain\s+on\s+Treatment/i,
+    /Chronic\s+Conditions?/i
+  ];
+  
+  // First try to extract the entire restrictions section
+  const restrictionSectionMatch = rawContent.match(/Restrictions?:\s*([^:]+?)(?:Comments|Medical\s+Fitness|Dr\s|$)/is);
+  if (restrictionSectionMatch && restrictionSectionMatch[1]) {
+    const restrictionText = restrictionSectionMatch[1].trim();
+    
+    // Split by common separators and clean up
+    const splitRestrictions = restrictionText.split(/[,;]|\s+(?=[A-Z][a-z])/)
+      .map(r => r.trim())
+      .filter(r => r.length > 3 && !r.match(/^(and|or|the|of|to|for)$/i));
+    
+    restrictions.push(...splitRestrictions);
+  }
+  
+  // Also check for individual restriction keywords
+  const commonRestrictions = [
+    'Confined Spaces',
+    'Chemical Exposure', 
+    'Wear Spectacles',
+    'Height Work',
+    'Hearing Protection',
+    'Chronic Conditions Treatment'
+  ];
+  
+  for (const restriction of commonRestrictions) {
+    const pattern = new RegExp(restriction.replace(/\s+/g, '\\s+'), 'i');
+    if (pattern.test(rawContent) && !restrictions.some(r => r.toLowerCase().includes(restriction.toLowerCase()))) {
+      restrictions.push(restriction);
+    }
+  }
+  
+  return restrictions;
 }
 
 function extractMedicalTests(rawContent: string) {
   const tests: any = {};
   
-  const testTypes = [
-    { key: 'vision_test', patterns: ['vision', 'visual', 'eye test'] },
-    { key: 'hearing_test', patterns: ['hearing', 'audio', 'ear test'] },
-    { key: 'lung_function', patterns: ['lung', 'spirometry', 'respiratory'] },
-    { key: 'x_ray', patterns: ['x-ray', 'xray', 'chest'] },
-    { key: 'drug_screen', patterns: ['drug', 'urine', 'substance'] }
+  // Enhanced medical test extraction with specific result patterns
+  const testMappings = [
+    {
+      key: 'vision_test',
+      patterns: [
+        { name: /FAR,?\s*NEAR\s+VISION/i, result: /FAR,?\s*NEAR\s+VISION[:\s]*([^\n\r]+?)(?:\s+SIDE|$)/i },
+        { name: /VISION/i, result: /VISION[:\s]*([^\n\r]+?)(?:\s|$)/i }
+      ]
+    },
+    {
+      key: 'hearing_test', 
+      patterns: [
+        { name: /HEARING/i, result: /HEARING[:\s]*([^\n\r]+?)(?:\s+WORKING|$)/i }
+      ]
+    },
+    {
+      key: 'lung_function',
+      patterns: [
+        { name: /LUNG\s+FUNCTION/i, result: /LUNG\s+FUNCTION[:\s]*([^\n\r]+?)(?:\s+X-RAY|$)/i },
+        { name: /SPIROMETRY/i, result: /SPIROMETRY[:\s]*([^\n\r]+?)(?:\s|$)/i }
+      ]
+    },
+    {
+      key: 'x_ray',
+      patterns: [
+        { name: /X-?RAY/i, result: /X-?RAY[:\s]*([^\n\r]+?)(?:\s+DRUG|$)/i }
+      ]
+    },
+    {
+      key: 'drug_screen',
+      patterns: [
+        { name: /DRUG\s+SCREEN/i, result: /DRUG\s+SCREEN[:\s]*([^\n\r]+?)(?:\s|$)/i }
+      ]
+    }
   ];
   
-  testTypes.forEach(testType => {
+  // Also extract side/depth vision and night vision specifically
+  const specificTests = [
+    {
+      key: 'side_depth_vision',
+      patterns: [
+        { name: /SIDE\s*&?\s*DEPTH/i, result: /SIDE\s*&?\s*DEPTH[:\s]*([^\n\r]+?)(?:\s+NIGHT|$)/i }
+      ]
+    },
+    {
+      key: 'night_vision',
+      patterns: [
+        { name: /NIGHT\s+VISION/i, result: /NIGHT\s+VISION[:\s]*([^\n\r]+?)(?:\s+HEARING|$)/i }
+      ]
+    },
+    {
+      key: 'working_heights',
+      patterns: [
+        { name: /WORKING\s+AT\s+HEIGHTS/i, result: /WORKING\s+AT\s+HEIGHTS[:\s]*([^\n\r]+?)(?:\s+LUNG|$)/i }
+      ]
+    },
+    {
+      key: 'bloods',
+      patterns: [
+        { name: /BLOODS/i, result: /BLOODS[:\s]*([^\n\r]+?)(?:\s+FAR|$)/i }
+      ]
+    }
+  ];
+  
+  // Process all test types
+  const allTests = [...testMappings, ...specificTests];
+  
+  for (const testType of allTests) {
     const testData: any = { performed: false, result: 'N/A' };
     
-    testType.patterns.forEach(pattern => {
-      const regex = new RegExp(`${pattern}.*?([0-9\/]+|Normal|N\\/A|NEGATIVE|Positive)`, 'i');
-      const match = rawContent.match(regex);
-      
-      if (match) {
+    for (const pattern of testType.patterns) {
+      // Check if test name is mentioned
+      if (pattern.name.test(rawContent)) {
         testData.performed = true;
-        testData.result = match[1];
+        
+        // Try to extract specific result
+        const resultMatch = rawContent.match(pattern.result);
+        if (resultMatch && resultMatch[1]) {
+          let result = resultMatch[1].trim();
+          // Clean up the result
+          result = result.replace(/[:\s]+$/, '').trim();
+          if (result && result !== '' && result.length > 0) {
+            testData.result = result;
+          }
+        }
+        break;
       }
-    });
+    }
     
     tests[testType.key] = testData;
-  });
+  }
+  
+  // Map specific vision tests back to main vision_test if needed
+  if (tests.side_depth_vision?.performed || tests.night_vision?.performed) {
+    if (!tests.vision_test.performed) {
+      tests.vision_test = {
+        performed: true,
+        result: 'Multiple tests performed',
+        visual_acuity_left: tests.side_depth_vision?.result || 'N/A',
+        visual_acuity_right: tests.night_vision?.result || 'N/A'
+      };
+    } else {
+      tests.vision_test.visual_acuity_left = tests.side_depth_vision?.result || 'N/A';
+      tests.vision_test.visual_acuity_right = tests.night_vision?.result || 'N/A';
+    }
+  }
   
   return tests;
 }
@@ -578,11 +766,13 @@ function extractMedicalTests(rawContent: string) {
 function extractMedicalPractitioner(rawContent: string, chunks: any[]) {
   const practitioner: any = {};
   
-  // Doctor name patterns
+  // Enhanced doctor name patterns
   const doctorPatterns = [
+    /Dr\.?\s+([A-Z]{1,3}\s+[A-Z][a-z]+)/i, // Pattern like "Dr MJ Mphuthi"
     /Dr\.?\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
     /Doctor:\s*([A-Z][a-zA-Z\s]+)/i,
-    /Practitioner:\s*([A-Z][a-zA-Z\s]+)/i
+    /Practitioner:\s*([A-Z][a-zA-Z\s]+)/i,
+    /([A-Z]{1,3}\s+[A-Z][a-z]+).*?Occupational/i // Extract name before "Occupational"
   ];
   
   for (const pattern of doctorPatterns) {
@@ -593,11 +783,12 @@ function extractMedicalPractitioner(rawContent: string, chunks: any[]) {
     }
   }
   
-  // Practice number patterns
+  // Enhanced practice number patterns
   const practicePatterns = [
-    /Practice\s*No\.?\s*:?\s*([A-Z0-9]+)/i,
-    /MP\s*No\.?\s*:?\s*([A-Z0-9]+)/i,
-    /Registration\s*No\.?\s*:?\s*([A-Z0-9]+)/i
+    /Practice\s*No\.?[:\s]*([A-Z0-9]+)/i,
+    /MP\s*No\.?[:\s]*([A-Z0-9]+)/i,
+    /Registration\s*No\.?[:\s]*([A-Z0-9]+)/i,
+    /No[:\s]*([0-9]{7})/i // Pattern like "0404160"
   ];
   
   for (const pattern of practicePatterns) {
@@ -608,7 +799,7 @@ function extractMedicalPractitioner(rawContent: string, chunks: any[]) {
     }
   }
   
-  // Signature and stamp detection from chunks
+  // Enhanced signature and stamp detection
   practitioner.signature_present = detectSignature(rawContent, chunks);
   practitioner.stamp_present = detectStamp(rawContent, chunks);
   
@@ -616,14 +807,16 @@ function extractMedicalPractitioner(rawContent: string, chunks: any[]) {
 }
 
 function detectSignature(rawContent: string, chunks: any[]): boolean {
-  // Check for signature indicators in chunks
+  // Enhanced signature detection keywords
   const signatureKeywords = [
-    'signature', 'handwritten', 'stylized flourish', 'overlapping strokes'
+    'signature', 'handwritten', 'stylized flourish', 'overlapping strokes',
+    'vertical strokes', 'horizontal line crosses', 'flourish with a loop',
+    'signed', 'handwriting', 'pen strokes'
   ];
   
   // Check in chunks first (more reliable)
   for (const chunk of chunks) {
-    if (chunk.chunk_type === 'figure') {
+    if (chunk.chunk_type === 'figure' || chunk.type === 'figure') {
       const chunkText = (chunk.text || '').toLowerCase();
       if (signatureKeywords.some(keyword => chunkText.includes(keyword))) {
         return true;
@@ -637,8 +830,10 @@ function detectSignature(rawContent: string, chunks: any[]): boolean {
 }
 
 function detectStamp(rawContent: string, chunks: any[]): boolean {
+  // Enhanced stamp detection keywords
   const stampKeywords = [
-    'stamp', 'practice no', 'sanc no', 'hpcsa', 'official seal'
+    'stamp', 'practice no', 'sanc no', 'hpcsa', 'official seal',
+    'practice number', 'mp no', 'registration', 'sasohn'
   ];
   
   // Check in chunks first
@@ -741,12 +936,15 @@ function calculateConfidenceScore(structuredData: any): number {
   
   const baseScore = totalFields > 0 ? extractedFields / totalFields : 0;
   
-  // Boost score for key fields
+  // Enhanced key field bonuses
   let keyFieldBonus = 0;
   if (structuredData.employee_info?.full_name) keyFieldBonus += 0.1;
   if (structuredData.employee_info?.id_number) keyFieldBonus += 0.1;
   if (structuredData.medical_examination?.fitness_status) keyFieldBonus += 0.15;
   if (structuredData.medical_examination?.examination_date) keyFieldBonus += 0.1;
+  if (structuredData.medical_examination?.examination_type) keyFieldBonus += 0.1;
+  if (structuredData.medical_practitioner?.doctor_name) keyFieldBonus += 0.05;
+  if (structuredData.medical_practitioner?.signature_present) keyFieldBonus += 0.05;
   
   return Math.min(0.99, baseScore + keyFieldBonus);
 }
@@ -762,13 +960,16 @@ function validateStructuredData(extractedData: any, documentType: string) {
     if (!extractedData.medical_examination?.fitness_status) {
       errors.push('Missing fitness status');
     }
+    if (!extractedData.medical_examination?.examination_type) {
+      errors.push('Missing examination type (PRE-EMPLOYMENT/PERIODICAL/EXIT)');
+    }
   }
   
   // Date format validation
   const dateFields = ['examination_date', 'expiry_date'];
   dateFields.forEach(field => {
     const dateValue = extractedData.medical_examination?.[field];
-    if (dateValue && !/^\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4}$/.test(dateValue)) {
+    if (dateValue && !/^\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4}$/.test(dateValue)) {
       errors.push(`Invalid date format for ${field}: ${dateValue}`);
     }
   });
