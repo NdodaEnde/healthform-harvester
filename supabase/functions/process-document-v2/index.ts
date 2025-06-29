@@ -39,26 +39,44 @@ function parseHtmlTable(htmlContent: string): string[] {
   
   const items: string[] = [];
   
-  // Extract content from table cells
-  const tdMatches = htmlContent.match(/<td[^>]*>(.*?)<\/td>/gi);
-  if (tdMatches) {
-    for (const match of tdMatches) {
-      const cellContent = match.replace(/<\/?td[^>]*>/gi, '').trim();
-      const cleaned = cleanHtmlContent(cellContent);
-      if (cleaned && cleaned !== 'N/A' && cleaned.length > 1) {
-        items.push(cleaned);
+  // Only extract from tables that appear to be in the restrictions section
+  // Look for specific table patterns related to restrictions
+  const restrictionTablePattern = /<table[^>]*>[\s\S]*?(?:Heights|Dust\s+Exposure|Motorized\s+Equipment|Confined\s+Spaces|Chemical\s+Exposure|Wear\s+Spectacles|Hearing\s+Protection)[\s\S]*?<\/table>/gi;
+  
+  const restrictionTables = htmlContent.match(restrictionTablePattern) || [];
+  
+  for (const table of restrictionTables) {
+    // Extract content from table cells in restriction tables only
+    const tdMatches = table.match(/<td[^>]*>(.*?)<\/td>/gi);
+    if (tdMatches) {
+      for (const match of tdMatches) {
+        const cellContent = match.replace(/<\/?td[^>]*>/gi, '').trim();
+        const cleaned = cleanHtmlContent(cellContent);
+        
+        // Only include if it looks like an actual restriction
+        if (cleaned && 
+            cleaned !== 'N/A' && 
+            cleaned.length > 3 &&
+            /(?:spaces|exposure|spectacles|heights|protection|treatment|dust|equipment)/i.test(cleaned)) {
+          items.push(cleaned);
+        }
       }
     }
-  }
-  
-  // Also try to extract from table headers
-  const thMatches = htmlContent.match(/<th[^>]*>(.*?)<\/th>/gi);
-  if (thMatches) {
-    for (const match of thMatches) {
-      const cellContent = match.replace(/<\/?th[^>]*>/gi, '').trim();
-      const cleaned = cleanHtmlContent(cellContent);
-      if (cleaned && cleaned !== 'N/A' && cleaned.length > 1) {
-        items.push(cleaned);
+    
+    // Also try to extract from table headers in restriction context
+    const thMatches = table.match(/<th[^>]*>(.*?)<\/th>/gi);
+    if (thMatches) {
+      for (const match of thMatches) {
+        const cellContent = match.replace(/<\/?th[^>]*>/gi, '').trim();
+        const cleaned = cleanHtmlContent(cellContent);
+        
+        // Only include restriction-related headers
+        if (cleaned && 
+            cleaned !== 'N/A' && 
+            cleaned.length > 3 &&
+            /(?:restriction|confined|chemical|spectacles|heights|hearing|dust|motorized)/i.test(cleaned)) {
+          items.push(cleaned);
+        }
       }
     }
   }
@@ -722,67 +740,108 @@ function extractRestrictions(rawContent: string): string[] {
   
   console.log("=== EXTRACTING RESTRICTIONS ===");
   
-  // First, check if there's HTML table content
-  if (rawContent.includes('<table') || rawContent.includes('<td')) {
-    console.log("Detecting HTML table content in restrictions");
-    const tableItems = parseHtmlTable(rawContent);
-    console.log("Extracted from table:", tableItems);
-    restrictions.push(...tableItems);
-  }
-  
-  // Enhanced restriction patterns for text-based extraction
-  const restrictionPatterns = [
-    /Restrictions?:\s*([^:]+?)(?:Comments|Medical\s+Fitness|$)/is,
-    /Confined\s+Spaces/i,
-    /Chemical\s+Exposure/i,
-    /Wear\s+Spectacles/i,
-    /Heights?\s+Work/i,
-    /Hearing\s+Protection/i,
-    /Remain\s+on\s+Treatment/i,
-    /Chronic\s+Conditions?/i,
-    /Dust\s+Exposure/i,
-    /Motorized\s+Equipment/i
-  ];
-  
-  // Try to extract the entire restrictions section
-  const restrictionSectionMatch = rawContent.match(/Restrictions?:\s*([^:]+?)(?:Comments|Medical\s+Fitness|Dr\s|$)/is);
-  if (restrictionSectionMatch && restrictionSectionMatch[1]) {
-    const restrictionText = cleanHtmlContent(restrictionSectionMatch[1]);
-    console.log("Found restriction section:", restrictionText);
-    
-    // Split by common separators and clean up
-    const splitRestrictions = restrictionText.split(/[,;]|\s+(?=[A-Z][a-z])/)
-      .map(r => sanitizeExtractedText(r))
-      .filter(r => r.length > 3 && !r.match(/^(and|or|the|of|to|for)$/i));
-    
-    restrictions.push(...splitRestrictions);
-  }
-  
-  // Also check for individual restriction keywords
-  const commonRestrictions = [
+  // Define actual workplace restrictions patterns
+  const validRestrictions = [
     'Confined Spaces',
     'Chemical Exposure', 
     'Wear Spectacles',
     'Height Work',
+    'Heights Work',
+    'Working at Heights',
     'Hearing Protection',
+    'Wear Hearing Protection',
     'Chronic Conditions Treatment',
+    'Remain on Treatment for Chronic Conditions',
     'Dust Exposure',
-    'Motorized Equipment'
+    'Motorized Equipment',
+    'No Night Work',
+    'No Shift Work',
+    'Regular Medical Review',
+    'Limited Physical Activity',
+    'Respiratory Protection Required'
   ];
   
-  for (const restriction of commonRestrictions) {
-    const pattern = new RegExp(restriction.replace(/\s+/g, '\\s+'), 'i');
-    if (pattern.test(rawContent) && !restrictions.some(r => r.toLowerCase().includes(restriction.toLowerCase()))) {
-      restrictions.push(restriction);
+  // First, try to find the specific restrictions section
+  const restrictionSectionPatterns = [
+    /Restrictions?:\s*([^:]*?)(?:Comments|Medical\s+Fitness\s+Declaration|Dr\s|Occupational|$)/is,
+    /(?:Heights|Dust\s+Exposure|Motorized\s+Equipment|Confined\s+Spaces|Chemical\s+Exposure|Wear\s+Spectacles|Hearing\s+Protection)\s*([^:]*?)(?:Medical\s+Fitness|Comments|Dr\s|$)/is
+  ];
+  
+  // Look for the restrictions section content
+  for (const pattern of restrictionSectionPatterns) {
+    const match = rawContent.match(pattern);
+    if (match && match[1]) {
+      const sectionContent = match[1];
+      console.log("Found restrictions section:", sectionContent.substring(0, 200));
+      
+      // Check each valid restriction against the section content
+      for (const restriction of validRestrictions) {
+        const restrictionPattern = new RegExp(restriction.replace(/\s+/g, '\\s*'), 'i');
+        if (restrictionPattern.test(sectionContent)) {
+          if (!restrictions.includes(restriction)) {
+            restrictions.push(restriction);
+            console.log(`✓ Found restriction: ${restriction}`);
+          }
+        }
+      }
+      
+      // If we found restrictions in this section, don't look further
+      if (restrictions.length > 0) {
+        break;
+      }
     }
   }
   
-  // Remove duplicates and clean final list
-  const uniqueRestrictions = [...new Set(restrictions)]
-    .filter(r => r && r.length > 2 && !r.match(/^<\/?[^>]+>$/)); // Remove pure HTML tags
+  // If no restrictions found in specific section, do a careful search in the full content
+  if (restrictions.length === 0) {
+    console.log("No restrictions found in dedicated section, searching full content carefully...");
+    
+    for (const restriction of validRestrictions) {
+      const restrictionPattern = new RegExp(`\\b${restriction.replace(/\s+/g, '\\s+')}\\b`, 'i');
+      if (restrictionPattern.test(rawContent)) {
+        // Additional validation: make sure it's not part of a medical test result
+        const context = rawContent.match(new RegExp(`[^.]*${restriction.replace(/\s+/g, '\\s+')}[^.]*`, 'i'));
+        if (context && context[0]) {
+          const contextText = context[0].toLowerCase();
+          // Skip if it appears to be part of medical test results or headers
+          const excludePatterns = [
+            'test done results',
+            'medical examination conducted',
+            'bloods',
+            'vision',
+            'hearing',
+            '20/20',
+            'normal',
+            'mild restriction',
+            'x-ray',
+            'drug screen'
+          ];
+          
+          const isExcluded = excludePatterns.some(pattern => contextText.includes(pattern));
+          if (!isExcluded && !restrictions.includes(restriction)) {
+            restrictions.push(restriction);
+            console.log(`✓ Found restriction in full content: ${restriction}`);
+          }
+        }
+      }
+    }
+  }
   
-  console.log("Final restrictions:", uniqueRestrictions);
-  return uniqueRestrictions;
+  // Final validation and cleanup
+  const validatedRestrictions = restrictions.filter(restriction => {
+    // Make sure it's actually a workplace restriction
+    const workplaceRestrictionKeywords = [
+      'spaces', 'exposure', 'spectacles', 'heights', 'protection', 
+      'treatment', 'dust', 'equipment', 'work', 'activity', 'review'
+    ];
+    
+    return workplaceRestrictionKeywords.some(keyword => 
+      restriction.toLowerCase().includes(keyword)
+    );
+  });
+  
+  console.log("Final restrictions:", validatedRestrictions);
+  return validatedRestrictions;
 }
 
 function extractMedicalTests(rawContent: string) {
