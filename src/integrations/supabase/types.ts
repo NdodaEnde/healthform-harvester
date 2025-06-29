@@ -576,6 +576,7 @@ export type Database = {
           owner_id: string | null
           processed_at: string | null
           processing_error: string | null
+          processing_metadata: Json | null
           public_url: string | null
           status: string
           updated_at: string
@@ -597,6 +598,7 @@ export type Database = {
           owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          processing_metadata?: Json | null
           public_url?: string | null
           status?: string
           updated_at?: string
@@ -618,6 +620,7 @@ export type Database = {
           owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          processing_metadata?: Json | null
           public_url?: string | null
           status?: string
           updated_at?: string
