@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -12,6 +11,81 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const microserviceUrl = Deno.env.get('SDK_MICROSERVICE_URL') || 'https://document-processing-service.onrender.com';
+
+// HTML Cleaning Utilities
+function cleanHtmlContent(content: string): string {
+  if (!content) return '';
+  
+  // Remove HTML comments with coordinates and IDs
+  let cleaned = content.replace(/\s*<!--.*?-->\s*/g, ' ');
+  
+  // Remove HTML tags but preserve their text content
+  cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+  
+  // Clean up multiple spaces and normalize whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  // Remove common HTML artifacts
+  cleaned = cleaned.replace(/&nbsp;/g, ' ');
+  cleaned = cleaned.replace(/&amp;/g, '&');
+  cleaned = cleaned.replace(/&lt;/g, '<');
+  cleaned = cleaned.replace(/&gt;/g, '>');
+  
+  return cleaned;
+}
+
+function parseHtmlTable(htmlContent: string): string[] {
+  if (!htmlContent) return [];
+  
+  const items: string[] = [];
+  
+  // Extract content from table cells
+  const tdMatches = htmlContent.match(/<td[^>]*>(.*?)<\/td>/gi);
+  if (tdMatches) {
+    for (const match of tdMatches) {
+      const cellContent = match.replace(/<\/?td[^>]*>/gi, '').trim();
+      const cleaned = cleanHtmlContent(cellContent);
+      if (cleaned && cleaned !== 'N/A' && cleaned.length > 1) {
+        items.push(cleaned);
+      }
+    }
+  }
+  
+  // Also try to extract from table headers
+  const thMatches = htmlContent.match(/<th[^>]*>(.*?)<\/th>/gi);
+  if (thMatches) {
+    for (const match of thMatches) {
+      const cellContent = match.replace(/<\/?th[^>]*>/gi, '').trim();
+      const cleaned = cleanHtmlContent(cellContent);
+      if (cleaned && cleaned !== 'N/A' && cleaned.length > 1) {
+        items.push(cleaned);
+      }
+    }
+  }
+  
+  return items;
+}
+
+function sanitizeExtractedText(text: string): string {
+  if (!text) return '';
+  
+  // Clean HTML content
+  let cleaned = cleanHtmlContent(text);
+  
+  // Remove any remaining HTML artifacts
+  cleaned = cleaned.replace(/^<\/?[^>]+>/, ''); // Remove leading HTML tags
+  cleaned = cleaned.replace(/<\/?[^>]+>$/, ''); // Remove trailing HTML tags
+  
+  // Clean up coordinates and IDs that might remain
+  cleaned = cleaned.replace(/\(l=[\d\.]+,t=[\d\.]+,r=[\d\.]+,b=[\d\.]+\)/g, '');
+  cleaned = cleaned.replace(/with ID [a-f0-9\-]+/g, '');
+  cleaned = cleaned.replace(/from page \d+/g, '');
+  
+  // Final cleanup
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
 
 // JSON Schemas for structured extraction
 const CERTIFICATE_OF_FITNESS_SCHEMA = {
@@ -395,8 +469,49 @@ async function extractDataUsingSchema(rawContent: string, chunks: any[], schema:
     extractedData.test_results = extractTestResults(rawContent, documentType);
   }
   
+  // Post-processing: Clean all extracted data
+  cleanExtractedData(extractedData);
+  
   console.log("Schema-based extraction completed");
   return extractedData;
+}
+
+function cleanExtractedData(data: any): void {
+  console.log("=== CLEANING EXTRACTED DATA ===");
+  
+  function cleanObject(obj: any): void {
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string') {
+        const cleaned = sanitizeExtractedText(value);
+        if (cleaned !== value) {
+          console.log(`Cleaned ${key}: "${value}" -> "${cleaned}"`);
+          obj[key] = cleaned;
+        }
+      } else if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          if (typeof value[i] === 'string') {
+            const cleaned = sanitizeExtractedText(value[i]);
+            if (cleaned !== value[i]) {
+              console.log(`Cleaned array item ${key}[${i}]: "${value[i]}" -> "${cleaned}"`);
+              value[i] = cleaned;
+            }
+          }
+        }
+        // Remove empty or invalid entries
+        obj[key] = value.filter(item => 
+          typeof item === 'string' && 
+          item.length > 0 && 
+          item !== 'N/A' && 
+          !item.match(/^<\/?[^>]+>$/) // Remove pure HTML tags
+        );
+      } else if (typeof value === 'object' && value !== null) {
+        cleanObject(value);
+      }
+    }
+  }
+  
+  cleanObject(data);
+  console.log("Data cleaning completed");
 }
 
 function classifyDocument(rawContent: string, suggestedType: string): string {
@@ -430,7 +545,7 @@ function extractEmployeeInfo(rawContent: string) {
   for (const pattern of namePatterns) {
     const match = rawContent.match(pattern);
     if (match && match[1] && match[1].trim().length > 2) {
-      employeeInfo.full_name = match[1].trim();
+      employeeInfo.full_name = sanitizeExtractedText(match[1].trim());
       break;
     }
   }
@@ -464,7 +579,7 @@ function extractEmployeeInfo(rawContent: string) {
   for (const pattern of companyPatterns) {
     const match = rawContent.match(pattern);
     if (match && match[1] && match[1].trim().length > 2) {
-      employeeInfo.company_name = match[1].trim();
+      employeeInfo.company_name = sanitizeExtractedText(match[1].trim());
       break;
     }
   }
@@ -479,7 +594,7 @@ function extractEmployeeInfo(rawContent: string) {
   for (const pattern of jobPatterns) {
     const match = rawContent.match(pattern);
     if (match && match[1] && match[1].trim().length > 1) {
-      employeeInfo.occupation = match[1].trim();
+      employeeInfo.occupation = sanitizeExtractedText(match[1].trim());
       break;
     }
   }
@@ -591,7 +706,7 @@ function extractMedicalExamination(rawContent: string) {
     }
   }
   
-  // Extract restrictions
+  // Extract restrictions with HTML awareness
   examination.restrictions = extractRestrictions(rawContent);
   
   // Follow-up detection
@@ -605,7 +720,17 @@ function extractMedicalExamination(rawContent: string) {
 function extractRestrictions(rawContent: string): string[] {
   const restrictions: string[] = [];
   
-  // Enhanced restriction patterns
+  console.log("=== EXTRACTING RESTRICTIONS ===");
+  
+  // First, check if there's HTML table content
+  if (rawContent.includes('<table') || rawContent.includes('<td')) {
+    console.log("Detecting HTML table content in restrictions");
+    const tableItems = parseHtmlTable(rawContent);
+    console.log("Extracted from table:", tableItems);
+    restrictions.push(...tableItems);
+  }
+  
+  // Enhanced restriction patterns for text-based extraction
   const restrictionPatterns = [
     /Restrictions?:\s*([^:]+?)(?:Comments|Medical\s+Fitness|$)/is,
     /Confined\s+Spaces/i,
@@ -614,17 +739,20 @@ function extractRestrictions(rawContent: string): string[] {
     /Heights?\s+Work/i,
     /Hearing\s+Protection/i,
     /Remain\s+on\s+Treatment/i,
-    /Chronic\s+Conditions?/i
+    /Chronic\s+Conditions?/i,
+    /Dust\s+Exposure/i,
+    /Motorized\s+Equipment/i
   ];
   
-  // First try to extract the entire restrictions section
+  // Try to extract the entire restrictions section
   const restrictionSectionMatch = rawContent.match(/Restrictions?:\s*([^:]+?)(?:Comments|Medical\s+Fitness|Dr\s|$)/is);
   if (restrictionSectionMatch && restrictionSectionMatch[1]) {
-    const restrictionText = restrictionSectionMatch[1].trim();
+    const restrictionText = cleanHtmlContent(restrictionSectionMatch[1]);
+    console.log("Found restriction section:", restrictionText);
     
     // Split by common separators and clean up
     const splitRestrictions = restrictionText.split(/[,;]|\s+(?=[A-Z][a-z])/)
-      .map(r => r.trim())
+      .map(r => sanitizeExtractedText(r))
       .filter(r => r.length > 3 && !r.match(/^(and|or|the|of|to|for)$/i));
     
     restrictions.push(...splitRestrictions);
@@ -637,7 +765,9 @@ function extractRestrictions(rawContent: string): string[] {
     'Wear Spectacles',
     'Height Work',
     'Hearing Protection',
-    'Chronic Conditions Treatment'
+    'Chronic Conditions Treatment',
+    'Dust Exposure',
+    'Motorized Equipment'
   ];
   
   for (const restriction of commonRestrictions) {
@@ -647,11 +777,18 @@ function extractRestrictions(rawContent: string): string[] {
     }
   }
   
-  return restrictions;
+  // Remove duplicates and clean final list
+  const uniqueRestrictions = [...new Set(restrictions)]
+    .filter(r => r && r.length > 2 && !r.match(/^<\/?[^>]+>$/)); // Remove pure HTML tags
+  
+  console.log("Final restrictions:", uniqueRestrictions);
+  return uniqueRestrictions;
 }
 
 function extractMedicalTests(rawContent: string) {
   const tests: any = {};
+  
+  console.log("=== EXTRACTING MEDICAL TESTS ===");
   
   // Enhanced medical test extraction with specific result patterns
   const testMappings = [
@@ -731,11 +868,14 @@ function extractMedicalTests(rawContent: string) {
         // Try to extract specific result
         const resultMatch = rawContent.match(pattern.result);
         if (resultMatch && resultMatch[1]) {
-          let result = resultMatch[1].trim();
+          let result = sanitizeExtractedText(resultMatch[1].trim());
           // Clean up the result
           result = result.replace(/[:\s]+$/, '').trim();
-          if (result && result !== '' && result.length > 0) {
+          if (result && result !== '' && result.length > 0 && result !== 'N/A') {
             testData.result = result;
+            console.log(`✓ Found medical test ${testType.key}: ${result}`);
+          } else {
+            console.log(`✓ Found medical test ${testType.key}: N/A (cleaned from "${resultMatch[1]}")`);
           }
         }
         break;
@@ -778,7 +918,7 @@ function extractMedicalPractitioner(rawContent: string, chunks: any[]) {
   for (const pattern of doctorPatterns) {
     const match = rawContent.match(pattern);
     if (match && match[1] && match[1].trim().length > 3) {
-      practitioner.doctor_name = match[1].trim();
+      practitioner.doctor_name = sanitizeExtractedText(match[1].trim());
       break;
     }
   }
@@ -973,6 +1113,27 @@ function validateStructuredData(extractedData: any, documentType: string) {
       errors.push(`Invalid date format for ${field}: ${dateValue}`);
     }
   });
+  
+  // Check for remaining HTML content
+  const htmlPattern = /<[^>]+>/;
+  function checkForHtml(obj: any, path = ''): void {
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = path ? `${path}.${key}` : key;
+      if (typeof value === 'string' && htmlPattern.test(value)) {
+        errors.push(`HTML content detected in ${currentPath}: ${value.substring(0, 50)}...`);
+      } else if (Array.isArray(value)) {
+        value.forEach((item, index) => {
+          if (typeof item === 'string' && htmlPattern.test(item)) {
+            errors.push(`HTML content detected in ${currentPath}[${index}]: ${item.substring(0, 50)}...`);
+          }
+        });
+      } else if (typeof value === 'object' && value !== null) {
+        checkForHtml(value, currentPath);
+      }
+    }
+  }
+  
+  checkForHtml(extractedData);
   
   return {
     isValid: errors.length === 0,
