@@ -52,7 +52,7 @@ const StructuredExtractionDashboard = () => {
         return;
       }
 
-      // Query documents with processing metadata
+      // Query documents with processing metadata - handle case where column might not exist
       const { data: documents, error } = await supabase
         .from('documents')
         .select('processing_metadata, status, created_at')
@@ -60,7 +60,21 @@ const StructuredExtractionDashboard = () => {
         .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Last 30 days
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching documents:', error);
+        // If processing_metadata column doesn't exist, set default stats
+        setStats({
+          totalDocuments: 0,
+          v1Documents: 0,
+          v2Documents: 0,
+          avgV1Confidence: 0.5,
+          avgV2Confidence: 0,
+          v1SuccessRate: 0,
+          v2SuccessRate: 0
+        });
+        setLoading(false);
+        return;
+      }
 
       const v1Docs = documents?.filter(doc => 
         !doc.processing_metadata?.extraction_method || 
@@ -98,6 +112,16 @@ const StructuredExtractionDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching extraction stats:', error);
+      // Set default stats on any error
+      setStats({
+        totalDocuments: 0,
+        v1Documents: 0,
+        v2Documents: 0,
+        avgV1Confidence: 0.5,
+        avgV2Confidence: 0,
+        v1SuccessRate: 0,
+        v2SuccessRate: 0
+      });
     } finally {
       setLoading(false);
     }

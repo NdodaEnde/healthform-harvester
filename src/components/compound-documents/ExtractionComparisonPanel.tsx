@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import {
   CheckCircle, 
   AlertTriangle,
   RefreshCw,
-  Compare
+  GitCompare
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { supabase } from '@/integrations/supabase/client';
@@ -231,7 +230,7 @@ const ExtractionComparisonPanel = () => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Compare className="h-5 w-5" />
+          <GitCompare className="h-5 w-5" />
           Extraction Method Comparison
           <Badge variant="outline">Testing Tool</Badge>
         </CardTitle>
