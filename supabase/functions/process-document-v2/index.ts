@@ -634,8 +634,8 @@ function extractMedicalExamination(rawContent: string) {
   
   // Enhanced date extraction with multiple formats and more specific patterns
   const datePatterns = [
-    /Date\s*of\s*Examination:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
-    /Examination.*?Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    /Date\s*of\s*Examination:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/ig,
+    /Examination.*?Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/ig,
     // Look for the specific date format in the document (4-10-2024)
     /(\d{1,2}-\d{1,2}-\d{4})(?!\s*\d)/g,
     /(\d{1,2}\/\d{1,2}\/\d{4})(?!\s*\d)/g,
