@@ -604,18 +604,25 @@ function extractEmployeeInfo(rawContent: string) {
     }
   }
   
-  // Enhanced job title extraction
+  // Enhanced job title extraction with more specific patterns
   const jobPatterns = [
-    /Job\s*Title:\s*([A-Z][A-Za-z\s]+?)(?:\s+PRE-|$)/i,
-    /(Artisan)/i,
-    /Occupation:\s*([A-Z][A-Za-z\s]+)/i
+    /Job\s*Title:\s*([A-Z][A-Za-z\s]+?)(?:\s+PRE-|Date|$)/i,
+    /(Artisan)(?=\s|$)/i,
+    /Occupation:\s*([A-Z][A-Za-z\s]+)/i,
+    /Position:\s*([A-Z][A-Za-z\s]+)/i,
+    // Look for job title between company name and examination type
+    /Wolf\s+Wasser\s+([A-Z][A-Za-z\s]+?)\s+PRE-EMPLOYMENT/i
   ];
   
   for (const pattern of jobPatterns) {
     const match = rawContent.match(pattern);
     if (match && match[1] && match[1].trim().length > 1) {
-      employeeInfo.job_title = sanitizeExtractedText(match[1].trim());
-      break;
+      const jobTitle = sanitizeExtractedText(match[1].trim());
+      // Filter out common false positives
+      if (!jobTitle.match(/^(Date|Pre|Employment|Medical|Certificate)$/i)) {
+        employeeInfo.job_title = jobTitle;
+        break;
+      }
     }
   }
   
@@ -625,20 +632,37 @@ function extractEmployeeInfo(rawContent: string) {
 function extractMedicalExamination(rawContent: string) {
   const examination: any = {};
   
-  // Enhanced date extraction with multiple formats
+  // Enhanced date extraction with multiple formats and more specific patterns
   const datePatterns = [
     /Date\s*of\s*Examination:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
     /Examination.*?Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
-    /(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/g,
-    /(\d{4}[\.\/\-]\d{1,2}[\.\/\-]\d{1,2})/g
+    // Look for the specific date format in the document (4-10-2024)
+    /(\d{1,2}-\d{1,2}-\d{4})(?!\s*\d)/g,
+    /(\d{1,2}\/\d{1,2}\/\d{4})(?!\s*\d)/g,
+    /(\d{1,2}\.\d{1,2}\.\d{4})(?!\s*\d)/g
   ];
   
   for (const pattern of datePatterns) {
-    const match = rawContent.match(pattern);
-    if (match && match[1]) {
-      examination.examination_date = match[1];
-      break;
+    const matches = rawContent.matchAll(pattern);
+    for (const match of matches) {
+      if (match && match[1]) {
+        // Validate that this looks like a reasonable examination date
+        const dateStr = match[1];
+        const dateParts = dateStr.split(/[\.\/\-]/);
+        if (dateParts.length === 3) {
+          const day = parseInt(dateParts[0]);
+          const month = parseInt(dateParts[1]);
+          const year = parseInt(dateParts[2]);
+          
+          // Basic date validation
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 2020 && year <= 2030) {
+            examination.examination_date = dateStr;
+            break;
+          }
+        }
+      }
     }
+    if (examination.examination_date) break;
   }
   
   // Updated examination type detection for PRE-EMPLOYMENT/PERIODICAL/EXIT
@@ -713,12 +737,14 @@ function extractMedicalExamination(rawContent: string) {
     if (examination.fitness_status) break;
   }
   
-  // Enhanced expiry date extraction
+  // Enhanced expiry date extraction with more patterns
   const expiryPatterns = [
     /Expiry\s*Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
     /Valid\s*Until:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
     /Expires?:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
-    /Review\s*Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i
+    /Review\s*Date:\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i,
+    // Look for dates that appear after examination date
+    /Certificate.*?valid.*?(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})/i
   ];
   
   for (const pattern of expiryPatterns) {
@@ -729,18 +755,25 @@ function extractMedicalExamination(rawContent: string) {
     }
   }
   
-  // Enhanced comments extraction
+  // Enhanced comments extraction with better boundaries
   const commentsPatterns = [
-    /Comments:\s*([^:]*?)(?:Dr\s|Occupational|Practice|$)/is,
-    /Additional\s+Notes:\s*([^:]*?)(?:Dr\s|Occupational|Practice|$)/is,
-    /Remarks:\s*([^:]*?)(?:Dr\s|Occupational|Practice|$)/is
+    /Comments:\s*([^:]*?)(?:Dr[\s\.]|Occupational|Practice|Signature|$)/is,
+    /Additional\s+Notes:\s*([^:]*?)(?:Dr[\s\.]|Occupational|Practice|Signature|$)/is,
+    /Remarks:\s*([^:]*?)(?:Dr[\s\.]|Occupational|Practice|Signature|$)/is,
+    // Extract any text that appears to be practitioner comments
+    /Medical\s+Fitness\s+Declaration.*?Comments:\s*([^:]*?)(?:Dr|Occupational|$)/is
   ];
   
   for (const pattern of commentsPatterns) {
     const match = rawContent.match(pattern);
-    if (match && match[1] && match[1].trim().length > 0) {
-      examination.comments = sanitizeExtractedText(match[1].trim());
-      break;
+    if (match && match[1] && match[1].trim().length > 0 && match[1].trim() !== 'N/A') {
+      let comments = sanitizeExtractedText(match[1].trim());
+      // Clean up common artifacts
+      comments = comments.replace(/\s*(Dr|Occupational|Practice|Signature).*$/i, '');
+      if (comments.length > 5) { // Only keep substantial comments
+        examination.comments = comments;
+        break;
+      }
     }
   }
   
@@ -782,7 +815,7 @@ function extractRestrictions(rawContent: string): string[] {
   
   // First, try to find the specific restrictions section
   const restrictionSectionPatterns = [
-    /Restrictions?:\s*([^:]*?)(?:Comments|Medical\s+Fitness\s+Declaration|Dr\s|Occupational|$)/is,
+    /Restrictions?:\s*([^:]*?)(?:Comments|Medical\s+Fitness\s+Declaration|Dr\s|$)/is,
     /(?:Heights|Dust\s+Exposure|Motorized\s+Equipment|Confined\s+Spaces|Chemical\s+Exposure|Wear\s+Spectacles|Hearing\s+Protection)\s*([^:]*?)(?:Medical\s+Fitness|Comments|Dr\s|$)/is
   ];
   
@@ -899,77 +932,79 @@ function extractRestrictions(rawContent: string): string[] {
 function extractMedicalTests(rawContent: string) {
   const tests: any = {};
   
-  console.log("=== EXTRACTING MEDICAL TESTS ===");
+  console.log("=== ENHANCED MEDICAL TESTS EXTRACTION ===");
   
-  // Enhanced medical test extraction with better table parsing and result matching
+  // Enhanced medical test mappings with better result patterns
   const testMappings = [
     {
       key: 'bloods',
       patterns: [
-        { name: /BLOODS/i, result: /BLOODS[:\s]*([^\n\r]+?)(?:\s+FAR|$)/i }
+        { name: /BLOODS/i, result: /BLOODS[:\s]*(X|✓|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'vision_test',
       patterns: [
-        { name: /FAR,?\s*NEAR\s+VISION/i, result: /FAR,?\s*NEAR\s+VISION[:\s]*([^\n\r]+?)(?:\s+SIDE|$)/i },
-        { name: /VISION/i, result: /VISION[:\s]*([^\n\r]+?)(?:\s|$)/i }
+        { name: /FAR,?\s*NEAR\s+VISION/i, result: /FAR,?\s*NEAR\s+VISION[:\s]*(✓|X|20\/\d+|NORMAL|[^\n\r\s]+?)(?:\s|$)/i },
+        { name: /VISION/i, result: /VISION[:\s]*(✓|X|20\/\d+|NORMAL|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'side_depth_vision',
       patterns: [
-        { name: /SIDE\s*&?\s*DEPTH/i, result: /SIDE\s*&?\s*DEPTH[:\s]*([^\n\r]+?)(?:\s+NIGHT|$)/i }
+        { name: /SIDE\s*&?\s*DEPTH/i, result: /SIDE\s*&?\s*DEPTH[:\s]*(✓|X|NORMAL|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'night_vision',
       patterns: [
-        { name: /NIGHT\s+VISION/i, result: /NIGHT\s+VISION[:\s]*([^\n\r]+?)(?:\s+HEARING|$)/i }
+        { name: /NIGHT\s+VISION/i, result: /NIGHT\s+VISION[:\s]*(✓|X|20\/\d+|NORMAL|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'hearing_test', 
       patterns: [
-        { name: /HEARING/i, result: /HEARING[:\s]*([^\n\r]+?)(?:\s+WORKING|$)/i }
+        { name: /HEARING/i, result: /HEARING[:\s]*(✓|X|\d+\.?\d*|NORMAL|MILD\s+RESTRICTION|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'working_heights',
       patterns: [
-        { name: /WORKING\s+AT\s+HEIGHTS/i, result: /WORKING\s+AT\s+HEIGHTS[:\s]*([^\n\r]+?)(?:\s+LUNG|$)/i }
+        { name: /WORKING\s+AT\s+HEIGHTS/i, result: /WORKING\s+AT\s+HEIGHTS[:\s]*(✓|X|FIT|NORMAL|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'lung_function',
       patterns: [
-        { name: /LUNG\s+FUNCTION/i, result: /LUNG\s+FUNCTION[:\s]*([^\n\r]+?)(?:\s+X-RAY|$)/i },
-        { name: /SPIROMETRY/i, result: /SPIROMETRY[:\s]*([^\n\r]+?)(?:\s|$)/i }
+        { name: /LUNG\s+FUNCTION/i, result: /LUNG\s+FUNCTION[:\s]*(✓|X|20\/\d+|NORMAL|[^\n\r\s]+?)(?:\s|$)/i },
+        { name: /SPIROMETRY/i, result: /SPIROMETRY[:\s]*(✓|X|NORMAL|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'x_ray',
       patterns: [
-        { name: /X-?RAY/i, result: /X-?RAY[:\s]*([^\n\r]+?)(?:\s+DRUG|$)/i }
+        { name: /X-?RAY/i, result: /X-?RAY[:\s]*(✓|X|NORMAL|CLEAR|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     },
     {
       key: 'drug_screen',
       patterns: [
-        { name: /DRUG\s+SCREEN/i, result: /DRUG\s+SCREEN[:\s]*([^\n\r]+?)(?:\s|$)/i }
+        { name: /DRUG\s+SCREEN/i, result: /DRUG\s+SCREEN[:\s]*(✓|X|NEGATIVE|POSITIVE|[^\n\r\s]+?)(?:\s|$)/i }
       ]
     }
   ];
   
-  // Enhanced table parsing for medical tests with Done/Results columns
+  // Enhanced table parsing for medical tests with better column recognition
   const tablePattern = /<table[^>]*>[\s\S]*?<\/table>/gi;
   const tables = rawContent.match(tablePattern) || [];
   
-  let testResultsFromTable: Record<string, string> = {};
+  let testResultsFromTable: Record<string, { done: boolean, result: string }> = {};
   
   for (const table of tables) {
     // Look for medical tests table (contains test names and results)
     if (/BLOODS|VISION|HEARING|LUNG|X-RAY|DRUG/i.test(table)) {
+      console.log("Processing medical tests table...");
+      
       // Extract rows from table
       const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
       const rows = [...table.matchAll(rowPattern)];
@@ -980,14 +1015,35 @@ function extractMedicalTests(rawContent: string) {
         
         if (cells.length >= 2) {
           const testName = cleanHtmlContent(cells[0][1] || '').trim();
-          const testResult = cleanHtmlContent(cells[1][1] || '').trim();
+          const doneIndicator = cleanHtmlContent(cells[1][1] || '').trim();
           
-          if (testName && testResult && testResult !== 'N/A' && testResult.length > 0) {
-            // Map test names to our keys
+          // Look for result in subsequent cells if available
+          let testResult = 'N/A';
+          if (cells.length >= 3) {
+            const resultCell = cleanHtmlContent(cells[2][1] || '').trim();
+            if (resultCell && resultCell !== 'N/A' && resultCell.length > 0) {
+              testResult = resultCell;
+            }
+          }
+          
+          if (testName && testName.length > 2) {
             const testKey = getTestKeyFromName(testName);
             if (testKey) {
-              testResultsFromTable[testKey] = testResult;
-              console.log(`✓ Found table result ${testKey}: ${testResult}`);
+              const isDone = doneIndicator === '✓' || doneIndicator.toLowerCase().includes('done');
+              
+              // Clean up the result value
+              if (testResult !== 'N/A') {
+                testResult = testResult.replace(/^(X\s*|✓\s*)/, '').trim();
+                if (testResult === '' || testResult === 'X') {
+                  testResult = 'N/A';
+                }
+              }
+              
+              testResultsFromTable[testKey] = {
+                done: isDone,
+                result: testResult
+              };
+              console.log(`✓ Found table result ${testKey}: Done=${isDone}, Result=${testResult}`);
             }
           }
         }
@@ -1001,11 +1057,12 @@ function extractMedicalTests(rawContent: string) {
     
     // First check if we found this test in the table
     if (testResultsFromTable[testType.key]) {
-      testData.performed = true;
-      testData.result = testResultsFromTable[testType.key];
-      console.log(`✓ Using table result for ${testType.key}: ${testData.result}`);
+      const tableData = testResultsFromTable[testType.key];
+      testData.performed = tableData.done;
+      testData.result = tableData.result;
+      console.log(`✓ Using enhanced table result for ${testType.key}: ${JSON.stringify(tableData)}`);
     } else {
-      // Fallback to pattern matching
+      // Fallback to pattern matching with enhanced result extraction
       for (const pattern of testType.patterns) {
         if (pattern.name.test(rawContent)) {
           testData.performed = true;
@@ -1014,9 +1071,17 @@ function extractMedicalTests(rawContent: string) {
           if (resultMatch && resultMatch[1]) {
             let result = sanitizeExtractedText(resultMatch[1].trim());
             result = result.replace(/[:\s]+$/, '').trim();
-            if (result && result !== '' && result.length > 0 && result !== 'N/A') {
-              testData.result = result;
-              console.log(`✓ Found pattern result ${testType.key}: ${result}`);
+            
+            // Enhanced result cleaning and validation
+            if (result && result !== '' && result.length > 0) {
+              // Clean common prefixes/suffixes
+              result = result.replace(/^(X\s*|✓\s*|Done\s*|Result\s*[:]\s*)/i, '').trim();
+              
+              // Validate result is not just markup
+              if (result !== 'N/A' && result !== 'X' && !result.match(/^<\/?[^>]+>$/)) {
+                testData.result = result;
+                console.log(`✓ Found enhanced pattern result ${testType.key}: ${result}`);
+              }
             }
           }
           break;
@@ -1024,12 +1089,13 @@ function extractMedicalTests(rawContent: string) {
       }
     }
     
-    // Only include core medical tests in the final output (not the specific vision subtests)
-    if (['vision_test', 'hearing_test', 'lung_function', 'x_ray', 'drug_screen'].includes(testType.key)) {
+    // Only include core medical tests in the final output
+    if (['vision_test', 'hearing_test', 'lung_function', 'x_ray', 'drug_screen', 'bloods', 'side_depth_vision', 'night_vision', 'working_heights'].includes(testType.key)) {
       tests[testType.key] = testData;
     }
   }
   
+  console.log("Enhanced medical tests extraction completed");
   return tests;
 }
 
@@ -1041,7 +1107,7 @@ function getTestKeyFromName(testName: string): string | null {
   if (testNameLower.includes('side') && testNameLower.includes('depth')) return 'side_depth_vision';
   if (testNameLower.includes('night') && testNameLower.includes('vision')) return 'night_vision';
   if (testNameLower.includes('hearing')) return 'hearing_test';
-  if (testNameLower.includes('height')) return 'working_heights';
+  if (testNameLower.includes('height') || testNameLower.includes('working')) return 'working_heights';
   if (testNameLower.includes('lung') || testNameLower.includes('spirometry')) return 'lung_function';
   if (testNameLower.includes('x-ray') || testNameLower.includes('xray')) return 'x_ray';
   if (testNameLower.includes('drug')) return 'drug_screen';
