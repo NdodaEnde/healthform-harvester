@@ -129,7 +129,7 @@ const CERTIFICATE_OF_FITNESS_SCHEMA = {
           "type": "string",
           "description": "Name of the employing company from certificate header"
         },
-        "occupation": {
+        "job_title": {
           "type": "string",
           "description": "Job title or occupation listed on certificate"
         }
@@ -144,8 +144,8 @@ const CERTIFICATE_OF_FITNESS_SCHEMA = {
         },
         "examination_type": {
           "type": "string",
-          "enum": ["initial", "periodical", "exit"],
-          "description": "Type of medical examination from checkboxes"
+          "enum": ["PRE-EMPLOYMENT", "PERIODICAL", "EXIT"],
+          "description": "Type of medical examination from checkboxes - PRE-EMPLOYMENT, PERIODICAL, or EXIT"
         },
         "fitness_status": {
           "type": "string",
@@ -164,6 +164,10 @@ const CERTIFICATE_OF_FITNESS_SCHEMA = {
         "expiry_date": {
           "type": "string",
           "description": "Certificate expiry date in DD/MM/YYYY format"
+        },
+        "comments": {
+          "type": "string",
+          "description": "Any comments or additional notes from the medical practitioner"
         }
       }
     },
@@ -174,9 +178,7 @@ const CERTIFICATE_OF_FITNESS_SCHEMA = {
           "type": "object",
           "properties": {
             "performed": {"type": "boolean"},
-            "result": {"type": "string"},
-            "visual_acuity_left": {"type": "string"},
-            "visual_acuity_right": {"type": "string"}
+            "result": {"type": "string"}
           }
         },
         "hearing_test": {
@@ -612,7 +614,7 @@ function extractEmployeeInfo(rawContent: string) {
   for (const pattern of jobPatterns) {
     const match = rawContent.match(pattern);
     if (match && match[1] && match[1].trim().length > 1) {
-      employeeInfo.occupation = sanitizeExtractedText(match[1].trim());
+      employeeInfo.job_title = sanitizeExtractedText(match[1].trim());
       break;
     }
   }
@@ -639,22 +641,25 @@ function extractMedicalExamination(rawContent: string) {
     }
   }
   
-  // Enhanced examination type detection with checkbox symbols
+  // Updated examination type detection for PRE-EMPLOYMENT/PERIODICAL/EXIT
   const examinationTypePatterns = [
-    { type: 'initial', patterns: [
+    { type: 'PRE-EMPLOYMENT', patterns: [
       /PRE-?EMPLOYMENT\s*[☒✓x✗]/i,
       /PRE-?EMPLOYMENT\s*\[[x✓]\]/i,
-      /PRE-?EMPLOYMENT.*?☒/i
+      /PRE-?EMPLOYMENT.*?☒/i,
+      /☒\s*PRE-?EMPLOYMENT/i
     ]},
-    { type: 'periodical', patterns: [
+    { type: 'PERIODICAL', patterns: [
       /PERIODICAL\s*[☒✓x✗]/i,
       /PERIODICAL\s*\[[x✓]\]/i,
-      /PERIODICAL.*?☒/i
+      /PERIODICAL.*?☒/i,
+      /☒\s*PERIODICAL/i
     ]},
-    { type: 'exit', patterns: [
+    { type: 'EXIT', patterns: [
       /EXIT\s*[☒✓x✗]/i,
       /EXIT\s*\[[x✓]\]/i,
-      /EXIT.*?☒/i
+      /EXIT.*?☒/i,
+      /☒\s*EXIT/i
     ]}
   ];
   
@@ -720,6 +725,21 @@ function extractMedicalExamination(rawContent: string) {
     const match = rawContent.match(pattern);
     if (match && match[1]) {
       examination.expiry_date = match[1];
+      break;
+    }
+  }
+  
+  // Enhanced comments extraction
+  const commentsPatterns = [
+    /Comments:\s*([^:]*?)(?:Dr\s|Occupational|Practice|$)/is,
+    /Additional\s+Notes:\s*([^:]*?)(?:Dr\s|Occupational|Practice|$)/is,
+    /Remarks:\s*([^:]*?)(?:Dr\s|Occupational|Practice|$)/is
+  ];
+  
+  for (const pattern of commentsPatterns) {
+    const match = rawContent.match(pattern);
+    if (match && match[1] && match[1].trim().length > 0) {
+      examination.comments = sanitizeExtractedText(match[1].trim());
       break;
     }
   }
@@ -881,8 +901,14 @@ function extractMedicalTests(rawContent: string) {
   
   console.log("=== EXTRACTING MEDICAL TESTS ===");
   
-  // Enhanced medical test extraction with specific result patterns
+  // Enhanced medical test extraction with better table parsing and result matching
   const testMappings = [
+    {
+      key: 'bloods',
+      patterns: [
+        { name: /BLOODS/i, result: /BLOODS[:\s]*([^\n\r]+?)(?:\s+FAR|$)/i }
+      ]
+    },
     {
       key: 'vision_test',
       patterns: [
@@ -891,9 +917,27 @@ function extractMedicalTests(rawContent: string) {
       ]
     },
     {
+      key: 'side_depth_vision',
+      patterns: [
+        { name: /SIDE\s*&?\s*DEPTH/i, result: /SIDE\s*&?\s*DEPTH[:\s]*([^\n\r]+?)(?:\s+NIGHT|$)/i }
+      ]
+    },
+    {
+      key: 'night_vision',
+      patterns: [
+        { name: /NIGHT\s+VISION/i, result: /NIGHT\s+VISION[:\s]*([^\n\r]+?)(?:\s+HEARING|$)/i }
+      ]
+    },
+    {
       key: 'hearing_test', 
       patterns: [
         { name: /HEARING/i, result: /HEARING[:\s]*([^\n\r]+?)(?:\s+WORKING|$)/i }
+      ]
+    },
+    {
+      key: 'working_heights',
+      patterns: [
+        { name: /WORKING\s+AT\s+HEIGHTS/i, result: /WORKING\s+AT\s+HEIGHTS[:\s]*([^\n\r]+?)(?:\s+LUNG|$)/i }
       ]
     },
     {
@@ -917,81 +961,92 @@ function extractMedicalTests(rawContent: string) {
     }
   ];
   
-  // Also extract side/depth vision and night vision specifically
-  const specificTests = [
-    {
-      key: 'side_depth_vision',
-      patterns: [
-        { name: /SIDE\s*&?\s*DEPTH/i, result: /SIDE\s*&?\s*DEPTH[:\s]*([^\n\r]+?)(?:\s+NIGHT|$)/i }
-      ]
-    },
-    {
-      key: 'night_vision',
-      patterns: [
-        { name: /NIGHT\s+VISION/i, result: /NIGHT\s+VISION[:\s]*([^\n\r]+?)(?:\s+HEARING|$)/i }
-      ]
-    },
-    {
-      key: 'working_heights',
-      patterns: [
-        { name: /WORKING\s+AT\s+HEIGHTS/i, result: /WORKING\s+AT\s+HEIGHTS[:\s]*([^\n\r]+?)(?:\s+LUNG|$)/i }
-      ]
-    },
-    {
-      key: 'bloods',
-      patterns: [
-        { name: /BLOODS/i, result: /BLOODS[:\s]*([^\n\r]+?)(?:\s+FAR|$)/i }
-      ]
-    }
-  ];
+  // Enhanced table parsing for medical tests with Done/Results columns
+  const tablePattern = /<table[^>]*>[\s\S]*?<\/table>/gi;
+  const tables = rawContent.match(tablePattern) || [];
   
-  // Process all test types
-  const allTests = [...testMappings, ...specificTests];
+  let testResultsFromTable: Record<string, string> = {};
   
-  for (const testType of allTests) {
-    const testData: any = { performed: false, result: 'N/A' };
-    
-    for (const pattern of testType.patterns) {
-      // Check if test name is mentioned
-      if (pattern.name.test(rawContent)) {
-        testData.performed = true;
+  for (const table of tables) {
+    // Look for medical tests table (contains test names and results)
+    if (/BLOODS|VISION|HEARING|LUNG|X-RAY|DRUG/i.test(table)) {
+      // Extract rows from table
+      const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+      const rows = [...table.matchAll(rowPattern)];
+      
+      for (const row of rows) {
+        const cellPattern = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi;
+        const cells = [...row[1].matchAll(cellPattern)];
         
-        // Try to extract specific result
-        const resultMatch = rawContent.match(pattern.result);
-        if (resultMatch && resultMatch[1]) {
-          let result = sanitizeExtractedText(resultMatch[1].trim());
-          // Clean up the result
-          result = result.replace(/[:\s]+$/, '').trim();
-          if (result && result !== '' && result.length > 0 && result !== 'N/A') {
-            testData.result = result;
-            console.log(`✓ Found medical test ${testType.key}: ${result}`);
-          } else {
-            console.log(`✓ Found medical test ${testType.key}: N/A (cleaned from "${resultMatch[1]}")`);
+        if (cells.length >= 2) {
+          const testName = cleanHtmlContent(cells[0][1] || '').trim();
+          const testResult = cleanHtmlContent(cells[1][1] || '').trim();
+          
+          if (testName && testResult && testResult !== 'N/A' && testResult.length > 0) {
+            // Map test names to our keys
+            const testKey = getTestKeyFromName(testName);
+            if (testKey) {
+              testResultsFromTable[testKey] = testResult;
+              console.log(`✓ Found table result ${testKey}: ${testResult}`);
+            }
           }
         }
-        break;
+      }
+    }
+  }
+  
+  // Process all test types using enhanced extraction
+  for (const testType of testMappings) {
+    const testData: any = { performed: false, result: 'N/A' };
+    
+    // First check if we found this test in the table
+    if (testResultsFromTable[testType.key]) {
+      testData.performed = true;
+      testData.result = testResultsFromTable[testType.key];
+      console.log(`✓ Using table result for ${testType.key}: ${testData.result}`);
+    } else {
+      // Fallback to pattern matching
+      for (const pattern of testType.patterns) {
+        if (pattern.name.test(rawContent)) {
+          testData.performed = true;
+          
+          const resultMatch = rawContent.match(pattern.result);
+          if (resultMatch && resultMatch[1]) {
+            let result = sanitizeExtractedText(resultMatch[1].trim());
+            result = result.replace(/[:\s]+$/, '').trim();
+            if (result && result !== '' && result.length > 0 && result !== 'N/A') {
+              testData.result = result;
+              console.log(`✓ Found pattern result ${testType.key}: ${result}`);
+            }
+          }
+          break;
+        }
       }
     }
     
-    tests[testType.key] = testData;
-  }
-  
-  // Map specific vision tests back to main vision_test if needed
-  if (tests.side_depth_vision?.performed || tests.night_vision?.performed) {
-    if (!tests.vision_test.performed) {
-      tests.vision_test = {
-        performed: true,
-        result: 'Multiple tests performed',
-        visual_acuity_left: tests.side_depth_vision?.result || 'N/A',
-        visual_acuity_right: tests.night_vision?.result || 'N/A'
-      };
-    } else {
-      tests.vision_test.visual_acuity_left = tests.side_depth_vision?.result || 'N/A';
-      tests.vision_test.visual_acuity_right = tests.night_vision?.result || 'N/A';
+    // Only include core medical tests in the final output (not the specific vision subtests)
+    if (['vision_test', 'hearing_test', 'lung_function', 'x_ray', 'drug_screen'].includes(testType.key)) {
+      tests[testType.key] = testData;
     }
   }
   
   return tests;
+}
+
+function getTestKeyFromName(testName: string): string | null {
+  const testNameLower = testName.toLowerCase();
+  
+  if (testNameLower.includes('blood')) return 'bloods';
+  if (testNameLower.includes('vision') && (testNameLower.includes('far') || testNameLower.includes('near'))) return 'vision_test';
+  if (testNameLower.includes('side') && testNameLower.includes('depth')) return 'side_depth_vision';
+  if (testNameLower.includes('night') && testNameLower.includes('vision')) return 'night_vision';
+  if (testNameLower.includes('hearing')) return 'hearing_test';
+  if (testNameLower.includes('height')) return 'working_heights';
+  if (testNameLower.includes('lung') || testNameLower.includes('spirometry')) return 'lung_function';
+  if (testNameLower.includes('x-ray') || testNameLower.includes('xray')) return 'x_ray';
+  if (testNameLower.includes('drug')) return 'drug_screen';
+  
+  return null;
 }
 
 function extractMedicalPractitioner(rawContent: string, chunks: any[]) {
