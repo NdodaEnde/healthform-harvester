@@ -740,7 +740,7 @@ function extractRestrictions(rawContent: string): string[] {
   
   console.log("=== EXTRACTING RESTRICTIONS ===");
   
-  // Define actual workplace restrictions patterns
+  // Define actual workplace restrictions patterns - removed duplicate "Hearing Protection"
   const validRestrictions = [
     'Confined Spaces',
     'Chemical Exposure', 
@@ -748,8 +748,7 @@ function extractRestrictions(rawContent: string): string[] {
     'Height Work',
     'Heights Work',
     'Working at Heights',
-    'Hearing Protection',
-    'Wear Hearing Protection',
+    'Wear Hearing Protection', // Keep only the specific one
     'Chronic Conditions Treatment',
     'Remain on Treatment for Chronic Conditions',
     'Dust Exposure',
@@ -827,7 +826,7 @@ function extractRestrictions(rawContent: string): string[] {
     }
   }
   
-  // Final validation and cleanup
+  // Final validation and cleanup with enhanced deduplication
   const validatedRestrictions = restrictions.filter(restriction => {
     // Make sure it's actually a workplace restriction
     const workplaceRestrictionKeywords = [
@@ -840,8 +839,41 @@ function extractRestrictions(rawContent: string): string[] {
     );
   });
   
-  console.log("Final restrictions:", validatedRestrictions);
-  return validatedRestrictions;
+  // Enhanced deduplication logic to prevent similar entries
+  const deduplicatedRestrictions: string[] = [];
+  
+  for (const restriction of validatedRestrictions) {
+    // Check if a similar restriction already exists
+    const isDuplicate = deduplicatedRestrictions.some(existing => {
+      const restrictionLower = restriction.toLowerCase();
+      const existingLower = existing.toLowerCase();
+      
+      // Specific case: if we have "Wear Hearing Protection", don't add just "Hearing Protection"
+      if (restrictionLower === 'hearing protection' && existingLower === 'wear hearing protection') {
+        return true;
+      }
+      if (restrictionLower === 'wear hearing protection' && existingLower === 'hearing protection') {
+        // Replace the less specific one with the more specific one
+        const index = deduplicatedRestrictions.findIndex(r => r.toLowerCase() === 'hearing protection');
+        if (index !== -1) {
+          deduplicatedRestrictions[index] = restriction;
+        }
+        return true;
+      }
+      
+      // General similarity check for other potential duplicates
+      return restrictionLower === existingLower || 
+             (restrictionLower.includes(existingLower) && existingLower.length > 5) ||
+             (existingLower.includes(restrictionLower) && restrictionLower.length > 5);
+    });
+    
+    if (!isDuplicate) {
+      deduplicatedRestrictions.push(restriction);
+    }
+  }
+  
+  console.log("Final restrictions:", deduplicatedRestrictions);
+  return deduplicatedRestrictions;
 }
 
 function extractMedicalTests(rawContent: string) {
