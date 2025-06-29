@@ -5,16 +5,15 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { PackageProvider } from '@/contexts/PackageContext';
 import Layout from '@/components/Layout';
-import HomePage from '@/pages/HomePage';
-import LoginPage from '@/pages/LoginPage';
-import RegisterPage from '@/pages/RegisterPage';
-import DashboardPage from '@/pages/DashboardPage';
-import OrganizationsPage from '@/pages/OrganizationsPage';
+import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
+import Dashboard from '@/pages/Dashboard';
+import OrganizationsListPage from '@/pages/OrganizationsListPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import PatientsPage from '@/pages/PatientsPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import StructuredExtractionPage from '@/pages/StructuredExtractionPage';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import OrganizationProtectedRoute from '@/components/OrganizationProtectedRoute';
 
 function App() {
   return (
@@ -25,57 +24,56 @@ function App() {
             <div className="min-h-screen bg-background">
               <Routes>
                 {/* Public routes */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
                 
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
-                  <ProtectedRoute>
+                  <OrganizationProtectedRoute>
                     <Layout>
-                      <DashboardPage />
+                      <Dashboard />
                     </Layout>
-                  </ProtectedRoute>
+                  </OrganizationProtectedRoute>
                 } />
                 
                 <Route path="/organizations" element={
-                  <ProtectedRoute>
+                  <OrganizationProtectedRoute>
                     <Layout>
-                      <OrganizationsPage />
+                      <OrganizationsListPage />
                     </Layout>
-                  </ProtectedRoute>
+                  </OrganizationProtectedRoute>
                 } />
                 
                 <Route path="/documents" element={
-                  <ProtectedRoute>
+                  <OrganizationProtectedRoute>
                     <Layout>
                       <DocumentsPage />
                     </Layout>
-                  </ProtectedRoute>
+                  </OrganizationProtectedRoute>
                 } />
                 
                 <Route path="/patients" element={
-                  <ProtectedRoute>
+                  <OrganizationProtectedRoute>
                     <Layout>
                       <PatientsPage />
                     </Layout>
-                  </ProtectedRoute>
+                  </OrganizationProtectedRoute>
                 } />
                 
                 <Route path="/structured-extraction" element={
-                  <ProtectedRoute>
+                  <OrganizationProtectedRoute>
                     <Layout>
                       <StructuredExtractionPage />
                     </Layout>
-                  </ProtectedRoute>
+                  </OrganizationProtectedRoute>
                 } />
                 
                 <Route path="/settings" element={
-                  <ProtectedRoute>
+                  <OrganizationProtectedRoute>
                     <Layout>
                       <SettingsPage />
                     </Layout>
-                  </ProtectedRoute>
+                  </OrganizationProtectedRoute>
                 } />
                 
                 {/* Redirect unknown routes to dashboard */}

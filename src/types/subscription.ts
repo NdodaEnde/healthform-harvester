@@ -1,4 +1,3 @@
-
 export type PackageTier = 'basic' | 'premium' | 'enterprise';
 
 export type FeatureKey = 
@@ -18,7 +17,16 @@ export type FeatureKey =
   | 'api_access'
   | 'custom_integrations'
   | 'white_label_reports'
-  | 'dedicated_support';
+  | 'dedicated_support'
+  | 'basic_analytics'
+  | 'document_upload'
+  | 'text_extraction'
+  | 'structured_extraction_v2'
+  | 'extraction_comparison_tools'
+  | 'structured_extraction_rollout'
+  | 'advanced_analytics'
+  | 'priority_support'
+  | 'white_label';
 
 export interface SubscriptionPackage {
   id: string;
