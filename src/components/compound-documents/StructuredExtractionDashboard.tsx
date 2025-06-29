@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,59 +51,86 @@ const StructuredExtractionDashboard = () => {
         return;
       }
 
-      // Query documents with processing metadata - handle case where column might not exist
-      const { data: documents, error } = await supabase
-        .from('documents')
-        .select('processing_metadata, status, created_at')
-        .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Last 30 days
-        .order('created_at', { ascending: false });
+      // Try to query with processing_metadata first, fallback if column doesn't exist
+      let documents: any[] | null = null;
+      let hasProcessingMetadata = true;
 
-      if (error) {
-        console.error('Error fetching documents:', error);
-        // If processing_metadata column doesn't exist, set default stats
-        setStats({
-          totalDocuments: 0,
-          v1Documents: 0,
-          v2Documents: 0,
-          avgV1Confidence: 0.5,
-          avgV2Confidence: 0,
-          v1SuccessRate: 0,
-          v2SuccessRate: 0
-        });
-        setLoading(false);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('processing_metadata, status, created_at')
+          .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false });
+
+        if (error && error.message.includes('processing_metadata')) {
+          hasProcessingMetadata = false;
+          throw error;
+        }
+
+        documents = data;
+      } catch (error: any) {
+        // If processing_metadata column doesn't exist, query without it
+        if (error.message?.includes('processing_metadata') || error.message?.includes('column')) {
+          console.log('Processing metadata column not found, using basic query');
+          hasProcessingMetadata = false;
+          
+          const { data, error: fallbackError } = await supabase
+            .from('documents')
+            .select('status, created_at')
+            .or(`organization_id.eq.${organizationId},client_organization_id.eq.${organizationId}`)
+            .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+            .order('created_at', { ascending: false });
+
+          if (fallbackError) throw fallbackError;
+          documents = data;
+        } else {
+          throw error;
+        }
       }
 
-      const v1Docs = documents?.filter(doc => 
-        !doc.processing_metadata?.extraction_method || 
-        doc.processing_metadata.extraction_method !== 'structured_extraction_v2'
-      ) || [];
-      
-      const v2Docs = documents?.filter(doc => 
-        doc.processing_metadata?.extraction_method === 'structured_extraction_v2'
-      ) || [];
+      // Process the data based on whether we have processing_metadata
+      let v1Docs, v2Docs, v1Confidences, v2Confidences, v1Success, v2Success;
 
-      const v1Confidences = v1Docs
-        .map(doc => doc.processing_metadata?.confidence_score || 0.5)
-        .filter(score => score > 0);
-      
-      const v2Confidences = v2Docs
-        .map(doc => doc.processing_metadata?.confidence_score || 0)
-        .filter(score => score > 0);
+      if (hasProcessingMetadata && documents) {
+        v1Docs = documents.filter((doc: any) => 
+          !doc.processing_metadata?.extraction_method || 
+          doc.processing_metadata.extraction_method !== 'structured_extraction_v2'
+        );
+        
+        v2Docs = documents.filter((doc: any) => 
+          doc.processing_metadata?.extraction_method === 'structured_extraction_v2'
+        );
 
-      const v1Success = v1Docs.filter(doc => doc.status === 'processed').length;
-      const v2Success = v2Docs.filter(doc => doc.status === 'processed').length;
+        v1Confidences = v1Docs
+          .map((doc: any) => doc.processing_metadata?.confidence_score || 0.5)
+          .filter(score => score > 0);
+        
+        v2Confidences = v2Docs
+          .map((doc: any) => doc.processing_metadata?.confidence_score || 0)
+          .filter(score => score > 0);
+
+        v1Success = v1Docs.filter((doc: any) => doc.status === 'processed').length;
+        v2Success = v2Docs.filter((doc: any) => doc.status === 'processed').length;
+      } else {
+        // Fallback: assume all documents are V1 for now
+        v1Docs = documents || [];
+        v2Docs = [];
+        v1Confidences = [0.5]; // Default confidence for V1
+        v2Confidences = [];
+        v1Success = v1Docs.filter((doc: any) => doc.status === 'processed').length;
+        v2Success = 0;
+      }
 
       setStats({
         totalDocuments: documents?.length || 0,
         v1Documents: v1Docs.length,
         v2Documents: v2Docs.length,
         avgV1Confidence: v1Confidences.length > 0 
-          ? v1Confidences.reduce((a, b) => a + b, 0) / v1Confidences.length 
+          ? v1Confidences.reduce((a: number, b: number) => a + b, 0) / v1Confidences.length 
           : 0.5,
         avgV2Confidence: v2Confidences.length > 0 
-          ? v2Confidences.reduce((a, b) => a + b, 0) / v2Confidences.length 
+          ? v2Confidences.reduce((a: number, b: number) => a + b, 0) / v2Confidences.length 
           : 0,
         v1SuccessRate: v1Docs.length > 0 ? v1Success / v1Docs.length : 0,
         v2SuccessRate: v2Docs.length > 0 ? v2Success / v2Docs.length : 0
