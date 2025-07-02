@@ -37,87 +37,211 @@ const HistoricalCertificateTemplate = ({
     return trueValues.includes(stringValue);
   };
 
-  // Normalize extracted data for template use
-  const normalizeExtractedDataForTemplate = (extractedData: any): any => {
-    if (!extractedData) return {
-      patient: { name: '', id_number: '', company: '', occupation: '' },
-      examination_results: { 
-        date: '', 
-        type: { pre_employment: false, periodical: false, exit: false },
-        test_results: {}
-      },
-      certification: {
-        examination_date: '',
-        valid_until: '',
-        stamp_date: '',
-        fit: false,
-        fit_with_restrictions: false,
-        fit_with_condition: false,
-        temporarily_unfit: false,
-        unfit: false,
-        comments: '',
-        follow_up: '',
-        review_date: ''
-      },
-      restrictions: {}
+  // Enhanced normalize function to handle microservice structure
+const normalizeExtractedDataForTemplate = (extractedData: any): any => {
+  if (!extractedData) return {
+    patient: { name: '', id_number: '', company: '', occupation: '' },
+    examination_results: { 
+      date: '', 
+      type: { pre_employment: false, periodical: false, exit: false },
+      test_results: {}
+    },
+    certification: {
+      examination_date: '',
+      valid_until: '',
+      stamp_date: '',
+      fit: false,
+      fit_with_restrictions: false,
+      fit_with_condition: false,
+      temporarily_unfit: false,
+      unfit: false,
+      comments: '',
+      follow_up: '',
+      review_date: ''
+    },
+    restrictions: {}
+  };
+
+  // Handle the microservice structure (your working version)
+  let sourceData = extractedData;
+  
+  // If we have structured_data wrapper, use that
+  if (extractedData?.structured_data) {
+    sourceData = extractedData.structured_data;
+  }
+
+  // NEW: Handle microservice structure with employee_info and medical_examination
+  if (sourceData?.employee_info || sourceData?.medical_examination) {
+    const empInfo = sourceData.employee_info || {};
+    const medExam = sourceData.medical_examination || {};
+    const medTests = sourceData.medical_tests || {};
+    const medPractitioner = sourceData.medical_practitioner || {};
+    
+    console.log('Processing microservice structure:', {
+      empInfo,
+      medExam,
+      medTests,
+      medPractitioner
+    });
+
+    // Map medical tests from microservice format to template format
+    const testResults = {};
+    if (medTests) {
+      // Blood test
+      if (medTests.blood_test) {
+        testResults.bloods_done = medTests.blood_test.performed || false;
+        testResults.bloods_results = medTests.blood_test.result || 'N/A';
+      }
+      
+      // Vision tests
+      if (medTests.vision_test) {
+        testResults.far_near_vision_done = medTests.vision_test.performed || false;
+        testResults.far_near_vision_results = medTests.vision_test.result || 'N/A';
+      }
+      
+      if (medTests.side_depth_test) {
+        testResults.side_depth_done = medTests.side_depth_test.performed || false;
+        testResults.side_depth_results = medTests.side_depth_test.result || 'N/A';
+      }
+      
+      if (medTests.night_vision) {
+        testResults.night_vision_done = medTests.night_vision.performed || false;
+        testResults.night_vision_results = medTests.night_vision.result || 'N/A';
+      }
+      
+      // Other tests
+      if (medTests.hearing_test) {
+        testResults.hearing_done = medTests.hearing_test.performed || false;
+        testResults.hearing_results = medTests.hearing_test.result || 'N/A';
+      }
+      
+      if (medTests.heights_test) {
+        testResults.heights_done = medTests.heights_test.performed || false;
+        testResults.heights_results = medTests.heights_test.result || 'N/A';
+      }
+      
+      if (medTests.lung_function) {
+        testResults.lung_function_done = medTests.lung_function.performed || false;
+        testResults.lung_function_results = medTests.lung_function.result || 'N/A';
+      }
+      
+      if (medTests.x_ray) {
+        testResults.x_ray_done = medTests.x_ray.performed || false;
+        testResults.x_ray_results = medTests.x_ray.result || 'N/A';
+      }
+      
+      if (medTests.drug_screen) {
+        testResults.drug_screen_done = medTests.drug_screen.performed || false;
+        testResults.drug_screen_results = medTests.drug_screen.result || 'N/A';
+      }
+    }
+
+    // Map examination type
+    const examinationType = {
+      pre_employment: medExam.examination_type === 'PRE-EMPLOYMENT',
+      periodical: medExam.examination_type === 'PERIODICAL', 
+      exit: medExam.examination_type === 'EXIT'
     };
 
-    // Handle the case where data comes from document processing
-    let sourceData = extractedData;
-    
-    // If we have structured_data wrapper, use that
-    if (extractedData?.structured_data) {
-      sourceData = extractedData.structured_data;
-    }
-    
-    // If we have certificate_info from document processing, map it properly
-    if (sourceData?.certificate_info) {
-      const certInfo = sourceData.certificate_info;
-      
-      return {
-        patient: {
-          name: certInfo.employee_name || '',
-          id_number: certInfo.id_number || '',
-          company: certInfo.company_name || '',
-          occupation: certInfo.job_title || ''
-        },
-        examination_results: {
-          date: certInfo.examination_date || '',
-          type: {
-            pre_employment: certInfo.pre_employment_checked || false,
-            periodical: certInfo.periodical_checked || false,
-            exit: certInfo.exit_checked || false
-          },
-          test_results: certInfo.medical_tests || {}
-        },
-        certification: {
-          examination_date: certInfo.examination_date || '',
-          valid_until: certInfo.expiry_date || '',
-          stamp_date: certInfo.examination_date || '', // Initialize stamp date with examination date
-          fit: certInfo.fitness_status?.fit || false,
-          fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
-          fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
-          temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
-          unfit: certInfo.fitness_status?.unfit || false,
-          comments: certInfo.comments || '',
-          follow_up: certInfo.follow_up || '',
-          review_date: certInfo.review_date || ''
-        },
-        restrictions: certInfo.restrictions || {}
-      };
-    }
-    
-    // If data is already in the right structure, return as-is
-    if (sourceData?.patient || sourceData?.examination_results || sourceData?.certification) {
-      // Ensure stamp_date is set to examination_date if not present
-      if (sourceData.certification && !sourceData.certification.stamp_date) {
-        sourceData.certification.stamp_date = sourceData.certification.examination_date || sourceData.examination_results?.date || '';
+    // Map fitness status
+    const fitnessStatus = medExam.fitness_status || 'UNKNOWN';
+    const fitness = {
+      fit: fitnessStatus === 'FIT',
+      fit_with_restrictions: fitnessStatus === 'FIT_WITH_RESTRICTIONS',
+      fit_with_condition: fitnessStatus === 'FIT_WITH_CONDITION',
+      temporarily_unfit: fitnessStatus === 'TEMPORARILY_UNFIT',
+      unfit: fitnessStatus === 'UNFIT'
+    };
+
+    // Map work restrictions
+    const restrictions = medExam.work_restrictions || {};
+
+    return {
+      patient: {
+        name: empInfo.full_name || '',
+        id_number: empInfo.id_number || '',
+        company: empInfo.company_name || '',
+        occupation: empInfo.job_title || ''
+      },
+      examination_results: {
+        date: medExam.examination_date || '',
+        type: examinationType,
+        test_results: testResults
+      },
+      certification: {
+        examination_date: medExam.examination_date || '',
+        valid_until: medExam.expiry_date || '',
+        stamp_date: medExam.examination_date || '',
+        fit: fitness.fit,
+        fit_with_restrictions: fitness.fit_with_restrictions,
+        fit_with_condition: fitness.fit_with_condition,
+        temporarily_unfit: fitness.temporarily_unfit,
+        unfit: fitness.unfit,
+        comments: medExam.comments || '',
+        follow_up: medExam.follow_up_actions || '',
+        review_date: medExam.review_date || ''
+      },
+      restrictions: {
+        heights: restrictions.heights || false,
+        dust_exposure: restrictions.dust_exposure || false,
+        motorized_equipment: restrictions.motorized_equipment || false,
+        wear_hearing_protection: restrictions.wear_hearing_protection || false,
+        confined_spaces: restrictions.confined_spaces || false,
+        chemical_exposure: restrictions.chemical_exposure || false,
+        wear_spectacles: restrictions.wear_spectacles || false,
+        chronic_conditions: restrictions.chronic_conditions || false
       }
-      return sourceData;
-    }
+    };
+  }
+  
+  // Handle existing certificate_info structure (platform version)
+  if (sourceData?.certificate_info) {
+    const certInfo = sourceData.certificate_info;
     
+    return {
+      patient: {
+        name: certInfo.employee_name || '',
+        id_number: certInfo.id_number || '',
+        company: certInfo.company_name || '',
+        occupation: certInfo.job_title || ''
+      },
+      examination_results: {
+        date: certInfo.examination_date || '',
+        type: {
+          pre_employment: certInfo.pre_employment_checked || false,
+          periodical: certInfo.periodical_checked || false,
+          exit: certInfo.exit_checked || false
+        },
+        test_results: certInfo.medical_tests || {}
+      },
+      certification: {
+        examination_date: certInfo.examination_date || '',
+        valid_until: certInfo.expiry_date || '',
+        stamp_date: certInfo.examination_date || '',
+        fit: certInfo.fitness_status?.fit || false,
+        fit_with_restrictions: certInfo.fitness_status?.fit_with_restrictions || false,
+        fit_with_condition: certInfo.fitness_status?.fit_with_condition || false,
+        temporarily_unfit: certInfo.fitness_status?.temporarily_unfit || false,
+        unfit: certInfo.fitness_status?.unfit || false,
+        comments: certInfo.comments || '',
+        follow_up: certInfo.follow_up || '',
+        review_date: certInfo.review_date || ''
+      },
+      restrictions: certInfo.restrictions || {}
+    };
+  }
+  
+  // If data is already in the right structure, return as-is
+  if (sourceData?.patient || sourceData?.examination_results || sourceData?.certification) {
+    // Ensure stamp_date is set to examination_date if not present
+    if (sourceData.certification && !sourceData.certification.stamp_date) {
+      sourceData.certification.stamp_date = sourceData.certification.examination_date || sourceData.examination_results?.date || '';
+    }
     return sourceData;
-  };
+  }
+  
+  return sourceData;
+};
 
   // Initialize editable data state
   useEffect(() => {
