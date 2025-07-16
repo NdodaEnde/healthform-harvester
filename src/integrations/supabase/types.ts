@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
-  }
   public: {
     Tables: {
       audit_logs: {
@@ -391,181 +386,6 @@ export type Database = {
           },
         ]
       }
-      compound_document_sections: {
-        Row: {
-          compound_document_id: string
-          created_at: string
-          extracted_data: Json | null
-          id: string
-          page_range: string | null
-          processing_confidence: number | null
-          requires_review: boolean | null
-          review_notes: string | null
-          section_name: string
-          section_type: string
-          updated_at: string
-          validated_at: string | null
-          validated_by: string | null
-          validation_status: string | null
-        }
-        Insert: {
-          compound_document_id: string
-          created_at?: string
-          extracted_data?: Json | null
-          id?: string
-          page_range?: string | null
-          processing_confidence?: number | null
-          requires_review?: boolean | null
-          review_notes?: string | null
-          section_name: string
-          section_type: string
-          updated_at?: string
-          validated_at?: string | null
-          validated_by?: string | null
-          validation_status?: string | null
-        }
-        Update: {
-          compound_document_id?: string
-          created_at?: string
-          extracted_data?: Json | null
-          id?: string
-          page_range?: string | null
-          processing_confidence?: number | null
-          requires_review?: boolean | null
-          review_notes?: string | null
-          section_name?: string
-          section_type?: string
-          updated_at?: string
-          validated_at?: string | null
-          validated_by?: string | null
-          validation_status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "compound_document_sections_compound_document_id_fkey"
-            columns: ["compound_document_id"]
-            isOneToOne: false
-            referencedRelation: "compound_documents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      compound_document_workflow: {
-        Row: {
-          assigned_at: string | null
-          assigned_to: string | null
-          completed_at: string | null
-          completed_by: string | null
-          compound_document_id: string
-          created_at: string
-          id: string
-          notes: string | null
-          rejection_reason: string | null
-          status: string | null
-          updated_at: string
-          workflow_step: string
-        }
-        Insert: {
-          assigned_at?: string | null
-          assigned_to?: string | null
-          completed_at?: string | null
-          completed_by?: string | null
-          compound_document_id: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          rejection_reason?: string | null
-          status?: string | null
-          updated_at?: string
-          workflow_step: string
-        }
-        Update: {
-          assigned_at?: string | null
-          assigned_to?: string | null
-          completed_at?: string | null
-          completed_by?: string | null
-          compound_document_id?: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          rejection_reason?: string | null
-          status?: string | null
-          updated_at?: string
-          workflow_step?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "compound_document_workflow_compound_document_id_fkey"
-            columns: ["compound_document_id"]
-            isOneToOne: false
-            referencedRelation: "compound_documents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      compound_documents: {
-        Row: {
-          client_organization_id: string | null
-          created_at: string
-          detected_sections: Json | null
-          file_name: string
-          file_path: string
-          file_size: number | null
-          id: string
-          mime_type: string
-          organization_id: string | null
-          owner_id: string | null
-          processing_metadata: Json | null
-          public_url: string | null
-          status: string
-          total_pages: number | null
-          updated_at: string
-          user_id: string | null
-          workflow_assignments: Json | null
-          workflow_status: string | null
-        }
-        Insert: {
-          client_organization_id?: string | null
-          created_at?: string
-          detected_sections?: Json | null
-          file_name: string
-          file_path: string
-          file_size?: number | null
-          id?: string
-          mime_type: string
-          organization_id?: string | null
-          owner_id?: string | null
-          processing_metadata?: Json | null
-          public_url?: string | null
-          status?: string
-          total_pages?: number | null
-          updated_at?: string
-          user_id?: string | null
-          workflow_assignments?: Json | null
-          workflow_status?: string | null
-        }
-        Update: {
-          client_organization_id?: string | null
-          created_at?: string
-          detected_sections?: Json | null
-          file_name?: string
-          file_path?: string
-          file_size?: number | null
-          id?: string
-          mime_type?: string
-          organization_id?: string | null
-          owner_id?: string | null
-          processing_metadata?: Json | null
-          public_url?: string | null
-          status?: string
-          total_pages?: number | null
-          updated_at?: string
-          user_id?: string | null
-          workflow_assignments?: Json | null
-          workflow_status?: string | null
-        }
-        Relationships: []
-      }
       documents: {
         Row: {
           client_organization_id: string | null
@@ -581,7 +401,6 @@ export type Database = {
           owner_id: string | null
           processed_at: string | null
           processing_error: string | null
-          processing_metadata: Json | null
           public_url: string | null
           status: string
           updated_at: string
@@ -603,7 +422,6 @@ export type Database = {
           owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
-          processing_metadata?: Json | null
           public_url?: string | null
           status?: string
           updated_at?: string
@@ -625,7 +443,6 @@ export type Database = {
           owner_id?: string | null
           processed_at?: string | null
           processing_error?: string | null
-          processing_metadata?: Json | null
           public_url?: string | null
           status?: string
           updated_at?: string
@@ -727,72 +544,6 @@ export type Database = {
           user_id?: string | null
           validated_by?: string | null
           validation_status?: string | null
-        }
-        Relationships: []
-      }
-      feature_flags: {
-        Row: {
-          created_at: string
-          description: string | null
-          flag_name: string
-          id: string
-          is_enabled: boolean | null
-          organization_id: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          flag_name: string
-          id?: string
-          is_enabled?: boolean | null
-          organization_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          flag_name?: string
-          id?: string
-          is_enabled?: boolean | null
-          organization_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      feature_flags_backup_migration: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          flag_name: string | null
-          id: string | null
-          is_enabled: boolean | null
-          organization_id: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          flag_name?: string | null
-          id?: string | null
-          is_enabled?: boolean | null
-          organization_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          flag_name?: string | null
-          id?: string | null
-          is_enabled?: boolean | null
-          organization_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: []
       }
@@ -2390,10 +2141,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }
-      is_feature_enabled: {
-        Args: { flag_name: string; org_id?: string; user_id_param?: string }
-        Returns: boolean
-      }
       is_org_admin: {
         Args: { org_id: string }
         Returns: boolean
@@ -2444,25 +2191,21 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -2480,16 +2223,14 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -2505,16 +2246,14 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -2530,16 +2269,14 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -2547,16 +2284,14 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
