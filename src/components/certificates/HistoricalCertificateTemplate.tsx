@@ -85,7 +85,27 @@ const normalizeExtractedDataForTemplate = (extractedData: any): any => {
     });
 
     // Map medical tests from microservice format to template format
-    const testResults = {};
+    const testResults: any = {
+      bloods_done: false,
+      bloods_results: 'N/A',
+      far_near_vision_done: false,
+      far_near_vision_results: 'N/A',
+      side_depth_done: false,
+      side_depth_results: 'N/A',
+      night_vision_done: false,
+      night_vision_results: 'N/A',
+      hearing_done: false,
+      hearing_results: 'N/A',
+      heights_done: false,
+      heights_results: 'N/A',
+      lung_function_done: false,
+      lung_function_results: 'N/A',
+      x_ray_done: false,
+      x_ray_results: 'N/A',
+      drug_screen_done: false,
+      drug_screen_results: 'N/A'
+    };
+
     if (medTests) {
       // Blood test
       if (medTests.blood_test) {
