@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,7 +7,6 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/contexts/AuthContext';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { PackageProvider } from '@/contexts/PackageContext';
-import { healthService } from '@/services/HealthService';
 import OrganizationProtectedRoute from '@/components/OrganizationProtectedRoute';
 import DashboardLayout from '@/components/DashboardLayout';
 import HeaderComponent from '@/components/HeaderComponent';
@@ -34,11 +33,6 @@ import { OrganizationsPage, CreateOrganizationPage, EditOrganizationPage, Organi
 const queryClient = new QueryClient();
 
 function App() {
-  // Initialize health monitoring for production
-  useEffect(() => {
-    healthService.startMonitoring();
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">

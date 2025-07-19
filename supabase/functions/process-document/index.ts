@@ -363,46 +363,17 @@ serve(async (req) => {
       const documentData = await dataResponse.json();
       console.log("Document data retrieved successfully");
       
-    // Extract the first document result
-    documentResult = documentData.result && documentData.result.length > 0 
-      ? documentData.result[0] 
-      : null;
-      
-    if (!documentResult) {
-      throw new Error("No document processing results returned from microservice");
-    }
-
-    // Handle different microservice response formats
-    if (documentResult.raw_data) {
-      // Microservice returned raw_data (markdown + chunks format)
-      rawContent = documentResult.raw_data.markdown || "";
-      chunks = documentResult.raw_data.chunks || [];
-      console.log("Using raw_data format from microservice");
-    } else if (documentResult.raw_content && documentResult.raw_content.includes('{')) {
-      // Microservice returned structured JSON data in raw_content
-      console.log("Processing structured JSON data from microservice raw_content");
-      try {
-        const structuredJson = JSON.parse(documentResult.raw_content);
+      // Extract the first document result
+      documentResult = documentData.result && documentData.result.length > 0 
+        ? documentData.result[0] 
+        : null;
         
-        // Transform structured JSON to our expected format
-        rawContent = `Structured data extracted: ${documentResult.filename || 'document'}`;
-        chunks = []; // No chunks in structured extraction
-        
-        // Store the structured data for later processing
-        documentResult.microservice_structured_data = structuredJson;
-        console.log("Microservice structured data keys:", Object.keys(structuredJson));
-      } catch (parseError) {
-        console.error("Failed to parse JSON from raw_content:", parseError);
-        // Fall back to treating as regular content
-        rawContent = documentResult.raw_content || "";
-        chunks = [];
+      if (!documentResult) {
+        throw new Error("No document processing results returned from microservice");
       }
-    } else {
-      // Fallback format
+
       rawContent = documentResult.markdown || "";
       chunks = documentResult.chunks || [];
-      console.log("Using fallback format from microservice");
-    }
       
       // Cleanup on the microservice side (in background)
       fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
@@ -494,112 +465,61 @@ serve(async (req) => {
     // Process chunks to create structured data
     const structuredData: any = {};
     
-    // Check if we have structured data from microservice (JSON format)
-    if (documentResult?.microservice_structured_data) {
-      console.log("=== PROCESSING MICROSERVICE STRUCTURED DATA ===");
-      const microserviceData = documentResult.microservice_structured_data;
+    // Group chunks by type for easier access
+    const chunksByType = chunks.reduce((acc: any, chunk: any) => {
+      const type = chunk.chunk_type || chunk.type || 'unknown';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push({
+        text: chunk.text || chunk.content || '',
+        chunk_id: chunk.chunk_id || '',
+        grounding: chunk.grounding || []
+      });
+      return acc;
+    }, {});
+    
+    console.log("Chunks by type:", Object.keys(chunksByType));
+    
+    // Extract specific information based on chunk types
+    if (chunksByType.form) {
+      structuredData.forms = chunksByType.form;
+      console.log("Added forms to structured data, count:", chunksByType.form.length);
+    }
+    
+    if (chunksByType.table) {
+      structuredData.tables = chunksByType.table;
+      console.log("Added tables to structured data, count:", chunksByType.table.length);
+    }
+    
+    if (chunksByType.figure) {
+      structuredData.figures = chunksByType.figure;
+      console.log("Added figures to structured data, count:", chunksByType.figure.length);
+    }
+    
+    if (chunksByType.text) {
+      structuredData.text_chunks = chunksByType.text;
+      console.log("Added text chunks to structured data, count:", chunksByType.text.length);
+    }
+    
+    if (chunksByType.marginalia) {
+      structuredData.marginalia = chunksByType.marginalia;
+      console.log("Added marginalia to structured data, count:", chunksByType.marginalia.length);
+    }
+    
+    // For certificate documents, extract specific fields
+    console.log("Checking if document type matches certificate patterns...");
+    if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
+      console.log("Processing as certificate document");
       
-      // Transform microservice structured data to our format
-      if (microserviceData.employee_info) {
-        structuredData.employee_info = microserviceData.employee_info;
-        console.log("✓ Added employee_info to structured data");
-      }
+      const certificateInfo = extractCertificateInfo(rawContent);
       
-      if (microserviceData.medical_examination) {
-        structuredData.medical_examination = microserviceData.medical_examination;
-        console.log("✓ Added medical_examination to structured data");
-      }
-      
-      if (microserviceData.medical_tests) {
-        structuredData.medical_tests = microserviceData.medical_tests;
-        console.log("✓ Added medical_tests to structured data");
-      }
-      
-      if (microserviceData.medical_practitioner) {
-        structuredData.medical_practitioner = microserviceData.medical_practitioner;
-        console.log("✓ Added medical_practitioner to structured data");
-      }
-      
-      // Convert to certificate_info format for backward compatibility
-      structuredData.certificate_info = {
-        employee_name: microserviceData.employee_info?.full_name,
-        id_number: microserviceData.employee_info?.id_number,
-        company_name: microserviceData.employee_info?.company_name,
-        job_title: microserviceData.employee_info?.job_title,
-        examination_date: microserviceData.medical_examination?.examination_date,
-        expiry_date: microserviceData.medical_examination?.expiry_date,
-        examination_type: microserviceData.medical_examination?.examination_type,
-        fitness_status: microserviceData.medical_examination?.fitness_status,
-        comments: microserviceData.medical_examination?.comments,
-        restrictions: microserviceData.medical_examination?.restrictions_list || [],
-        doctor_name: microserviceData.medical_practitioner?.doctor_name,
-        practice_number: microserviceData.medical_practitioner?.practice_number,
-        signature_present: microserviceData.medical_practitioner?.signature_present || false,
-        stamp_present: microserviceData.medical_practitioner?.stamp_present || false
-      };
-      
-      console.log("✓ Created certificate_info from structured data");
-      
-    } else {
-      // Fallback to chunk-based processing
-      console.log("=== PROCESSING CHUNKS FOR STRUCTURED DATA ===");
-      
-      // Group chunks by type for easier access
-      const chunksByType = chunks.reduce((acc: any, chunk: any) => {
-        const type = chunk.chunk_type || chunk.type || 'unknown';
-        if (!acc[type]) acc[type] = [];
-        acc[type].push({
-          text: chunk.text || chunk.content || '',
-          chunk_id: chunk.chunk_id || '',
-          grounding: chunk.grounding || []
-        });
-        return acc;
-      }, {});
-      
-      console.log("Chunks by type:", Object.keys(chunksByType));
-      
-      // Extract specific information based on chunk types
-      if (chunksByType.form) {
-        structuredData.forms = chunksByType.form;
-        console.log("Added forms to structured data, count:", chunksByType.form.length);
-      }
-      
-      if (chunksByType.table) {
-        structuredData.tables = chunksByType.table;
-        console.log("Added tables to structured data, count:", chunksByType.table.length);
-      }
-      
-      if (chunksByType.figure) {
-        structuredData.figures = chunksByType.figure;
-        console.log("Added figures to structured data, count:", chunksByType.figure.length);
-      }
-      
-      if (chunksByType.text) {
-        structuredData.text_chunks = chunksByType.text;
-        console.log("Added text chunks to structured data, count:", chunksByType.text.length);
-      }
-      
-      if (chunksByType.marginalia) {
-        structuredData.marginalia = chunksByType.marginalia;
-        console.log("Added marginalia to structured data, count:", chunksByType.marginalia.length);
-      }
-      
-      // For certificate documents, extract specific fields using legacy method
-      console.log("Checking if document type matches certificate patterns...");
-      if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
-        console.log("Processing as certificate document (legacy method)");
-        
-        const certificateInfo = extractCertificateInfo(rawContent);
-        
-        if (Object.keys(certificateInfo).length > 0) {
-          structuredData.certificate_info = certificateInfo;
-          console.log("✓ Added certificate_info to structured data");
-        } else {
-          console.log("✗ No certificate info extracted");
-        }
+      if (Object.keys(certificateInfo).length > 0) {
+        structuredData.certificate_info = certificateInfo;
+        console.log("✓ Added certificate_info to structured data");
       } else {
-        console.log("Document type does not match certificate patterns");
+        console.log("✗ No certificate info extracted");
       }
+    } else {
+      console.log("Document type does not match certificate patterns");
     }
     
     console.log("=== FINAL STRUCTURED DATA ===");
@@ -610,7 +530,6 @@ serve(async (req) => {
     const hasStructuredData = Object.keys(structuredData).length > 0;
     const hasValidContent = rawContent && rawContent.length > 50;
     const hasChunks = chunks && chunks.length > 0;
-    const hasMicroserviceData = documentResult?.microservice_structured_data;
     const isFallback = documentResult?.metadata?.fallback;
     
     let documentStatus = 'pending';
@@ -618,9 +537,6 @@ serve(async (req) => {
     if (isFallback) {
       documentStatus = 'uploaded'; // New status for fallback documents
       console.log("Document uploaded without processing due to microservice unavailability");
-    } else if (hasMicroserviceData && hasStructuredData) {
-      documentStatus = 'processed';
-      console.log("Document has microservice structured data, marking as 'processed'");
     } else if (hasStructuredData && hasValidContent) {
       documentStatus = 'processed';
       console.log("Document has structured data and content, marking as 'processed'");
@@ -651,17 +567,13 @@ serve(async (req) => {
         structured_data: structuredData,
         chunks: chunks,
         metadata: documentResult?.metadata || {},
-        microservice_data: documentResult?.microservice_structured_data || null,
         processing_info: {
           processing_time: 0,
           chunk_count: chunks.length,
-          fallback: isFallback || false,
-          extraction_method: hasMicroserviceData ? 'structured_pydantic' : 'ocr_fallback'
+          fallback: isFallback || false
         }
       }
     };
-    
-    console.log("About to insert document record:", JSON.stringify(documentRecord, null, 2));
     
     console.log(`Creating document record in database with status '${documentStatus}'`);
     if (patientId) {
