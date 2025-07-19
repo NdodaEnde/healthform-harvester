@@ -378,18 +378,25 @@ serve(async (req) => {
       rawContent = documentResult.raw_data.markdown || "";
       chunks = documentResult.raw_data.chunks || [];
       console.log("Using raw_data format from microservice");
-    } else if (documentResult.structured_data) {
-      // Microservice returned structured JSON data
-      console.log("Processing structured JSON data from microservice");
-      const structuredJson = JSON.parse(documentResult.raw_data || '{}');
-      
-      // Transform structured JSON to our expected format
-      rawContent = `Structured data extracted: ${documentResult.filename || 'document'}`;
-      chunks = []; // No chunks in structured extraction
-      
-      // Store the structured data for later processing
-      documentResult.microservice_structured_data = structuredJson;
-      console.log("Microservice structured data keys:", Object.keys(structuredJson));
+    } else if (documentResult.raw_content && documentResult.raw_content.includes('{')) {
+      // Microservice returned structured JSON data in raw_content
+      console.log("Processing structured JSON data from microservice raw_content");
+      try {
+        const structuredJson = JSON.parse(documentResult.raw_content);
+        
+        // Transform structured JSON to our expected format
+        rawContent = `Structured data extracted: ${documentResult.filename || 'document'}`;
+        chunks = []; // No chunks in structured extraction
+        
+        // Store the structured data for later processing
+        documentResult.microservice_structured_data = structuredJson;
+        console.log("Microservice structured data keys:", Object.keys(structuredJson));
+      } catch (parseError) {
+        console.error("Failed to parse JSON from raw_content:", parseError);
+        // Fall back to treating as regular content
+        rawContent = documentResult.raw_content || "";
+        chunks = [];
+      }
     } else {
       // Fallback format
       rawContent = documentResult.markdown || "";
