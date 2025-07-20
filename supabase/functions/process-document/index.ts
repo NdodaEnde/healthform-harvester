@@ -465,6 +465,50 @@ serve(async (req) => {
     // Process chunks to create structured data
     const structuredData: any = {};
     
+    // CRITICAL FIX: Check if microservice returned structured data
+    console.log("=== CHECKING MICROSERVICE STRUCTURED DATA ===");
+    if (documentResult && typeof documentResult === 'object') {
+      console.log("Document result keys:", Object.keys(documentResult));
+      
+      // Check for structured data from microservice
+      if (documentResult.structured_data) {
+        console.log("✅ Found microservice structured_data:", Object.keys(documentResult.structured_data));
+        
+        // If we have structured data from microservice, use it as the base
+        Object.assign(structuredData, documentResult.structured_data);
+        
+        // Map microservice data to direct fields that frontend expects
+        const microData = documentResult.structured_data;
+        
+        if (microData.employee_info) {
+          structuredData.patientName = microData.employee_info.full_name;
+          structuredData.patientId = microData.employee_info.id_number;
+          structuredData.companyName = microData.employee_info.company_name;
+          structuredData.occupation = microData.employee_info.job_title;
+          console.log("✅ Mapped employee_info to direct fields");
+        }
+        
+        if (microData.medical_examination) {
+          structuredData.examinationDate = microData.medical_examination.examination_date;
+          structuredData.expiryDate = microData.medical_examination.expiry_date;
+          structuredData.examinationType = microData.medical_examination.examination_type?.toLowerCase();
+          structuredData.fitnessStatus = microData.medical_examination.fitness_status?.toLowerCase();
+          structuredData.comments = microData.medical_examination.comments;
+          structuredData.followUpActions = microData.medical_examination.follow_up_actions;
+          
+          // Map restrictions
+          if (microData.medical_examination.restrictions_list?.length > 0) {
+            structuredData.restrictionsText = microData.medical_examination.restrictions_list.join(', ');
+          } else {
+            structuredData.restrictionsText = 'None';
+          }
+          console.log("✅ Mapped medical_examination to direct fields");
+        }
+        
+        console.log("✅ Structured data keys after microservice mapping:", Object.keys(structuredData));
+      }
+    }
+    
     // Group chunks by type for easier access
     const chunksByType = chunks.reduce((acc: any, chunk: any) => {
       const type = chunk.chunk_type || chunk.type || 'unknown';
