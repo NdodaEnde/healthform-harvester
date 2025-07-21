@@ -505,6 +505,34 @@ serve(async (req) => {
       console.log("Added marginalia to structured data, count:", chunksByType.marginalia.length);
     }
     
+    // CRITICAL FIX: Check if we have microservice structured data and add it at root level
+    if (documentResult?.structured_data) {
+      console.log("=== MICROSERVICE DATA INTEGRATION ===");
+      console.log("Microservice structured data:", JSON.stringify(documentResult.structured_data, null, 2));
+      
+      // Add microservice data at ROOT LEVEL for frontend compatibility
+      if (documentResult.structured_data.employee_info) {
+        structuredData.employee_info = documentResult.structured_data.employee_info;
+        console.log("✅ Added employee_info at root level");
+      }
+      if (documentResult.structured_data.medical_examination) {
+        structuredData.medical_examination = documentResult.structured_data.medical_examination;
+        console.log("✅ Added medical_examination at root level");
+      }
+      if (documentResult.structured_data.medical_tests) {
+        structuredData.medical_tests = documentResult.structured_data.medical_tests;
+        console.log("✅ Added medical_tests at root level");
+      }
+      if (documentResult.structured_data.medical_practitioner) {
+        structuredData.medical_practitioner = documentResult.structured_data.medical_practitioner;
+        console.log("✅ Added medical_practitioner at root level");
+      }
+      if (documentResult.structured_data.document_classification) {
+        structuredData.document_classification = documentResult.structured_data.document_classification;
+        console.log("✅ Added document_classification at root level");
+      }
+    }
+    
     // For certificate documents, extract specific fields
     console.log("Checking if document type matches certificate patterns...");
     if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
@@ -639,3 +667,4 @@ serve(async (req) => {
     );
   }
 });
+

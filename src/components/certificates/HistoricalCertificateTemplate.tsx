@@ -84,8 +84,8 @@ const normalizeExtractedDataForTemplate = (extractedData: any): any => {
       medPractitioner
     });
 
-    // Map medical tests from microservice format to template format
-    const testResults = {};
+    // Map medical tests from microservice format to template format - FIX: Use any type
+    const testResults: any = {};
     if (medTests) {
       // Blood test
       if (medTests.blood_test) {
