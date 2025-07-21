@@ -465,27 +465,30 @@ serve(async (req) => {
     // Process chunks to create structured data
     const structuredData: any = {};
     
-    // CRITICAL FIX: Check if microservice returned structured data
+    // CRITICAL FIX: Check if microservice returned structured data directly at root level
     console.log("=== CHECKING MICROSERVICE STRUCTURED DATA ===");
     if (documentResult && typeof documentResult === 'object') {
       console.log("Document result keys:", Object.keys(documentResult));
+      console.log("Document result sample:", JSON.stringify(documentResult, null, 2).substring(0, 1000));
       
-      // Check for structured data from microservice
-      if (documentResult.structured_data) {
-        console.log("✅ Found microservice structured_data:", Object.keys(documentResult.structured_data));
-        
-        // If we have structured data from microservice, use it as the base
-        Object.assign(structuredData, documentResult.structured_data);
+      // FIXED: Check for microservice data at root level, not in nested structured_data
+      if (documentResult.employee_info || documentResult.medical_examination || documentResult.document_classification) {
+        console.log("✅ Found microservice structured data at root level");
         
         // Map microservice data to direct fields that frontend expects
-        const microData = documentResult.structured_data;
+        const microData = documentResult; // Use root level data, not nested
         
         if (microData.employee_info) {
           structuredData.patientName = microData.employee_info.full_name;
           structuredData.patientId = microData.employee_info.id_number;
           structuredData.companyName = microData.employee_info.company_name;
           structuredData.occupation = microData.employee_info.job_title;
-          console.log("✅ Mapped employee_info to direct fields");
+          console.log("✅ Mapped employee_info to direct fields:", {
+            name: microData.employee_info.full_name,
+            id: microData.employee_info.id_number,
+            company: microData.employee_info.company_name,
+            job: microData.employee_info.job_title
+          });
         }
         
         if (microData.medical_examination) {
@@ -497,15 +500,25 @@ serve(async (req) => {
           structuredData.followUpActions = microData.medical_examination.follow_up_actions;
           
           // Map restrictions
-          if (microData.medical_examination.restrictions_list?.length > 0) {
-            structuredData.restrictionsText = microData.medical_examination.restrictions_list.join(', ');
+          if (microData.medical_examination.restrictions?.length > 0) {
+            structuredData.restrictionsText = microData.medical_examination.restrictions.join(', ');
           } else {
             structuredData.restrictionsText = 'None';
           }
-          console.log("✅ Mapped medical_examination to direct fields");
+          console.log("✅ Mapped medical_examination to direct fields:", {
+            examDate: microData.medical_examination.examination_date,
+            expiry: microData.medical_examination.expiry_date,
+            type: microData.medical_examination.examination_type,
+            fitness: microData.medical_examination.fitness_status
+          });
         }
         
+        // Copy the entire microservice response as structured_data
+        Object.assign(structuredData, microData);
+        
         console.log("✅ Structured data keys after microservice mapping:", Object.keys(structuredData));
+      } else {
+        console.log("⚠️ No microservice structured data found at root level, falling back to extraction");
       }
     }
     
@@ -549,38 +562,46 @@ serve(async (req) => {
       console.log("Added marginalia to structured data, count:", chunksByType.marginalia.length);
     }
     
-    // For certificate documents, extract specific fields
+    // For certificate documents, extract specific fields as fallback
     console.log("Checking if document type matches certificate patterns...");
     if (documentType === 'certificate-fitness' || documentType === 'certificate' || rawContent.toLowerCase().includes('certificate')) {
       console.log("Processing as certificate document");
       
-      const certificateInfo = extractCertificateInfo(rawContent);
-      
-      if (Object.keys(certificateInfo).length > 0) {
-        structuredData.certificate_info = certificateInfo;
-        console.log("✓ Added certificate_info to structured data");
+      // Only do fallback extraction if we don't have microservice data
+      if (!structuredData.patientName && !structuredData.employee_info) {
+        console.log("No microservice data found, doing fallback extraction");
+        const certificateInfo = extractCertificateInfo(rawContent);
+        
+        if (Object.keys(certificateInfo).length > 0) {
+          structuredData.certificate_info = certificateInfo;
+          console.log("✓ Added certificate_info to structured data");
+        } else {
+          console.log("✗ No certificate info extracted");
+        }
       } else {
-        console.log("✗ No certificate info extracted");
+        console.log("✓ Microservice data already available, skipping fallback extraction");
       }
-    } else {
-      console.log("Document type does not match certificate patterns");
     }
     
     console.log("=== FINAL STRUCTURED DATA ===");
     console.log("Structured data keys:", Object.keys(structuredData));
-    console.log("Structured data:", JSON.stringify(structuredData, null, 2).substring(0, 1000));
+    console.log("Structured data sample:", JSON.stringify(structuredData, null, 2).substring(0, 1000));
     
     // Determine document status based on extracted data
     const hasStructuredData = Object.keys(structuredData).length > 0;
     const hasValidContent = rawContent && rawContent.length > 50;
     const hasChunks = chunks && chunks.length > 0;
     const isFallback = documentResult?.metadata?.fallback;
+    const hasMicroserviceData = structuredData.employee_info || structuredData.medical_examination || structuredData.patientName;
     
     let documentStatus = 'pending';
     
     if (isFallback) {
       documentStatus = 'uploaded'; // New status for fallback documents
       console.log("Document uploaded without processing due to microservice unavailability");
+    } else if (hasMicroserviceData) {
+      documentStatus = 'processed';
+      console.log("Document has microservice structured data, marking as 'processed'");
     } else if (hasStructuredData && hasValidContent) {
       documentStatus = 'processed';
       console.log("Document has structured data and content, marking as 'processed'");
@@ -614,7 +635,8 @@ serve(async (req) => {
         processing_info: {
           processing_time: 0,
           chunk_count: chunks.length,
-          fallback: isFallback || false
+          fallback: isFallback || false,
+          microservice_data_found: hasMicroserviceData
         }
       }
     };
