@@ -5,6 +5,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+  'Access-Control-Max-Age': '86400',
 };
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -690,11 +692,15 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Error processing document:", error);
     
+    // Ensure CORS headers are always included in error responses
+    const errorResponse = {
+      success: false,
+      error: error.message || "Unknown error occurred",
+      details: error.stack ? error.stack.split('\n').slice(0, 3) : undefined
+    };
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || "Unknown error occurred",
-      }),
+      JSON.stringify(errorResponse),
       {
         status: 500,
         headers: {

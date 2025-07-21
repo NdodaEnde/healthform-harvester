@@ -2188,6 +2188,13 @@ export type Database = {
         Args: { user_id: string; org_id: string; user_role?: string }
         Returns: string
       }
+      backfill_document_validation_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          document_id: string
+          updated_status: string
+        }[]
+      }
       backfill_medical_test_results: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -2206,6 +2213,17 @@ export type Database = {
       check_user_exists: {
         Args: { user_id: string }
         Returns: Json
+      }
+      check_validation_consistency: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_documents: number
+          pending_documents: number
+          validated_documents: number
+          documents_with_patients: number
+          documents_with_examinations: number
+          inconsistent_count: number
+        }[]
       }
       create_analytics_indexes: {
         Args: Record<PropertyKey, never>
@@ -2396,6 +2414,10 @@ export type Database = {
       }
       is_org_admin: {
         Args: { org_id: string }
+        Returns: boolean
+      }
+      is_service_role: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_superadmin: {
