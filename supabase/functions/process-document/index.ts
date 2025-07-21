@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -363,7 +362,10 @@ serve(async (req) => {
       }
 
       const documentData = await dataResponse.json();
+      console.log("=== DETAILED MICROSERVICE RESPONSE LOGGING ===");
       console.log("Document data retrieved successfully");
+      console.log("Full documentData keys:", Object.keys(documentData));
+      console.log("Full documentData structure:", JSON.stringify(documentData, null, 2));
       
       // Extract the first document result
       documentResult = documentData.result && documentData.result.length > 0 
@@ -374,8 +376,41 @@ serve(async (req) => {
         throw new Error("No document processing results returned from microservice");
       }
 
-      rawContent = documentResult.markdown || "";
-      chunks = documentResult.chunks || [];
+      console.log("=== DOCUMENT RESULT DETAILED LOGGING ===");
+      console.log("Document result keys:", Object.keys(documentResult));
+      console.log("Document result type:", typeof documentResult);
+      console.log("Full document result:", JSON.stringify(documentResult, null, 2));
+      
+      // Check for structured data at different levels
+      console.log("=== CHECKING FOR STRUCTURED DATA ===");
+      console.log("documentResult.structured_data:", documentResult.structured_data ? "EXISTS" : "MISSING");
+      if (documentResult.structured_data) {
+        console.log("structured_data keys:", Object.keys(documentResult.structured_data));
+        console.log("structured_data content:", JSON.stringify(documentResult.structured_data, null, 2));
+      }
+      
+      console.log("documentResult.employee_info:", documentResult.employee_info ? "EXISTS" : "MISSING");
+      if (documentResult.employee_info) {
+        console.log("employee_info content:", JSON.stringify(documentResult.employee_info, null, 2));
+      }
+      
+      console.log("documentResult.medical_examination:", documentResult.medical_examination ? "EXISTS" : "MISSING");
+      if (documentResult.medical_examination) {
+        console.log("medical_examination content:", JSON.stringify(documentResult.medical_examination, null, 2));
+      }
+      
+      console.log("documentResult.raw_data:", documentResult.raw_data ? "EXISTS" : "MISSING");
+      if (documentResult.raw_data) {
+        console.log("raw_data keys:", Object.keys(documentResult.raw_data));
+      }
+
+      rawContent = documentResult.markdown || documentResult.raw_data?.markdown || "";
+      chunks = documentResult.chunks || documentResult.raw_data?.chunks || [];
+      
+      console.log("=== EXTRACTED CONTENT SUMMARY ===");
+      console.log("rawContent length:", rawContent.length);
+      console.log("chunks count:", chunks.length);
+      console.log("rawContent preview:", rawContent.substring(0, 200));
       
       // Cleanup on the microservice side (in background)
       fetch(`${microserviceUrl}/cleanup/${initialResult.batch_id}`, {
