@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -28,6 +27,8 @@ import DocumentsPage from './pages/DocumentsPage';
 import DocumentViewer from './pages/DocumentViewer';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
 import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
+import AuthCallback from './pages/AuthCallback';
 import { OrganizationsPage, CreateOrganizationPage, EditOrganizationPage, OrganizationUsersPage, OrganizationClientsPage } from './pages/admin';
 
 const queryClient = new QueryClient();
@@ -55,6 +56,10 @@ function App() {
                         <Auth />
                       </>
                     } />
+                    {/* Missing public routes */}
+                    <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
+                    <Route path="/callback" element={<AuthCallback />} />
                     <Route path="/setup" element={
                       <OrganizationProtectedRoute>
                         <HeaderComponent />
