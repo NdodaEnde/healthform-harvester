@@ -2,7 +2,7 @@
 project_id = "wgkbsiczgyaqmgoyirjs"
 
 [functions.process-document]
-verify_jwt = false
+verify_jwt = true
 
 [functions.natural-language-query]
 verify_jwt = true
