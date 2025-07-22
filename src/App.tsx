@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -37,9 +37,8 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <TooltipProvider>
-          <Toaster />
           <AuthProvider>
             <OrganizationProvider>
               <PackageProvider>
@@ -136,6 +135,7 @@ function App() {
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
+      <Toaster />
     </QueryClientProvider>
   );
 }
