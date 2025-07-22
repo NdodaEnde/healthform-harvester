@@ -30,21 +30,30 @@ import { Suspense } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PackageProvider } from "@/contexts/PackageContext";
-import SettingsPage from "@/pages/settings/SettingsPage";
+import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminOrganizationsPage from "@/pages/admin/AdminOrganizationsPage";
+import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
+import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
+import AdminTasksPage from "@/pages/admin/AdminTasksPage";
+import { TaskProvider } from "@/contexts/TaskContext";
+import { WorkQueuePage } from "@/pages/WorkQueuePage";
+import { DocumentProvider } from "@/contexts/DocumentContext";
+import { CertificateCompliancePage } from "@/pages/CertificateCompliancePage";
+import { BillingProvider } from "@/contexts/BillingContext";
+import { BillingPage } from "@/pages/BillingPage";
+import { SettingsPage } from "@/pages/SettingsPage";
+import { ProfilePage } from "@/pages/ProfilePage";
+import { TaskTemplatesPage } from "@/pages/TaskTemplatesPage";
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <OrganizationProvider>
-            <PackageProvider>
-              <TooltipProvider>
-                <Router>
-                  <div className="min-h-screen bg-background">
-                    <Routes>
+    <Router>
+      <div className="min-h-screen bg-background">
+        <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -119,23 +128,78 @@ function App() {
             </OrganizationProtectedRoute>
           } />
 
+          <Route path="/work-queue" element={
+            <OrganizationProtectedRoute>
+              <WorkQueuePage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/certificate-compliance" element={
+            <OrganizationProtectedRoute>
+              <CertificateCompliancePage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/billing" element={
+            <OrganizationProtectedRoute>
+              <BillingPage />
+            </OrganizationProtectedRoute>
+          } />
+
           <Route path="/settings" element={
             <OrganizationProtectedRoute>
               <SettingsPage />
             </OrganizationProtectedRoute>
           } />
 
+          <Route path="/profile" element={
+            <OrganizationProtectedRoute>
+              <ProfilePage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/task-templates" element={
+            <OrganizationProtectedRoute>
+              <TaskTemplatesPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <AdminProtectedRoute>
+              <AdminUsersPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/organizations" element={
+            <AdminProtectedRoute>
+              <AdminOrganizationsPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/documents" element={
+            <AdminProtectedRoute>
+              <AdminDocumentsPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <AdminProtectedRoute>
+              <AdminSettingsPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/tasks" element={
+            <AdminProtectedRoute>
+              <AdminTasksPage />
+            </AdminProtectedRoute>
+          } />
+
           <Route path="*" element={<NotFound />} />
-                    </Routes>
-                    <Toaster />
-                  </div>
-                </Router>
-              </TooltipProvider>
-            </PackageProvider>
-          </OrganizationProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
