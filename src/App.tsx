@@ -36,9 +36,15 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-background">
-        <Routes>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <OrganizationProvider>
+            <PackageProvider>
+              <TooltipProvider>
+                <Router>
+                  <div className="min-h-screen bg-background">
+                    <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -120,9 +126,16 @@ function App() {
           } />
 
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </Router>
+                    </Routes>
+                    <Toaster />
+                  </div>
+                </Router>
+              </TooltipProvider>
+            </PackageProvider>
+          </OrganizationProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
