@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useOrganization } from '@/contexts/OrganizationContext';
+import { useOptionalOrganization } from '@/contexts/OrganizationContext';
 import { PackageTier, PACKAGE_FEATURES, FeatureKey } from '@/types/subscription';
 
 interface SubscriptionData {
@@ -12,18 +12,27 @@ interface SubscriptionData {
 }
 
 export const useSubscription = () => {
-  const { currentOrganization } = useOrganization();
+  const organizationContext = useOptionalOrganization();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchSubscription = async () => {
-      if (!currentOrganization?.id) {
+      // If no organization context is available, provide safe defaults
+      if (!organizationContext || !organizationContext.currentOrganization?.id) {
+        console.log('[useSubscription] No organization context available, using basic defaults');
+        setSubscription({
+          package_tier: 'basic',
+          status: 'active',
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        });
         setLoading(false);
         return;
       }
 
       try {
+        const { currentOrganization } = organizationContext;
+        
         // Check if the organization has subscription info in settings
         const settings = currentOrganization.settings as any;
         const subscriptionData = settings?.subscription;
@@ -31,7 +40,7 @@ export const useSubscription = () => {
         if (subscriptionData) {
           setSubscription(subscriptionData);
         } else {
-          // Default to basic package instead of premium
+          // Default to basic package
           setSubscription({
             package_tier: 'basic',
             status: 'active',
@@ -40,7 +49,7 @@ export const useSubscription = () => {
         }
       } catch (error) {
         console.error('Error fetching subscription:', error);
-        // Fallback to basic instead of premium
+        // Fallback to basic
         setSubscription({
           package_tier: 'basic',
           status: 'active',
@@ -52,7 +61,7 @@ export const useSubscription = () => {
     };
 
     fetchSubscription();
-  }, [currentOrganization]);
+  }, [organizationContext?.currentOrganization]);
 
   const hasFeature = (feature: FeatureKey): boolean => {
     if (!subscription) return false;
@@ -70,9 +79,14 @@ export const useSubscription = () => {
   };
 
   const upgradeSubscription = async (newTier: PackageTier) => {
-    if (!currentOrganization?.id) return false;
+    // Check if organization context is available
+    if (!organizationContext?.currentOrganization?.id) {
+      console.warn('[useSubscription] Cannot upgrade subscription: no organization context');
+      return false;
+    }
 
     try {
+      const { currentOrganization } = organizationContext;
       const settings = (currentOrganization.settings as any) || {};
       const updatedSettings = {
         ...settings,
