@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
+import DashboardLayout from '@/components/DashboardLayout';
 import {
   Table,
   TableBody,

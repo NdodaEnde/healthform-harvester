@@ -28,178 +28,105 @@ import LoadingFallback from "@/components/LoadingFallback";
 import { Suspense } from "react";
 
 import { AuthProvider } from "@/contexts/AuthContext";
-import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PackageProvider } from "@/contexts/PackageContext";
-import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import AdminUsersPage from "@/pages/admin/AdminUsersPage";
-import AdminOrganizationsPage from "@/pages/admin/AdminOrganizationsPage";
-import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
-import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
-import AdminTasksPage from "@/pages/admin/AdminTasksPage";
-import { TaskProvider } from "@/contexts/TaskContext";
-import { WorkQueuePage } from "@/pages/WorkQueuePage";
-import { DocumentProvider } from "@/contexts/DocumentContext";
-import { CertificateCompliancePage } from "@/pages/CertificateCompliancePage";
-import { BillingProvider } from "@/contexts/BillingContext";
-import { BillingPage } from "@/pages/BillingPage";
-import { SettingsPage } from "@/pages/SettingsPage";
-import { ProfilePage } from "@/pages/ProfilePage";
-import { TaskTemplatesPage } from "@/pages/TaskTemplatesPage";
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-background">
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/accept-invite" element={<AcceptInvitePage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/update-password" element={<UpdatePasswordPage />} />
-          <Route path="/first-time-setup" element={<FirstTimeSetupPage />} />
-          <Route path="/tier-testing" element={<TierTestingPage />} />
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <AuthProvider>
+          <PackageProvider>
+            <TooltipProvider>
+              <Router>
+                <div className="min-h-screen bg-background">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
+                      <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      <Route path="/update-password" element={<UpdatePasswordPage />} />
+                      <Route path="/first-time-setup" element={<FirstTimeSetupPage />} />
+                      <Route path="/tier-testing" element={<TierTestingPage />} />
 
-          <Route path="/dashboard" element={
-            <OrganizationProtectedRoute>
-              <Dashboard />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/dashboard" element={
+                        <OrganizationProtectedRoute>
+                          <Dashboard />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/patients" element={
-            <OrganizationProtectedRoute>
-              <PatientsPage />
-            </OrganizationProtectedRoute>
-          } />
-          <Route path="/patients/:patientId" element={
-            <OrganizationProtectedRoute>
-              <PatientDetailPage />
-            </OrganizationProtectedRoute>
-          } />
-          <Route path="/patients/:patientId/edit" element={
-            <OrganizationProtectedRoute>
-              <PatientEditPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/patients" element={
+                        <OrganizationProtectedRoute>
+                          <PatientsPage />
+                        </OrganizationProtectedRoute>
+                      } />
+                      <Route path="/patients/:patientId" element={
+                        <OrganizationProtectedRoute>
+                          <PatientDetailPage />
+                        </OrganizationProtectedRoute>
+                      } />
+                      <Route path="/patients/:patientId/edit" element={
+                        <OrganizationProtectedRoute>
+                          <PatientEditPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/patient-records" element={
-            <OrganizationProtectedRoute>
-              <PatientRecordsPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/patient-records" element={
+                        <OrganizationProtectedRoute>
+                          <PatientRecordsPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/documents" element={
-            <OrganizationProtectedRoute>
-              <DocumentsPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/documents" element={
+                        <OrganizationProtectedRoute>
+                          <DocumentsPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          {/* NEW: Document Analytics Route */}
-          <Route path="/documents/analytics" element={
-            <OrganizationProtectedRoute>
-              <DocumentAnalyticsPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/documents/analytics" element={
+                        <OrganizationProtectedRoute>
+                          <DocumentAnalyticsPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/document-viewer/:documentId" element={
-            <OrganizationProtectedRoute>
-              <DocumentViewer />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/document-viewer/:documentId" element={
+                        <OrganizationProtectedRoute>
+                          <DocumentViewer />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/analytics" element={
-            <OrganizationProtectedRoute>
-              <AnalyticsPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/analytics" element={
+                        <OrganizationProtectedRoute>
+                          <AnalyticsPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/reports" element={
-            <OrganizationProtectedRoute>
-              <ReportsPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/reports" element={
+                        <OrganizationProtectedRoute>
+                          <ReportsPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/organizations" element={
-            <OrganizationProtectedRoute>
-              <OrganizationsListPage />
-            </OrganizationProtectedRoute>
-          } />
+                      <Route path="/organizations" element={
+                        <OrganizationProtectedRoute>
+                          <OrganizationsListPage />
+                        </OrganizationProtectedRoute>
+                      } />
 
-          <Route path="/work-queue" element={
-            <OrganizationProtectedRoute>
-              <WorkQueuePage />
-            </OrganizationProtectedRoute>
-          } />
-
-          <Route path="/certificate-compliance" element={
-            <OrganizationProtectedRoute>
-              <CertificateCompliancePage />
-            </OrganizationProtectedRoute>
-          } />
-
-          <Route path="/billing" element={
-            <OrganizationProtectedRoute>
-              <BillingPage />
-            </OrganizationProtectedRoute>
-          } />
-
-          <Route path="/settings" element={
-            <OrganizationProtectedRoute>
-              <SettingsPage />
-            </OrganizationProtectedRoute>
-          } />
-
-          <Route path="/profile" element={
-            <OrganizationProtectedRoute>
-              <ProfilePage />
-            </OrganizationProtectedRoute>
-          } />
-
-          <Route path="/task-templates" element={
-            <OrganizationProtectedRoute>
-              <TaskTemplatesPage />
-            </OrganizationProtectedRoute>
-          } />
-
-          {/* Admin Routes */}
-          <Route path="/admin" element={
-            <AdminProtectedRoute>
-              <AdminDashboard />
-            </AdminProtectedRoute>
-          } />
-          <Route path="/admin/users" element={
-            <AdminProtectedRoute>
-              <AdminUsersPage />
-            </AdminProtectedRoute>
-          } />
-          <Route path="/admin/organizations" element={
-            <AdminProtectedRoute>
-              <AdminOrganizationsPage />
-            </AdminProtectedRoute>
-          } />
-          <Route path="/admin/documents" element={
-            <AdminProtectedRoute>
-              <AdminDocumentsPage />
-            </AdminProtectedRoute>
-          } />
-          <Route path="/admin/settings" element={
-            <AdminProtectedRoute>
-              <AdminSettingsPage />
-            </AdminProtectedRoute>
-          } />
-          <Route path="/admin/tasks" element={
-            <AdminProtectedRoute>
-              <AdminTasksPage />
-            </AdminProtectedRoute>
-          } />
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </Router>
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                  <Toaster />
+                </div>
+              </Router>
+            </TooltipProvider>
+          </PackageProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
