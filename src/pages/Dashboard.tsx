@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +27,9 @@ import { RecentDocuments } from '@/components/dashboard/RecentDocuments';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import TaskWidget from '@/components/tasks/TaskWidget';
+import { DashboardLayout } from '@/components/DashboardLayout';
 
-export default function Dashboard() {
+function DashboardContent() {
   const { currentTier, isPremium, isEnterprise } = usePackage();
   const {
     totalActiveEmployees,
@@ -56,7 +56,6 @@ export default function Dashboard() {
     refreshMetrics: refreshPremiumMetrics
   } = usePremiumDashboardMetrics();
 
-  // Calculate month-over-month change
   const monthOverMonthChange = testsThisMonth - testsLastMonth;
 
   const handleRefresh = () => {
@@ -436,5 +435,13 @@ export default function Dashboard() {
       </div>
       
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <DashboardLayout>
+      <DashboardContent />
+    </DashboardLayout>
   );
 }
