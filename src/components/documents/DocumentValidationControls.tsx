@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -8,7 +7,6 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import CertificatePromotionDialog from '../certificates/CertificatePromotionDialog';
 import { saveValidatedData } from '@/services/documentValidationService';
 import { toast } from 'sonner';
-import { getEffectiveTemplate } from '@/utils/templateDetection';
 import type { DatabaseDocument } from '@/types/database';
 
 interface DocumentValidationControlsProps {
@@ -27,21 +25,12 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
   validatedData,
   onValidationModeChange,
   onValidationComplete,
-  selectedTemplate,
+  selectedTemplate = 'modern',
   onTemplateChange
 }) => {
   const { currentOrganization } = useOrganization();
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // ✅ SINGLE SOURCE OF TRUTH - Use shared template detection
-  const templateSelection = getEffectiveTemplate(document, selectedTemplate);
-  const effectiveTemplate = templateSelection.template;
-  const isAutoDetected = templateSelection.source === 'auto-detected';
-  const isManualOverride = templateSelection.source === 'manual-override';
-  const isSaved = templateSelection.source === 'saved';
-
-  console.log('📋 [DocumentValidationControls] Template selection:', templateSelection);
 
   // 🔧 ENHANCED: Save function that preserves template selection
   const handleSaveValidatedData = async () => {
@@ -52,15 +41,16 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
 
     setIsSaving(true);
     try {
-      console.log('💾 Saving validated data with template:', effectiveTemplate);
+      console.log('💾 Saving validated data with template:', selectedTemplate);
       console.log('💾 Data being saved:', validatedData);
       
-      const { error } = await saveValidatedData(document.id, validatedData, effectiveTemplate);
+      const { error } = await saveValidatedData(document.id, validatedData, selectedTemplate);
       
       if (error) {
         toast.error('Failed to save validated data: ' + error.message);
       } else {
         toast.success('Validated data saved successfully');
+        // Don't call onValidationComplete here to avoid data refresh that might cause issues
         console.log('💾 Save completed successfully');
       }
     } catch (err) {
@@ -84,16 +74,69 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
     
     console.log('🎉 Patient record creation completed');
     
+    // Just show success message - don't save again as this might overwrite data
     toast.success('Patient record created successfully!');
     
+    // Optionally refresh the document to show any status updates
+    // but don't trigger a save operation that might clear the template data
     if (onValidationComplete) {
+      // Add a small delay to ensure patient creation is fully complete
       setTimeout(() => {
         onValidationComplete();
       }, 1000);
     }
   };
 
-  // 🔧 ENHANCED: Transform function with better data extraction
+  // 🔧 ENHANCED: Check for saved template selection
+  const getEffectiveTemplate = (): 'modern' | 'historical' => {
+    const extractedData = document.extracted_data as any;
+    
+    // Check if template was previously saved
+    if (extractedData?.template_selection?.selected_template) {
+      console.log('Found saved template selection:', extractedData.template_selection.selected_template);
+      return extractedData.template_selection.selected_template;
+    }
+    
+    // Return the current selection if no saved template
+    return selectedTemplate;
+  };
+
+  // Auto-detect template based on document data (fallback)
+  const detectTemplateFromData = (): 'modern' | 'historical' => {
+    const extractedData = document.extracted_data as any;
+    
+    // Check for signature/stamp indicators
+    const hasSignature = !!(
+      extractedData?.structured_data?.certificate_info?.signature ||
+      extractedData?.raw_content?.toLowerCase()?.includes('signature')
+    );
+
+    const hasStamp = !!(
+      extractedData?.structured_data?.certificate_info?.stamp ||
+      extractedData?.raw_content?.toLowerCase()?.includes('stamp') ||
+      extractedData?.raw_content?.toLowerCase()?.includes('practice no')
+    );
+
+    const detectedTemplate = (hasSignature || hasStamp) ? 'historical' : 'modern';
+    
+    console.log('Template detection result:', {
+      hasSignature,
+      hasStamp,
+      detectedTemplate,
+      reasoning: (hasSignature || hasStamp) 
+        ? 'Found signature/stamp data → Historical template' 
+        : 'No signature/stamp data → Modern template'
+    });
+    
+    return detectedTemplate;
+  };
+
+  // Use saved template selection, then provided selection, then auto-detect
+  const effectiveTemplate = getEffectiveTemplate();
+  const autoDetectedTemplate = detectTemplateFromData();
+  const isUsingAutoDetection = effectiveTemplate === autoDetectedTemplate && !document.extracted_data?.template_selection;
+
+  // 🔧 FIXED: Enhanced transform function with better data extraction
   const transformDataForPromotion = (data: any) => {
     if (!data) {
       console.warn('⚠️ No data provided to transformDataForPromotion');
@@ -227,31 +270,28 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
             <SelectContent>
               <SelectItem value="historical">
                 Historical Certificate
-                {templateSelection.detection.template === 'historical' && (
+                {autoDetectedTemplate === 'historical' && (
                   <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
                 )}
               </SelectItem>
               <SelectItem value="modern">
                 Modern Certificate
-                {templateSelection.detection.template === 'modern' && (
+                {autoDetectedTemplate === 'modern' && (
                   <Badge variant="outline" className="ml-2 text-xs text-green-600">Auto</Badge>
                 )}
               </SelectItem>
             </SelectContent>
           </Select>
           
-          {/* Dynamic badge based on source */}
-          {isSaved && (
+          {document.extracted_data?.template_selection ? (
             <Badge variant="outline" className="text-green-600 border-green-200 text-xs">
               Saved Selection
             </Badge>
-          )}
-          {isAutoDetected && (
+          ) : isUsingAutoDetection ? (
             <Badge variant="outline" className="text-blue-600 border-blue-200 text-xs">
               Auto-detected
             </Badge>
-          )}
-          {isManualOverride && (
+          ) : (
             <Badge variant="outline" className="text-orange-600 border-orange-200 text-xs">
               Manual Override
             </Badge>
@@ -266,20 +306,18 @@ const DocumentValidationControls: React.FC<DocumentValidationControlsProps> = ({
           }
         </div>
 
-        {/* Enhanced auto-detection explanation */}
+        {/* Auto-detection explanation */}
         <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded border-l-2 border-blue-200">
-          <strong>Auto-detection:</strong> {templateSelection.detection.reasoning}
-          {templateSelection.detection.confidence > 0 && (
-            <span className="ml-2 opacity-75">
-              (Confidence: {templateSelection.detection.confidence}%)
-            </span>
-          )}
+          <strong>Auto-detection:</strong> {autoDetectedTemplate === 'historical' 
+            ? 'Found signature/stamp data → Historical template recommended'
+            : 'No signature/stamp data found → Modern template recommended'
+          }
         </div>
 
         {/* Show if template was saved */}
-        {isSaved && (
+        {document.extracted_data?.template_selection && (
           <div className="text-xs text-muted-foreground p-2 bg-green-50 rounded border-l-2 border-green-200">
-            <strong>Saved Selection:</strong> Template choice saved previously
+            <strong>Saved Selection:</strong> Template choice saved on {new Date(document.extracted_data.template_selection.saved_at).toLocaleDateString()}
           </div>
         )}
       </div>
