@@ -1,141 +1,127 @@
 
 import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BarChart3, PieChart, TrendingUp, Users } from 'lucide-react';
 import { usePackage } from '@/contexts/PackageContext';
-import EnhancedBasicOverviewTab from '@/components/analytics/EnhancedBasicOverviewTab';
-import PremiumOverviewTab from '@/components/analytics/PremiumOverviewTab';
-import BasicReports from '@/components/analytics/BasicReports';
-import PremiumReports from '@/components/analytics/PremiumReports';
-import BasicAnalyticsDashboard from '@/components/analytics/BasicAnalyticsDashboard';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { TrendingUp, FileText, BarChart3, Zap, Activity } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 export default function AnalyticsPage() {
-  const { currentTier, isBasic, isPremium, isEnterprise } = usePackage();
-  const navigate = useNavigate();
+  const { currentTier, isPremium, isEnterprise } = usePackage();
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Occupational Health Analytics</h1>
-          <p className="text-muted-foreground mt-1">
-            Comprehensive health analytics and medical insights for your organization
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/documents/analytics')}
-            className="flex items-center gap-2"
-          >
-            <Activity className="h-4 w-4" />
-            Document Analytics
-          </Button>
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <BarChart3 className="h-8 w-8" />
+              Analytics
+            </h1>
+            <p className="text-muted-foreground">
+              Comprehensive analytics and insights
+            </p>
+          </div>
           <Badge variant="outline" className={`
             ${isEnterprise ? 'bg-purple-100 text-purple-800' : ''}
             ${isPremium ? 'bg-yellow-100 text-yellow-800' : ''}
-            ${isBasic ? 'bg-blue-100 text-blue-800' : ''}
+            ${currentTier === 'basic' ? 'bg-blue-100 text-blue-800' : ''}
           `}>
             {currentTier.toUpperCase()} Plan
           </Badge>
         </div>
-      </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Health Overview
-          </TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Medical Reports
-          </TabsTrigger>
-          <TabsTrigger 
-            value="insights" 
-            className="flex items-center gap-2"
-            disabled={isBasic}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Clinical Insights {isBasic && <span className="text-xs">(Premium)</span>}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="advanced" 
-            className="flex items-center gap-2"
-            disabled={!isEnterprise}
-          >
-            <Zap className="h-4 w-4" />
-            Advanced Health Analytics {!isEnterprise && <span className="text-xs">(Enterprise)</span>}
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="patients">Patients</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          {isBasic ? (
-            <BasicAnalyticsDashboard />
-          ) : (
-            <PremiumOverviewTab />
-          )}
-        </TabsContent>
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">1,248</div>
+                  <p className="text-xs text-muted-foreground">+12% from last month</p>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="reports" className="space-y-6">
-          {isBasic ? (
-            <BasicReports />
-          ) : (
-            <PremiumReports />
-          )}
-        </TabsContent>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Documents Processed</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">2,847</div>
+                  <p className="text-xs text-muted-foreground">+18% from last month</p>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="insights" className="space-y-6">
-          {isBasic ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Compliance Rate</CardTitle>
+                  <PieChart className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">94.2%</div>
+                  <p className="text-xs text-muted-foreground">+2.1% from last month</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Processing Time</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">2.4s</div>
+                  <p className="text-xs text-muted-foreground">-0.3s from last month</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="patients">
             <Card>
-              <CardContent className="p-6 text-center">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="p-3 bg-yellow-100 rounded-full">
-                    <Zap className="h-8 w-8 text-yellow-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Premium Feature</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Advanced clinical insights and health trend analysis are available with Premium subscription.
-                    </p>
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-800">
-                      Upgrade to Premium
-                    </Badge>
-                  </div>
-                </div>
+              <CardHeader>
+                <CardTitle>Patient Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Patient-specific analytics and insights will be displayed here.</p>
               </CardContent>
             </Card>
-          ) : (
-            <PremiumOverviewTab />
-          )}
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="advanced" className="space-y-6">
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <Zap className="h-8 w-8 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Enterprise Feature</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Advanced health analytics, predictive health modeling, and strategic health insights are available with Enterprise subscription.
-                  </p>
-                  <Badge variant="outline" className="bg-purple-50 text-purple-800">
-                    Upgrade to Enterprise
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="documents">
+            <Card>
+              <CardHeader>
+                <CardTitle>Document Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Document processing analytics and insights will be displayed here.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="compliance">
+            <Card>
+              <CardHeader>
+                <CardTitle>Compliance Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Compliance tracking and analytics will be displayed here.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </DashboardLayout>
   );
 }

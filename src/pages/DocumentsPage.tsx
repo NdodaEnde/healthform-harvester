@@ -1,5 +1,6 @@
+
 import React, { useState, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
+import { DashboardLayout } from '@/components/DashboardLayout';
 import {
   Table,
   TableBody,
@@ -11,8 +12,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from '@/components/ui/button';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Upload, FileText, Eye, Edit, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
 
 export default function DocumentsPage() {
   const navigate = useNavigate();
@@ -21,6 +23,42 @@ export default function DocumentsPage() {
   const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
   }, []);
+
+  // Mock document data - replace with actual data from your system
+  const documents = [
+    {
+      id: 1,
+      name: "Medical Certificate - John Doe",
+      type: "Certificate of Fitness",
+      status: "Approved",
+      uploadDate: "2024-01-15",
+      patientName: "John Doe",
+      size: "2.4 MB"
+    },
+    {
+      id: 2,
+      name: "Medical Certificate - Jane Smith",
+      type: "Certificate of Fitness", 
+      status: "Pending Review",
+      uploadDate: "2024-01-14",
+      patientName: "Jane Smith",
+      size: "1.8 MB"
+    },
+    {
+      id: 3,
+      name: "Medical Questionnaire - Bob Johnson",
+      type: "Medical Questionnaire",
+      status: "Approved",
+      uploadDate: "2024-01-13",
+      patientName: "Bob Johnson",
+      size: "3.2 MB"
+    }
+  ];
+
+  const filteredDocuments = documents.filter(doc => 
+    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    doc.patientName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <DashboardLayout>
@@ -41,7 +79,10 @@ export default function DocumentsPage() {
               <BarChart3 className="h-4 w-4" />
               Analytics
             </Button>
-            <Button>Upload Document</Button>
+            <Button className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Upload Document
+            </Button>
           </div>
         </div>
 
@@ -60,31 +101,48 @@ export default function DocumentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Invoice</TableHead>
+                <TableHead>Document Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Patient</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Upload Date</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">INV20240101</TableCell>
-                <TableCell>Paid</TableCell>
-                <TableCell>Credit Card</TableCell>
-                <TableCell className="text-right">$250.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">INV20240102</TableCell>
-                <TableCell>Pending</TableCell>
-                <TableCell>PayPal</TableCell>
-                <TableCell className="text-right">$150.00</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">INV20240103</TableCell>
-                <TableCell>Paid</TableCell>
-                <TableCell>Credit Card</TableCell>
-                <TableCell className="text-right">$300.00</TableCell>
-              </TableRow>
+              {filteredDocuments.map((doc) => (
+                <TableRow key={doc.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      {doc.name}
+                    </div>
+                  </TableCell>
+                  <TableCell>{doc.type}</TableCell>
+                  <TableCell>{doc.patientName}</TableCell>
+                  <TableCell>
+                    <Badge variant={doc.status === 'Approved' ? 'default' : 'secondary'}>
+                      {doc.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{doc.uploadDate}</TableCell>
+                  <TableCell>{doc.size}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button variant="ghost" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
