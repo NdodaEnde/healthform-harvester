@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 import { extractCertificateData, formatCertificateData, determineFitnessStatus } from '@/lib/utils';
 import CertificateTemplate from '@/components/CertificateTemplate';
 import DocumentValidationControls from '@/components/documents/DocumentValidationControls';
+import { detectTemplateTypeCached } from '@/utils/templateDetection';
 import type { DatabaseDocument } from '@/types/database';
 
 export default function DocumentViewer() {
@@ -22,14 +24,7 @@ export default function DocumentViewer() {
   const [error, setError] = useState<string | null>(null);
   const [isValidationMode, setIsValidationMode] = useState(false);
   const [validatedData, setValidatedData] = useState<any>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<'modern' | 'historical'>('modern');
-  
-  // Use refs to track state and prevent conflicts
-  const isManualSelection = useRef(false);
-  const hasAutoDetected = useRef(false);
-  const documentId = useRef<string | null>(null);
-  const autoDetectionRan = useRef(false);
-  const initialTemplateSet = useRef(false); // NEW: Track if initial template has been set
+  const [manualTemplateOverride, setManualTemplateOverride] = useState<'modern' | 'historical' | undefined>();
 
   useEffect(() => {
     if (id) {
@@ -42,138 +37,6 @@ export default function DocumentViewer() {
       setValidatedData(document.extracted_data);
     }
   }, [document]);
-
-  // Reset refs when document changes
-  useEffect(() => {
-    if (document && document.id !== documentId.current) {
-      console.log('🔄 Document changed, resetting template selection state');
-      documentId.current = document.id;
-      isManualSelection.current = false;
-      hasAutoDetected.current = false;
-      autoDetectionRan.current = false;
-      initialTemplateSet.current = false; // NEW: Reset initial template flag
-    }
-  }, [document?.id]);
-
-  // Auto-detection useEffect with better guards
-  useEffect(() => {
-    // MODIFIED: Don't run auto-detection if initial template has already been set
-    if (!document?.extracted_data || 
-        isManualSelection.current || 
-        hasAutoDetected.current || 
-        autoDetectionRan.current ||
-        initialTemplateSet.current) {
-      
-      if (isManualSelection.current) {
-        console.log('⚡ Skipping auto-detection - user has manually selected template');
-      } else if (hasAutoDetected.current || autoDetectionRan.current) {
-        console.log('⚡ Skipping auto-detection - already completed for this document');
-      } else if (initialTemplateSet.current) {
-        console.log('⚡ Skipping auto-detection - initial template already set');
-      }
-      return;
-    }
-
-    console.log('=== SIGNATURE/STAMP AUTO-DETECTION ===');
-    console.log('Full extracted_data:', document.extracted_data);
-
-    const structuredData = document.extracted_data.structured_data;
-    const certificateInfo = structuredData?.certificate_info;
-    const rawContent = document.extracted_data.raw_content || '';
-
-    console.log('Certificate info:', certificateInfo);
-    console.log('Raw content sample:', rawContent.substring(0, 200));
-
-    let hasSignature = false;
-    let hasStamp = false;
-    
-    // Check explicit boolean flags from Edge Function
-    if (certificateInfo?.signature === true) {
-      hasSignature = true;
-      console.log('✅ Signature detected from Edge Function boolean flag');
-    }
-    
-    if (certificateInfo?.stamp === true) {
-      hasStamp = true;
-      console.log('✅ Stamp detected from Edge Function boolean flag');
-    }
-    
-    // Fallback to enhanced content analysis if flags not set
-    if (!hasSignature || !hasStamp) {
-      console.log('Using fallback content analysis...');
-      
-      const contentLower = rawContent.toLowerCase();
-      
-      if (!hasSignature) {
-        const signatureKeywords = [
-          'signature:',
-          'handwritten signature',
-          'stylized flourish',
-          'placed above the printed word "signature"',
-          'overlapping strokes',
-          'signature consists of',
-          'tall, looping, and angular strokes',
-          'handwriting & style',
-          'multiple overlapping lines',
-          'horizontal flourish'
-        ];
-        
-        hasSignature = signatureKeywords.some(keyword => contentLower.includes(keyword));
-        if (hasSignature) {
-          console.log('✅ Signature detected from enhanced raw content analysis');
-        }
-      }
-      
-      if (!hasStamp) {
-        const stampKeywords = [
-          'stamp:',
-          'rectangular black stamp',
-          'practice no',
-          'practice number',
-          'practice no.',
-          'practice no:',
-          'sanc no',
-          'sanc number',
-          'sasohn no',
-          'mp no',
-          'mp number',
-          'black stamp',
-          'official stamp',
-          'hpcsa',
-          'with partial text and date'
-        ];
-        
-        hasStamp = stampKeywords.some(keyword => contentLower.includes(keyword));
-        if (hasStamp) {
-          console.log('✅ Stamp detected from enhanced raw content analysis');
-        }
-      }
-    }
-    
-    const hasSignatureStampData = hasSignature || hasStamp;
-
-    const detectionResult = {
-      hasSignature,
-      hasStamp,
-      hasSignatureStampData,
-      detectedTemplate: hasSignatureStampData ? 'historical' : 'modern',
-      reasoning: hasSignatureStampData 
-        ? `Found ${hasSignature ? 'signature' : ''}${hasSignature && hasStamp ? ' and ' : ''}${hasStamp ? 'stamp' : ''} → Historical template (filed record)` 
-        : 'No signature/stamp data → Modern template (current workflow)'
-    };
-
-    console.log('Enhanced template detection:', detectionResult);
-
-    const detectedTemplate = hasSignatureStampData ? 'historical' : 'modern';
-    setSelectedTemplate(detectedTemplate);
-    
-    console.log(`✅ Auto-detected: ${detectedTemplate} template (${detectionResult.reasoning})`);
-    
-    hasAutoDetected.current = true;
-    autoDetectionRan.current = true;
-    initialTemplateSet.current = true; // NEW: Mark that initial template has been set
-    console.log('=== END AUTO-DETECTION ===');
-  }, [document?.extracted_data]);
 
   const fetchDocument = async () => {
     try {
@@ -234,17 +97,9 @@ export default function DocumentViewer() {
   };
 
   const handleTemplateChange = useCallback((template: 'modern' | 'historical') => {
-    console.log(`🎯 Template manually changed to: ${template}`);
-    console.log('Previous template:', selectedTemplate);
-    console.log('Manual selection flag before:', isManualSelection.current);
-    
-    isManualSelection.current = true;
-    initialTemplateSet.current = true; // NEW: Prevent auto-detection from overriding
-    setSelectedTemplate(template);
-    
-    console.log('Manual selection flag set to true - auto-detection will be permanently disabled');
-    console.log('Template should now be:', template);
-  }, [selectedTemplate]);
+    console.log('🔄 [DocumentViewer] Manual template change:', template);
+    setManualTemplateOverride(template);
+  }, []);
 
   // Helper function to determine if document is a PDF
   const isPDF = (document: DatabaseDocument) => {
@@ -403,6 +258,9 @@ export default function DocumentViewer() {
   const isCertificate = document.document_type?.includes('certificate') || 
                         document.file_name?.toLowerCase().includes('certificate');
 
+  // Get template detection result for debugging
+  const templateDetection = document.extracted_data ? detectTemplateTypeCached(document) : null;
+
   return (
     <div className="space-y-6">
       <Helmet>
@@ -460,14 +318,13 @@ export default function DocumentViewer() {
           </div>
 
           {/* Debug info */}
-          {process.env.NODE_ENV === 'development' && isProcessed && validatedData && (
+          {process.env.NODE_ENV === 'development' && isProcessed && validatedData && templateDetection && (
             <div className="p-3 bg-gray-100 rounded text-xs">
-              <p><strong>Debug:</strong></p>
-              <p>Manual selection: {isManualSelection.current ? 'Yes' : 'No'}</p>
-              <p>Auto-detected: {hasAutoDetected.current ? 'Yes' : 'No'}</p>
-              <p>Auto-detection ran: {autoDetectionRan.current ? 'Yes' : 'No'}</p>
-              <p>Initial template set: {initialTemplateSet.current ? 'Yes' : 'No'}</p>
-              <p>Selected template: {selectedTemplate}</p>
+              <p><strong>Debug - Template Detection:</strong></p>
+              <p>Auto-detected template: {templateDetection.template}</p>
+              <p>Confidence: {templateDetection.confidence}%</p>
+              <p>Reasoning: {templateDetection.reasoning}</p>
+              <p>Manual override: {manualTemplateOverride || 'None'}</p>
               <p>File type: {document.mime_type}</p>
               <p>Is PDF: {isPDF(document) ? 'Yes' : 'No'}</p>
               <p>Is Image: {isImage(document) ? 'Yes' : 'No'}</p>
@@ -482,7 +339,7 @@ export default function DocumentViewer() {
               validatedData={validatedData}
               onValidationModeChange={handleValidationModeChange}
               onValidationComplete={handleValidationComplete}
-              selectedTemplate={selectedTemplate}
+              selectedTemplate={manualTemplateOverride}
               onTemplateChange={handleTemplateChange}
             />
           )}
@@ -531,7 +388,7 @@ export default function DocumentViewer() {
                 extractedData={validatedData}
                 editable={true}
                 onDataChange={handleDataChange}
-                templateType={selectedTemplate}
+                templateType={manualTemplateOverride || templateDetection?.template || 'modern'}
               />
 
               <div className="mt-4 pt-4 border-t">
@@ -553,14 +410,14 @@ export default function DocumentViewer() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Certificate Preview ({selectedTemplate === 'modern' ? 'Modern' : 'Historical'} Template)
+              Certificate Preview ({(manualTemplateOverride || templateDetection?.template || 'modern') === 'modern' ? 'Modern' : 'Historical'} Template)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <CertificateTemplate 
               extractedData={validatedData}
               editable={false}
-              templateType={selectedTemplate}
+              templateType={manualTemplateOverride || templateDetection?.template || 'modern'}
             />
           </CardContent>
         </Card>

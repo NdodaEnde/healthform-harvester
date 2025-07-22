@@ -16,8 +16,11 @@ const CertificateTemplate = ({
   documentId,
   editable = false,
   onDataChange,
-  templateType = 'historical'
+  templateType = 'modern' // Default to modern, but should be overridden by parent
 }: CertificateTemplateProps) => {
+  
+  console.log('📋 [CertificateTemplate] Rendering with template type:', templateType);
+  console.log('📋 [CertificateTemplate] Extracted data:', extractedData);
   
   if (templateType === 'modern') {
     return (
