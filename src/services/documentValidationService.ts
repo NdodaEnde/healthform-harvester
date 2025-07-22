@@ -54,6 +54,7 @@ export const saveValidatedData = async (
       .from('documents')
       .update({
         extracted_data: updatedExtractedData,
+        validation_status: 'validated',
         validated_by: (await supabase.auth.getUser()).data.user?.id,
         updated_at: new Date().toISOString()
       })

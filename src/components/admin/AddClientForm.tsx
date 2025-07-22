@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -47,15 +48,15 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSuccess, onCancel }) =>
       }
 
       console.log('Creating client organization with data:', {
-        organization_name: data.name,
-        contact_email: data.contact_email || null,
+        org_name: data.name,
+        org_email: data.contact_email || null,
         service_provider_id: currentOrganization.id
       });
 
-      // Use the RPC function to create client organization with CORRECT parameter names
+      // Use the RPC function to create client organization
       const { data: result, error } = await supabase.rpc('create_client_organization', {
-        organization_name: data.name,  // Changed from org_name to organization_name
-        contact_email: data.contact_email || null,  // Changed from org_email to contact_email
+        org_name: data.name,
+        org_email: data.contact_email || null,
         service_provider_id: currentOrganization.id
       });
 

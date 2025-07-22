@@ -95,9 +95,8 @@ export default function OrganizationForm({ organization, isEdit = false }: Organ
           const { data: newClientId, error } = await supabase.rpc(
             "create_client_organization",
             {
-              organization_name: name.trim(),
-              contact_email: contactEmail?.trim() || null,
-              service_provider_id: currentOrganization.id
+              org_name: name.trim(),
+              org_email: contactEmail?.trim() || null
             }
           );
             
