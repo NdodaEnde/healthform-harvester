@@ -28,6 +28,7 @@ import LoadingFallback from "@/components/LoadingFallback";
 import { Suspense } from "react";
 
 import { AuthProvider } from "@/contexts/AuthContext";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PackageProvider } from "@/contexts/PackageContext";
 
 const queryClient = new QueryClient();
@@ -37,7 +38,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <AuthProvider>
-          <PackageProvider>
+          <OrganizationProvider>
+            <PackageProvider>
             <TooltipProvider>
               <Router>
                 <div className="min-h-screen bg-background">
@@ -123,7 +125,8 @@ function App() {
                 </div>
               </Router>
             </TooltipProvider>
-          </PackageProvider>
+            </PackageProvider>
+          </OrganizationProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
