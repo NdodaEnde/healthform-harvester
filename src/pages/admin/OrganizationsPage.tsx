@@ -28,7 +28,7 @@ export default function OrganizationsPage() {
           </Button>
         </div>
 
-        <OrganizationList />
+        <OrganizationList organizations={[]} />
       </div>
     </DashboardLayout>
   );

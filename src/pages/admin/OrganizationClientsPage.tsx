@@ -28,7 +28,7 @@ export default function OrganizationClientsPage() {
           </Button>
         </div>
 
-        <ClientRelationshipTable organizationId={organizationId} />
+        <ClientRelationshipTable serviceProviderId={organizationId} />
       </div>
     </DashboardLayout>
   );

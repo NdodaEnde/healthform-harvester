@@ -28,7 +28,7 @@ export default function OrganizationUsersPage() {
           </Button>
         </div>
 
-        <UserManagementList organizationId={organizationId} />
+        <UserManagementList users={[]} organizationId={organizationId || ""} />
       </div>
     </DashboardLayout>
   );
