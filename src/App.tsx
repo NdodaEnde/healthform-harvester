@@ -39,6 +39,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <TooltipProvider>
+          <Toaster />
           <AuthProvider>
             <OrganizationProvider>
               <PackageProvider>
@@ -135,7 +136,6 @@ function App() {
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
-      <Toaster />
     </QueryClientProvider>
   );
 }
