@@ -36,93 +36,107 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-background">
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/accept-invite" element={<AcceptInvitePage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/update-password" element={<UpdatePasswordPage />} />
-          <Route path="/first-time-setup" element={<FirstTimeSetupPage />} />
-          <Route path="/tier-testing" element={<TierTestingPage />} />
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <TooltipProvider>
+          <AuthProvider>
+            <OrganizationProvider>
+              <PackageProvider>
+                <Router>
+                  <div className="min-h-screen bg-background">
+                    <Suspense fallback={<LoadingFallback />}>
+                      <Routes>
+                        <Route path="/" element={<Index />} />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/auth/callback" element={<AuthCallback />} />
+                        <Route path="/accept-invite" element={<AcceptInvitePage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        <Route path="/update-password" element={<UpdatePasswordPage />} />
+                        <Route path="/first-time-setup" element={<FirstTimeSetupPage />} />
+                        <Route path="/tier-testing" element={<TierTestingPage />} />
 
-          <Route path="/dashboard" element={
-            <OrganizationProtectedRoute>
-              <Dashboard />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/dashboard" element={
+                          <OrganizationProtectedRoute>
+                            <Dashboard />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/patients" element={
-            <OrganizationProtectedRoute>
-              <PatientsPage />
-            </OrganizationProtectedRoute>
-          } />
-          <Route path="/patients/:patientId" element={
-            <OrganizationProtectedRoute>
-              <PatientDetailPage />
-            </OrganizationProtectedRoute>
-          } />
-          <Route path="/patients/:patientId/edit" element={
-            <OrganizationProtectedRoute>
-              <PatientEditPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/patients" element={
+                          <OrganizationProtectedRoute>
+                            <PatientsPage />
+                          </OrganizationProtectedRoute>
+                        } />
+                        <Route path="/patients/:patientId" element={
+                          <OrganizationProtectedRoute>
+                            <PatientDetailPage />
+                          </OrganizationProtectedRoute>
+                        } />
+                        <Route path="/patients/:patientId/edit" element={
+                          <OrganizationProtectedRoute>
+                            <PatientEditPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/patient-records" element={
-            <OrganizationProtectedRoute>
-              <PatientRecordsPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/patient-records" element={
+                          <OrganizationProtectedRoute>
+                            <PatientRecordsPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/documents" element={
-            <OrganizationProtectedRoute>
-              <DocumentsPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/documents" element={
+                          <OrganizationProtectedRoute>
+                            <DocumentsPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          {/* NEW: Document Analytics Route */}
-          <Route path="/documents/analytics" element={
-            <OrganizationProtectedRoute>
-              <DocumentAnalyticsPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/documents/analytics" element={
+                          <OrganizationProtectedRoute>
+                            <DocumentAnalyticsPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/document-viewer/:documentId" element={
-            <OrganizationProtectedRoute>
-              <DocumentViewer />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/document-viewer/:documentId" element={
+                          <OrganizationProtectedRoute>
+                            <DocumentViewer />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/analytics" element={
-            <OrganizationProtectedRoute>
-              <AnalyticsPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/analytics" element={
+                          <OrganizationProtectedRoute>
+                            <AnalyticsPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/reports" element={
-            <OrganizationProtectedRoute>
-              <ReportsPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/reports" element={
+                          <OrganizationProtectedRoute>
+                            <ReportsPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/organizations" element={
-            <OrganizationProtectedRoute>
-              <OrganizationsListPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/organizations" element={
+                          <OrganizationProtectedRoute>
+                            <OrganizationsListPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="/settings" element={
-            <OrganizationProtectedRoute>
-              <SettingsPage />
-            </OrganizationProtectedRoute>
-          } />
+                        <Route path="/settings" element={
+                          <OrganizationProtectedRoute>
+                            <SettingsPage />
+                          </OrganizationProtectedRoute>
+                        } />
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </Router>
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </div>
+                </Router>
+              </PackageProvider>
+            </OrganizationProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+      <Toaster />
+    </QueryClientProvider>
   );
 }
 
