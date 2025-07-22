@@ -1,282 +1,205 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
-import { AuthProvider } from '@/contexts/AuthContext';
-import { OrganizationProvider } from '@/contexts/OrganizationContext';
-import { PackageProvider } from '@/contexts/PackageContext';
-import OrganizationProtectedRoute from '@/components/OrganizationProtectedRoute';
-import DashboardLayout from '@/components/DashboardLayout';
-import HeaderComponent from '@/components/HeaderComponent';
-import Index from '@/pages/Index';
-import Dashboard from '@/pages/Dashboard';
-import AnalyticsPage from './pages/analytics/AnalyticsPage';
-import ClinicalAnalyticsPage from './pages/analytics/ClinicalAnalyticsPage';
-import IntegratedOccupationalHealthPage from './pages/analytics/IntegratedOccupationalHealthPage';
-import ReportsPage from './pages/ReportsPage';
-import CertificateTemplatesPage from './pages/certificates/CertificateTemplatesPage';
-import CertificatesPage from './pages/certificates/CertificatesPage';
-import EmployeesPage from './pages/employees/EmployeesPage';
-import OnboardingPage from './pages/onboarding/OnboardingPage';
-import TierTestingPage from './pages/TierTestingPage';
-import Auth from './pages/Auth';
-import PatientsPage from './pages/PatientsPage';
-import PatientDetailPage from './pages/PatientDetailPage';
-import DocumentsPage from './pages/DocumentsPage';
-import DocumentViewer from './pages/DocumentViewer';
-import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
-import FirstTimeSetupPage from './pages/FirstTimeSetupPage';
-import AcceptInvitePage from './pages/AcceptInvitePage';
-import AuthCallback from './pages/AuthCallback';
-import { OrganizationsPage, CreateOrganizationPage, EditOrganizationPage, OrganizationUsersPage, OrganizationClientsPage } from './pages/admin';
+import Index from "@/pages/Index";
+import Auth from "@/pages/Auth";
+import Dashboard from "@/pages/Dashboard";
+import PatientsPage from "@/pages/PatientsPage";
+import PatientDetailPage from "@/pages/PatientDetailPage";
+import PatientEditPage from "@/pages/PatientEditPage";
+import DocumentsPage from "@/pages/DocumentsPage";
+import DocumentAnalyticsPage from "@/pages/documents/DocumentAnalyticsPage";
+import DocumentViewer from "@/pages/DocumentViewer";
+import AnalyticsPage from "@/pages/analytics/AnalyticsPage";
+import PatientRecordsPage from "@/pages/PatientRecordsPage";
+import ReportsPage from "@/pages/ReportsPage";
+import AuthCallback from "@/pages/AuthCallback";
+import AcceptInvitePage from "@/pages/AcceptInvitePage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
+import FirstTimeSetupPage from "@/pages/FirstTimeSetupPage";
+import OrganizationsListPage from "@/pages/OrganizationsListPage";
+import NotFound from "@/pages/NotFound";
+import TierTestingPage from "@/pages/TierTestingPage";
+import OrganizationProtectedRoute from "@/components/OrganizationProtectedRoute";
+import LoadingFallback from "@/components/LoadingFallback";
+import { Suspense } from "react";
+
+import { AuthProvider } from "@/contexts/AuthContext";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { PackageProvider } from "@/contexts/PackageContext";
+import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminOrganizationsPage from "@/pages/admin/AdminOrganizationsPage";
+import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
+import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
+import AdminTasksPage from "@/pages/admin/AdminTasksPage";
+import { TaskProvider } from "@/contexts/TaskContext";
+import { WorkQueuePage } from "@/pages/WorkQueuePage";
+import { DocumentProvider } from "@/contexts/DocumentContext";
+import { CertificateCompliancePage } from "@/pages/CertificateCompliancePage";
+import { BillingProvider } from "@/contexts/BillingContext";
+import { BillingPage } from "@/pages/BillingPage";
+import { SettingsPage } from "@/pages/SettingsPage";
+import { ProfilePage } from "@/pages/ProfilePage";
+import { TaskTemplatesPage } from "@/pages/TaskTemplatesPage";
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-        <AuthProvider>
-          <OrganizationProvider>
-            <PackageProvider>
-              <Router>
-                <div className="min-h-screen bg-background">
-                  <Routes>
-                    {/* Public routes */}
-                    <Route path="/" element={
-                      <>
-                        <HeaderComponent />
-                        <Index />
-                      </>
-                    } />
-                    <Route path="/auth" element={
-                      <>
-                        <HeaderComponent />
-                        <Auth />
-                      </>
-                    } />
-                    {/* Missing public routes */}
-                    <Route path="/accept-invite" element={<AcceptInvitePage />} />
-                    <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/callback" element={<AuthCallback />} />
-                    <Route path="/setup" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <FirstTimeSetupPage />
-                      </OrganizationProtectedRoute>
-                    } />
-                    
-                    {/* All dashboard routes are now protected */}
-                    <Route path="/dashboard" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <Dashboard />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/analytics" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <AnalyticsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/clinical-analytics" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <ClinicalAnalyticsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/integrated-occupational-health" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <IntegratedOccupationalHealthPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/patients" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <PatientsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/patients/:id" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <PatientDetailPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/patients/:id/edit" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <PatientDetailPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/patients/new" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <PatientsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/documents" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <DocumentsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/documents/:id" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <DocumentViewer />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/reports" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <ReportsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/settings" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OrganizationSettingsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/settings/organization" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OrganizationSettingsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/certificates" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <CertificatesPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/certificates/templates" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <CertificateTemplatesPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/employees" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <EmployeesPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/onboarding" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OnboardingPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/tier-testing" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <TierTestingPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/testing" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <TierTestingPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/admin/organizations" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OrganizationsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/admin/organizations/new" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <CreateOrganizationPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/admin/organizations/:id/edit" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <EditOrganizationPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/admin/organizations/:orgId/clients" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OrganizationClientsPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/admin/organizations/:id/users" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OrganizationUsersPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                    <Route path="/admin/users" element={
-                      <OrganizationProtectedRoute>
-                        <HeaderComponent />
-                        <DashboardLayout>
-                          <OrganizationUsersPage />
-                        </DashboardLayout>
-                      </OrganizationProtectedRoute>
-                    } />
-                  </Routes>
-                  <Toaster />
-                </div>
-              </Router>
-            </PackageProvider>
-          </OrganizationProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <Router>
+      <div className="min-h-screen bg-background">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/update-password" element={<UpdatePasswordPage />} />
+          <Route path="/first-time-setup" element={<FirstTimeSetupPage />} />
+          <Route path="/tier-testing" element={<TierTestingPage />} />
+
+          <Route path="/dashboard" element={
+            <OrganizationProtectedRoute>
+              <Dashboard />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/patients" element={
+            <OrganizationProtectedRoute>
+              <PatientsPage />
+            </OrganizationProtectedRoute>
+          } />
+          <Route path="/patients/:patientId" element={
+            <OrganizationProtectedRoute>
+              <PatientDetailPage />
+            </OrganizationProtectedRoute>
+          } />
+          <Route path="/patients/:patientId/edit" element={
+            <OrganizationProtectedRoute>
+              <PatientEditPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/patient-records" element={
+            <OrganizationProtectedRoute>
+              <PatientRecordsPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/documents" element={
+            <OrganizationProtectedRoute>
+              <DocumentsPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          {/* NEW: Document Analytics Route */}
+          <Route path="/documents/analytics" element={
+            <OrganizationProtectedRoute>
+              <DocumentAnalyticsPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/document-viewer/:documentId" element={
+            <OrganizationProtectedRoute>
+              <DocumentViewer />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/analytics" element={
+            <OrganizationProtectedRoute>
+              <AnalyticsPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/reports" element={
+            <OrganizationProtectedRoute>
+              <ReportsPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/organizations" element={
+            <OrganizationProtectedRoute>
+              <OrganizationsListPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/work-queue" element={
+            <OrganizationProtectedRoute>
+              <WorkQueuePage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/certificate-compliance" element={
+            <OrganizationProtectedRoute>
+              <CertificateCompliancePage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/billing" element={
+            <OrganizationProtectedRoute>
+              <BillingPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/settings" element={
+            <OrganizationProtectedRoute>
+              <SettingsPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/profile" element={
+            <OrganizationProtectedRoute>
+              <ProfilePage />
+            </OrganizationProtectedRoute>
+          } />
+
+          <Route path="/task-templates" element={
+            <OrganizationProtectedRoute>
+              <TaskTemplatesPage />
+            </OrganizationProtectedRoute>
+          } />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <AdminProtectedRoute>
+              <AdminUsersPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/organizations" element={
+            <AdminProtectedRoute>
+              <AdminOrganizationsPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/documents" element={
+            <AdminProtectedRoute>
+              <AdminDocumentsPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <AdminProtectedRoute>
+              <AdminSettingsPage />
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/tasks" element={
+            <AdminProtectedRoute>
+              <AdminTasksPage />
+            </AdminProtectedRoute>
+          } />
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
